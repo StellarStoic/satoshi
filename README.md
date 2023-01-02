@@ -1,0 +1,1 @@
+satoshi.si Nip05 Identifier registrar in the making
