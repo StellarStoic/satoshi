@@ -238,6 +238,27 @@ footer,p {
 	text-align: center;
 	color: hsla(42, 100%, 47%, 0.13) ;
 	left: 50%;
-	bottom: 3%;
+	bottom: 6%;
 	transform: translate(-50%, 50%);
+}
+
+.hover-text {
+	display: none;
 	}
+.element:hover .hover-text {
+	position:relative;
+	display:block;
+	margin-top: 10px;
+	text-align: center;
+	text-align-last:center;
+	}
+
+.element:hover .hover-text i{
+	color: hsla(42, 100%, 47%, 0.356);
+	font-size: 1.8em;
+	margin-inline: 5px;
+	
+}
+.element:hover .hover-text a :hover{
+	color: hsl(42, 100%, 47%);
+}
