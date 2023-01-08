@@ -230,3 +230,14 @@ label{
 		align-items: center;
 	}
 }
+
+/* footer */
+
+footer,p {
+	position: absolute;
+	text-align: center;
+	color: hsla(42, 100%, 47%, 0.13) ;
+	left: 50%;
+	bottom: 3%;
+	transform: translate(-50%, 50%);
+	}
