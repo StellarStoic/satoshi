@@ -90,3 +90,8 @@ function animate() {
 
 // Start the animation.
 animate();
+
+setTimeout(function() {
+	window.location.replace("quotes.html");
+  }, 30000); // This will redirect the user to example.com after 5 seconds (5000 milliseconds)
+  
