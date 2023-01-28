@@ -92,6 +92,6 @@ function animate() {
 animate();
 
 setTimeout(function() {
-	window.location.replace("quotes.html");
+	window.location.replace("https://satoshi.si/quotes.html");
   }, 30000); // This will redirect the user to example.com after 5 seconds (5000 milliseconds)
   
