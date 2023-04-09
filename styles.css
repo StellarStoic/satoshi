@@ -185,6 +185,7 @@ p, #text {
 	line-height: 15px;
 }
 #quotes{
+	display: block;
 	position: absolute;
     top: 50%;
     left: 50%;
@@ -193,8 +194,8 @@ p, #text {
     max-width: 500px;
     text-align: center;
 	font-size: 1rem;
-}
 
+}
 
 /* copy text on clipboard */
 
