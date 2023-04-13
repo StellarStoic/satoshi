@@ -146,6 +146,12 @@ li a:focus {
 	color: #fff;
 }
 
+.ico{
+	margin-bottom:40px;
+	width: 2.5rem;
+	height: 2.5rem;
+}
+
 
 /* footer */
 
@@ -154,7 +160,7 @@ li a:focus {
 	text-align: center;
 	color: hsla(42, 100%, 47%, 0.13) ;
 	left: 50%;
-	bottom: 6%;
+	bottom: 10%;
 	transform: translate(-50%, 50%);
 }
 
@@ -193,7 +199,7 @@ p, #text {
     width: 80%;
     max-width: 500px;
     text-align: center;
-	font-size: 1rem;
+	font-size: 1.1rem;
 
 }
 
