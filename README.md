@@ -1,1 +1,1 @@
-satoshi.si Nip05 Identifier registrar in the making
+Yet another satoshi website [satoshi.si](https://satoshi.si)
