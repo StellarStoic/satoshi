@@ -96,5 +96,5 @@ animate();
 
 setTimeout(function() {
 	window.location.replace("https://satoshi.si/quotes.html");
-  }, 30000); // This will redirect the user to example.com after 30 seconds (30000 milliseconds)
+  }, 60000); // This will redirect the user to example.com after 60 seconds (60000 milliseconds)
   
