@@ -13,6 +13,9 @@ const texts = [
 	"are",
 	"all",
 	"Satoshi",
+	"except",
+	"Craig",
+	"Wright",
 ];
 
 // Controls the speed of morphing.
