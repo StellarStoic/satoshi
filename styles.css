@@ -231,4 +231,14 @@ p, #text {
 
 }
 
+/* Mobile styles */
+@media only screen and (max-width: 600px) {
+	#quotes {
+		font-size: 0.7em;
+	}
 
+	.element {
+		font-size: 0.7em;
+	}
+
+}
