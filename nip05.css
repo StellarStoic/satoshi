@@ -1,0 +1,157 @@
+/* nip05.css */
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;1,300&display=swap');
+
+/* Style for the image container */
+.image-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px;
+}
+
+/* Style for each image box */
+.image-box {
+    position: relative;
+    width: 200px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.image-box:hover {
+    transform: scale(1.05);
+}
+
+/* Style for the images */
+.image-box img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Style for the price */
+.price {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+/* Style for the description */
+.description {
+    display: none;
+
+    /* padding: 10px;
+    background-color: rgb(34, 33, 33);
+    width: 100%;
+    box-sizing: border-box;
+    transition: max-height 0.3s ease;
+    max-height: 0;
+    overflow: hidden;
+    font-family: "Roboto Mono", monospace;
+	font-optical-sizing: auto;
+	font-weight: 300;
+	font-style: normal; */
+
+}
+
+.description.active {
+    display: block;
+    
+    max-height: 500px; /* Adjust as necessary */
+}
+
+/* Blur background when description modal is active */
+body.modal-active {
+    overflow: hidden;
+}
+
+.modal-active .image-container {
+    filter: blur(5px);
+    pointer-events: none; /* Prevent interactions with blurred background */
+}
+
+/* Description modal styling */
+.description-modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    word-break: keep-all; /* Prevents breaking words unless necessary */
+    overflow-wrap: break-word; /* Allows long words to break if they exceed the container width */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 500px;
+    background-color: rgb(34, 33, 33);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000; /* Higher than the rest */
+}
+
+.description-modal.active {
+    display: block; /* Show modal when active */
+}
+
+.modal-overlay {
+    display: none; /* Hidden by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent overlay */
+    z-index: 999; /* Below the modal but above the content */
+}
+
+.modal-overlay.active {
+    display: block; /* Show overlay when active */
+}
+
+/* Close icon for modal */
+.close-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 20px;
+    color: #333;
+    background: none;
+    border: none;
+    font-weight: bold;
+    z-index: 1001; /* Higher than the modal content */
+}
+
+/* Hover effect for close icon */
+.close-icon:hover {
+    color: hsla(42, 100%, 47%, 0.13);
+}
+
+.button-container {
+    display: flex; /* Use flexbox for centering */
+    justify-content: center; /* Center the button horizontally */
+    margin-top: 20px; /* Add space above the button */
+}
+
+.contact-button {
+    display: inline-block; /* Allows width and height to be set */
+    padding: 7px 8px; /* Adds padding for button-like appearance */
+    font-size: 20px; /* Increases font size */
+    color: #b5a1c0; /* Text color */
+    background-color: hsla(42, 100%, 47%, 0.13); /* Button background color */
+    text-decoration: none; /* Removes underline from the link */
+    border-radius: 5px; /* Rounds the corners */
+    transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+}
+
+.contact-button:hover {
+    background-color: #69427e; /* Changes color on hover */
+    cursor: pointer; /* Changes cursor to pointer on hover */
+}

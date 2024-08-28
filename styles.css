@@ -57,6 +57,7 @@ body {
 	width: 28px;
 	height: 30px;
 	margin: 30px auto 10px;
+	z-index: 2000; /* Increase z-index to be on top of all content */
 	}
 
 #toggle span:after,
@@ -121,6 +122,7 @@ body {
 	opacity: 0;
 	visibility: hidden;
 	transition: opacity .4s;
+	z-index: 2000; /* Increase z-index to be on top of all content */
 	}
 #menu:after {
 	position: absolute;
@@ -131,6 +133,7 @@ body {
 	border-left: 10px solid transparent;
 	border-right: 10px solid transparent;
 	border-bottom: 15px solid rgb(59, 52, 30);
+	z-index: 2000; /* Increase z-index to be on top of all content */
 	}
 ul, li, li a {
 	list-style: none;
