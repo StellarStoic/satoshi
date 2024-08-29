@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="whitepaper.css">
+    <link href="https://cdn.lineicons.com/3.0/lineicons.css" rel="stylesheet">
+    <title>Bitcoin Whitepapers</title>
+</head>
+<body class="fixed-layout">
+
+    <!-- Burger menu -->
+    <a href="#menu" id="toggle"><span></span></a>
+
+    <div id="menu">
+        <ul>
+            <li><a href="index.html">home</a></li>
+            <li><a href="quotes.html">Quotes</a></li>
+            <li><a href="nip05.html">NIP-05</a></li>
+        </ul> 
+    </div> 
+
+    <!-- Main content area -->
+    <div class="container">
+        <div class="content">
+            <div class="description">
+                <h4 id="text">Bitcoin white paper /'s</h4>
+                <div class="image-container" id="whitepapers-container">
+                    <!-- Dynamic content will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for upload instructions -->
+        <div id="uploadModal" class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="closeModal()">&times;</span>
+                <h2>Instructions for Uploading Your Translated Bitcoin Whitepaper</h2>
+                <p>To upload your translated whitepaper, please follow these steps:</p>
+                <ul id="instructions-modal">
+                    <li>Ensure your translation is accurate and complete, and save it in PDF format.</li>
+                    <br>
+                    <li>Fork this repository on GitHub: 
+                        <a href="https://github.com/StellarStoic/satoshi" target="_blank">https://github.com/StellarStoic/satoshi</a>
+                    </li>
+                    <br>
+                    <li>Scan the PDF file with VirusTotal to ensure it is safe. Once confirmed, copy the relevant data into the `whitepaper/whitepapers.json` file.</li>
+                    <br>
+                    <li>Update the <code>whitepapers.json</code> file:
+                        <ul>
+                            <li>Open the <code>whitepaper</code> folder.</li>
+                            <li>Add or update entries as necessary.</li>
+                        </ul>
+                    </li>
+                    <br>
+                    <li>Name your PDF file in the format: <code>bitcoin_{lower cased ISO_alpha-2_country_code}.pdf</code> (e.g., <code>bitcoin_sl.pdf</code>).</li>
+                    <br>
+                    <li>Include your PDF file in the appropriate folder named after the ISO alpha-2 country code representing the language's country (e.g., <code>LT</code> for Lithuania).</li>
+                    <br>
+                    <li>Find ISO alpha-2 country codes online if you're unsure about the correct code.</li>
+                    <br>
+                    <li>Once you've made your changes, submit a pull request to merge your updates into the main repository.</li>
+                </ul>
+                <p>Thank you for contributing to the Bitcoin community!</p>
+            </div>
+        </div>
+
+        <!-- Modal for file information (VirusTotal links, hashes, etc.) -->
+        <div id="infoModal" class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="closeInfoModal()">&times;</span>
+                <!-- Content will be dynamically injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="quotes.js"></script>
+    <script src="script.js"></script>
+    <script src="burgerMenu.js"></script>
+    <script src="whitepaper.js"></script>
+</body>
+</html>
+
+

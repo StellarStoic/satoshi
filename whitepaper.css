@@ -1,0 +1,235 @@
+/* Main styles for fixed layout */
+body.fixed-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden; /* Prevent horizontal scrolling */
+}
+
+/* Add this to blur background when modal is open */
+body.modal-open {
+    overflow: hidden; /* Prevent scrolling */
+}
+
+/* Make the container flex to occupy space between fixed header and footer */
+.container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Ensure content area is scrollable within its container */
+.content {
+    overflow-y: auto;
+    flex-grow: 1;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Ensure no horizontal scrolling */
+html, body {
+    overflow-x: hidden;
+}
+
+h4 {
+    font-size: 1.5em;
+    margin-top: 3%;
+    text-align: center;
+    padding-bottom: 20px;
+}
+
+/* Burger menu */
+#toggle {
+    position: fixed; /* Fixed position */
+    top: 1rem;
+    left: 1.5rem;
+    display: block;
+    width: 28px;
+    height: 30px;
+    margin: 30px auto 10px;
+    z-index: 2000; /* High z-index to be on top of all content */
+}
+
+#menu {
+    position: fixed; /* Fixed position */
+    top: 4.9rem;
+    left: 1.3rem;
+    color: #333131;
+    width: 200px;
+    padding: 10px;
+    margin: auto;
+    font-family: "Roboto Mono", monospace;
+    font-optical-sizing: auto;
+    font-weight: 300;
+    font-style: normal;
+    text-align: center;
+    border-radius: 4px;
+    background: rgb(34, 33, 33);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .4s;
+    z-index: 2000; /* High z-index to be on top of all content */
+}
+
+/* Style for the image container */
+.image-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin: 20px;
+    align-items: start;
+    position: relative; /* Ensure container remains positioned */
+    z-index: 1; /* Ensure this layer is below expanded translator info */
+}
+
+.image-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 150px;
+    cursor: pointer;
+    text-align: center;
+    position: relative;
+    z-index: 10; /* Default positioning */
+}
+
+.image-box {
+    width: 100%;
+    height: 90px;
+    overflow: hidden;
+    position: relative;
+}
+
+.image-box img {
+    width: 70%;
+    height: auto;
+    object-fit: cover;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.image-box:hover img {
+    opacity: 1;
+}
+
+/* Language text styling */
+.lang-name {
+    text-align: center;
+    width: 75%;
+    height: auto;
+    font-size: 0.8em;
+    position: relative;
+    word-break:break-all;
+    color: white;
+    background: #313131e6;
+    padding: 0px 5px 0px 5px;
+    z-index: 10; /* Normal stacking order */
+    box-sizing: border-box; /* Ensure padding and border are included in width */
+}
+
+.translator-info {
+    display: none;
+    font-size: 1em;
+    color: #cebb8fab;
+    position: absolute; /* Position absolute to expand over lower items */
+    top: 100%; /* Start right below the lang-name */
+    left: 0;
+    width: 100%; /* Make it the same width as lang-name */
+    background: #272727fa;
+    padding: 5px; /* Same padding as lang-name */
+    z-index: 100; /* Ensure it is above other items */
+    pointer-events: auto; /* Allows interaction with the expanded info */
+    box-sizing: border-box; /* Ensure padding and border are included in width */
+}
+
+/* Reset styles for links inside translator-info */
+.translator-info a {
+    color: inherit; /* Inherit the color from the parent */
+    text-decoration: none; /* Remove underline */
+    font-size: inherit; /* Inherit font size */
+    font-weight: normal; /* Reset to normal weight */
+    background: none; /* Remove any background */
+    padding: 0; /* Remove any padding */
+    margin: 0; /* Remove any margin */
+    cursor: default; /* Change cursor to default */
+}
+
+/* Styles for modals */
+.description-modal, #uploadModal, #infoModal{
+    display: none;
+    position: fixed;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 500px;
+    background-color: rgb(34, 33, 33);
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000; /* Ensure modal is above everything */
+    justify-content: center; /* Center modal content */
+    align-items: center; /* Align content vertically */
+
+}
+
+/* Apply responsive styles to modal content */
+.modal-content {
+    max-width: 100%; /* Ensure content does not exceed modal width */
+    word-break: break-word; /* Break long words */
+    overflow-wrap: break-word; /* Break words at appropriate points */
+    width: 100%;
+    box-sizing: border-box; /* Include padding and borders in width calculation */
+}
+
+.description-modal.active, #uploadModal.active, #infoModal.active {
+    display: flex; /* Use flex to center content */
+}
+
+.description-modal a {
+    color: #f9af02d5; /* Brighter color for better visibility */
+    text-decoration: underline; /* Optional: Underline to indicate a link */
+}
+
+.description-modal a:hover {
+    color: #fff; /* Even brighter on hover for emphasis */
+}
+
+.close-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 20px;
+    color: #fff;
+    background: none;
+    border: none;
+    font-weight: bold;
+    z-index: 1001;
+}
+
+.close-icon:hover {
+    color: hsla(42, 100%, 47%, 0.13);
+}
+
+/* Style for the upload image to make it circular */
+.custom-size-image {
+    width: 100%; /* Ensure it fits within its container */
+    height: auto; /* Maintain aspect ratio */
+    border-radius: 50%; /* Make the image circular */
+    object-fit: cover; /* Ensure the image covers the circle area */
+}
+
+#instructions-modal li {
+    color: #cebb8fab;
+
+}
+

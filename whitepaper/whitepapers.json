@@ -1,0 +1,1150 @@
+[
+    {
+      "index": 1,
+      "country": "world",
+      "language": {
+        "en": "English",
+        "native": "English",
+        "alpha-2": "GB"
+      },
+      "translators": {
+        "note": "This is the original Bitcoin white paper intruduced by:",
+        "translator": [
+          {
+            "t_name": "Satoshi Nakamoto",
+            "t_link": "https://en.wikipedia.org/wiki/Satoshi_Nakamoto"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "b1674191a88ec5cdd733e4240a81803105dc412d6c6708d53ab94fc248f4f553",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/b1674191a88ec5cdd733e4240a81803105dc412d6c6708d53ab94fc248f4f553",
+        "path": "whitepaper/EN/bitcoin.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 2,
+      "country": "Slovenia",
+      "language": {
+        "en": "Slovenian",
+        "native": "Slovenščina",
+        "alpha-2": "SI"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Bitcoin association Slovenia",
+            "t_link": "https://bitcoin.si"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "5307956daa27cdc72d5ce58c2c9e0910b20bd6cd4d8e9bed34021d3779530889",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/5307956daa27cdc72d5ce58c2c9e0910b20bd6cd4d8e9bed34021d3779530889",
+        "path": "whitepaper/SI/bitcoin_sl.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 3,
+      "country": "Armenia",
+      "language": {
+        "en": "Armenian",
+        "native": "Հայերեն",
+        "alpha-2": "AM"
+      },
+      "translators": {
+        "note": "translated by Diana Sisakian, sponsored by",
+        "translator": [
+          {
+            "t_name": "ClearTalks",
+            "t_link": "https://cleartalks.com/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "ae28f98f5575de267d765366f62dd88b69f00bb8619851c575ae3ef81f502660",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/ae28f98f5575de267d765366f62dd88b69f00bb8619851c575ae3ef81f502660",
+        "path": "whitepaper/AM/bitcoin_am.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 4,
+      "country": "Indonesia",
+      "language": {
+        "en": "Indonesian",
+        "native": "Bahasa Indonesia",
+        "alpha-2": "ID"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Christopher Tahir",
+            "t_link": "https://github.com/christahir"
+          },
+          {
+            "t_name": "Gregorius Airlangga",
+            "t_link": ""
+          },
+          {
+            "t_name": "K Hendrawan",
+            "t_link": "https://github.com/khendraw"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "037cf7d43741e5b2e9c757b3cdbde775cb6f29df947d3d89600bbf1991324341",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/037cf7d43741e5b2e9c757b3cdbde775cb6f29df947d3d89600bbf1991324341",
+        "path": "whitepaper/ID/bitcoin_id.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 5,
+      "country": "Czech Republic",
+      "language": {
+        "en": "Czech",
+        "native": "Čeština",
+        "alpha-2": "CZ"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "braiins.com",
+            "t_link": "https://braiins.com/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "77a12fd8583bf35a81441b16d3ffa7a4705d37bb4421218092810ab7bf6c192d",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/77a12fd8583bf35a81441b16d3ffa7a4705d37bb4421218092810ab7bf6c192d",
+        "path": "whitepaper/CZ/bitcoin_cz.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 6,
+      "country": "Germany",
+      "language": {
+        "en": "German",
+        "native": "Deutsch",
+        "alpha-2": "DE"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Daniel Deckner",
+            "t_link": ""
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "45b075187363f72e0fdaed67f6494e00bd27517bc53a10fc9242f68bf9eb4fae",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/45b075187363f72e0fdaed67f6494e00bd27517bc53a10fc9242f68bf9eb4fae",
+        "path": "whitepaper/DE/bitcoin_de.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 7,
+      "country": "Spain",
+      "language": {
+        "en": "Spanish",
+        "native": "Español",
+        "alpha-2": "ES"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Breathingdog",
+            "t_link": "https://github.com/breathingdog"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "9956fcc0adaece85a350276f5c3c0330e7196883a9a65f23407cce91a87cea2f",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/9956fcc0adaece85a350276f5c3c0330e7196883a9a65f23407cce91a87cea2f",
+        "path": "whitepaper/ES/bitcoin_es.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 8,
+      "country": "France",
+      "language": {
+        "en": "French",
+        "native": "Français",
+        "alpha-2": "FR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Arnaud-François Fausse",
+            "t_link": "https://github.com/Arnaud-Francois-Fausse"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "7d26444ddd380ef844f2d77e1c41fadd55b8cd67d71867d78ddcfa728b9beb07",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/7d26444ddd380ef844f2d77e1c41fadd55b8cd67d71867d78ddcfa728b9beb07",
+        "path": "whitepaper/FR/bitcoin_fr.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 9,
+      "country": "Italy",
+      "language": {
+        "en": "Italian",
+        "native": "Italiano",
+        "alpha-2": "IT"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Terzim",
+            "t_link": "https://github.com/terzim"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "ea7c698602ae5eacf8f0c7d18048a107438b00b72c27335c8bba2b1a114a8343",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/ea7c698602ae5eacf8f0c7d18048a107438b00b72c27335c8bba2b1a114a8343",
+        "path": "whitepaper/IT/bitcoin_it.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 10,
+      "country": "Lithuania",
+      "language": {
+        "en": "Lithuanian",
+        "native": "Lietuvių kalba",
+        "alpha-2": "LT"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Domas Dranginis",
+            "t_link": "https://github.com/DDomas"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "eb53ccd247ffa6001a05fc30ab1b18d00d23e85de17ae3f869237e474e81fc3a",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/eb53ccd247ffa6001a05fc30ab1b18d00d23e85de17ae3f869237e474e81fc3a",
+        "path": "whitepaper/LT/bitcoin_lt.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 11,
+      "country": "Hungary",
+      "language": {
+        "en": "Hungarian",
+        "native": "Magyar",
+        "alpha-2": "HU"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Balaxi",
+            "t_link": "https://github.com/Balaxi"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "200ca671cc17e1f75f1eafb465eea784c60156a43b59a313835bf4dbe104bf09",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/200ca671cc17e1f75f1eafb465eea784c60156a43b59a313835bf4dbe104bf09",
+        "path": "whitepaper/HU/bitcoin_hu.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 12,
+      "country": "India",
+      "language": {
+        "en": "Marathi",
+        "native": "मराठी",
+        "alpha-2": "IN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Shivaji Ambedkar",
+            "t_link": "https://github.com/shivajiambedkar"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "a4c940500208206f5ce8aa001089864e0c5e6ff75af0d07730e24b6944f7f726",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/a4c940500208206f5ce8aa001089864e0c5e6ff75af0d07730e24b6944f7f726",
+        "path": "whitepaper/IN/bitcoin_mr.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 13,
+      "country": "Netherlands",
+      "language": {
+        "en": "Dutch",
+        "native": "Nederlands",
+        "alpha-2": "NL"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "GiftBitNL",
+            "t_link": "https://github.com/Giftbitnl"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "12f8f5e48bfd3088332eeb560bf619a1c0d09f083f9550de140fe060de85cbc6",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/12f8f5e48bfd3088332eeb560bf619a1c0d09f083f9550de140fe060de85cbc6",
+        "path": "whitepaper/NL/bitcoin_nl.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 14,
+      "country": "Norway",
+      "language": {
+        "en": "Norwegian (Bokmål)",
+        "native": " Norsk (Bokmål)",
+        "alpha-2": "NO"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Kryptografen.no",
+            "t_link": "https://kryptografen.no/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "fc5e892ad12d9bcea05d4164b52eb013cdbf48ea7ce943e2fcd174d75f2fd5de",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/fc5e892ad12d9bcea05d4164b52eb013cdbf48ea7ce943e2fcd174d75f2fd5de",
+        "path": "whitepaper/NO/bitcoin_no.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 15,
+      "country": "Iceland",
+      "language": {
+        "en": "Icelandic",
+        "native": "Íslenska",
+        "alpha-2": "IS"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "PEGA Pool",
+            "t_link": "https://www.pega-pool.com/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "78ace7606b2ff260ae1ab27401f3b174eb1217a8652e84a6f21e3a63d77994eb",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/78ace7606b2ff260ae1ab27401f3b174eb1217a8652e84a6f21e3a63d77994eb",
+        "path": "whitepaper/IS/bitcoin_no.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 16,
+      "country": "Poland",
+      "language": {
+        "en": "Polish",
+        "native": "Polski",
+        "alpha-2": "PL"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "meeDamian",
+            "t_link": "https://www.pega-pool.com/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "b59471f6edbf101a63b1bd88080c23b072ea0b1c34b4f0d4ba396fc7dc831248",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/b59471f6edbf101a63b1bd88080c23b072ea0b1c34b4f0d4ba396fc7dc831248",
+        "path": "whitepaper/PL/bitcoin_pl.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 17,
+      "country": "Portugal",
+      "language": {
+        "en": "Portuguese",
+        "native": "Português",
+        "alpha-2": "PT"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "rhlinden",
+            "t_link": "https://github.com/rhlinden"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "811eb6ae99ebb61a77a636a5853b8946a3f063e655f80808f91113e6327176e6",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/811eb6ae99ebb61a77a636a5853b8946a3f063e655f80808f91113e6327176e6",
+        "path": "whitepaper/PT/bitcoin_pt.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 18,
+      "country": "Brazil",
+      "language": {
+        "en": "Brazilian Portuguese",
+        "native": "Português Brasileiro",
+        "alpha-2": "BR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Rodrigo Silva Pinto",
+            "t_link": "https://www.linkedin.com/in/rodrigosilvap"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "7324e758ffcc4b24abbba64a8e245aef479a79277b2b5b969ad07b9d2429ae9c",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/7324e758ffcc4b24abbba64a8e245aef479a79277b2b5b969ad07b9d2429ae9c",
+        "path": "whitepaper/BR/bitcoin_pt_br.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 19,
+      "country": "Romania",
+      "language": {
+        "en": "Romanian",
+        "native": "Română",
+        "alpha-2": "RO"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Gazeta Bitcoin",
+            "t_link": "https://bitcointalk.org/index.php?action=profile;u=1285797"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "e66c8c297b831efe3d12470a6e39504ad04a289a92fc39a05c747a38945dec41",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/e66c8c297b831efe3d12470a6e39504ad04a289a92fc39a05c747a38945dec41",
+        "path": "whitepaper/RO/bitcoin_ro.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 20,
+      "country": "Slovakia",
+      "language": {
+        "en": "Slovak",
+        "native": "Slovenčina",
+        "alpha-2": "SK"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Ondrej Sarnecký",
+            "t_link": "https://github.com/OndroS"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "e731eb415c3b780636d0d1f1395b42b8dcf03adb1866cc8a7867576522e25edc",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/e731eb415c3b780636d0d1f1395b42b8dcf03adb1866cc8a7867576522e25edc",
+        "path": "whitepaper/SK/bitcoin_sk.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 21,
+      "country": "Serbia",
+      "language": {
+        "en": "Serbian",
+        "native": "Српски",
+        "alpha-2": "RS"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Božo Popović",
+            "t_link": ""
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "c7fa14071350d12d0494b667b98f59c305d86385e4ab0d4fbc0587ced8ca5fa9",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/c7fa14071350d12d0494b667b98f59c305d86385e4ab0d4fbc0587ced8ca5fa9",
+        "path": "whitepaper/RS/bitcoin_rs.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 22,
+      "country": "Finland",
+      "language": {
+        "en": "Finnish",
+        "native": "Suomen kieli",
+        "alpha-2": "FI"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Biocycle",
+            "t_link": "https://twitter.com/bio_bitcoin"
+          },
+          {
+            "t_name": "LohkoKettu",
+            "t_link": "https://twitter.com/LohkoKettu"
+          },
+          {
+            "t_name": "Aleksi Suomalainen",
+            "t_link": "https://twitter.com/locusf"
+          },
+          {
+            "t_name": "Antti Majakivi",
+            "t_link": "https://twitter.com/AnttiMay"
+          },
+          {
+            "t_name": "Niko Laamanen",
+            "t_link": "https://twitter.com/OmniFinn"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "ac9a8ed62870cc9a8ed98ff4087888e3f7018c111be8038c0b66b73d04bf3903",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/ac9a8ed62870cc9a8ed98ff4087888e3f7018c111be8038c0b66b73d04bf3903",
+        "path": "whitepaper/FI/bitcoin_fi.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 23,
+      "country": "Sweden",
+      "language": {
+        "en": "Swedish",
+        "native": "Svenska",
+        "alpha-2": "SE"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "hanspandeya",
+            "t_link": "https://github.com/hanspandeya"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "50ae1a468eefeb7bd1cfde449096dfc7c97469919e45c43afded518996b2a24b",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/50ae1a468eefeb7bd1cfde449096dfc7c97469919e45c43afded518996b2a24b",
+        "path": "whitepaper/SE/bitcoin_se.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 24,
+      "country": "Turkey",
+      "language": {
+        "en": "Turkish",
+        "native": "Türkçe",
+        "alpha-2": "TR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Efe Cini",
+            "t_link": "https://www.linkedin.com/in/efecini/"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "bea9f658e48f2007ba4e6d503cbdce74a3bb44fd0fb36272450f35de5f3397fe",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/bea9f658e48f2007ba4e6d503cbdce74a3bb44fd0fb36272450f35de5f3397fe",
+        "path": "whitepaper/TR/bitcoin_tr.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 25,
+      "country": "Greece",
+      "language": {
+        "en": "Greek",
+        "native": "ελληνικά",
+        "alpha-2": "GR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "chdimosthenis",
+            "t_link": "https://github.com/chdimosthenis"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "141afe31401eafdaf64ffbd4c07c8b4d2f423f05b00a8a579569b037827d64a2",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/141afe31401eafdaf64ffbd4c07c8b4d2f423f05b00a8a579569b037827d64a2",
+        "path": "whitepaper/GR/bitcoin_gr.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 26,
+      "country": "India",
+      "language": {
+        "en": "Hindi",
+        "native": "मानक हिन्दी",
+        "alpha-2": "IN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Praneet Jain",
+            "t_link": "https://twitter.com/blockbitmedia"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "5d4ed913adf58c6d2742d224b2053cb68951cc5949d7dc4755aafae1ff850dbe",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/5d4ed913adf58c6d2742d224b2053cb68951cc5949d7dc4755aafae1ff850dbe",
+        "path": "whitepaper/IN/bitcoin_hi.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 27,
+      "country": "Pakistan",
+      "language": {
+        "en": "Urdu",
+        "native": "اُردُو",
+        "alpha-2": "PK"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Muhammad Safdar Jamal",
+            "t_link": "https://aharix.com/MSJ"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "f1f54720d367118c6997475e7fd05bbc05a02667357c19a00f7ccf73d7ee14e9",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/f1f54720d367118c6997475e7fd05bbc05a02667357c19a00f7ccf73d7ee14e9",
+        "path": "whitepaper/PK/bitcoin_ur.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 28,
+      "country": "India",
+      "language": {
+        "en": "Tamil",
+        "native": "தமிழ்",
+        "alpha-2": "IN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Raja Sahaya Jose",
+            "t_link": "https://twitter.com/rajasahayajose"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "e07c70a85c24a520c349f2e1ef12232073d4fb653768d55581e8c93a0c9a7985",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/e07c70a85c24a520c349f2e1ef12232073d4fb653768d55581e8c93a0c9a7985",
+        "path": "whitepaper/IN/bitcoin_ta.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 29,
+      "country": "India",
+      "language": {
+        "en": "Malayalam",
+        "native": "മലയാളം",
+        "alpha-2": "IN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Hyder Ali Abdulla",
+            "t_link": "https://www.linkedin.com/in/neeludan"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "c78d380b9f8050fc4fac7fab3d035d25fbe8dafc3236d0c8fb438d9465dc5d51",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/c78d380b9f8050fc4fac7fab3d035d25fbe8dafc3236d0c8fb438d9465dc5d51",
+        "path": "whitepaper/IN/bitcoin_ml.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 30,
+      "country": "Israel",
+      "language": {
+        "en": "Hebrew",
+        "native": "עברית",
+        "alpha-2": "IL"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Meni Rosenfeld",
+            "t_link": "https://twitter.com/MeniRosenfeld"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "18c9e0d9b554cecd4b556d6d2fbbfe496c6455941a8346d0bd71241291b9d14b",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/18c9e0d9b554cecd4b556d6d2fbbfe496c6455941a8346d0bd71241291b9d14b",
+        "path": "whitepaper/IL/bitcoin_iw.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 31,
+      "country": "Russia",
+      "language": {
+        "en": "Russian",
+        "native": "Русский",
+        "alpha-2": "RU"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Ar Vicco",
+            "t_link": "https://github.com/arvicco"
+          },
+          {
+            "t_name": "Ivan Nikolaev",
+            "t_link": "https://github.com/nik0x01"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "e2a220eb49cfacf1ac85a994689c095274935c70ef12965f21551caee366c4f3",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/e2a220eb49cfacf1ac85a994689c095274935c70ef12965f21551caee366c4f3",
+        "path": "whitepaper/RU/bitcoin_ru.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 32,
+      "country": "Vietnam",
+      "language": {
+        "en": "Vietnamese",
+        "native": "Tiếng Việt",
+        "alpha-2": "VN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Pham Cong Dinh",
+            "t_link": "https://github.com/pcdinh"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "1b3bd55c11427fce332596d255c3c4ff761ba0335c18f95fd7076e0c9bc65649",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/1b3bd55c11427fce332596d255c3c4ff761ba0335c18f95fd7076e0c9bc65649",
+        "path": "whitepaper/VN/bitcoin_vi.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 33,
+      "country": "Ukraine",
+      "language": {
+        "en": "Ukrainian",
+        "native": "Українська",
+        "alpha-2": "UA"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "WTFBit",
+            "t_link": "https://t.me/wtfbit"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "ecdfafda3657c0b63904a931d35688e029d3b39c372ddc67e8f8ccf67227b3f7",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/ecdfafda3657c0b63904a931d35688e029d3b39c372ddc67e8f8ccf67227b3f7",
+        "path": "whitepaper/UA/bitcoin_uk.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 34,
+      "country": "Saudi Arabia",
+      "language": {
+        "en": "Arabic",
+        "native": "العربية",
+        "alpha-2": "SA"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Ahmed Alsayadi",
+            "t_link": "https://github.com/alsayadi"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "9bda0791d99c2001709ed1714aebe24d1ea679f2e4127084dc6d1ab891bdeaf3",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/9bda0791d99c2001709ed1714aebe24d1ea679f2e4127084dc6d1ab891bdeaf3",
+        "path": "whitepaper/SA/bitcoin_ar.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 35,
+      "country": "Iran",
+      "language": {
+        "en": "farsi",
+        "native": "فارسی",
+        "alpha-2": "IR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "ZeeAmini",
+            "t_link": "https://github.com/ZeeAmini"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "74f39a70883cbcad88b3f78f2f2580fb7b6d3b1036e68ba3e10398a417bf19ce",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/74f39a70883cbcad88b3f78f2f2580fb7b6d3b1036e68ba3e10398a417bf19ce",
+        "path": "whitepaper/IR/bitcoin_fa.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 36,
+      "country": "South Korea",
+      "language": {
+        "en": "Korean",
+        "native": "한국어",
+        "alpha-2": "KR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Mincheol Im",
+            "t_link": "https://github.com/mincheolim"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "5adcd529d34422e397121de1114d1cec2794c5584a59b503cc77ce34fdcb6ed8",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/5adcd529d34422e397121de1114d1cec2794c5584a59b503cc77ce34fdcb6ed8",
+        "path": "whitepaper/KR/bitcoin_ko.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 37,
+      "country": "Japan",
+      "language": {
+        "en": "Japanese",
+        "native": "日本語",
+        "alpha-2": "JP"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "hakka",
+            "t_link": "https://github.com/cryptohakka"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "751805870e29e676d893566075c0d4f51b366284b9406c3cf223b875cdc424bf",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/751805870e29e676d893566075c0d4f51b366284b9406c3cf223b875cdc424bf",
+        "path": "whitepaper/JP/bitcoin_jp.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 38,
+      "country": "Thailand",
+      "language": {
+        "en": "Thai",
+        "native": "ภาษาไทย",
+        "alpha-2": "TH"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Peeraphat Hankongkaew",
+            "t_link": "https://github.com/PeeraphatHan"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "0a8ac77b039766b0799d0eee2093e032b886aae3373efb0d0bb77960f19ed486",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/0a8ac77b039766b0799d0eee2093e032b886aae3373efb0d0bb77960f19ed486",
+        "path": "whitepaper/TH/bitcoin_th.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 39,
+      "country": "China",
+      "language": {
+        "en": "Chinese (Simplified)",
+        "native": "简化字",
+        "alpha-2": "CN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "shdxiang",
+            "t_link": "https://github.com/shdxiang"
+          },
+          {
+            "t_name": "Bill Zhao",
+            "t_link": "#"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "07b4cc74f4bd28618b0a3b5f0b46468645f19f9c465c9dceffa113c88782262d",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/07b4cc74f4bd28618b0a3b5f0b46468645f19f9c465c9dceffa113c88782262d",
+        "path": "whitepaper/CN/bitcoin_zh_cn.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 40,
+      "country": "Bangladesh",
+      "language": {
+        "en": "Bengali",
+        "native": "বাংলা",
+        "alpha-2": "BD"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Shafiun Miraz",
+            "t_link": "https://twitter.com/shafiunmiraz0"
+          },
+          {
+            "t_name": "Tonmoy Sarkar",
+            "t_link": "https://github.com/tonmoy10ms"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
+        "path": "whitepaper/BD/bitcoin_bn.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 41,
+      "country": "Bangladesh",
+      "language": {
+        "en": "Bengali",
+        "native": "বাংলা",
+        "alpha-2": "BD"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Shafiun Miraz",
+            "t_link": "https://twitter.com/shafiunmiraz0"
+          },
+          {
+            "t_name": "Tonmoy Sarkar",
+            "t_link": "https://github.com/tonmoy10ms"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
+        "path": "whitepaper/BD/bitcoin_bn.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 42,
+      "country": "Estonia",
+      "language": {
+        "en": "Estonian",
+        "native": "Eesti keel",
+        "alpha-2": "EE"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "ekukxs",
+            "t_link": "https://github.com/ekukxs"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "70aef9432cba3f21f774180ab4c98d54bf7c01df1c2c5c750dc251c37fbb52a8",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/70aef9432cba3f21f774180ab4c98d54bf7c01df1c2c5c750dc251c37fbb52a8",
+        "path": "whitepaper/EE/bitcoin_et.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 43,
+      "country": "Croatia",
+      "language": {
+        "en": "Croatian",
+        "native": "Hrvatski",
+        "alpha-2": "HR"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "LuxBTC",
+            "t_link": "https://twitter.com/LuxBTC"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "01cda7a42fb671ff5d06270bec7d43fd04bc996860ced27c8724c5e609aba6e2",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/01cda7a42fb671ff5d06270bec7d43fd04bc996860ced27c8724c5e609aba6e2",
+        "path": "whitepaper/HR/bitcoin_hr.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 44,
+      "country": "Blind Language",
+      "language": {
+        "en": "Braille",
+        "native": "Braille",
+        "alpha-2": ""
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "@NeatNik",
+            "t_link": "https://github.com/neatnik/braille-bitcoin-whitepaper"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "259580d87618576208b077139f184a2db0a3b0f6d8620b00bcbdceb9847910a8",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/259580d87618576208b077139f184a2db0a3b0f6d8620b00bcbdceb9847910a8",
+        "path": "whitepaper/EN/bitcoin-braille.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 45,
+      "country": "Nepal",
+      "language": {
+        "en": "Nepali",
+        "native": "नेपाली",
+        "alpha-2": "NP"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Krishna Dahal",
+            "t_link": "https://twitter.com/iamkrishnadahal"
+          },
+          {
+            "t_name": "Bibek Koirala",
+            "t_link": "https://twitter.com/bibekblockchain"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "d0c215f4b6deb091b48a0b53a981ad9396b612f7722f90fc771a26f176cc8686",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/d0c215f4b6deb091b48a0b53a981ad9396b612f7722f90fc771a26f176cc8686",
+        "path": "whitepaper/NP/bitcoin_np.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 46,
+      "country": "Basque Country",
+      "language": {
+        "en": "Basque",
+        "native": "Euskara",
+        "alpha-2": "ES-PV"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "@Blooma_Lorea",
+            "t_link": "https://x.com/Blooma_Lorea"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "9c37de48c29e81ed652db75cf33f491f1b2511d6c01b6aca2b8f9df871fc5c9e",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/9c37de48c29e81ed652db75cf33f491f1b2511d6c01b6aca2b8f9df871fc5c9e",
+        "path": "whitepaper/ES/bitcoin_basque.pdf"
+      },
+      "active": true
+    }
+  ]
