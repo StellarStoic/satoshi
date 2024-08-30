@@ -1,34 +1,42 @@
-// document.getElementById("quotes").addEventListener("click", function() {
-//     let quotesText = document.getElementById("quotes").innerText;
-    
-//     let textArea = document.createElement("textarea");
-//     textArea.value = quotesText;
-//     document.body.appendChild(textArea);
-//     textArea.select();
-    
-//     document.execCommand("copy");
-    
-//     document.body.removeChild(textArea);
-//   });
+document.addEventListener('DOMContentLoaded', function () {
+    // Existing code for quotes
+    const quotes = document.getElementById("quotes");
+    const copyNotification = document.querySelector(".copy-notification");
 
-// document.getElementById("quotes").addEventListener("click", function() {
-//     const quoteText = document.getElementById("quotes").innerText;
-//     navigator.clipboard.writeText(quoteText).then(function() {
-//     //   alert("Quote copied to clipboard!");
-//     });
-//   });
+    if (quotes) {
+        quotes.addEventListener("click", function () {
+            const quote = quotes.innerText;
 
-const quotes = document.getElementById("quotes");
-const copyNotification = document.querySelector(".copy-notification");
+            navigator.clipboard.writeText(quote).then(() => {
+                copyNotification.style.display = "block";
 
-quotes.addEventListener("click", function() {
-const quote = document.getElementById("quotes").innerText;
+                setTimeout(() => {
+                    copyNotification.style.display = "none";
+                }, 3500);
+            });
+        });
+    }
 
-navigator.clipboard.writeText(quote).then(() => {
-    copyNotification.style.display = "block";
+    // Function to copy content to clipboard and show a stylish notification
+    function copyToClipboard(content, message) {
+        navigator.clipboard.writeText(content).then(() => {
+            const copyNotification = document.querySelector('.copy-notification');
+            if (copyNotification) {
+                copyNotification.textContent = message;
+                copyNotification.style.display = "block";
+                setTimeout(() => {
+                    copyNotification.style.display = "none";
+                }, 3500);
+            }
+        }).catch(err => console.error('Failed to copy text: ', err));
+    }
 
-    setTimeout(() => {
-    copyNotification.style.display = "none";
-    }, 1200);
-});
+    // Attach click events to QR codes and their descriptions
+    document.querySelectorAll('.qr-code, .qr-code-text').forEach(element => {
+        element.addEventListener('click', function() {
+            const addressToCopy = this.title || this.innerText;
+            const message = this.id.includes('lightning') ? "Bitcoin lightning address copied to clipboard!" : "OnChain bitcoin address copied to clipboard!";
+            copyToClipboard(addressToCopy, message);
+        });
+    });
 });

@@ -22,3 +22,4 @@ fetch('quotes.json')
     }, 35000);
   });
 
+

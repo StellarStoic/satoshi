@@ -1021,7 +1021,7 @@
         "virusTotal_link": "https://www.virustotal.com/gui/file/492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
         "path": "whitepaper/BD/bitcoin_bn.pdf"
       },
-      "active": true
+      "active": false
     },
     {
       "index": 42,

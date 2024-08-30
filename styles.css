@@ -1,12 +1,10 @@
 /* Explanation in JS tab */
 
 /* Cool font from Google Fonts! */
-@import url('https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@200&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;1,300&display=swap');
 
 body {
-	background-color: rgb(17, 17, 17);
+	background-color: #4d4d4e;
 	background-position: center;
 	background-repeat: no-repeat;
 	background-size: cover;
@@ -43,7 +41,6 @@ body {
 	
 	user-select: none;
 }
-
 
 
 /* Burger menu */
@@ -153,52 +150,11 @@ li a:focus {
 	color: #fff;
 }
 
-.ico{
-	margin-bottom:40px;
-	width: 2.5rem;
-	height: 2.5rem;
-}
 
-
-/* footer */
-
-.element {
-	position: absolute;
-	text-align: center;
-	color: hsla(42, 100%, 47%, 0.13) ;
-	left: 50%;
-	bottom: 10%;
-	transform: translate(-50%, 50%);
-	font-family: "Roboto Mono", monospace;
-	font-optical-sizing: auto;
-	font-weight: 300;
-	font-style: normal;
-}
-
-.hover-text {
-	display: none;
-	}
-.element:hover .hover-text {
-	position:relative;
-	display:block;
-	margin-top: 10px;
-	text-align: center;
-	text-align-last:center;
-	}
-
-.element:hover .hover-text i{
-	color: hsla(42, 100%, 47%, 0.356);
-	font-size: 1.8em;
-	margin-inline: 5px;
-	
-}
-.element:hover .hover-text a :hover{
-	color: hsl(42, 100%, 47%);
-}
 
 /* quotes */
 p, #text {
-	color: #ddc17eab;
+	color: #c5ba9e;
 	line-height: 1.4em;
 }
 
@@ -222,17 +178,18 @@ p, #text {
 /* copy text on clipboard */
 
 .copy-notification {
-    position: sticky;
-	color: rgb(255, 255, 255);
-    bottom: 20%;
-    padding-left: 20%;
-	padding-right: 20%;
-    padding: 10px;
-    background-color: rgba(109, 98, 110, 0.342);
-    border-radius: 5px;
-	text-align: center;
-    display: none;
-
+    position: fixed; /* Fixed position to stay at the top */
+    top: 0; /* Align to the top of the viewport */
+    left: 0; /* Align to the left of the viewport */
+    width: 100%; /* Stretch across the full width */
+    padding: 10px; /* Padding for aesthetics */
+    background-color: #f2a900; /* Semi-transparent background with your chosen color */
+    border-radius: 0; /* No border radius for a full-width banner */
+    text-align: center; /* Center the text inside the notification */
+    color: #4d4d4e; /* White text color */
+    display: none; /* Initially hidden */
+    z-index: 1500; /* High enough z-index to overlay other content */
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
 }
 
 /* Mobile styles */
@@ -245,4 +202,145 @@ p, #text {
 		font-size: 0.7em;
 	}
 
+}
+
+/* Footer styles */
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: rgb(34, 33, 33);
+    color: #c5ba9e;
+    text-align: center;
+    padding: 7px 0;
+    font-family: "Roboto Mono", monospace;
+	font-size: 0.6em;
+    z-index: 2000; /* Make sure it's above other content */
+    box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.2);
+}
+
+.footer a {
+    color: #c5ba9e;
+    text-decoration: none;
+    margin-right: 15px;
+}
+
+.footer img.ico {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    vertical-align: middle; /* Aligns the image with the text */
+}
+
+/* Lightning icon styling */
+.footer i.lni.lni-bolt-alt {
+    color: #f2a900;
+    cursor:pointer;
+    font-size: 12px;
+    margin-left: -10px;
+}
+
+/* Styles for modals */
+.description-modal, #uploadModal, #infoModal, #qrCodeModal {
+    display: none;
+    position: fixed;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 500px;
+    background-color: rgb(34, 33, 33);
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000; /* Ensure modal is above everything */
+	overflow: hidden;
+    justify-content: center; /* Center modal content */
+    align-items: center; /* Align content vertically */
+}
+
+/* Apply responsive styles to modal content */
+.modal-content {
+    max-width: 100%; /* Ensure content does not exceed modal width */
+	max-height: 80vh; /* Maximum height to ensure it doesn't go out of view */
+	overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden; /* Hide horizontal overflow */
+    word-break: break-word; /* Break long words */
+    overflow-wrap: break-word; /* Break words at appropriate points */
+    width: 100%;
+    box-sizing: border-box; /* Include padding and borders in width calculation */
+	font-family: "Roboto Mono", monospace;
+}
+
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active {
+    display: flex; /* Use flex to center content */
+}
+
+.description-modal a {
+    color: #c5ba9e; /* Brighter color for better visibility */
+    text-decoration: underline; /* Optional: Underline to indicate a link */
+}
+
+.description-modal a:hover {
+    color: #f2a900; /* Even brighter on hover for emphasis */
+}
+
+/* Close icon for modal */
+.close-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 20px;
+    color: #fff; /* Make sure the close icon is visible */
+    background: none;
+    border: none;
+    font-weight: bold;
+    z-index: 1001; /* Higher than the modal content */
+}
+
+/* Hover effect for close icon */
+.close-icon:hover {
+    color: #f9af02; /* A brighter color on hover */
+}
+
+#gratitudeHeader {
+    display: flex;
+	text-align: center;
+    justify-content: center; /* Centers the content horizontally */
+    align-items: center; /* Centers the content vertically if needed */
+    max-width: 50%;
+    margin: 0 auto; /* Centers the flex container in the middle of the parent element */
+}
+
+
+.qr-code-container {
+    display: flex;
+	flex-wrap: wrap;
+    justify-content: space-around; /* Space QR codes evenly */
+    margin-top: 20px; /* Add some spacing above QR codes */
+}
+
+.qr-code-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer; /* Cursor pointer to indicate it's clickable */
+}
+
+.qr-code {
+    width: 150px; /* Set a fixed width for the QR code images */
+    height: 150px; /* Set a fixed height for the QR code images */
+    margin-bottom: 10px; /* Add some space below the QR code image */
+}
+
+.qr-code-text {
+    font-size: 0.5em;
+	max-width: 40%;
+    color: #fff;
+    margin-top: 5px; /* Add some spacing above the text */
+    text-align: center; /* Center align the text */
 }

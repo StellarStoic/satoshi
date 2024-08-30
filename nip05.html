@@ -10,7 +10,8 @@
     <title>Hi Satoshi</title>
 </head>
 <body>
-
+    <!-- Copy text notification -->
+    <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
     <!-- Burger menu -->
     <a href="#menu" id="toggle"><span></span></a>
 
@@ -21,103 +22,138 @@
             <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
         </ul>
     </div>
-
+    <div class="nip05-container">
     <div class="image-container">
+        <!-- Image and description wrapped for modal functionality -->
         <div class="image-box" onclick="toggleDescription(this)">
             <img src="https://image.nostr.build/4cf2e3fe15f904e13daca301f48e1303f899654809db8e31785ce11439dfd3b1.jpg" alt="Ostrich holding a sign asking what the duck is NIP-05">
         </div>
-        <div class="description">
-            <p><strong>What is NIP-05 and Why Do You Need It?</strong></p>
-            <p>NIP-05 is a special identifier on the Nostr network, a permissionless protocol for social interactions and other stuff. Think of NIP-05 as a simple, easy-to-read username that links to your long and complicated Nostr public key like <code>npub1qqqqqqz7nhdqz3uuwmzlflxt46lyu7zkuqhcapddhgz66c4ddynswreecw</code>, which is linked to a specific domain name on the internet allowing you to present and verify yourself digitally as <code>alice@satoshi.si</code>.</p>
-            <p>If you don't have your own domain, you can choose your NIP-05 with our domain with 3 options based on the character length of your name</p>
-            <p>There are many services offering NIP-05 identifiers, but remember, none of them is called <strong>satoshi.si</strong></p>
-            <p>Claim your new digital identity now by contacting me!</p>
-            <div class="button-container">
-                <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr" class="contact-button">Contact</a>
+        <div class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="toggleDescription(this.parentElement.parentElement)">&times;</span>
+                <p><strong>What is NIP-05 and Why Do You Need It?</strong></p>
+                <p>NIP-05 is a special identifier on the Nostr network, a permissionless protocol for social interactions and other stuff. Think of NIP-05 as a simple, easy-to-read username that links to your long and complicated Nostr public key like <code>npub1qqqqqqz7nhdqz3uuwmzlflxt46lyu7zkuqhcapddhgz66c4ddynswreecw</code>, which is linked to a specific domain name on the internet allowing you to present and verify yourself digitally as <code>alice@satoshi.si</code>.</p>
+                <p>If you don't have your own domain, you can choose your NIP-05 with our domain with 3 options based on the character length of your name</p>
+                <p>There are many services offering NIP-05 identifiers, but remember, none of them is called <strong>satoshi.si</strong></p>
+                <p>Claim your new digital identity now by contacting me!</p>
+                    <!-- Continue your description content here -->
+                <div class="button-container">
+                    <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr" class="contact-button">Contact</a>
+                </div>
             </div>
         </div>
-        
 
-
+        <!-- Repeat the above structure for each image and description -->
         <div class="image-box" onclick="toggleDescription(this)">
             <img src="https://image.nostr.build/resp/720p/09175067d23790a7546fa002df5691d21719d86050015b0ad24109adc1a30707.jpg" alt="a man statue with the hoodie in black and white">
             <p class="price">5 characters = 21.000 sats</p>
         </div>
-        <div class="description">
-            <p>Secure Your 5+ characters NIP-05 at Satoshi.si for only 21.000 sats!</p>
-            <p>Stand out on Nostr with a unique identifier like craigwrightisnot@satoshi.si</p>
-            <p>Premium:<br>
-            bitcoin and satoshi - the price is ridiculous but negotiable.</p>
-            <p>Bonus:<br>
-            Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
-            <p>Resale?<br>
-            Your message to me on Nostr acts as a signature to do so.</p>
-            <p>Disclaimer:<br>
-            I strive for stability and longevity  but cannot predict everything in todays unstable world.</p>
-            <p>Claim your new digital identity now by contacting me!</p>
-            <div class="button-container">
-                <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr"  class="contact-button">Contact</a>
+        <div class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="toggleDescription(this.parentElement.parentElement)">&times;</span>
+                <p>Secure Your 5+ characters NIP-05 at Satoshi.si for only 21.000 sats!</p>
+                <p>Stand out on Nostr with a unique identifier like craigwrightisnot@satoshi.si</p>
+                <p>Premium:<br>
+                bitcoin and satoshi - the price is ridiculous but negotiable.</p>
+                <p>Bonus:<br>
+                Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
+                <p>Resale?<br>
+                Your message to me on Nostr acts as a signature to do so.</p>
+                <p>Disclaimer:<br>
+                I strive for stability and longevity  but cannot predict everything in todays unstable world.</p>
+                <p>Claim your new digital identity now by contacting me!</p>
+                    <!-- Continue your description content here -->
+                <div class="button-container">
+                    <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr" class="contact-button">Contact</a>
+                </div>
             </div>
-
         </div>
 
-
+        <!-- Repeat the same structure for other images and descriptions -->
+        <!-- Image and description for 4 characters -->
         <div class="image-box" onclick="toggleDescription(this)">
             <img src="https://image.nostr.build/resp/720p/cfd57e5a6cdd98a259ffd80118bc20cfd9686964fe7f50158f8c96341011db51.jpg" alt="Image 3">
             <p class="price">4 characters = 42.000 sats</p>
         </div>
-        <div class="description">
-            <p>Secure Your 4 characters NIP-05 at Satoshi.si for 42.000 sats!</p>
-            <p>Stand out on Nostr with a unique identifier like moon@satoshi.si</p>
-            <p>Bonus:<br>
-                Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
-            <p>Resale?<br>
-                Your message to me on Nostr acts as a signature to do so.</p>
-            <p>Disclaimer:<br>
-                I strive for stability and longevity but cannot predict everything in todays unstable world.</p>
-            <p>Claim your new digital identity now by contacting me!</p>
-            <div class="button-container">
-                <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr"  class="contact-button">Contact</a>
+        <div class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="toggleDescription(this.parentElement.parentElement)">&times;</span>
+                <p>Secure Your 4 characters NIP-05 at Satoshi.si for 42.000 sats!</p>
+                <p>Stand out on Nostr with a unique identifier like moon@satoshi.si</p>
+                <p>Bonus:<br>
+                    Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
+                <p>Resale?<br>
+                    Your message to me on Nostr acts as a signature to do so.</p>
+                <p>Disclaimer:<br>
+                    I strive for stability and longevity but cannot predict everything in todays unstable world.</p>
+                <p>Claim your new digital identity now by contacting me!</p>
+                    <!-- Continue your description content here -->
+                <div class="button-container">
+                    <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr" class="contact-button">Contact</a>
+                </div>
             </div>
         </div>
 
-
+        <!-- Image and description for 3 characters -->
         <div class="image-box" onclick="toggleDescription(this)">
             <img src="https://image.nostr.build/resp/720p/20d60f6a327cb8e7a21c27681d2a4670668a3882085225398e3ecd507a227794.jpg" alt="Image 4">
             <p class="price">3 characters = 69.000 sats</p>
         </div>
-        <div class="description">
-            <p>Secure Your 3 characters NIP-05 at Satoshi.si 69.000 sats!</p>
-            <p>Stand out on Nostr with a unique identifier like cat@satoshi.si</p>
-            <p>Bonus:<br>
-            Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
-            <p>Resale?<br>
-                Your message to me on Nostr acts as a signature to do so.</p>
-            <p>Disclaimer:<br>
-                I strive for stability and longevity but cannot predict everything in todays unstable world.</p>
-            <p>Claim your new digital identity now by contacting me!</p>
-            <div class="button-container">
-                <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr"  class="contact-button">Contact</a>
+        <div class="description-modal">
+            <div class="modal-content">
+                <span class="close-icon" onclick="toggleDescription(this.parentElement.parentElement)">&times;</span>
+                <p>Secure Your 3 characters NIP-05 at Satoshi.si 69.000 sats!</p>
+                <p>Stand out on Nostr with a unique identifier like cat@satoshi.si</p>
+                <p>Bonus:<br>
+                Swap long WOF(Wallet Of Satoshi) or getalby lightning address for you@satoshi.si at no extra charge (trust-dependent).</p>
+                <p>Resale?<br>
+                    Your message to me on Nostr acts as a signature to do so.</p>
+                <p>Disclaimer:<br>
+                    I strive for stability and longevity but cannot predict everything in todays unstable world.</p>
+                <p>Claim your new digital identity now by contacting me!</p>
+                    <!-- Continue your description content here -->
+                <div class="button-container">
+                    <a href="https://stellarstoic.npub.pro/" target="_blank" title="come to Nostr" class="contact-button">Contact</a>
+                </div>
             </div>
         </div>
-
-        
+    </div>
     </div>
 
-    <!-- footer -->
-    <footer>
-        <div class="element" title="this address can receive Bitcoin via lightning">
+    <!-- Footer with Email and Lightning Icon -->
+    <footer class="footer">
+        <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
             one@satoshi.si
-            <div class="hover-text">
-                <a href="https://stellarstoic.npub.pro/" target="_blank" title="nostr" alt="a link to nostr account"><img class="ico" src="icons/ostrich.png"></img></a>
-                <a href="mailto:&#105;&#110;&#102;&#111;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank"><img class="ico" title="send mail to the domain satoshi.si owner" src="icons/mail.png"></img></a>
-            </div>
-        </div>
+        </a>
+        <!-- Lightning Icon -->
+        <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
     </footer>
 
-    <script src="quotes.js"></script>
-    <script src="script.js"></script>
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+        <div class="modal-content">
+            <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+            <h4 id="gratitudeHeader">If you like what you see, consider contributing a few sats. Thanks!</h4>
+            <div class="qr-code-container">
+                <!-- Lightning QR Code -->
+                <div class="qr-code-wrapper">
+                    <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                    <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+                </div>
+                
+                <!-- Onchain QR Code -->
+                <div class="qr-code-wrapper">
+                    <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                    <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="copyonclick.js"></script>
     <script src="burgerMenu.js"></script>
+    <script src="index.js"></script>
     <script src="nip05.js"></script>
 </body>
 </html>

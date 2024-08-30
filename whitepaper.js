@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const container = document.getElementById('whitepapers-container');
-    const header = document.getElementById('text'); // Assuming this is the header element
+    const header = document.getElementById('header');
 
     fetch('whitepaper/whitepapers.json')
         .then(response => response.json())
@@ -16,19 +16,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     const imageBox = document.createElement('div');
                     imageBox.className = 'image-box';
-                    imageBox.onclick = () => handleClick(imageBox, item.PDF.path);
-                    const img = document.createElement('img');
-                    // img.src = `https://hatscripts.github.io/circle-flags/flags/${item.language['alpha-2'].toLowerCase()}.svg`;
-                    img.alt = `${item.language.native} Flag`;
+                    imageBox.addEventListener('pointerdown', (event) => handlePointerDown(event, imageBox, item.PDF.path)); // Unified handling
 
-                    // Dynamically set the image source based on the native language
-                    if (item.language.native === 'Braille') {
+                    const img = document.createElement('img');
+                    img.alt = `${item.language.en} Flag`;
+
+                    // Dynamically set the image source based on the en language
+                    if (item.language.en === 'Braille') {
                         img.src = '/img/braille.webp';
                         img.classList.add('custom-size-image');
-                    } else if (item.language.native === 'SomeLanguage') {
+                    } else if (item.language.en === 'SomeLanguage') {
                         img.src = 'https://path/to/#/image.svg';
                         img.classList.add('custom-size-image');
-                    } else if (item.language.native === 'anotherLanguage') {
+                    } else if (item.language.en === 'anotherLanguage') {
                         img.src = 'https://#/image.svg';
                         img.classList.add('custom-size-image');
                     } else {
@@ -41,8 +41,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     const langName = document.createElement('div');
                     langName.className = 'lang-name';
-                    langName.innerHTML = `<p>${item.language.native}</p>`;
-                    langName.onclick = () => handleClick(imageBox, item.PDF.path);
+                    langName.innerHTML = `<p>${item.language.en}</p>`;
+                    langName.addEventListener('pointerdown', (event) => handlePointerDown(event, imageBox, item.PDF.path)); // Unified handling
 
                     const translatorInfo = document.createElement('div');
                     translatorInfo.className = 'translator-info';
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         translatorLink.textContent = translator.t_name;
 
                         // Prevent click event from bubbling up to parent elements
-                        translatorLink.addEventListener('click', function(event) {
+                        translatorLink.addEventListener('click', function (event) {
                             event.stopPropagation();
                         });
 
@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Update the header with the count of active statuses
             header.textContent = `Bitcoin white paper \n translated in ${wp_counter} languages`;
+            header.classList.add('header');
 
             // Ensure "Upload Instructions" is appended last
             appendUploadInstructions(container);
@@ -92,11 +93,9 @@ function setupLongPress(element, item) {
     let pressTimer;
     let longPressDuration = 2000; // 2 seconds
 
-    element.addEventListener('mousedown', startLongPress);
-    element.addEventListener('mouseup', cancelLongPress);
-    element.addEventListener('mouseleave', cancelLongPress);
-    element.addEventListener('touchstart', startLongPress);
-    element.addEventListener('touchend', cancelLongPress);
+    element.addEventListener('pointerdown', startLongPress);
+    element.addEventListener('pointerup', cancelLongPress);
+    element.addEventListener('pointerleave', cancelLongPress);
 
     function startLongPress(e) {
         e.preventDefault(); // Prevent default click behavior
@@ -107,6 +106,12 @@ function setupLongPress(element, item) {
 
     function cancelLongPress() {
         clearTimeout(pressTimer);
+    }
+}
+
+function handlePointerDown(event, box, pdfPath) {
+    if (event.target.tagName.toLowerCase() !== 'a') {  // If not clicking on a link
+        handleClick(box, pdfPath);
     }
 }
 
@@ -121,7 +126,7 @@ function openInfoModal(item) {
 
     // Modal title
     const title = document.createElement('h2');
-    title.innerHTML = `Whitepaper in ${item.language.native}<hr>${item.PDF.path.split('/').pop()}`;
+    title.innerHTML = `Whitepaper in ${item.language.en}<hr>${item.PDF.path.split('/').pop()}`;
 
     // Download button
     const downloadButton = document.createElement('button');
@@ -155,14 +160,15 @@ function closeInfoModal() {
     document.body.classList.remove('modal-open'); // Remove class to body for blur effect
 }
 
-// Function to append the "Upload Instructions" block
+// Function to append the "Upload Instructions" block with a unique behavior
 function appendUploadInstructions(container) {
     const uploadWrapper = document.createElement('div');
     uploadWrapper.className = 'image-wrapper';
 
     const uploadImageBox = document.createElement('div');
     uploadImageBox.className = 'image-box';
-    uploadImageBox.onclick = openModal;
+    // This onclick event specifically opens the upload modal
+    uploadImageBox.onclick = openUploadModal;
 
     const uploadImg = document.createElement('img');
     uploadImg.src = 'img/bin.webp';
@@ -170,18 +176,37 @@ function appendUploadInstructions(container) {
     uploadImg.classList.add('custom-size-image');
     uploadImageBox.appendChild(uploadImg);
 
-    const uploadlangName = document.createElement('div');
-    uploadlangName.className = 'lang-name';
-    uploadlangName.innerHTML = `<p>Upload Instructions</p>
-                                   <div class="translator-info">
-                                       <a href="#" class="translator-link">For Translators</a>
-                                   </div>`;
+    const uploadLangName = document.createElement('div');
+    uploadLangName.className = 'lang-name';
+    uploadLangName.innerHTML = `<p>Upload Instructions</p>`;
 
     uploadWrapper.appendChild(uploadImageBox);
-    uploadWrapper.appendChild(uploadlangName);
+    uploadWrapper.appendChild(uploadLangName);
 
     // Append the upload instructions as the last child of the container
     container.appendChild(uploadWrapper);
+}
+
+// Function to open the upload modal
+function openUploadModal() {
+    const uploadModal = document.getElementById('uploadModal');
+    if (uploadModal) {
+        uploadModal.classList.add('active');
+        document.body.classList.add('modal-open');
+    }
+}
+
+// Function to close the upload modal (make sure it is properly defined)
+function closeUploadModal() {
+    console.log("Attempting to close upload modal");
+    const uploadModal = document.getElementById('uploadModal');
+    if (uploadModal.classList.contains('active')) {
+        uploadModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        console.log("Upload modal closed");
+    } else {
+        console.log("Upload modal was not active");
+    }
 }
 
 // Existing functions for handling clicks and modals
@@ -201,16 +226,6 @@ function handleClick(box, pdfPath) {
         clearTimeout(autoCloseTimeout);
         window.open(pdfPath, '_blank');
     }
-}
-
-function openModal() {
-    document.getElementById('uploadModal').classList.add('active');
-    document.body.classList.add('modal-open'); // Add class to body for blur effect
-}
-
-function closeModal() {
-    document.getElementById('uploadModal').classList.remove('active');
-    document.body.classList.remove('modal-open'); // Remove class to body for blur effect
 }
 
 window.addEventListener('click', function(event) {

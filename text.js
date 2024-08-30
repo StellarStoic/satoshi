@@ -13,9 +13,6 @@ const texts = [
 	"are",
 	"all",
 	"Satoshi",
-	"except",
-	"Craig",
-	"Wright",
 ];
 
 // Controls the speed of morphing.
@@ -97,4 +94,4 @@ animate();
 setTimeout(function() {
 	window.location.replace("https://satoshi.si/quotes.html");
   }, 60000); // This will redirect the user to example.com after 60 seconds (60000 milliseconds)
-  
+

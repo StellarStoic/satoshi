@@ -5,19 +5,20 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
-    <!-- <link href="https://cdn.lineicons.com/3.0/lineicons.css" rel="stylesheet"> -->
+    <link href="https://cdn.lineicons.com/3.0/lineicons.css" rel="stylesheet">
     
     <title>Hi Satoshi</title>
 </head>
 <body>
-
+  <!-- Copy text notification -->
+  <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
     <!-- Burger menu -->
     <a href="#menu" id="toggle"><span></span></a>
 
     <div id="menu">
       <ul>
         <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
-        <li><a href="quotes.html">Quotes</a></li>
+        <li><a href="quotes.html">Words of Satoshi</a></li>
         <li><a href="nip05.html">NIP-05</a></li>
       </ul>
     </div>
@@ -46,18 +47,42 @@
 	</defs>
 </svg>
 
-<footer>
-  <div class="element" title="this address can receive Bitcoin via lightning">
-    one@satoshi.si
-    <div class="hover-text">
-      <a href="https://stellarstoic.npub.pro/" target="_blank" title="nostr" alt="a link to my Nostr ID"><img class="ico" src="icons/ostrich.png"></img></a>
-      <!-- http://www.wbwip.com/wbw/emailencoder.html -->
-      <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank"><img class="ico" title="send mail to the domain satoshi.si owner" src="icons/mail.png"></img></a>
-    </div>
-  </div>
-</footer>
+    <!-- Footer with Email and Lightning Icon -->
+    <footer class="footer">
+      <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
+          one@satoshi.si
+      </a>
+      <!-- Lightning Icon -->
+      <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+  </footer>
 
-<script src="script.js"></script>
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+      <div class="modal-content">
+          <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+          <h4 id="gratitudeHeader">If you like what you see, consider contributing a few sats. Thanks!</h4>
+          <div class="qr-code-container">
+              <!-- Lightning QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                  <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+              </div>
+              
+              <!-- Onchain QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                  <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+
+
+<script src="copyonclick.js"></script>
+<script src="text.js"></script>
+<script src="index.js"></script>
 <script src="burgerMenu.js"></script>
+
 </body>
 </html>

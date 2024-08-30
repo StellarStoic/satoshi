@@ -17,26 +17,30 @@
     <div id="menu">
         <ul>
             <li><a href="index.html">home</a></li>
-            <li><a href="quotes.html">Quotes</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
             <li><a href="nip05.html">NIP-05</a></li>
         </ul> 
     </div> 
+
+    <!-- copy notification element -->
+    <div class="copy-notification" style="display:none;">Address copied to clipboard!</div> 
 
     <!-- Main content area -->
     <div class="container">
         <div class="content">
             <div class="description">
-                <h4 id="text">Bitcoin white paper /'s</h4>
+                <h4 id="header">Bitcoin white paper</h4>
                 <div class="image-container" id="whitepapers-container">
                     <!-- Dynamic content will be injected here -->
                 </div>
             </div>
         </div>
 
+
         <!-- Modal for upload instructions -->
         <div id="uploadModal" class="description-modal">
             <div class="modal-content">
-                <span class="close-icon" onclick="closeModal()">&times;</span>
+                <span class="close-icon" onclick="closeUploadModal()">&times;</span>
                 <h2>Instructions for Uploading Your Translated Bitcoin Whitepaper</h2>
                 <p>To upload your translated whitepaper, please follow these steps:</p>
                 <ul id="instructions-modal">
@@ -46,16 +50,15 @@
                     <li>Send me an email with:
                       <ul>
                         <li>- The VirusTotal link you copied before.</li>
-                        <li>- Your carefully translated PDF file.</li>
-                        <li>- Your credentials, including names and links to social profiles (LinkedIn, GitHub, Nostr, Twitter...).</li>
-                        <li>- Note: not well known domains younger than 2 years will not be linked.</li>
+                        <li>- Your carefully translated Bitcoin whitepaper.</li>
+                        <li>- Your credentials, including names, pseudonyms, links like websites and social profiles (such as GitHub, Nostr, Twitter, etc.)...</li>
                       </ul>
                     </li>
+                    <p>You can find an email at the bottom of this page.</p>
                     <hr>
-                    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi about the Translated whitepaper" target="_blank"><img class="ico" title="send mail to the domain satoshi.si owner" src="icons/mail.png"></img></a>
                   </ul>
 
-                  <p>Thank you for contributing to the Bitcoin community!</p>
+                  <p>Thanks for contributing to the Bitcoin community! Satoshi would be proud.</p>
             </div>
         </div>
 
@@ -68,10 +71,42 @@
         </div>
     </div>
 
+    <!-- Footer with Email and Lightning Icon -->
+    <footer class="footer">
+        <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
+            one@satoshi.si
+        </a>
+        <!-- Lightning Icon -->
+        <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+    </footer>
+
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+        <div class="modal-content">
+            <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+            <h4 id="gratitudeHeader">If you like what you see, consider contributing a few sats. Thanks!</h4>
+            <div class="qr-code-container">
+                <!-- Lightning QR Code -->
+                <div class="qr-code-wrapper">
+                    <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                    <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+                </div>
+                
+                <!-- Onchain QR Code -->
+                <div class="qr-code-wrapper">
+                    <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                    <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Copy text notification -->
+    <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
+
     <!-- Scripts -->
-    <script src="quotes.js"></script>
-    <script src="script.js"></script>
+    <script src="index.js"></script>
     <script src="burgerMenu.js"></script>
+    <script src="copyonclick.js"></script>
     <script src="whitepaper.js"></script>
 </body>
 </html>

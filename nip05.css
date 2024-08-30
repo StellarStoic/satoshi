@@ -1,13 +1,17 @@
 /* nip05.css */
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;1,300&display=swap');
 
+.nip05-container {
+    display: flex;
+    justify-content: center;
+}
+
 /* Style for the image container */
 .image-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
     justify-content: center;
-    margin: 20px;
+    padding-bottom: 60px;
 }
 
 /* Style for each image box */
@@ -18,6 +22,7 @@
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer;
+    margin: 10px;
     transition: transform 0.3s ease;
 }
 
@@ -45,26 +50,13 @@
 }
 
 /* Style for the description */
+/* Style for the description */
 .description {
     display: none;
-
-    /* padding: 10px;
-    background-color: rgb(34, 33, 33);
-    width: 100%;
-    box-sizing: border-box;
-    transition: max-height 0.3s ease;
-    max-height: 0;
-    overflow: hidden;
-    font-family: "Roboto Mono", monospace;
-	font-optical-sizing: auto;
-	font-weight: 300;
-	font-style: normal; */
-
 }
 
 .description.active {
     display: block;
-    
     max-height: 500px; /* Adjust as necessary */
 }
 
@@ -78,26 +70,38 @@ body.modal-active {
     pointer-events: none; /* Prevent interactions with blurred background */
 }
 
-/* Description modal styling */
-.description-modal {
-    display: none; /* Hidden by default */
+/* Styles for modals */
+.description-modal, #uploadModal, #infoModal, #qrCodeModal {
+    display: none;
     position: fixed;
-    word-break: keep-all; /* Prevents breaking words unless necessary */
-    overflow-wrap: break-word; /* Allows long words to break if they exceed the container width */
+    word-break: keep-all;
+    overflow-wrap: break-word;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 80%;
     max-width: 500px;
     background-color: rgb(34, 33, 33);
+    color: #fff;
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1000; /* Higher than the rest */
+    z-index: 1000; /* Ensure modal is above everything */
+    justify-content: center; /* Center modal content */
+    align-items: center; /* Align content vertically */
 }
 
-.description-modal.active {
-    display: block; /* Show modal when active */
+/* Apply responsive styles to modal content */
+.modal-content {
+    max-width: 100%; /* Ensure content does not exceed modal width */
+    word-break: break-word; /* Break long words */
+    overflow-wrap: break-word; /* Break words at appropriate points */
+    width: 100%;
+    box-sizing: border-box; /* Include padding and borders in width calculation */
+}
+
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active {
+    display: flex; /* Use flex to center content */
 }
 
 .modal-overlay {
@@ -122,7 +126,7 @@ body.modal-active {
     right: 10px;
     cursor: pointer;
     font-size: 20px;
-    color: #333;
+    color: #fff; /* Make sure the close icon is visible */
     background: none;
     border: none;
     font-weight: bold;
@@ -131,7 +135,7 @@ body.modal-active {
 
 /* Hover effect for close icon */
 .close-icon:hover {
-    color: hsla(42, 100%, 47%, 0.13);
+    color: #f9af02; /* A brighter color on hover */
 }
 
 .button-container {
@@ -155,3 +159,7 @@ body.modal-active {
     background-color: #69427e; /* Changes color on hover */
     cursor: pointer; /* Changes cursor to pointer on hover */
 }
+
+
+
+

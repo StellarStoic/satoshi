@@ -34,45 +34,20 @@ html, body {
     overflow-x: hidden;
 }
 
-h4 {
+#header {
+    display: flex;
+	text-align: center;
+    justify-content: center; /* Centers the content horizontally */
+    align-items: center; /* Centers the content vertically if needed */
+    max-width: 50%;
+    margin: 0 auto; /* Centers the flex container in the middle of the parent element */
+    color: #c5ba9e;
+    max-width: 70%;
     font-size: 1.5em;
     margin-top: 3%;
     text-align: center;
     padding-bottom: 20px;
-}
-
-/* Burger menu */
-#toggle {
-    position: fixed; /* Fixed position */
-    top: 1rem;
-    left: 1.5rem;
-    display: block;
-    width: 28px;
-    height: 30px;
-    margin: 30px auto 10px;
-    z-index: 2000; /* High z-index to be on top of all content */
-}
-
-#menu {
-    position: fixed; /* Fixed position */
-    top: 4.9rem;
-    left: 1.3rem;
-    color: #333131;
-    width: 200px;
-    padding: 10px;
-    margin: auto;
     font-family: "Roboto Mono", monospace;
-    font-optical-sizing: auto;
-    font-weight: 300;
-    font-style: normal;
-    text-align: center;
-    border-radius: 4px;
-    background: rgb(34, 33, 33);
-    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity .4s;
-    z-index: 2000; /* High z-index to be on top of all content */
 }
 
 /* Style for the image container */
@@ -82,6 +57,8 @@ h4 {
     gap: 20px;
     justify-content: center;
     margin: 20px;
+    padding-top: 10px;
+    padding-bottom: 100px;
     align-items: start;
     position: relative; /* Ensure container remains positioned */
     z-index: 1; /* Ensure this layer is below expanded translator info */
@@ -120,11 +97,12 @@ h4 {
 /* Language text styling */
 .lang-name {
     text-align: center;
+    font-family: "Roboto Mono", monospace;
     width: 75%;
     height: auto;
-    font-size: 0.8em;
+    font-size: 0.6em;
     position: relative;
-    word-break:break-all;
+    word-break:keep-all;
     color: white;
     background: #313131e6;
     padding: 0px 5px 0px 5px;
@@ -135,7 +113,7 @@ h4 {
 .translator-info {
     display: none;
     font-size: 1em;
-    color: #cebb8fab;
+    color: #c5ba9e;
     position: absolute; /* Position absolute to expand over lower items */
     top: 100%; /* Start right below the lang-name */
     left: 0;
@@ -159,65 +137,8 @@ h4 {
     cursor: default; /* Change cursor to default */
 }
 
-/* Styles for modals */
-.description-modal, #uploadModal, #infoModal{
-    display: none;
-    position: fixed;
-    word-break: keep-all;
-    overflow-wrap: break-word;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    max-width: 500px;
-    background-color: rgb(34, 33, 33);
-    color: #fff;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1000; /* Ensure modal is above everything */
-    justify-content: center; /* Center modal content */
-    align-items: center; /* Align content vertically */
-
-}
-
-/* Apply responsive styles to modal content */
-.modal-content {
-    max-width: 100%; /* Ensure content does not exceed modal width */
-    word-break: break-word; /* Break long words */
-    overflow-wrap: break-word; /* Break words at appropriate points */
-    width: 100%;
-    box-sizing: border-box; /* Include padding and borders in width calculation */
-}
-
-.description-modal.active, #uploadModal.active, #infoModal.active {
-    display: flex; /* Use flex to center content */
-}
-
-.description-modal a {
-    color: #f9af02d5; /* Brighter color for better visibility */
-    text-decoration: underline; /* Optional: Underline to indicate a link */
-}
-
-.description-modal a:hover {
-    color: #fff; /* Even brighter on hover for emphasis */
-}
-
-.close-icon {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    cursor: pointer;
-    font-size: 20px;
-    color: #fff;
-    background: none;
-    border: none;
-    font-weight: bold;
-    z-index: 1001;
-}
-
-.close-icon:hover {
-    color: hsla(42, 100%, 47%, 0.13);
+.translator-info a:hover {
+    color: #f2a900;
 }
 
 /* Style for the upload image to make it circular */
@@ -229,7 +150,7 @@ h4 {
 }
 
 #instructions-modal li {
-    color: #cebb8fab;
+    color: #c5ba9e;
 
 }
 
