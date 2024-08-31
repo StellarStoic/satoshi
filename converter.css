@@ -1,0 +1,159 @@
+/* Converter container setup */
+#converter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 20px;
+    margin-top: 60px;
+}
+
+.currency-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+    width: 95%;
+    max-width: 650px;
+    background: #2c332a;
+    border-radius: 8px;
+    padding: 8px;
+    position: relative;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+}
+
+/* Styling for dragging state */
+.dragging {
+    z-index: 1000;
+    cursor: grabbing;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Placeholder style */
+.placeholder {
+    background-color: #eee;
+    opacity: 0.5;
+}
+
+.currency-container.dragging, .placeholder {
+    transition: none;
+}
+
+.currency-input {
+    flex-grow: 1;
+    padding: 5px;
+    font-size: 1em;
+    font-family: "Roboto Mono", monospace;
+    border: none;
+    background: none;
+    color: #f2a900;
+    text-align: right;
+    outline: none;
+    overflow: hidden;
+    margin-right: 5px;
+    min-width: 60px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Base class for input highlight */
+.highlight-red {
+    background-color: red;
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Variations */
+.highlight-red-blink {
+    animation: blink-red 2s steps(2, start) infinite;
+}
+
+.highlight-red-fade {
+    animation: fade-red 2s ease-in-out;
+}
+
+@keyframes blink-red {
+    50% {
+        background-color: transparent;
+    }
+}
+
+@keyframes fade-red {
+    0% {
+        background-color: red;
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.currency-symbol {
+    padding: 5px;
+    font-size: 16px;
+    color: #f2a900;
+    background: transparent;
+    min-width: 30px;
+    text-align: left;
+}
+
+.drag-handle {
+    cursor: grab;
+    padding: 10px;
+    background-color: transparent;
+    border-radius: 3px;
+    font-size: 18px;
+    align-self: center;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Plus button icon */
+.add-currency-icon {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #5c735100;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 24px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease;
+}
+
+.add-currency-icon:hover {
+    background-color: #66d930;
+}
+
+/* Placeholder text color */
+.currency-input::placeholder {
+    color: transparent;
+}
+
+/* Currency item styles */
+.currency-item {
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #2d2c2c; /* Background color for currency item */
+    border-radius: 5px; /* Rounded corners */
+    cursor: pointer; /* Pointer cursor to indicate clickability */
+    transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition for hover effects */
+}
+
+.currency-item:hover {
+    background-color: #f2a900; /* Highlight background color on hover */
+    color: #000; /* Text color on hover for better visibility */
+}
+
+.description-modal a {
+    color: #c5ba9e; /* Brighter color for better visibility */
+    text-decoration: underline; /* Optional: Underline to indicate a link */
+}
+
+.description-modal a:hover {
+    color: #f2a900; /* Even brighter on hover for emphasis */
+} 

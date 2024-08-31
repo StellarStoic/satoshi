@@ -5,6 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="converter.css">
     <link href="https://cdn.lineicons.com/3.0/lineicons.css" rel="stylesheet">
     
     <title>Hi Satoshi</title>
@@ -17,38 +18,47 @@
 
     <div id="menu">
       <ul>
-        <li><a href="#">Home</a></li>
+        <li><a href="home.html">home</a></li>
         <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
         <li><a href="quotes.html">Words of Satoshi</a></li>
         <li><a href="nip05.html">NIP-05</a></li>
-        <li><a href="converter.html">Converter</a></li>
+        <li><a href="#">converter</a></li>
       </ul>
     </div>
+<!-- -----------------------------CONVERTER STUFF----------------------------------------- -->
 
-
-<!-- Explanation in JS tab -->
-
-<!-- The two texts -->
-<div id="container">
-	<span id="text1"></span>
-	<span id="text2"></span>
+<div id="converter">
+  <div class="currency-container">
+      <span class="currency-symbol">BTC</span>
+      <input type="text" class="currency-input" value="0.01" />
+  </div>
+  <div class="currency-container">
+      <span class="currency-symbol">SAT</span>
+      <input type="text" class="currency-input" value="5000" />
+  </div>
+  <div class="currency-container">
+      <span class="currency-symbol">USD</span>
+      <input type="text" class="currency-input" value="10000" />
+  </div>
 </div>
 
-<!-- The SVG filter used to create the merging effect -->
-<svg id="filters">
-	<defs>
-		<filter id="threshold">
-			<!-- Basically just a threshold effect - pixels with a high enough opacity are set to full opacity, and all other pixels are set to completely transparent. -->
-			<feColorMatrix in="SourceGraphic"
-					type="matrix"
-					values="1 0 0 0 0
-									0 1 0 0 0
-									0 0 1 0 0
-									0 0 0 255 -140" />
-		</filter>
-	</defs>
-</svg>
+<!-- Fixed position plus icon to add new currency container -->
+<div class="add-currency-icon" onclick="openCurrencyModal()">
+    <span class="add-icon">+</span>
+</div>
 
+<!-- Modal for currency selection -->
+<div id="currencyModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close-icon" onclick="closeCurrencyModal()">&times;</span>
+        <h4>Select a Currency</h4>
+        <div id="currencyList"></div> <!-- Container for currency list -->
+    </div>
+</div>
+
+
+
+<!-- ---------------------------------------------------------------------- -->
     <!-- Footer with Email and Lightning Icon -->
     <footer class="footer">
       <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
@@ -82,10 +92,11 @@
 
 
 <script src="copyonclick.js"></script>
-<script src="text.js"></script>
+<script src="converter.js"></script>
 <script src="index.js"></script>
 <script src="burgerMenu.js"></script>
-<script src="nameForm.js"></script>
+<script src="slip.js"></script>
+
 
 </body>
 </html>
