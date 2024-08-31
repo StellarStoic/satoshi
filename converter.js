@@ -49,7 +49,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const currencySymbol = currencySymbolElement.textContent;
         if (currencySymbol !== 'BTC' && currencySymbol !== 'SAT') {
             e.target.parentNode.removeChild(e.target); // Remove the swiped container
-            saveUserSettings(); // Save settings after removing a currency
+            if (getCookie("cookieConsent") === "true") {
+                saveUserSettings(); // Save settings after removing a currency
+            }
             updateAllCurrencies(); // Update currencies after removing one
         }
     });
@@ -67,7 +69,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     container.addEventListener('slip:reorder', function (e) {
         e.target.parentNode.insertBefore(e.target, e.detail.insertBefore);
-        saveUserSettings(); // Save settings after reordering
+        if (getCookie("cookieConsent") === "true") {
+            saveUserSettings(); // Save settings after reordering
+        }
         updateAllCurrencies(); // Recalculate all currencies after reorder
         return false;
     });
@@ -110,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     loadUserSettings(); // Load user settings after fetching rates
                     updateAllCurrencies();
 
-                    // Store rates in localStorage with expiry
+                    // Store rates in localStorage with expiry (always store this data)
                     localStorage.setItem(CACHE_KEY, JSON.stringify(exchangeRates));
                     localStorage.setItem(CACHE_EXPIRY_KEY, (now + CACHE_DURATION_MS).toString());
                 })
@@ -312,7 +316,9 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
         container.appendChild(newContainer);
         initializeInputValidation(); // Reinitialize input validation
-        saveUserSettings(); // Save user settings after adding a new currency
+        if (getCookie("cookieConsent") === "true") {
+            saveUserSettings(); // Save user settings after adding a new currency
+        }
         selectedCurrency = null;  // Reset after use
         updateAllCurrencies(); // Update all currencies after adding a new one
     };
@@ -349,4 +355,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     initializeInputValidation();
     fetchSupportedCurrencies(); // Fetch the supported currencies and exchange rates
+
+    // Helper functions to manage cookies
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        const expires = "expires=" + date.toUTCString();
+        document.cookie = name + "=" + value + ";" + expires + ";path=/";  // Set path to root
+    }
+
+    function getCookie(name) {
+        const value = "; " + document.cookie;
+        const parts = value.split("; " + name + "=");
+        if (parts.length === 2) return parts.pop().split(";").shift();
+    }
+
+    function deleteCookie(name) {
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";  // Set path to root
+    }
 });

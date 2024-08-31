@@ -242,7 +242,7 @@ p, #text {
 }
 
 /* Styles for modals */
-.description-modal, #uploadModal, #infoModal, #qrCodeModal {
+.description-modal, #uploadModal, #infoModal, #qrCodeModal #cookieConsentModal {
     display: none;
     position: fixed;
     word-break: keep-all;
@@ -276,7 +276,7 @@ p, #text {
 	font-family: "Roboto Mono", monospace;
 }
 
-.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active {
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active #cookieConsentModal.active {
     display: flex; /* Use flex to center content */
 }
 
@@ -344,4 +344,37 @@ p, #text {
     color: #fff;
     margin-top: 5px; /* Add some spacing above the text */
     text-align: center; /* Center align the text */
+}
+
+/* Container for the consent buttons */
+.consent-button-container {
+    display: flex; /* Enable Flexbox layout */
+    justify-content: center; /* Center items horizontally */
+    gap: 40px; /* Set gap between the buttons */
+    margin-top: 20px; /* Optional: Add some margin above the button row */
+}
+
+/* Styles for icon-only buttons */
+.consent-icon-button {
+    background-color: transparent; /* No background */
+    border: none; /* Remove border */
+    font-size: 2rem; /* Make icons larger */
+    cursor: pointer; /* Show pointer cursor on hover */
+    transition: transform 0.2s ease; /* Smooth transform effect */
+}
+
+.consent-icon-button:focus {
+    outline: none; /* Remove default focus outline */
+}
+
+.consent-icon-button:hover {
+    transform: scale(1.2); /* Slightly enlarge the button on hover */
+}
+
+.green-check {
+    color: green; /* Green color for checkmark */
+}
+
+.red-cross {
+    color: red; /* Red color for cross */
 }
