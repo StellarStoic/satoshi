@@ -109,24 +109,18 @@
 /* Plus button icon */
 .add-currency-icon {
     position: fixed;
-    bottom: 20px;
+    top: 23px;
     right: 20px;
     background-color: #5c735100;
-    color: #fff;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    color: #888;
     cursor: pointer;
-    font-size: 24px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    font-size: 43px;
+    font-weight: bolder;
     transition: background-color 0.3s ease;
 }
 
 .add-currency-icon:hover {
-    background-color: #66d930;
+    color: #fefffe;
 }
 
 /* Placeholder text color */
