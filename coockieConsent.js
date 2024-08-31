@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
         sessionStorage.setItem("cookieConsentDeclined", "true");
 
         // List of cookies to delete
-        const cookiesToDelete = ['exchangeRatesCache', 'exchangeRatesCacheExpiry', 'userCurrencySettings', 'cookieConsent'];
+        const cookiesToDelete = ['userCurrencySettings', 'cookieConsent'];
 
         // Delete each cookie
         cookiesToDelete.forEach(cookieName => {

@@ -69,6 +69,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     container.addEventListener('slip:reorder', function (e) {
         e.target.parentNode.insertBefore(e.target, e.detail.insertBefore);
+
+        // Add vibration feedback on mobile devices when reordering
+        if (navigator.vibrate) {
+            navigator.vibrate(50); // Vibrate for 50 milliseconds
+        }
+
         if (getCookie("cookieConsent") === "true") {
             saveUserSettings(); // Save settings after reordering
         }
