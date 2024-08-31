@@ -271,10 +271,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         input.style.fontSize = `${maxFontSize}px`;
 
-        while (input.scrollWidth > input.clientWidth && parseFloat(input.style.fontSize) > minFontSize) {
-            input.style.fontSize = `${parseFloat(input.style.fontSize) - step}px`;
-        }
+    // Check if the input's scrollWidth is greater than its clientWidth
+    // This means that the text is overflowing
+    while (input.scrollWidth > input.clientWidth && parseFloat(input.style.fontSize) > minFontSize) {
+        input.style.fontSize = `${parseFloat(input.style.fontSize) - step}px`;
     }
+    
+    // Ensure the font size does not reduce unnecessarily when input is not full
+    if (input.scrollWidth <= input.clientWidth) {
+        input.style.fontSize = `${maxFontSize}px`; // Reset to maximum font size if there's enough space
+    }
+}
 
     function initializeInputValidation() {
         const inputs = document.querySelectorAll('.currency-input');
