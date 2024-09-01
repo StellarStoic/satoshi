@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         const btcToUsdRate = exchangeRates['BTC'];
                         const conversionRate = exchangeRates[currencySymbol] / btcToUsdRate;
                         const newValue = btcValue * conversionRate;
-                        inputField.value = formatCurrency(newValue, 2);
+                        inputField.value = formatCurrency(newValue, 4);
                     }
                 } else if (currencySymbol === 'BTC') {
                     // Convert fiat to BTC
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Convert between two fiat currencies
                     const conversionRate = exchangeRates[currencySymbol] / exchangeRates[baseCurrency];
                     const newValue = baseValue * conversionRate;
-                    inputField.value = formatCurrency(newValue, 2); // Format with commas and decimals
+                    inputField.value = formatCurrency(newValue, 4); // Format with commas and decimals
                 }
             });
         }, 300); // Adjust the delay as necessary
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            adjustFontSize(this);
+            // adjustFontSize(this);
             updateAllCurrencies(); // Trigger update on input change
         });
 
@@ -264,24 +264,26 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function adjustFontSize(input) {
-        const maxFontSize = 16;
-        const minFontSize = 10;
-        const step = 0.2;
+// commented out due to non-proper font size handling when starting typing in input
 
-        input.style.fontSize = `${maxFontSize}px`;
+//     function adjustFontSize(input) {
+//         const maxFontSize = 16;
+//         const minFontSize = 10;
+//         const step = 0.2;
 
-    // Check if the input's scrollWidth is greater than its clientWidth
-    // This means that the text is overflowing
-    while (input.scrollWidth > input.clientWidth && parseFloat(input.style.fontSize) > minFontSize) {
-        input.style.fontSize = `${parseFloat(input.style.fontSize) - step}px`;
-    }
+//         input.style.fontSize = `${maxFontSize}px`;
+
+//     // Check if the input's scrollWidth is greater than its clientWidth
+//     // This means that the text is overflowing
+//     while (input.scrollWidth > input.clientWidth && parseFloat(input.style.fontSize) > minFontSize) {
+//         input.style.fontSize = `${parseFloat(input.style.fontSize) - step}px`;
+//     }
     
-    // Ensure the font size does not reduce unnecessarily when input is not full
-    if (input.scrollWidth <= input.clientWidth) {
-        input.style.fontSize = `${maxFontSize}px`; // Reset to maximum font size if there's enough space
-    }
-}
+//     // Ensure the font size does not reduce unnecessarily when input is not full
+//     if (input.scrollWidth <= input.clientWidth) {
+//         input.style.fontSize = `${maxFontSize}px`; // Reset to maximum font size if there's enough space
+//     }
+// }
 
     function initializeInputValidation() {
         const inputs = document.querySelectorAll('.currency-input');
@@ -369,21 +371,12 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeInputValidation();
     fetchSupportedCurrencies(); // Fetch the supported currencies and exchange rates
 
-    // Helper functions to manage cookies
-    function setCookie(name, value, days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        const expires = "expires=" + date.toUTCString();
-        document.cookie = name + "=" + value + ";" + expires + ";path=/";  // Set path to root
-    }
+
 
     function getCookie(name) {
         const value = "; " + document.cookie;
         const parts = value.split("; " + name + "=");
         if (parts.length === 2) return parts.pop().split(";").shift();
     }
-
-    function deleteCookie(name) {
-        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";  // Set path to root
-    }
+    
 });

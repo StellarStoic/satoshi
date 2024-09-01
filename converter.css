@@ -12,11 +12,11 @@
     align-items: center;
     justify-content: space-between;
     margin: 10px 0;
-    width: 95%;
-    max-width: 650px;
+    width: 98%;
+    max-width: 830px;
     background: #2c332a;
     border-radius: 8px;
-    padding: 8px;
+    padding: 21px;
     position: relative;
     flex-wrap: nowrap;
     box-sizing: border-box;
@@ -42,7 +42,7 @@
 .currency-input {
     flex-grow: 1;
     padding: 5px;
-    font-size: 1em;
+    font-size: 1.3em;
     font-family: "Roboto Mono", monospace;
     border: none;
     background: none;
@@ -50,7 +50,7 @@
     text-align: right;
     outline: none;
     overflow: hidden;
-    margin-right: 5px;
+    margin-right: 3px;
     min-width: 60px;
     max-width: 100%;
     box-sizing: border-box;
