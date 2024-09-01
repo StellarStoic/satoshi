@@ -21,6 +21,7 @@
     "BOB": "Bolivian Boliviano",
     "BRL": "Brazilian Real",
     "BSD": "Bahamian Dollar",
+    "BTC": "Bitcoin (Removed from the list in the populateCurrencList function but should not be removed from json!)",
     "BTN": "Bhutanese Ngultrum",
     "BWP": "Botswana Pula",
     "BYN": "Belarusian Ruble",

@@ -293,6 +293,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function populateCurrencyList(currencies) {
         currencyList.innerHTML = ''; // Clear existing list
         for (const [code, name] of Object.entries(currencies)) {
+            if (code === 'BTC') continue; // Skip adding BTC to the list
+            
             const currencyItem = document.createElement('div');
             currencyItem.className = 'currency-item';
             currencyItem.textContent = `${name} (${code})`;
