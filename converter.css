@@ -39,6 +39,35 @@
     transition: none;
 }
 
+/* Base class for input highlight */
+.highlight-red {
+    background-color: red;
+    border-radius: 8px; /* Rounded corners */
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.6);
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+/* Neon glow animation */
+.highlight-red-neon {
+    border-radius: 8px; /* Ensure the glow effect also has rounded corners */
+    animation: neon-glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes neon-glow {
+    0% {
+        background-color: red;
+        box-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.6), 0 0 30px rgba(255, 0, 0, 0.4), 0 0 40px rgba(255, 0, 0, 0.2);
+    }
+    50% {
+        background-color: red;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 30px rgba(255, 0, 0, 0.8), 0 0 40px rgba(255, 0, 0, 0.6), 0 0 50px rgba(255, 0, 0, 0.4);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: 0 0 10px rgba(255, 0, 0, 0), 0 0 20px rgba(255, 0, 0, 0);
+    }
+}
+
 .currency-input {
     flex-grow: 1;
     padding: 5px;
@@ -53,37 +82,9 @@
     margin-right: 3px;
     min-width: 60px;
     max-width: 100%;
+    border-radius: 8px; /* Round the corners of the input */
+    transition: all 0.2s ease-in-out; /* Smooth transition for background and shadow */
     box-sizing: border-box;
-}
-
-/* Base class for input highlight */
-.highlight-red {
-    background-color: red;
-    transition: background-color 0.2s ease-in-out;
-}
-
-/* Variations */
-.highlight-red-blink {
-    animation: blink-red 2s steps(2, start) infinite;
-}
-
-.highlight-red-fade {
-    animation: fade-red 2s ease-in-out;
-}
-
-@keyframes blink-red {
-    50% {
-        background-color: transparent;
-    }
-}
-
-@keyframes fade-red {
-    0% {
-        background-color: red;
-    }
-    100% {
-        background-color: transparent;
-    }
 }
 
 .currency-symbol {

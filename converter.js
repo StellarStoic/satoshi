@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const MAX_BTC_SUPPLY = 21000000; // Maximum supply of BTC
     const MAX_SAT_SUPPLY = MAX_BTC_SUPPLY * 100000000; // Maximum supply of SAT (21 million BTC in Satoshis)
 
-    // Initialize Slip.js for drag-and-drop and swipe-to-remove functionality
+    // Slip.js is used for drag-and-drop and swipe-to-remove functionality
     const slipInstance = new Slip(container);
 
     // Prevent drag start when clicking on an input field
@@ -88,13 +88,16 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 supportedCurrencies = data.currencies; // Store the supported currencies
                 populateCurrencyList(supportedCurrencies); // Populate the modal with supported currencies
-
-                // Exclude "SAT" from the list of currencies to fetch from API
-                const currencyCodes = Object.keys(supportedCurrencies).filter(code => code !== 'SAT');
+    
+                // Exclude SAT and other BTC-derived units from the list of currencies to fetch from API
+                const excludedUnits = ['SAT', 'msat', '𝑓BTC', 'μBTC', 'mBTC', 'cBTC'];
+                const currencyCodes = Object.keys(supportedCurrencies).filter(code => !excludedUnits.includes(code));
+                
                 fetchExchangeRates(currencyCodes); // Fetch rates for these currencies
             })
             .catch(error => console.error('Error fetching supported currencies:', error));
     }
+    
 
     function fetchExchangeRates(currencyCodes = ['USD']) {
         // Check if exchange rates are stored in localStorage and not expired
@@ -130,93 +133,95 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateAllCurrencies() {
         if (updateTimeout) clearTimeout(updateTimeout); // Clear any existing timeout
-
+    
         updateTimeout = setTimeout(() => { // Debounce logic to reduce excessive calculations
             const baseCurrencyContainer = container.querySelector('.currency-container:first-child .currency-symbol');
             const baseCurrency = baseCurrencyContainer ? baseCurrencyContainer.textContent : 'USD';
             const baseInput = container.querySelector('.currency-container:first-child .currency-input');
             const baseValue = parseFloat(baseInput.value.replace(/,/g, ''));
-
+    
             if (isNaN(baseValue)) return; // If base value is not a number, exit
-
+    
             if (baseCurrency === 'BTC' && baseValue > MAX_BTC_SUPPLY) {
-                // Cap BTC at maximum supply and highlight
                 baseInput.value = MAX_BTC_SUPPLY.toFixed(8);
                 highlightInput(container.querySelector('.currency-container:first-child'));
             } else if (baseCurrency === 'SAT' && baseValue > MAX_SAT_SUPPLY) {
-                // Cap SAT at maximum supply in Satoshis and highlight
                 baseInput.value = MAX_SAT_SUPPLY.toFixed(0);
                 highlightInput(container.querySelector('.currency-container:first-child'));
             }
-
+    
             document.querySelectorAll('.currency-container').forEach((currencyContainer, index) => {
                 const inputField = currencyContainer.querySelector('.currency-input');
                 const currencySymbol = currencyContainer.querySelector('.currency-symbol').textContent;
-
+    
                 if (index === 0) {
                     inputField.readOnly = false; // Make the first input editable
                     return; // Skip further processing for the base currency
                 }
-
+    
                 inputField.readOnly = true; // Make all other inputs read-only
+    
+                // Conversion logic for Bitcoin and related units
+                const conversions = {
+                    'msat': 100000000000, // Millisatoshi
+                    'SAT': 100000000, // Satoshi
+                    '𝑓BTC': 10000000, // finney
+                    'μBTC': 1000000, // bit (Micro-Bitcoin)
+                    'mBTC': 1000, // millie (Milli-Bitcoin)
+                    'cBTC': 100 // bitcent (Centi-Bitcoin)
+                };
 
                 if (baseCurrency === 'BTC') {
-                    if (currencySymbol === 'SAT') {
-                        // Convert BTC to SAT
-                        const satoshiValue = baseValue * 100000000;
-                        inputField.value = formatCurrency(satoshiValue, 0); // No decimals needed for SAT
+                    if (conversions[currencySymbol]) {
+                        const convertedValue = baseValue * conversions[currencySymbol];
+                        inputField.value = formatCurrency(convertedValue, 0); // No decimals needed for these small units
                     } else if (exchangeRates[currencySymbol]) {
-                        // Convert BTC to other currencies
                         const btcToUsdRate = exchangeRates['BTC'];
                         const conversionRate = exchangeRates[currencySymbol] / btcToUsdRate;
                         const newValue = baseValue * conversionRate;
                         inputField.value = formatCurrency(newValue, 2);
                     }
-                } else if (baseCurrency === 'SAT') {
+                } else if (conversions[baseCurrency]) {
+                    // Conversions from other BTC units to BTC
+                    const btcValue = baseValue / conversions[baseCurrency];
+    
                     if (currencySymbol === 'BTC') {
-                        // Convert SAT to BTC
-                        let btcValue = baseValue / 100000000;
-                        if (btcValue > MAX_BTC_SUPPLY) {
-                            btcValue = MAX_BTC_SUPPLY;
-                            highlightInput(currencyContainer); // Highlight input if exceeded
-                        }
                         inputField.value = formatCurrency(btcValue, 8); // Up to 8 decimals for BTC
+                    } else if (conversions[currencySymbol]) {
+                        const convertedValue = btcValue * conversions[currencySymbol];
+                        inputField.value = formatCurrency(convertedValue, 0); // No decimals needed
                     } else if (exchangeRates[currencySymbol]) {
-                        // Convert SAT to other currencies via BTC
-                        const btcValue = baseValue / 100000000;
                         const btcToUsdRate = exchangeRates['BTC'];
                         const conversionRate = exchangeRates[currencySymbol] / btcToUsdRate;
                         const newValue = btcValue * conversionRate;
                         inputField.value = formatCurrency(newValue, 4);
                     }
                 } else if (currencySymbol === 'BTC') {
-                    // Convert fiat to BTC
                     if (exchangeRates['BTC'] && exchangeRates[baseCurrency]) {
                         const conversionRate = exchangeRates['BTC'] / exchangeRates[baseCurrency];
                         let btcValue = baseValue * conversionRate;
                         if (btcValue > MAX_BTC_SUPPLY) {
                             btcValue = MAX_BTC_SUPPLY;
-                            highlightInput(currencyContainer); // Highlight input if exceeded
+                            highlightInput(currencyContainer);
                         }
-                        inputField.value = formatCurrency(btcValue, 8); // Up to 8 decimals for BTC
+                        inputField.value = formatCurrency(btcValue, 8);
                     }
-                } else if (currencySymbol === 'SAT') {
-                    // Convert fiat to SAT via BTC
+                } else if (conversions[currencySymbol]) {
+                    // Convert fiat to Bitcoin units
                     if (exchangeRates['BTC'] && exchangeRates[baseCurrency]) {
                         const conversionRate = exchangeRates['BTC'] / exchangeRates[baseCurrency];
                         let btcValue = baseValue * conversionRate;
                         if (btcValue > MAX_BTC_SUPPLY) {
                             btcValue = MAX_BTC_SUPPLY;
-                            highlightInput(currencyContainer); // Highlight input if exceeded
+                            highlightInput(currencyContainer);
                         }
-                        const satoshiValue = btcValue * 100000000;
-                        inputField.value = formatCurrency(satoshiValue, 0); // No decimals needed for SAT
+                        const convertedValue = btcValue * conversions[currencySymbol];
+                        inputField.value = formatCurrency(convertedValue, 2); // No decimals needed
                     }
                 } else if (exchangeRates[baseCurrency] && exchangeRates[currencySymbol]) {
-                    // Convert between two fiat currencies
                     const conversionRate = exchangeRates[currencySymbol] / exchangeRates[baseCurrency];
                     const newValue = baseValue * conversionRate;
-                    inputField.value = formatCurrency(newValue, 4); // Format with commas and decimals
+                    inputField.value = formatCurrency(newValue, 4);
                 }
             });
         }, 300); // Adjust the delay as necessary
@@ -224,10 +229,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function highlightInput(container) {
         const inputField = container.querySelector('.currency-input');
-        inputField.classList.add('highlight-red');
+        
+        // Add neon glow class
+        inputField.classList.add('highlight-red-neon');
+    
+        // Remove the class after a few seconds to stop the blinking
         setTimeout(() => {
-            inputField.classList.remove('highlight-red'); // Reset background color after 1 second
-        }, 1000);
+            inputField.classList.remove('highlight-red-neon'); // Stop neon effect
+        }, 3000); // Adjust duration as needed (e.g., 3 seconds)
     }
 
     function formatCurrency(value, decimals) {
@@ -238,32 +247,120 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+
+    // function restrictInput(input) {
+    //     input.addEventListener('input', function () {
+    //         // Allow only numbers, commas, and periods in the input
+    //         this.value = this.value.replace(/[^0-9.,]/g, '');
+    //         const inputValue = parseFloat(this.value.replace(/,/g, ''));
+    
+    //         if (!isNaN(inputValue)) {
+    //             const currencySymbol = this.closest('.currency-container').querySelector('.currency-symbol').textContent;
+    
+    //             // Check and cap values based on the currency symbol
+    //             if (currencySymbol === 'BTC' && inputValue > MAX_BTC_SUPPLY) {
+    //                 this.value = MAX_BTC_SUPPLY.toFixed(8);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === 'SAT' && inputValue > MAX_SAT_SUPPLY) {
+    //                 this.value = MAX_SAT_SUPPLY.toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === 'msat' && inputValue > MAX_BTC_SUPPLY * 100000000000) {
+    //                 // Max supply for msat (1 BTC = 100,000,000,000 msat)
+    //                 this.value = (MAX_BTC_SUPPLY * 100000000000).toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === '𝑓BTC' && inputValue > MAX_BTC_SUPPLY * 10000000) {
+    //                 // Max supply for 𝑓BTC (1 BTC = 10,000,000 𝑓BTC)
+    //                 this.value = (MAX_BTC_SUPPLY * 10000000).toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === 'μBTC' && inputValue > MAX_BTC_SUPPLY * 1000000) {
+    //                 // Max supply for μBTC (1 BTC = 1,000,000 μBTC)
+    //                 this.value = (MAX_BTC_SUPPLY * 1000000).toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === 'mBTC' && inputValue > MAX_BTC_SUPPLY * 1000) {
+    //                 // Max supply for mBTC (1 BTC = 1,000 mBTC)
+    //                 this.value = (MAX_BTC_SUPPLY * 1000).toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             } else if (currencySymbol === 'cBTC' && inputValue > MAX_BTC_SUPPLY * 100) {
+    //                 // Max supply for cBTC (1 BTC = 100 cBTC)
+    //                 this.value = (MAX_BTC_SUPPLY * 100).toFixed(0);
+    //                 highlightInput(this.closest('.currency-container'));
+    //             }
+    //         }
+
+
+    //         // Trigger update on input change
+    //         updateAllCurrencies();
+    //     });
+    
+    //     // Prevent entering non-numeric characters except comma and period
+    //     input.addEventListener('keypress', function (event) {
+    //         if (!/[0-9.,]/.test(event.key) && !event.ctrlKey) {
+    //             event.preventDefault();
+    //         }
+    //     });
+    // }
+
+
+
     function restrictInput(input) {
         input.addEventListener('input', function () {
+            // Allow only numbers, commas, and periods in the input
             this.value = this.value.replace(/[^0-9.,]/g, '');
-            const inputValue = parseFloat(this.value.replace(/,/g, ''));
-
-            if (!isNaN(inputValue) && (this.closest('.currency-container').querySelector('.currency-symbol').textContent === 'BTC' || this.closest('.currency-container').querySelector('.currency-symbol').textContent === 'SAT')) {
-                if (this.closest('.currency-container').querySelector('.currency-symbol').textContent === 'BTC' && inputValue > MAX_BTC_SUPPLY) {
-                    this.value = MAX_BTC_SUPPLY.toFixed(8);
-                    highlightInput(this.closest('.currency-container'));
-                } else if (this.closest('.currency-container').querySelector('.currency-symbol').textContent === 'SAT' && inputValue > MAX_SAT_SUPPLY) {
+            let inputValue = parseFloat(this.value.replace(/,/g, ''));
+    
+            if (!isNaN(inputValue)) {
+                const currencySymbol = this.closest('.currency-container').querySelector('.currency-symbol').textContent;
+    
+                // Check and cap values based on the currency symbol
+                if (currencySymbol === 'BTC') {
+                    if (inputValue > MAX_BTC_SUPPLY) {
+                        this.value = MAX_BTC_SUPPLY.toFixed(0);
+                        highlightInput(this.closest('.currency-container'));
+                    } else {
+                        // Allow up to 8 decimal places for BTC but do not exceed the supply
+                        this.value = formatCurrency(inputValue, 8).replace(/(\.0+|0+)$/, '');
+                    }
+                } else if (currencySymbol === 'SAT' && inputValue > MAX_SAT_SUPPLY) {
                     this.value = MAX_SAT_SUPPLY.toFixed(0);
                     highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === 'msat' && inputValue > MAX_BTC_SUPPLY * 100000000000) {
+                    // Max supply for msat (1 BTC = 100,000,000,000 msat)
+                    this.value = (MAX_BTC_SUPPLY * 100000000000).toFixed(0);
+                    highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === '𝑓BTC' && inputValue > MAX_BTC_SUPPLY * 10000000) {
+                    // Max supply for 𝑓BTC (1 BTC = 10,000,000 𝑓BTC)
+                    this.value = (MAX_BTC_SUPPLY * 10000000).toFixed(0);
+                    highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === 'μBTC' && inputValue > MAX_BTC_SUPPLY * 1000000) {
+                    // Max supply for μBTC (1 BTC = 1,000,000 μBTC)
+                    this.value = (MAX_BTC_SUPPLY * 1000000).toFixed(0);
+                    highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === 'mBTC' && inputValue > MAX_BTC_SUPPLY * 1000) {
+                    // Max supply for mBTC (1 BTC = 1,000 mBTC)
+                    this.value = (MAX_BTC_SUPPLY * 1000).toFixed(0);
+                    highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === 'cBTC' && inputValue > MAX_BTC_SUPPLY * 100) {
+                    // Max supply for cBTC (1 BTC = 100 cBTC)
+                    this.value = (MAX_BTC_SUPPLY * 100).toFixed(0);
+                    highlightInput(this.closest('.currency-container'));
+                } else {
+                    // For non-BTC currencies, keep the standard format without extra zeros
+                    this.value = formatCurrency(inputValue, 8).replace(/(\.0+|0+)$/, '');
                 }
             }
 
-            // adjustFontSize(this);
-            updateAllCurrencies(); // Trigger update on input change
+            // Trigger update on input change
+            updateAllCurrencies();
         });
-
+    
+        // Prevent entering non-numeric characters except comma and period
         input.addEventListener('keypress', function (event) {
             if (!/[0-9.,]/.test(event.key) && !event.ctrlKey) {
                 event.preventDefault();
             }
         });
     }
-
+    
 // commented out due to non-proper font size handling when starting typing in input
 
 //     function adjustFontSize(input) {
@@ -290,20 +387,43 @@ document.addEventListener('DOMContentLoaded', function () {
         inputs.forEach(input => restrictInput(input));
     }
 
-    function populateCurrencyList(currencies) {
-        currencyList.innerHTML = ''; // Clear existing list
-        for (const [code, name] of Object.entries(currencies)) {
-            if (code === 'BTC') continue; // Skip adding BTC to the list
-            
-            const currencyItem = document.createElement('div');
-            currencyItem.className = 'currency-item';
-            currencyItem.textContent = `${name} (${code})`;
-            currencyItem.onclick = function () {
-                selectCurrency(code);
-            };
-            currencyList.appendChild(currencyItem);
-        }
+function populateCurrencyList(currencies) {
+    currencyList.innerHTML = ''; // Clear existing list
+
+    // First, add Bitcoin-derived units manually
+    const btcDerivedUnits = {
+        'msat': 'Millisatoshi',
+        // 'SAT': 'Satoshi', - Should be excluded because BTC and SATs can not be swiped off the screen
+        '𝑓BTC': 'finney',
+        'μBTC': 'bit (Micro-Bitcoin)',
+        'mBTC': 'millie (Milli-Bitcoin)',
+        'cBTC': 'bitcent (Centi-Bitcoin)'
+    };
+
+    for (const [code, name] of Object.entries(btcDerivedUnits)) {
+        const currencyItem = document.createElement('div');
+        currencyItem.className = 'currency-item';
+        currencyItem.textContent = `${name} (${code})`;
+        currencyItem.onclick = function () {
+            selectCurrency(code);
+        };
+        currencyList.appendChild(currencyItem);
     }
+
+    // Then, add the rest of the currencies from the fetched data
+    for (const [code, name] of Object.entries(currencies)) {
+        // Optional: If you want to skip adding BTC itself, uncomment the next line
+        if (code === 'BTC') continue;
+
+        const currencyItem = document.createElement('div');
+        currencyItem.className = 'currency-item';
+        currencyItem.textContent = `${name} (${code})`;
+        currencyItem.onclick = function () {
+            selectCurrency(code);
+        };
+        currencyList.appendChild(currencyItem);
+    }
+}
 
     window.openCurrencyModal = function () {
         currencyModal.style.display = 'block';
