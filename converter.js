@@ -247,82 +247,50 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-
-    // function restrictInput(input) {
-    //     input.addEventListener('input', function () {
-    //         // Allow only numbers, commas, and periods in the input
-    //         this.value = this.value.replace(/[^0-9.,]/g, '');
-    //         const inputValue = parseFloat(this.value.replace(/,/g, ''));
-    
-    //         if (!isNaN(inputValue)) {
-    //             const currencySymbol = this.closest('.currency-container').querySelector('.currency-symbol').textContent;
-    
-    //             // Check and cap values based on the currency symbol
-    //             if (currencySymbol === 'BTC' && inputValue > MAX_BTC_SUPPLY) {
-    //                 this.value = MAX_BTC_SUPPLY.toFixed(8);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === 'SAT' && inputValue > MAX_SAT_SUPPLY) {
-    //                 this.value = MAX_SAT_SUPPLY.toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === 'msat' && inputValue > MAX_BTC_SUPPLY * 100000000000) {
-    //                 // Max supply for msat (1 BTC = 100,000,000,000 msat)
-    //                 this.value = (MAX_BTC_SUPPLY * 100000000000).toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === '𝑓BTC' && inputValue > MAX_BTC_SUPPLY * 10000000) {
-    //                 // Max supply for 𝑓BTC (1 BTC = 10,000,000 𝑓BTC)
-    //                 this.value = (MAX_BTC_SUPPLY * 10000000).toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === 'μBTC' && inputValue > MAX_BTC_SUPPLY * 1000000) {
-    //                 // Max supply for μBTC (1 BTC = 1,000,000 μBTC)
-    //                 this.value = (MAX_BTC_SUPPLY * 1000000).toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === 'mBTC' && inputValue > MAX_BTC_SUPPLY * 1000) {
-    //                 // Max supply for mBTC (1 BTC = 1,000 mBTC)
-    //                 this.value = (MAX_BTC_SUPPLY * 1000).toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             } else if (currencySymbol === 'cBTC' && inputValue > MAX_BTC_SUPPLY * 100) {
-    //                 // Max supply for cBTC (1 BTC = 100 cBTC)
-    //                 this.value = (MAX_BTC_SUPPLY * 100).toFixed(0);
-    //                 highlightInput(this.closest('.currency-container'));
-    //             }
-    //         }
-
-
-    //         // Trigger update on input change
-    //         updateAllCurrencies();
-    //     });
-    
-    //     // Prevent entering non-numeric characters except comma and period
-    //     input.addEventListener('keypress', function (event) {
-    //         if (!/[0-9.,]/.test(event.key) && !event.ctrlKey) {
-    //             event.preventDefault();
-    //         }
-    //     });
-    // }
-
-
-
     function restrictInput(input) {
         input.addEventListener('input', function () {
-            // Allow only numbers, commas, and periods in the input
-            this.value = this.value.replace(/[^0-9.,]/g, '');
-            let inputValue = parseFloat(this.value.replace(/,/g, ''));
+            // Allow only numbers and periods (dot) in the input
+            this.value = this.value.replace(/[^0-9.]/g, '');
     
+            // Ensure only one period (dot) is allowed in the input
+            if ((this.value.match(/\./g) || []).length > 1) {
+                this.value = this.value.substring(0, this.value.length - 1);
+            }
+    
+            // Prevent multiple leading zeros unless followed by a decimal point
+            if (this.value.startsWith('0') && this.value.length > 1 && this.value[1] !== '.') {
+                // Remove leading zeros unless followed by a decimal
+                this.value = this.value.replace(/^0+/, '');
+            }
+    
+            // If the input is empty or a single dot, do nothing and wait for valid input
+            if (this.value === '' || this.value === '.') {
+                updateAllCurrencies();
+                return;
+            }
+    
+            let inputValue = parseFloat(this.value); // Parse the input value to a number
+    
+            // Proceed only if the parsed value is a valid number
             if (!isNaN(inputValue)) {
                 const currencySymbol = this.closest('.currency-container').querySelector('.currency-symbol').textContent;
     
                 // Check and cap values based on the currency symbol
                 if (currencySymbol === 'BTC') {
                     if (inputValue > MAX_BTC_SUPPLY) {
-                        this.value = MAX_BTC_SUPPLY.toFixed(0);
+                        this.value = MAX_BTC_SUPPLY.toFixed(8);
                         highlightInput(this.closest('.currency-container'));
-                    } else {
-                        // Allow up to 8 decimal places for BTC but do not exceed the supply
-                        this.value = formatCurrency(inputValue, 8).replace(/(\.0+|0+)$/, '');
+                    } else if (this.value.includes('.')) {
+                        // Allow up to 8 decimal places for BTC only when the input contains a dot
+                        let decimals = this.value.split('.')[1].length;
+                        if (decimals > 8) {
+                            // Limit the decimals to 8 if user tries to input more
+                            this.value = this.value.slice(0, this.value.indexOf('.') + 9);
+                        }
                     }
-                } else if (currencySymbol === 'SAT' && inputValue > MAX_SAT_SUPPLY) {
-                    this.value = MAX_SAT_SUPPLY.toFixed(0);
-                    highlightInput(this.closest('.currency-container'));
+                } else if (currencySymbol === 'SAT') {
+                    // Satoshis should not have any decimal places
+                    this.value = Math.floor(inputValue).toString();
                 } else if (currencySymbol === 'msat' && inputValue > MAX_BTC_SUPPLY * 100000000000) {
                     // Max supply for msat (1 BTC = 100,000,000,000 msat)
                     this.value = (MAX_BTC_SUPPLY * 100000000000).toFixed(0);
@@ -343,19 +311,33 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Max supply for cBTC (1 BTC = 100 cBTC)
                     this.value = (MAX_BTC_SUPPLY * 100).toFixed(0);
                     highlightInput(this.closest('.currency-container'));
-                } else {
-                    // For non-BTC currencies, keep the standard format without extra zeros
-                    this.value = formatCurrency(inputValue, 8).replace(/(\.0+|0+)$/, '');
                 }
-            }
 
-            // Trigger update on input change
-            updateAllCurrencies();
+             // // Adjust the font size based on input content width
+             // adjustFontSize(this);
+
+
+                // Trigger update on input change for valid numbers
+                updateAllCurrencies();
+            } else {
+
+             // // Adjust the font size based on input content width
+             // adjustFontSize(this);
+
+
+                // If input is invalid (like just a dot or incorrect format), clear the input or handle accordingly
+                updateAllCurrencies(); // Ensure currencies are updated if the input is cleared or invalid
+            }
         });
     
-        // Prevent entering non-numeric characters except comma and period
+        // Prevent entering non-numeric characters except for period (dot)
         input.addEventListener('keypress', function (event) {
-            if (!/[0-9.,]/.test(event.key) && !event.ctrlKey) {
+            if (!/[0-9.]/.test(event.key) && !event.ctrlKey) {
+                event.preventDefault();
+            }
+    
+            // Prevent multiple periods (dots) from being entered
+            if (event.key === '.' && this.value.includes('.')) {
                 event.preventDefault();
             }
         });
@@ -363,29 +345,37 @@ document.addEventListener('DOMContentLoaded', function () {
     
 // commented out due to non-proper font size handling when starting typing in input
 
-//     function adjustFontSize(input) {
-//         const maxFontSize = 16;
-//         const minFontSize = 10;
-//         const step = 0.2;
-
-//         input.style.fontSize = `${maxFontSize}px`;
-
-//     // Check if the input's scrollWidth is greater than its clientWidth
-//     // This means that the text is overflowing
-//     while (input.scrollWidth > input.clientWidth && parseFloat(input.style.fontSize) > minFontSize) {
-//         input.style.fontSize = `${parseFloat(input.style.fontSize) - step}px`;
-//     }
+// function adjustFontSize(input) {
+//     const maxFontSizeEm = 1.3;  // Maximum font size in em
+//     const minFontSizeEm = 0.5;  // Minimum font size in em
+//     const step = 0.05;  // Step size for smooth adjustment
     
-//     // Ensure the font size does not reduce unnecessarily when input is not full
-//     if (input.scrollWidth <= input.clientWidth) {
-//         input.style.fontSize = `${maxFontSize}px`; // Reset to maximum font size if there's enough space
+
+//     // Get the current font size in em units
+//     let currentFontSizeEm = parseFloat(window.getComputedStyle(input).fontSize) / parseFloat(getComputedStyle(document.documentElement).fontSize);
+
+//     // Calculate the maximum width the text can occupy without overflowing
+//     const inputWidth = input.clientWidth;
+
+//     // Check if the text fits within the input's visible width
+//     if (input.scrollWidth <= inputWidth) {
+//         // If the text fits and the current font size is less than the maximum, increase the font size
+//         if (currentFontSizeEm < maxFontSizeEm) {
+//             input.style.fontSize = `${Math.min(maxFontSizeEm, currentFontSizeEm + step)}em`;
+//         }
+//     } else {
+//         // If the text overflows the left edge, reduce the font size
+//         if (currentFontSizeEm > minFontSizeEm) {
+//             input.style.fontSize = `${Math.max(minFontSizeEm, currentFontSizeEm - step)}em`;
+//         }
 //     }
 // }
 
-    function initializeInputValidation() {
-        const inputs = document.querySelectorAll('.currency-input');
-        inputs.forEach(input => restrictInput(input));
-    }
+
+function initializeInputValidation() {
+    const inputs = document.querySelectorAll('.currency-input');
+    inputs.forEach(input => restrictInput(input));
+}
 
 function populateCurrencyList(currencies) {
     currencyList.innerHTML = ''; // Clear existing list
@@ -393,7 +383,7 @@ function populateCurrencyList(currencies) {
     // First, add Bitcoin-derived units manually
     const btcDerivedUnits = {
         'msat': 'Millisatoshi',
-        // 'SAT': 'Satoshi', - Should be excluded because BTC and SATs can not be swiped off the screen
+        // 'SAT': 'Satoshi', - Should be excluded from the currency list because BTC and SATs can not be swiped off the screen
         '𝑓BTC': 'finney',
         'μBTC': 'bit (Micro-Bitcoin)',
         'mBTC': 'millie (Milli-Bitcoin)',
