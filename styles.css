@@ -241,6 +241,20 @@ p, #text {
     margin-left: -10px;
 }
 
+.footer #fee-rate {
+	font-size: 1em;
+	position: absolute;
+	right: 10px;
+	cursor: pointer;
+}
+
+.footer #block-height {
+	font-size: 1em;
+	position: absolute;
+	left: 10px;
+	cursor: pointer;
+}
+
 /* Styles for modals */
 .description-modal, #uploadModal, #infoModal, #qrCodeModal #cookieConsentModal {
     display: none;
@@ -311,6 +325,7 @@ p, #text {
 #gratitudeHeader {
     display: flex;
 	text-align: center;
+	font-size: 0.8em;
     justify-content: center; /* Centers the content horizontally */
     align-items: center; /* Centers the content vertically if needed */
     max-width: 50%;

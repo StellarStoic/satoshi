@@ -49,20 +49,41 @@
 	</defs>
 </svg>
 
-    <!-- Footer with Email and Lightning Icon -->
-    <footer class="footer">
-      <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
-          one@satoshi.si
-      </a>
-      <!-- Lightning Icon -->
-      <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+<!-- ---------------------------------------------------------------------- -->
+<!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
+<footer class="footer">
+    <!-- Email Link -->
+    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
+      one@satoshi.si
+    </a>
+  
+    <!-- Block Height Display (Left Side) -->
+    <span id="block-height"  title="Block Height" onclick="openMempoolTinyDataModal()">
+    </span>
+  
+    <!-- Fee Rate Display (Right Side) -->
+    <span id="fee-rate" title="Network fee rate" onclick="openMempoolTinyDataModal()">
+    </span>
+    
+    <!-- Lightning Icon -->
+    <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
   </footer>
+
+  <!-- modal for Mempool Tiny Data Modal -->
+<div id="mempoolTinyDataModal" class="description-modal">
+    <div class="modal-content">
+      <span class="close-button" onclick="closeMempoolTinyDataModal()">&times;</span>
+      <h2>This section is still under development...</h2>
+      <!-- Content for mempool data goes here -->
+    </div>
+</div>
+
 
     <!-- Modal for QR Code donation -->
     <div id="qrCodeModal" class="description-modal">
       <div class="modal-content">
           <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
-          <h4 id="gratitudeHeader">If you like what you see, consider contributing a few sats. Thanks!</h4>
+          <h4 id="gratitudeHeader">If you find this website valuable, consider contributing a sat or two. Thank you.</h4>
           <div class="qr-code-container">
               <!-- Lightning QR Code -->
               <div class="qr-code-wrapper">
@@ -107,6 +128,7 @@
 
 <script src="coockieConsent.js"></script>
 <script src="copyonclick.js"></script>
+<script src="mempoolWebSocket.js"></script>
 <script src="text.js"></script>
 <script src="index.js"></script>
 <script src="burgerMenu.js"></script>

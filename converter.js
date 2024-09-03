@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cachedRates && cachedExpiry && now < cachedExpiry) {
             // Use cached rates if not expired
             exchangeRates = JSON.parse(cachedRates);
-            console.log('Using cached exchange rates:', exchangeRates);
+            // consol.log('Using cached exchange rates:', exchangeRates);
             loadUserSettings(); // Load user settings after fetching rates
             updateAllCurrencies();
         } else {
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(response => response.json())
                 .then(data => {
                     exchangeRates = data.rates;
-                    console.log('Fetched new exchange rates:', exchangeRates);
+                    // consol.log('Fetched new exchange rates:', exchangeRates);
                     loadUserSettings(); // Load user settings after fetching rates
                     updateAllCurrencies();
 
@@ -425,7 +425,7 @@ function populateCurrencyList(currencies) {
 
     window.selectCurrency = function (currency) {
         selectedCurrency = currency;  // Store selected currency
-        console.log(`Selected currency: ${selectedCurrency}`);
+        // consol.log(`Selected currency: ${selectedCurrency}`);
         closeCurrencyModal();
         addCurrencyContainer();  // Call to add the container after currency selection
     };
