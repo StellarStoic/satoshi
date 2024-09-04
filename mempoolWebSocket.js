@@ -27,7 +27,7 @@ function connectToMempoolAPI() {
 
         // Extract the last block height from the 'blocks' object
         if (data.blocks && data.blocks.length > 0) {
-            const lastBlockHeight = data.blocks[0].height;
+            const lastBlockHeight = data.blocks[7].height;
             document.getElementById('block-height').textContent = '' + lastBlockHeight;
         } else {
             console.log('Block height data not available in the received payload.');
