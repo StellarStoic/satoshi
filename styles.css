@@ -256,7 +256,7 @@ p, #text {
 }
 
 /* Styles for modals */
-.description-modal, #uploadModal, #infoModal, #qrCodeModal #cookieConsentModal {
+.description-modal, #uploadModal, #infoModal, #qrCodeModal #cookieConsentModal #mempoolTinyDataModal {
     display: none;
     position: fixed;
     word-break: keep-all;
@@ -290,7 +290,7 @@ p, #text {
 	font-family: "Roboto Mono", monospace;
 }
 
-.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active #cookieConsentModal.active {
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active #cookieConsentModal.active #mempoolTinyDataModal.active {
     display: flex; /* Use flex to center content */
 }
 
@@ -392,4 +392,51 @@ p, #text {
 
 .red-cross {
     color: red; /* Red color for cross */
+}
+
+#mempoolTinyDataModal .avg-fee-rate,
+#mempoolTinyDataModal .fee-range,
+#mempoolTinyDataModal .total-fees-btc,
+#mempoolTinyDataModal .total-fees-sats,
+#mempoolTinyDataModal .tx-count,
+#mempoolTinyDataModal .time-passed,
+#mempoolTinyDataModal .mined-by {
+    margin-bottom: 5px;
+    font-size: 1em;
+}
+
+.modal-title {
+	position: relative;
+	text-align: center;
+}
+
+#mempoolTinyDataModal .modal-navigation {
+    display: flex;
+    justify-content: space-between;
+	padding: 0px 30px 0px 30px ;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+#mempoolTinyDataModal .left-arrow,
+#mempoolTinyDataModal .right-arrow {
+    position: relative;
+	cursor: pointer;
+
+    color: #c5ba9e;
+    font-size: 1.9em;
+    opacity: 0.7;
+	margin-top: -10px;
+    transition: opacity 0.3s;
+}
+
+#mempoolTinyDataModal .left-arrow:hover,
+#mempoolTinyDataModal .right-arrow:hover {
+    opacity: 1;
+}
+
+/* Styling for modal sections */
+#mem-poolTinyDataModal .block-data,
+#mem-poolTinyDataModal .fee-data {
+    display: none; /* Hidden by default, shown conditionally */
 }

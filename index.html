@@ -69,12 +69,37 @@
     <i class="lni lni-bolt-alt" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
   </footer>
 
-  <!-- modal for Mempool Tiny Data Modal -->
+<!-- Mempool Tiny Data Modal -->
 <div id="mempoolTinyDataModal" class="description-modal">
     <div class="modal-content">
-      <span class="close-button" onclick="closeMempoolTinyDataModal()">&times;</span>
-      <h2>This section is still under development...</h2>
-      <!-- Content for mempool data goes here -->
+        <span class="close-icon" onclick="closeMempoolTinyDataModal()">&times;</span>
+        <div class="modal-navigation">
+            <span class="left-arrow" title="Previous Block">&larrfs;</span>
+            <h2 class="modal-title"></h2>
+            <span class="right-arrow" title="Next Block">&rarrfs;</span>
+        </div>
+        
+
+        <!-- Block Data Content -->
+        <div class="block-data" style="display: none;">
+            <div class="avg-fee-rate" title="Median fee rate"></div>
+            <div class="fee-range" title="Fee Range from Lowest to Highest"></div>
+            <div class="total-fees-btc" title="Total fees in Bitcoin"></div>
+            <div class="total-fees-sats" title="Total fees in Satoshis"></div>
+            <div class="tx-count" title="Number of transactions"></div>
+            <div class="time-passed" title="Time passed since this block was mined"></div>
+            <div class="mined-by" title="Miner of the block"></div>
+        </div>
+
+        <!-- Fee Rate Content -->
+        <div class="fee-data" style="display: none;">
+            <div class="fee-info" title="Current Half-Hour Fee Rate"></div>
+            <div class="economy-fee" title="Economy Fee Rate"></div>
+            <div class="fastest-fee" title="Fastest Fee Rate"></div>
+            <div class="half-hour-fee" title="Half-Hour Fee Rate"></div>
+            <div class="hour-fee" title="Hourly Fee Rate"></div>
+            <div class="minimum-fee" title="Minimum Fee Rate"></div>
+        </div>
     </div>
 </div>
 
