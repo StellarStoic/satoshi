@@ -418,12 +418,15 @@ p, #text {
     margin-bottom: 15px;
 }
 
+.modal-navigation h2 {
+	color: #f2a900;
+}
+
 #mempoolTinyDataModal .left-arrow,
 #mempoolTinyDataModal .right-arrow {
     position: relative;
 	cursor: pointer;
-
-    color: #c5ba9e;
+    color: #d89c05;
     font-size: 1.9em;
     opacity: 0.7;
 	margin-top: -10px;

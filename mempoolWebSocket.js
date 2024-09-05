@@ -9,11 +9,15 @@ function connectToMempoolAPI() {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        window.latestMempoolData = data; // Store the latest data globally
-
         console.log('Received data:', data);
 
-        updateFooterDisplay(data);
+        // Check if the received message contains block or fee data, ignore others
+        if (data.blocks || data.fees) {
+            window.latestMempoolData = data; // Store relevant data globally
+            updateFooterDisplay(data);
+        } else {
+            console.log('Unnecessary data received, ignoring.');
+        }
     };
 
     ws.onerror = (error) => {
@@ -22,8 +26,11 @@ function connectToMempoolAPI() {
 
     ws.onclose = () => {
         console.log('WebSocket connection closed');
-        setTimeout(connectToMempoolAPI, 30000);
+        setTimeout(connectToMempoolAPI, 1000);
     };
+
+    // Store the WebSocket instance globally for further reference
+    window.currentWebSocket = ws;
 }
 
 // Call the function to establish connection on page load
@@ -35,8 +42,8 @@ let dataType = ''; // To track whether we clicked 'fee rate' or 'block height'
 
 // Function to update footer display
 function updateFooterDisplay(data) {
-    if (data.blocks && data.blocks.length > 7) {
-        const lastBlockHeight = data.blocks[7].height;
+    if (data.blocks && data.blocks.length > 0) {
+        const lastBlockHeight = data.blocks[data.blocks.length - 1].height; // Use the last block in the array
         document.getElementById('block-height').textContent = '' + lastBlockHeight;
     } else {
         console.log('Block height data not available in the received payload.');
@@ -54,6 +61,7 @@ function updateFooterDisplay(data) {
 function openMempoolDataModal(type, event) {
     event.stopPropagation();
     const mempoolModal = document.getElementById('mempoolTinyDataModal');
+
     if (mempoolModal) {
         closeAllModals();
         dataType = type;
@@ -72,11 +80,27 @@ function openMempoolDataModal(type, event) {
     }
 }
 
+// Function to ensure WebSocket is ready and data is available before updating modal
+function validateWebSocketAndData(callback) {
+    if (window.currentWebSocket.readyState !== WebSocket.OPEN) {
+        console.log('WebSocket is not open. Reconnecting...');
+        connectToMempoolAPI(); // Reconnect if not open
+        return;
+    }
+
+    if (!window.latestMempoolData || (!window.latestMempoolData.blocks && !window.latestMempoolData.fees)) {
+        console.log('Data is not available yet. Please wait...');
+        return;
+    }
+
+    callback();
+}
+
 // Function to clear modal content before loading new data
 function clearModalContent() {
     const elementsToClear = [
         'modal-title', 'avg-fee-rate', 'fee-range', 'total-fees-btc',
-        'total-fees-sats', 'tx-count', 'time-passed', 'mined-by', 'fee-info',
+        'total-fees-sats', 'tx-count', 'time-passed', 'mined-by', 'half-hour-fee',
         'economy-fee', 'fastest-fee', 'half-hour-fee', 'hour-fee', 'minimum-fee'
     ];
     elementsToClear.forEach(className => {
@@ -132,7 +156,7 @@ function updateFeeRateModalData() {
     
     // Populate modal content for fee data
     document.querySelector('#mempoolTinyDataModal .modal-title').textContent = `Fee Rates`;
-    document.querySelector('#mempoolTinyDataModal .fee-info').textContent = `Half-Hour Fee: ${halfHourFee} sat/vB`;
+    document.querySelector('#mempoolTinyDataModal .half-hour-fee').textContent = `Half-Hour Fee: ${halfHourFee} sat/vB`;
     document.querySelector('#mempoolTinyDataModal .economy-fee').textContent = `Economy Fee: ${economyFee} sat/vB`;
     document.querySelector('#mempoolTinyDataModal .fastest-fee').textContent = `Fastest Fee: ${fastestFee} sat/vB`;
     document.querySelector('#mempoolTinyDataModal .hour-fee').textContent = `Hour Fee: ${hourFee} sat/vB`;
@@ -142,12 +166,33 @@ function updateFeeRateModalData() {
     toggleModalSections('fee');
 }
 
-// Helper function to toggle modal sections visibility
+// Function to toggle modal sections visibility and manage arrow display
 function toggleModalSections(type) {
     const showBlockData = type === 'block';
+    
+    // Toggle block data visibility
     document.querySelectorAll('#mempoolTinyDataModal .block-data').forEach(el => el.style.display = showBlockData ? 'block' : 'none');
+    
+    // Toggle fee data visibility
     document.querySelectorAll('#mempoolTinyDataModal .fee-data').forEach(el => el.style.display = showBlockData ? 'none' : 'block');
+    
+    // Show or hide arrows based on the type (blocks vs fee)
+    const leftArrow = document.querySelector('#mempoolTinyDataModal .left-arrow');
+    const rightArrow = document.querySelector('#mempoolTinyDataModal .right-arrow');
+
+    if (showBlockData) {
+        // Set arrow visibility for block data
+        leftArrow.style.visibility = currentBlockIndex > 0 ? 'visible' : 'hidden';
+        rightArrow.style.visibility = currentBlockIndex < (window.latestMempoolData.blocks.length - 1) ? 'visible' : 'hidden';
+        leftArrow.style.color = currentBlockIndex > 0 ? 'white' : 'rgba(128, 128, 128, 0.)'; // Adjust arrow color based on current block index
+        rightArrow.style.color = currentBlockIndex < (window.latestMempoolData.blocks.length - 1) ? 'white' : 'rgba(128, 128, 128, 0.2)';
+    } else {
+        // Completely hide arrows for fee data
+        leftArrow.style.visibility = 'hidden';
+        rightArrow.style.visibility = 'hidden';
+    }
 }
+
 
 // Event listener for left arrow click to navigate blocks
 document.querySelector('#mempoolTinyDataModal .left-arrow').addEventListener('click', function () {
@@ -159,10 +204,19 @@ document.querySelector('#mempoolTinyDataModal .left-arrow').addEventListener('cl
 
 // Event listener for right arrow click to navigate blocks
 document.querySelector('#mempoolTinyDataModal .right-arrow').addEventListener('click', function () {
-    if (dataType === 'block' && currentBlockIndex < 7) {
+    if (dataType === 'block' && currentBlockIndex < (window.latestMempoolData.blocks.length - 1)) {
         currentBlockIndex++;
         updateBlockHeightModalData(currentBlockIndex);
     }
+});
+
+// Attach event listeners for footer elements
+document.getElementById('block-height').addEventListener('click', function (event) {
+    validateWebSocketAndData(() => openMempoolDataModal('block', event));
+});
+
+document.getElementById('fee-rate').addEventListener('click', function (event) {
+    validateWebSocketAndData(() => openMempoolDataModal('fee', event));
 });
 
 function closeAllModals() {
@@ -171,12 +225,3 @@ function closeAllModals() {
     });
     document.body.classList.remove('modal-open');
 }
-
-// Attach event listeners for footer elements
-document.getElementById('block-height').addEventListener('click', function (event) {
-    openMempoolDataModal('block', event);
-});
-
-document.getElementById('fee-rate').addEventListener('click', function (event) {
-    openMempoolDataModal('fee', event);
-});
