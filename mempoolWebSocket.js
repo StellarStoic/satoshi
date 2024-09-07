@@ -3,20 +3,20 @@ function connectToMempoolAPI() {
     const ws = new WebSocket('wss://mempool.space/api/v1/ws');
 
     ws.onopen = () => {
-        console.log('WebSocket connection established');
+        // consol.log('WebSocket connection established');
         ws.send(JSON.stringify({ "action": "init", "channels": ["stats", "blocks"] }));
     };
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log('Received data:', data);
+        // consol.log('Received data:', data);
 
         // Check if the received message contains block or fee data, ignore others
         if (data.blocks || data.fees) {
             window.latestMempoolData = data; // Store relevant data globally
             updateFooterDisplay(data);
         } else {
-            console.log('Unnecessary data received, ignoring.');
+            // consol.log('Unnecessary data received, ignoring.');
         }
     };
 
@@ -25,7 +25,7 @@ function connectToMempoolAPI() {
     };
 
     ws.onclose = () => {
-        console.log('WebSocket connection closed');
+        // consol.log('WebSocket connection closed');
         setTimeout(connectToMempoolAPI, 1000);
     };
 
@@ -46,14 +46,14 @@ function updateFooterDisplay(data) {
         const lastBlockHeight = data.blocks[data.blocks.length - 1].height; // Use the last block in the array
         document.getElementById('block-height').textContent = '' + lastBlockHeight;
     } else {
-        console.log('Block height data not available in the received payload.');
+        // consol.log('Block height data not available in the received payload.');
     }
 
     if (data.fees && data.fees.halfHourFee) {
         const feeRate = data.fees.halfHourFee;
         document.getElementById('fee-rate').textContent = feeRate + ' sat/vB';
     } else {
-        console.log('Fee rate data not available in the received payload.');
+        // consol.log('Fee rate data not available in the received payload.');
     }
 }
 
@@ -83,13 +83,13 @@ function openMempoolDataModal(type, event) {
 // Function to ensure WebSocket is ready and data is available before updating modal
 function validateWebSocketAndData(callback) {
     if (window.currentWebSocket.readyState !== WebSocket.OPEN) {
-        console.log('WebSocket is not open. Reconnecting...');
+        // consol.log('WebSocket is not open. Reconnecting...');
         connectToMempoolAPI(); // Reconnect if not open
         return;
     }
 
     if (!window.latestMempoolData || (!window.latestMempoolData.blocks && !window.latestMempoolData.fees)) {
-        console.log('Data is not available yet. Please wait...');
+        // consol.log('Data is not available yet. Please wait...');
         return;
     }
 
@@ -114,14 +114,14 @@ function updateBlockHeightModalData(blockIndex) {
     const data = window.latestMempoolData;
 
     if (!data || !data.blocks || data.blocks.length <= blockIndex) {
-        console.log('No data available for the specified block index.');
+        // consol.log('No data available for the specified block index.');
         return;
     }
 
     const blockData = data.blocks[blockIndex];
 
     if (!blockData || !blockData.extras) {
-        console.log('Block data or extras not available.');
+        // consol.log('Block data or extras not available.');
         return;
     }
 
@@ -148,7 +148,7 @@ function updateFeeRateModalData() {
     const data = window.latestMempoolData;
 
     if (!data || !data.fees) {
-        console.log('Fee rate data not available.');
+        // consol.log('Fee rate data not available.');
         return;
     }
 
