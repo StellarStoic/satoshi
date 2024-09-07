@@ -1,5 +1,6 @@
 let sintraWebSocket = null; // Declare WebSocket globally
 let isManuallyClosed = false; // Flag to control automatic reconnect
+let btcAgeInterval = null; // Variable to store the interval ID
 
 // Function to start Sintra WebSocket connection
 function startSintraWebSocket() {
@@ -79,6 +80,30 @@ function getCachedBtcAge() {
     return null;
 }
 
+// Function to start the interval to update BTC age every minute
+function startBtcAgeUpdater() {
+    // Clear any existing interval before starting a new one
+    if (btcAgeInterval) {
+        clearInterval(btcAgeInterval);
+    }
+
+    // Function to update BTC price age
+    function updateBtcAge() {
+        const stopText = document.getElementById('stop-text');
+        const btcAge = getCachedBtcAge();
+        
+        // Update the stop-text with the new BTC price age
+        stopText.textContent = btcAge !== null ? `BTC Price from ${btcAge} ago` : "BTC Price (cache unavailable)";
+    }
+
+    // Call the function immediately to set the initial text
+    updateBtcAge();
+
+    // Start the interval to update the text every minute (60000ms)
+    btcAgeInterval = setInterval(updateBtcAge, 60000);
+}
+
+
 // Function to handle toggle between live and cached BTC prices
 function handleBtcToggle() {
     const toggleButton = document.getElementById('toggle-button');
@@ -93,6 +118,9 @@ function handleBtcToggle() {
             stopText.classList.remove('active');
             btcPriceStatus.classList.add('active');
             startSintraWebSocket(); // Start WebSocket for live price
+
+            // Stop updating BTC age since we're using live price
+            clearInterval(btcAgeInterval);
         } else {
             // Switch to "BTC Price from Cache"
             toggleButton.classList.remove('moveup');
@@ -102,7 +130,9 @@ function handleBtcToggle() {
             const btcAge = getCachedBtcAge();
             stopText.classList.add('active');
             btcPriceStatus.classList.remove('active');
-            stopText.textContent = btcAge !== null ? `BTC Price from ${btcAge} ago` : "BTC Price (cache unavailable)";
+
+            // Start updating BTC age every minute
+            startBtcAgeUpdater();
         }
     });
 }
@@ -124,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
             stopText.textContent = "BTC Price (cache unavailable)";
         }
         toggleButton.classList.add('movedown');
+        startBtcAgeUpdater(); // Start updating BTC age if in cached mode
     } else {
         btcPriceStatus.textContent = "Live BTC Price";
         toggleButton.classList.add('moveup');
