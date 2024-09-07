@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let updateTimeout; // For debouncing
     const CACHE_KEY = 'exchangeRatesCache';
     const CACHE_EXPIRY_KEY = 'exchangeRatesCacheExpiry';
-    const CACHE_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+    const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
     const USER_SETTINGS_KEY = 'userCurrencySettings'; // Key to store user settings
     const MAX_BTC_SUPPLY = 21000000; // Maximum supply of BTC
     const MAX_SAT_SUPPLY = MAX_BTC_SUPPLY * 100000000; // Maximum supply of SAT (21 million BTC in Satoshis)
