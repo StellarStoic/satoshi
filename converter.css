@@ -151,4 +151,127 @@
 
 .description-modal a:hover {
     color: #f2a900; /* Even brighter on hover for emphasis */
-} 
+}
+
+#toggle-btn-space {
+    font-family: monospace, Courier, "Courier New";
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow-y: auto;
+  }
+
+  #toggle-btn-box {
+    position: sticky;
+    top: 33px;
+    left: 50%;
+    transform: translateX(-0%);
+    width: 52px;
+    margin: 0;
+  }
+  
+  #toggle-button {
+    width: 16px;
+    height: 33px;
+    background-color: #2d2c2c;
+    border-radius: 100px;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+  }
+  
+  #toggle-button:before {
+    content: "";
+    position: absolute;
+    top: 18px;
+    bottom: 2px;
+    left: 2px;
+    width: 12px;
+    opacity: 1;
+    background-color: #bcbcbc;
+    border-radius: 100px;
+    transition: 0.3s linear all;
+  }
+  
+  #toggle-button.moveup:before {
+    top: 2px;
+    bottom: 18px;
+    background-color: #f2a900;
+    animation: moveup-1 0.3s linear forwards, moveup-2 0.3s linear 0.6s forwards,
+      blink 1s ease-in-out 0.9s infinite;
+  }
+  
+  #toggle-button.movedown:before {
+    top: 18px;
+    bottom: 2px;
+    background-color: #bcbcbc;
+    animation: movedown-1 0.3s linear 0s forwards,
+      movedown-2 0.3s linear 0.6s forwards;
+  }
+  
+  @keyframes moveup-1 {
+    0% { top: 18px; }
+    100% { top: 2px; }
+  }
+  
+  @keyframes moveup-2 {
+    0% { bottom: 2px; }
+    100% { bottom: 18px; }
+  }
+  
+  @keyframes movedown-1 {
+    0% { bottom: 18px; }
+    100% { bottom: 2px; }
+  }
+  
+  @keyframes movedown-2 {
+    0% { top: 2px; }
+    100% { top: 18px; }
+  }
+  
+  @keyframes blink {
+    0% { opacity: 1; }
+    75% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  #live-data {
+    position: fixed;
+    top: 50%;
+    right: -90px;
+    width: 120px;
+    margin-top: -44px;
+  }
+  
+  .live-data-text {
+    color: #88888856;
+    font-size: 10px;
+    line-height: 1;
+    margin-top: 70px;
+    margin: 0;
+    transition: 0.3s ease color;
+    cursor: pointer;
+    visibility: hidden;
+  }
+  
+  .live-data-text.active {
+    visibility: visible;
+    color: #8888886f;
+  }
+  
+  #active-text {
+    font-size: 10px;
+    margin-top: 13px;
+    margin-left: -50px;
+  }
+
+  #stop-text {
+    margin-top: 40px;
+    margin-left: -74px;
+  }
+  
+  #active-text.lspace {
+    letter-spacing: 2px;
+  }
