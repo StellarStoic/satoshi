@@ -997,34 +997,6 @@
     },
     {
       "index": 41,
-      "country": "Bangladesh",
-      "language": {
-        "en": "Bengali",
-        "native": "বাংলা",
-        "alpha-2": "BD"
-      },
-      "translators": {
-        "note": "translated by",
-        "translator": [
-          {
-            "t_name": "Shafiun Miraz",
-            "t_link": "https://twitter.com/shafiunmiraz0"
-          },
-          {
-            "t_name": "Tonmoy Sarkar",
-            "t_link": "https://github.com/tonmoy10ms"
-          }
-        ]
-      },
-      "PDF": {
-        "hash": "492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
-        "virusTotal_link": "https://www.virustotal.com/gui/file/492799dae2f0e239f83c1df285fc62c8aaa239927b82b488b369043d54e97540",
-        "path": "whitepaper/BD/bitcoin_bn.pdf"
-      },
-      "active": false
-    },
-    {
-      "index": 42,
       "country": "Estonia",
       "language": {
         "en": "Estonian",
@@ -1048,7 +1020,7 @@
       "active": true
     },
     {
-      "index": 43,
+      "index": 42,
       "country": "Croatia",
       "language": {
         "en": "Croatian",
@@ -1072,7 +1044,7 @@
       "active": true
     },
     {
-      "index": 44,
+      "index": 43,
       "country": "Blind Language",
       "language": {
         "en": "Braille",
@@ -1096,7 +1068,7 @@
       "active": true
     },
     {
-      "index": 45,
+      "index": 44,
       "country": "Nepal",
       "language": {
         "en": "Nepali",
@@ -1124,7 +1096,7 @@
       "active": true
     },
     {
-      "index": 46,
+      "index": 45,
       "country": "Basque Country",
       "language": {
         "en": "Basque",
@@ -1144,6 +1116,30 @@
         "hash": "9c37de48c29e81ed652db75cf33f491f1b2511d6c01b6aca2b8f9df871fc5c9e",
         "virusTotal_link": "https://www.virustotal.com/gui/file/9c37de48c29e81ed652db75cf33f491f1b2511d6c01b6aca2b8f9df871fc5c9e",
         "path": "whitepaper/ES/bitcoin_basque.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 46,
+      "country": "Ethiopia",
+      "language": {
+        "en": "Amharic",
+        "native": "አማርኛ",
+        "alpha-2": "ET"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Ξcrypto",
+            "t_link": "https://x.com/Ecryptofficial"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "584bb0da6bc3edeab4a1c1f1db0bd60cb8a0281e1492f56646b93ddf52515c97",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/584bb0da6bc3edeab4a1c1f1db0bd60cb8a0281e1492f56646b93ddf52515c97",
+        "path": "whitepaper/ET/bitcoin_et_am.pdf"
       },
       "active": true
     }
