@@ -221,7 +221,7 @@ function handleClick(box, pdfPath) {
         autoCloseTimeout = setTimeout(() => {
             translatorInfo.style.display = 'none';
             box.parentElement.style.zIndex = '10'; // Reset zIndex after closing
-        }, 7000);
+        }, 3000);
     } else {
         clearTimeout(autoCloseTimeout);
         window.open(pdfPath, '_blank');
