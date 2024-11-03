@@ -52,6 +52,10 @@ function updateFooterDisplay(data) {
     if (data.fees && data.fees.halfHourFee) {
         const feeRate = data.fees.halfHourFee;
         document.getElementById('fee-rate').textContent = feeRate + ' sat/vB';
+
+        // Update the document title with the half-hour fee rate (medium fee)
+        document.title = `${feeRate} sat/vB`;
+            
     } else {
         // consol.log('Fee rate data not available in the received payload.');
     }
