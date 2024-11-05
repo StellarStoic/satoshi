@@ -1,0 +1,49 @@
+body { /* Ensuring the body or a main container has relative positioning */
+    position: relative;
+}
+
+.moscow-time-container {
+    position: relative; /* This keeps existing styles functional */
+    text-align: center;
+    margin-top: 20px; /* Adjust spacing as necessary */
+}
+
+.moscow-time {
+    font-family: "Roboto Mono", monospace;
+    display: inline-block;
+    margin-top: 30px;
+    font-size: 14px;
+    color: #777;
+    cursor: help;
+}
+
+.center-container {
+    position: fixed;  /* Use fixed to keep it in the viewport and above other content */
+    top: 50%;        /* Center vertically */
+    left: 50%;       /* Center horizontally */
+    transform: translate(-50%, -50%); /* Offset the container by half its width and height */
+    width: 100%;     /* Optional: Adjust width as necessary */
+    text-align: center; /* Ensure content within is centered */
+    z-index: 1000;   /* High z-index to ensure it appears above other content */
+}
+
+.satoshis-display {
+    font-family: 'East Sea Dokdo', cursive;
+    display: inline-block; /* Allows the use of text-align from the container */
+    font-size: calc((100vw - 30px) / 3); /* Dynamically adjust font size */
+    color: #f2a900; /* Your specified color */
+    white-space: nowrap; /* Prevents the text from wrapping */
+    overflow: hidden; /* Keeps the content contained within the element bounds */
+    text-overflow: ellipsis; /* Adds an ellipsis if the text overflows */
+}
+
+.info-modal-trigger {
+    position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
+    top: 36px; /* 25px from the top of the nearest positioned ancestor */
+    right: 25px; /* 25px from the left of the nearest positioned ancestor */
+    font-size: 24px;
+    color: #888; /* Icon color */
+    cursor: pointer;
+}
+
+

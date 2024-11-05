@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="MoscowTime.css">
+    <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet"> <!--this might needed to be updated in the future https://lineicons.com/docs/cdn-->
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <!-- Web Manifest -->
+    <link rel="manifest" href="/site.webmanifest">
+
+    <!-- Windows Tile Icon -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff">
+
+    
+    <title>Hi Satoshi</title>
+</head>
+<body>
+  <!-- Copy text notification -->
+  <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
+    <!-- Burger menu -->
+    <a href="#menu" id="toggle"><span></span></a>
+
+    <div id="menu">
+      <ul>
+        <li><a href="index.html">home</a></li>
+        <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+        <li><a href="quotes.html">Words of Satoshi</a></li>
+        <li><a href="nip05.html">NIP-05</a></li>
+        <li><a href="converter.html">converter</a></li>
+        <li><a href="#">Moscow time</a></li>
+      </ul>
+    </div>
+<!-- -----------------------------Moscow Time----------------------------------------- -->
+
+<!-- Moscow Time and Interactive Question Mark Element -->
+<div class="moscow-time-container">
+    <div class="moscow-time" title="Click the '?' to learn why it's called Moscow Time!">Moscow Time</div>
+    <div class="info-modal-trigger"><i class="lni lni-question-mark-circle"></i></div>
+</div>
+
+<!-- Center Container for Satoshis Display -->
+<div class="center-container">
+    <div class="satoshis-display">
+        <span id="satoshisValue">Syncing</span> <!-- Satoshis per Dollar: injected by JS with the help of Sintra API -->
+    </div>
+</div>
+
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
+<footer class="footer">
+    <!-- Email Link -->
+    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
+      one@satoshi.si
+    </a>
+  
+    <!-- Block Height Display (Left Side) -->
+    <span id="block-height"  title="Block Height" onclick="openMempoolTinyDataModal()">
+    </span>
+  
+    <!-- Fee Rate Display (Right Side) -->
+    <span id="fee-rate" title="Network fee rate" onclick="openMempoolTinyDataModal()">
+    </span>
+    
+    <!-- Lightning Icon -->
+    <i class="lni lni-bolt-2" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+  </footer>
+
+<!-- MoscowTime Explainer Modal  -->
+<div id="moscowTimeModal" class="description-modal">
+    <span class="close-icon" onclick="closeMoscowTimeModal()">&times;</span>
+    <div class="modal-content">
+        <h4>What is Moscow Time</h4>
+        <p>
+            In March 2021, Twitter's CEO at the time,</a> Jack Dorsey, joined a <a href="https://youtu.be/cTQTnc8gFDU" target="_blank" rel="noopener noreferrer"></a>video call</a> with the 
+            United States Congress to discuss a serious issue: the rise of misinformation online. 
+            Yet, instead of the content of the conversation itself, what really got people talking 
+            was a curious detail on Dorsey’s screen. Behind him sat a <a href="https://blockclockmini.com/" target="_blank" rel="noopener noreferrer">BlockClock</a>, a digital device 
+            displaying a number: 1952. This number represented how many satoshis you could buy for a single U.S. dollar.
+        </p>
+
+        <p>
+            For people immersed in Bitcoin, this was as ordinary as checking the weather. 
+            But for a casual observer, this seemingly random number on Dorsey’s clock looked 
+            like a mysterious code. Enter Chris Vickery, a cybersecurity researcher with a knack 
+            for spotting clues. Vickery took one look at Dorsey’s Block Clock and was convinced he’d 
+            cracked the secret: Jack was running his clock on Russian time! This number, he reasoned, 
+            must refer to Moscow’s time zone. There was just one slight issue with this hypothesis: 
+            by the time of the discovery, the sun had already set in Moscow.
+        </p>
+
+        <p>
+            The Bitcoin community wasted no time turning Vickery’s interpretation into a running joke. 
+            Twitter threads lit up with Bitcoin fans poking fun, laughing at the idea of a Block Clock 
+            display being confused for Moscow’s actual time zone. And with that, the satoshi-to-dollar 
+            rate picked up a new nickname: “Moscow Time.”
+        <br>
+            After all, if you start measuring your life in satoshis instead of dollars, you’re officially on “Moscow Time”
+        </p>
+
+        <p>
+            And if you’re actually here being redirected by search engines looking for Moscow’s current time, 
+            we won’t leave you empty-handed.
+            <br>
+            Here’s Moscow’s current time:
+            <br>
+            <br>
+            <iframe src="https://free.timeanddate.com/clock/i9meu0c8/n736/fs16/fcf2a900/tct/pct/ftb/th1/ts1/ta1" frameborder="0" width="79" height="20" allowtransparency="true"></iframe>
+        </p>
+    </div>
+</div>
+
+<!-- Mempool Tiny Data Modal -->
+<div id="mempoolTinyDataModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close-icon" onclick="closeMempoolTinyDataModal()">&times;</span>
+        <div class="modal-navigation">
+            <span class="left-arrow" title="Previous Block">&larrfs;</span>
+            <h2 class="modal-title"></h2>
+            <span class="right-arrow" title="Next Block">&rarrfs;</span>
+        </div>
+        
+
+        <!-- Block Data Content -->
+        <div class="block-data" style="display: none;">
+            <div class="avg-fee-rate" title="Median fee rate"></div>
+            <div class="fee-range" title="Fee Range from Lowest to Highest"></div>
+            <div class="total-fees-btc" title="Total fees in Bitcoin"></div>
+            <div class="total-fees-sats" title="Total fees in Satoshis"></div>
+            <div class="tx-count" title="Number of transactions"></div>
+            <div class="time-passed" title="Time passed since this block was mined"></div>
+            <div class="mined-by" title="Miner of the block"></div>
+        </div>
+
+        <!-- Fee Rate Content -->
+        <div class="fee-data" style="display: none;">
+            <!-- <div class="fee-info" title="Current Half-Hour Fee Rate"></div> -->
+            <div class="economy-fee" title="Economy Fee Rate"></div>
+            <div class="fastest-fee" title="Fastest Fee Rate"></div>
+            <div class="half-hour-fee" title="Half-Hour Fee Rate"></div>
+            <div class="hour-fee" title="Hourly Fee Rate"></div>
+            <div class="minimum-fee" title="Minimum Fee Rate"></div>
+        </div>
+    </div>
+</div>
+
+
+
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+      <div class="modal-content">
+          <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+          <h4 id="gratitudeHeader">If you find this website valuable, consider contributing a sat or two. Thank you.</h4>
+          <div class="qr-code-container">
+              <!-- Lightning QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                  <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+              </div>
+              
+              <!-- Onchain QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                  <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+    <!-- Cookie Consent Modal -->
+    <div id="cookieConsentModal" class="description-modal">
+        <div class="modal-content">
+            <h4>Listen Up, Cookie Crunchers!</h4>
+            <h6>The G.D.P.R. (Greatly Demanding Privacy Rules) requires us to share this with you...</h6>
+            <p>We don't really give a damn about cookies. But some settings, like our fancy currency rates converter, store your preferences so you don't have to waste time setting things up every damn time you visit.</p>
+            <br>
+            <p>But seriously, we don't track you, we don't sell your data, and we definitely don't care about what you're doing online (unless you're baking actual cookies, in which case, send some our way digitally in sats. <span style="color: aliceblue">⚡</span>)</p>
+            <br>
+            <p>If you're cool with us making your life a little bit easier, click the button below. If not, hey, that's cool too. Just remember! stay humble and stack sats.</p>
+            <br>
+            <!-- Button container with Flexbox -->
+            <div class="consent-button-container">
+                <button onclick="acceptCookies()" class="consent-icon-button green-check" title="Yeah, whatever, just do it!">
+                    &#10004; <!-- Unicode checkmark -->
+                </button>
+                <button onclick="declineCookies()" class="consent-icon-button red-cross" title="Nope, delete all none essential cookies">
+                    &#10008; <!-- Unicode cross -->
+                </button>
+            </div>
+        </div>
+      </div>
+
+
+
+<script src="coockieConsent.js"></script>
+<script src="copyonclick.js"></script>
+<script src="mempoolWebSocket.js"></script>
+<script src="MoscowTime.js"></script>
+<script src="sintraWebSocket.js"></script>
+<script src="index.js"></script>
+<script src="burgerMenu.js"></script>
+<!-- <script src="slip.js"></script> -->
+
+
+</body>
+</html>
