@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Ensure that clicking on the lightning icon opens the QR code modal
-    const lightningIcon = document.querySelector('.lni-bolt-alt');
+    const lightningIcon = document.querySelector('.lni-bolt-2');
     if (lightningIcon) {
         console.log('Lightning icon found, adding click event'); // Debugging log
         lightningIcon.addEventListener('click', openQRCodeModal);

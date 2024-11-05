@@ -234,10 +234,12 @@ p, #text {
 }
 
 /* Lightning icon styling */
-.footer i.lni.lni-bolt-alt {
+.footer i.lni.lni-bolt-2 {
     color: #f2a900;
     cursor:pointer;
-    font-size: 12px;
+	margin-top: -20px;
+	vertical-align: sub;
+    font-size: 15px;
     margin-left: -10px;
 }
 

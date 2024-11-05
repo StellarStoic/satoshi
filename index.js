@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Attach click event to lightning icon specifically
-    const lightningIcon = document.querySelector('.lni-bolt-alt');
+    const lightningIcon = document.querySelector('.lni-bolt-2');
     if (lightningIcon) {
         lightningIcon.addEventListener('click', openQRCodeModal);
     }
