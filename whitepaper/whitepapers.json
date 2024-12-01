@@ -1142,5 +1142,53 @@
         "path": "whitepaper/ET/bitcoin_et_am.pdf"
       },
       "active": true
+    },
+    {
+      "index": 47,
+      "country": "India",
+      "language": {
+        "en": "Telugu",
+        "native": "తెలుగు",
+        "alpha-2": "IN"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Charaen",
+            "t_link": "#"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "946525adea8fda7ff9a6311f35063efda8c9073d9b484fae231ac6877aca6f00",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/946525adea8fda7ff9a6311f35063efda8c9073d9b484fae231ac6877aca6f00",
+        "path": "whitepaper/IN/bitcoin_te.pdf"
+      },
+      "active": true
+    },
+    {
+      "index": 48,
+      "country": "Albania",
+      "language": {
+        "en": "Albanian",
+        "native": "Shqip",
+        "alpha-2": "AL"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "Tony Xhufi",
+            "t_link": "https://x.com/TonyXhufi"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "81d7917dda93b88b3c86943664295642e85077894d4b5696cd959ae6319fd2ee",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/81d7917dda93b88b3c86943664295642e85077894d4b5696cd959ae6319fd2ee",
+        "path": "whitepaper/AL/bitcoin_al.pdf"
+      },
+      "active": true
     }
   ]
