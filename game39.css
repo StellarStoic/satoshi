@@ -1,0 +1,182 @@
+
+/* GAME39 START PAGE LAYOUT */
+#gameSetup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    padding: 2rem;
+    height: 100vh;
+    text-align: center;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  /* INPUT STYLING */
+  #gameSetup input {
+    padding: 0.8rem 1rem;
+    width: 80%;
+    max-width: 320px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+  }
+  
+  /* BUTTON STYLING */
+  #gameSetup button {
+    padding: 0.8rem 1.2rem;
+    width: 80%;
+    max-width: 320px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    background-color: #f7931a;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  #gameSetup button:hover {
+    background-color: #c47710;
+  }
+  
+  /* PEER ID DISPLAY */
+  #yourId {
+    font-size: 0.95rem;
+    color: #444;
+    word-break: break-word;
+    max-width: 80%;
+  }
+
+  /* === GAME LAYOUT === */
+
+  #joinStatus {
+    font-size: 1rem;
+    color: #333;
+  }
+  
+  #joinStatus.error {
+    color: red;
+  }
+  
+#game39-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100vh;
+    padding: 2rem 1rem;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  #game-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  #player1-score,
+  #player2-score {
+    font-weight: bold;
+    font-size: 1rem;
+    text-align: center;
+  }
+  
+  #player1-score span,
+  #player2-score span {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #f7931a;
+  }
+  
+  #round-count {
+    text-align: center;
+    font-size: 1rem;
+  }
+  
+  #countdown {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #f7931a;
+    margin-top: 0.5rem;
+  }
+  
+  /* === WORD DISPLAY === */
+  #word-display {
+    font-size: 3rem;
+    font-weight: bold;
+    text-align: center;
+    margin-top: auto;
+    margin-bottom: 1rem;
+    word-break: break-word;
+    transition: all 0.2s ease;
+  }
+
+  #word-display:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+  
+  /* === BUTTONS === */
+  #answer-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: auto;
+  }
+  
+  #answer-buttons button {
+    padding: 1rem 2rem;
+    font-size: 2rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    background-color: #f7931a;
+    color: white;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+    transition: background-color 0.2s;
+    min-width: 120px;
+  }
+  
+  #answer-buttons button:hover {
+    background-color: #c47710;
+  }
+
+  #answer-buttons button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  
+  /* === FINAL RESULT === */
+  #final-result {
+    font-size: 2rem;
+    text-align: center;
+    margin-top: 2rem;
+    color: #333;
+  }
+  
+  /* RESPONSIVE TEXT */
+  body {
+    font-size: clamp(14px, 2.5vw, 18px);
+  }
+  
+  /* Small tweaks for mobile */
+  @media (max-width: 480px) {
+    #gameSetup input,
+    #gameSetup button {
+      width: 90%;
+      font-size: 1rem;
+    }
+  
+    #yourId {
+      font-size: 0.9rem;
+    }
+  }
+  
