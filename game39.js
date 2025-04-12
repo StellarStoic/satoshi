@@ -76,7 +76,13 @@ document.getElementById("joinGame").onclick = () => {
 function setupPeer() {
     if (peer) return;
 
-    peer = new Peer();
+    Peer.debug = 3;
+    peer = new Peer({
+        host: 'skyway.peerjs.dev',
+        port: 443,
+        secure: true,
+        path: '/'
+      });
 
     peer.on("open", id => {
         console.log("🌐 PeerJS client ID:", id);
