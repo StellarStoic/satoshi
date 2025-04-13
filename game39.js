@@ -17,6 +17,15 @@ console.log("Firebase:", typeof firebase); // logs the type of Firebase to verif
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // 👥 Listen to matchmaking pool changes and update UI with live count
+  db.ref("matchmaking").on("value", snapshot => {
+    const pool = snapshot.val() || {};
+    poolCount = Object.keys(pool).length;
+
+    // Update any UI showing pool info
+    updatePoolLabels(poolCount);
+  });
+
   let roomId = ""; // Room ID is shared by host and joiner. Host generates it, joiner uses it to connect.
   let isHost = false; // Used to distinguish logic between host and joiner throughout the app.
   let roundLimit = 21; // Default number of rounds if not selected by the host. Host can override it on game creation.
@@ -32,6 +41,7 @@ console.log("Firebase:", typeof firebase); // logs the type of Firebase to verif
   let isSpectator = false; // default false, true if third user joins
   let countdownInterval; // Global timer interval object for the game countdown. Can be cleared/stopped.
   let gameStarted = false; // Global flag to prevent game logic from triggering before it’s ready.
+  let poolCount = 0; // track the count of waiting participants in the Game pool
   let bip39Words = [], nonBip39Words = [], allWords = []; // Word pools. Host loads both lists, mixes them and sends them to joiner via Firebase.
 
 // Auto-join if ?room=xyz is in URL
@@ -272,6 +282,21 @@ document.getElementById("joinPool").onclick = async () => {
     }, 1000); // Run every second
   }
 
+  // Update pool-related UI (only updates the "Join Pool" button label)
+  function updatePoolLabels(count) {
+    // Update the "Join Pool" button text
+    const poolBtn = document.getElementById("joinPool");
+    if (poolBtn) {
+      poolBtn.innerText = `Join Pool (${count})`;
+    }
+
+    // Update spectator message live (if visible)
+    const liveCountSpan = document.getElementById("spectator-pool-count");
+    if (liveCountSpan) {
+      liveCountSpan.textContent = count;
+    }
+  }
+
   // Switches from the setup screen to the main game screen (used by both host and joiner)
   function setupGameScreen() {
     document.getElementById("gameSetup").style.display = "none"; // Hide setup UI
@@ -282,8 +307,11 @@ document.getElementById("joinPool").onclick = async () => {
       console.log("Spectator detected, showing message");
       const buttons = document.getElementById("answer-buttons");
       buttons.innerHTML = `<div class="spectator-message">
-        This game is already in progress. You can watch it or create your own game or join the pool of players waiting for oponents <a href="/game39.html">create</a> your own or .
-      </div>`;
+      This game is already in progress. You can watch it, 
+      <a href="/game39.html">create</a> your own game, 
+      or <a href="#" onclick="joinPool()">join the pool where (<span id="spectator-pool-count">${poolCount}</span> others) are waiting</a>.
+    </div>`;
+    
       buttons.style.display = "block";
       return;
     }
