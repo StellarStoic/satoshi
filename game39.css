@@ -48,6 +48,20 @@
   #gameSetup button:hover {
     background-color: #c47710;
   }
+
+  .info-modal-trigger {
+    position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
+    top: 35px; /* 25px from the top of the nearest positioned ancestor */
+    right: 25px; /* 25px from the left of the nearest positioned ancestor */
+    font-size: 24px;
+    color: #888; /* Icon color */
+    cursor: pointer;
+}
+
+ul, li {
+  color: #c5ba9e;
+  font-weight: 600;
+}
   
   /* PEER ID DISPLAY */
   #yourId {

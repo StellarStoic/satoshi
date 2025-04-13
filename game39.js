@@ -302,6 +302,10 @@ document.getElementById("joinPool").onclick = async () => {
     document.getElementById("gameSetup").style.display = "none"; // Hide setup UI
     document.getElementById("game39-container").style.display = "block"; // Show game container
 
+      // Hide help icon during gameplay
+    const infoIcon = document.querySelector(".info-modal-trigger");
+    if (infoIcon) infoIcon.style.display = "none";
+
     // Spectator notice instead of answer buttons
     if (isSpectator) {
       console.log("Spectator detected, showing message");
@@ -696,3 +700,31 @@ document.getElementById("joinPool").onclick = async () => {
     document.getElementById("yes-btn").disabled = false;
     document.getElementById("no-btn").disabled = false;
   }
+
+  // Open the modal (triggered from question mark icon in game setup)
+  function openGameModal(event) {
+    if (event) event.stopPropagation(); // Prevent click bubbling
+    closeAllModals(); // close any others that might be open
+    const modal = document.getElementById("game39Modal");
+    modal.classList.add("active");
+    document.body.classList.add("modal-open");
+  }
+  
+  // Close the modal when close icon is clicked or background is clicked
+  function closeGameModal() {
+    const modal = document.getElementById("game39Modal");
+    modal.classList.remove("active");
+    document.body.classList.remove("modal-open");
+  }
+
+  // Register modal functions globally so other scripts can access them (like index.js)
+  window.openGameModal = openGameModal;
+  window.closeGameModal = closeGameModal;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const helpBtn = document.getElementById("openGameInfoModal");
+    if (helpBtn) {
+      helpBtn.addEventListener("click", openGameModal);
+    }
+  });
+
