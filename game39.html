@@ -7,7 +7,13 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="game39.css">
     <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <!-- Firebase App (core) SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+
+    <!-- Firebase Realtime Database SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -30,6 +36,7 @@
     <title>Hi Satoshi let's play</title>
 </head>
 <body>
+  
   <!-- Copy text notification -->
   <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
     <!-- Burger menu -->
@@ -55,17 +62,26 @@
       <input id="peerIdInput" placeholder="Enter host ID" />
       <div id="yourId"></div>
     </div>
+
+    <!-- <p id="debugStatus" style="font-size: 0.9em; color: #888; padding-top: 10px;"></p> -->
     
     <div id="game39-container" style="display:none;">
       <div id="joinStatus" style="text-align:center; margin-top: 1rem;"></div>
       <div id="game-status">
-        <div id="player1-score">Player 1:<span>0</span></div>
+        <div id="player1-score">
+          <div class="score-label">Player 1</div>
+          <span>0</span>
+        </div>
         <div>
-          <div id="round-count">Round: 1 / 10</div>
+          <div id="round-count">Round: 0 / 0</div>
           <div id="countdown">0:00</div>
         </div>
-        <div id="player2-score">Player 2:<span>0</span></div>
+        <div id="player2-score">
+          <div class="score-label">Player 2</div>
+          <span>0</span>
+        </div>
       </div>
+      <div id="room-info" style="cursor: pointer; font-size: 0.9em; color: #888;"></div>
       <div id="word-display">Waiting for word...</div>
       <div id="answer-buttons">
         <button id="yes-btn">YES</button>
@@ -74,10 +90,10 @@
       <div id="final-result" style="display:none;"></div>
     </div>
 
-<!-- Modal for currency selection -->
+<!-- Modal for game selection -->
 <div id="game39Modal" class="description-modal">
     <div class="modal-content">
-        <span class="close-icon" onclick="closePingPoolModal()">&times;</span>
+        <span class="close-icon" onclick="closeGameModal()">&times;</span>
         <h4>How game39 works</h4>
         <p>Article about game39...</p>
     </div>
@@ -182,7 +198,6 @@
             </div>
         </div>
       </div>
-
 
 
 <script src="coockieConsent.js"></script>
