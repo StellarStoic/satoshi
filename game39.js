@@ -64,6 +64,10 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     }); 
   }
 
+    // ---------------------------------------------------------//
+  // ---------------- HOST GAME -------------------------//
+  // ---------------------------------------------------------//
+
   // Host and Join buttons: set up a new game room or join an existing one
   // When the "Host Game" button is clicked...
   document.getElementById("hostGame").onclick = () => {
@@ -106,7 +110,7 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
 
       document.getElementById("word-display").innerText = "Share the link and wait for the opponent"; // Initial instruction for host
     
-
+      // Create room data in Firebase
       db.ref(`rooms/${roomId}`).set({
         host: true, // Mark this room as hosted
         ready: false, // Joiner hasn't connected yet
@@ -114,6 +118,13 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
         players: { player1: playerId } // Store host's ID
       });
 
+        //  Add this room to matchmaking pool
+      db.ref("matchmaking").child(roomId).set({
+        createdAt: Date.now(), // Used to prioritize oldest
+        hostId: playerId
+      });
+
+      // Listen for room updates
     db.ref(`rooms/${roomId}`).on("value", snapshot => {
       const data = snapshot.val(); // Listen for updates from Firebase
       if (!data) return;
@@ -122,6 +133,10 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
 
     log("Host created room. Waiting for Player 2...");
   };
+
+  // ---------------------------------------------------------//
+  // ---------------- JOIN GAME -------------------------//
+  // ---------------------------------------------------------//
 
   // When the "Join Game" button is clicked
   document.getElementById("joinGame").onclick = () => {
@@ -151,12 +166,11 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       alert("Invalid room ID."); // Reject malformed room codes
       return;
     }
-  
+
     roomId = inputRoomId; // Store the valid room ID
     isHost = false; // This client is not the host
-    setupGameScreen(); // Switch UI to the game screen
     document.getElementById("joinGame").innerText = "Connecting..."; // Show connecting status
-  
+
     // Check if the room exists in Firebase
     db.ref(`rooms/${roomId}`).once("value").then(snapshot => {
       if (!snapshot.exists()) return alert("Room not found!"); // Show error if not found
@@ -165,16 +179,17 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       const roomData = snapshot.val();
       const players = roomData.players || {};
       const playerIds = Object.keys(players);
+
+          // If no joiners yet, assign this user as the first joiner (Player 2)
+    if (!playerIds.includes("player2")) {
+      db.ref(`rooms/${roomId}/players/player2`).set(playerId);
+      isSpectator = false;
+    } else {
+      isSpectator = true; // Everyone else is a spectator
+    }
+    console.log("isSpectator =", isSpectator);
+    setupGameScreen(); // Switch UI to the game screen
   
-      // If no joiners yet, assign this user as the first joiner (Player 2)
-      if (!playerIds.includes("player2")) {
-        db.ref(`rooms/${roomId}/players/player2`).set(playerId);
-        isSpectator = false;
-      } else {
-        isSpectator = true; // Everyone else is a spectator
-      }
-
-
       send({ ready: true }); // Notify the host that the joiner is ready
 
       // Subscribe to room updates in real time
@@ -185,6 +200,56 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       log("Joined room. Waiting for game to start...");
     });
   }
+
+  // ---------------------------------------------------------//
+  // ---------------- JOIN GAME POOL -------------------------//
+  // ---------------------------------------------------------//
+
+  // When clicking the "Join Game Pool" button
+document.getElementById("joinPool").onclick = async () => {
+  const poolRef = db.ref("matchmaking");
+
+  // Try to find an open game in the pool
+  const snapshot = await poolRef.once("value");
+  const poolData = snapshot.val() || {};
+
+  const availableRoomId = Object.keys(poolData).find(id => poolData[id].status === "waiting");
+
+  if (availableRoomId) {
+    console.log("👥 Joining room from pool:", availableRoomId);
+    joinRoom(availableRoomId); // Auto join existing open game
+    await poolRef.child(availableRoomId).remove(); // Remove it from pool once claimed
+  } else {
+    // No rooms waiting, so become host and add self to matchmaking
+    isHost = true;
+    roomId = crypto.randomUUID().split("-")[0];
+    roundLimit = 21;
+
+    setupGameScreen();
+
+    await db.ref(`rooms/${roomId}`).set({
+      host: true,
+      ready: false,
+      roundLimit: roundLimit,
+      players: { player1: playerId }
+    });
+
+    await poolRef.child(roomId).set({
+      status: "waiting",
+      createdAt: Date.now()
+    });
+
+    db.ref(`rooms/${roomId}`).on("value", snapshot => {
+      const data = snapshot.val();
+      if (!data) return;
+      handleIncomingData(data);
+    });
+
+    log("👤 No open games — created room and registered in pool.");
+    document.getElementById("word-display").innerText = "Waiting for opponent...";
+  }
+};
+
   
   // Starts a 10-second countdown before the game begins (host triggers this)
   function startPreGameCountdown() {
@@ -214,9 +279,10 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
 
     // Spectator notice instead of answer buttons
     if (isSpectator) {
+      console.log("Spectator detected, showing message");
       const buttons = document.getElementById("answer-buttons");
       buttons.innerHTML = `<div class="spectator-message">
-        This game is already in progress. You can watch or <a href="/game39.html">create your own room</a>.
+        This game is already in progress. You can watch it or create your own game or join the pool of players waiting for oponents <a href="/game39.html">create</a> your own or .
       </div>`;
       buttons.style.display = "block";
       return;
@@ -240,6 +306,10 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     if (data.ready && isHost && currentRound === 0 && !gameStarted) {
         log("Player 2 joined. Starting game...");
         gameStarted = true;
+
+      // Remove host from matchmaking pool now that player 2 joined
+      db.ref("matchmaking").child(roomId).remove();
+
         startPreGameCountdown();
       }
 
@@ -253,7 +323,8 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       // Both players receive the new word; joiner sets current round and answer state
       if (data.type === "new-word") {
         displayWord(data); // always update the UI
-        if (!isHost) {
+
+        if (!isHost && !isSpectator) {
           currentRound = data.round; // sync joiner round
           currentIsBip39 = data.isBip39; // joiner needs this to check answers
 
@@ -263,6 +334,12 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
             enableAnswerButtons();
           }, 200);
         }
+
+        //  If spectator, make sure no buttons show
+        if (isSpectator) {
+          document.getElementById("answer-buttons").style.display = "none";
+        }
+
       }
       
       // Host handles incoming answer from joiner and scores it
@@ -284,15 +361,20 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     
       player2Score += points; // update joiner’s score on host
       updateScores();
-      send({ type: "score", points }); // send result back to joiner
+      // Send full scores to ensure joiner and spectators are in sync
+      send({
+        type: "score",
+        player1Score,
+        player2Score
+      });
     }
   
     // Joiner receives their own score update from host
-    if (data.type === "score") {
-      if (!isHost) {
-        player2Score += data.points;
-        updateScores();
-      }
+    if (data.type === "score" && !isHost) {
+      //  Overwrite score instead of adding — ensures no desync
+      player1Score = data.player1Score ?? player1Score;
+      player2Score = data.player2Score ?? player2Score;
+      updateScores();
     }
 
     // Joiner receives host's score update
@@ -385,19 +467,22 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
   
       setTimeout(() => {
         if (isHost) {
-          // if no answer was received from joiner in time, assign 0 points
           if (!answeredThisRound) {
-            send({ type: "score", points: 0 });  // no penalty, no reward
+            send({
+              type: "score",
+              player1Score,
+              player2Score
+            });
           }
-          nextWord(); // move to next round
+          nextWord();
         }
       }, 3000); // 3s delay before showing next word
-    }, 5000); // joiner has 5s to answer
+    }, 7000); // joiner has 5s to answer
   }
 
   // Starts the global game timer (affects both players' countdown display)
   function startGameTimer() {
-    let timeLeft = roundLimit * 8; // total time depends on how many rounds were set (8s per round)
+    let timeLeft = roundLimit * 10; // total time depends on how many rounds were set (8s per round)
     clearInterval(countdownInterval); // avoid stacking multiple timers
   
     countdownInterval = setInterval(() => {
@@ -434,6 +519,13 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
   
   // Handles when a player clicks "Yes" or "No" during a round
   function handleAnswer(answer) {
+
+      // Prevent spectators from answering
+      if (isSpectator) {
+        console.log("Spectators are not allowed to answer.");
+        return;
+      }
+
     if (answeredThisRound) return; // prevent double-clicking
     answeredThisRound = true; // lock in that the player answered this round
   
@@ -559,11 +651,12 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     return `${m}:${s.toString().padStart(2, '0')}`; // Zero-padded seconds
   }
 
-  // When "Yes" button is clicked, submit answer: true (means "Yes, it's a BIP39 word")
-  document.getElementById("yes-btn").onclick = () => handleAnswer(true);
-  // When "No" button is clicked, submit answer: false (means "No, it's not a BIP39 word")
-  document.getElementById("no-btn").onclick = () => handleAnswer(false);
-
+  if (!isSpectator) {
+    // When "Yes" button is clicked, submit answer: true (means "Yes, it's a BIP39 word")
+    document.getElementById("yes-btn").onclick = () => handleAnswer(true);
+    // When "No" button is clicked, submit answer: false (means "No, it's not a BIP39 word")
+    document.getElementById("no-btn").onclick = () => handleAnswer(false);
+  }
   // Disables both Yes and No buttons (prevents answering more than once per round)
   function disableAnswerButtons() {
     document.getElementById("yes-btn").disabled = true;
