@@ -258,7 +258,7 @@ p, #text {
 }
 
 /* Styles for modals */
-.description-modal, #uploadModal, #infoModal, #qrCodeModal, #cookieConsentModal, #mempoolTinyDataModal, #game39Modal {
+.description-modal, #uploadModal, #infoModal, #qrCodeModal, #cookieConsentModal, #mempoolTinyDataModal, #game39Modal, #bip39Modal {
     display: none;
     position: fixed;
     word-break: keep-all;
@@ -292,7 +292,7 @@ p, #text {
 	font-family: "Roboto Mono", monospace;
 }
 
-.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active, #cookieConsentModal.active, #mempoolTinyDataModal.active, #game39Modal.active {
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active, #cookieConsentModal.active, #mempoolTinyDataModal.active, #game39Modal.active, #bip39Modal.active {
     display: flex; /* Use flex to center content */
 }
 

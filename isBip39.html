@@ -5,15 +5,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="game39.css">
+    <link rel="stylesheet" href="isBip39.css">
     <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
-
-    <!-- Firebase App (core) SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-
-    <!-- Firebase Realtime Database SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -33,7 +26,7 @@
     <meta name="theme-color" content="#ffffff">
 
     
-    <title>Hi Satoshi let's play</title>
+    <title>Hi Satoshi</title>
 </head>
 <body>
   
@@ -48,106 +41,36 @@
         <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
         <li><a href="quotes.html">Words of Satoshi</a></li>
         <li><a href="nip05.html">NIP-05</a></li>
-        <li><a href="#">Game39</a></li>
+        <li><a href="game39.html">Game39</a></li>
         <li><a href="converter.html">Converter</a></li>
-        <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        <li><a href="#">Is BIP39 word?</a></li>
         <li><a href="MoscowTime.html">Moscow time</a></li>
 
       </ul>
     </div>
 
     <!-- Question mark icon shown only during game setup -->
-    <div class="info-modal-trigger" id="openGameInfoModal">
+    <div class="info-modal-trigger" id="openBipInfoModal">
       <i class="lni lni-question-mark-circle"></i>
     </div>
 
-    <div id="gameSetup">
-      <input id="roundCount" type="number" placeholder="Number of words to play" min="5" />
-      <button id="hostGame">Host Game</button>
-      <button id="joinPool">Join Game Pool</button>
-      <button id="joinGame">Join Game</button>
-      <input id="peerIdInput" placeholder="Enter host ID" />
-      <div id="yourId"></div>
+    <div class="isBip39questionTitle">
+      <p>Is a BIP39 word?</p>
     </div>
 
-    <!-- <p id="debugStatus" style="font-size: 0.9em; color: #888; padding-top: 10px;"></p> -->
+    <div class="centered-input-container">
+      <input type="text" id="bip39Input" placeholder="Enter word..." autocomplete="off">
+      <div id="suggestions" class="suggestions-box"></div>
+    </div>
     
-    <div id="game39-container" style="display:none;">
-      <div id="joinStatus" style="text-align:center; margin-top: 1rem;"></div>
-      <div id="game-status">
-        <div id="player1-score">
-          <div class="score-label">Player 1</div>
-          <span>0</span>
-        </div>
-        <div>
-          <div id="round-count">Round: 0 / 0</div>
-          <div id="countdown">0:00</div>
-        </div>
-        <div id="player2-score">
-          <div class="score-label">Player 2</div>
-          <span>0</span>
-        </div>
-      </div>
-      <div id="room-info" style="cursor: pointer; font-size: 0.9em; color: #888;"></div>
-      <div id="word-display">Waiting for word...</div>
-      <div id="answer-buttons">
-        <button id="yes-btn">YES</button>
-        <button id="no-btn">NO</button>
-      </div>
-      <div id="final-result" style="display:none;"></div>
-    </div>
 
-<!-- Modal for game selection -->
-<!-- Modal for game selection -->
-<div id="game39Modal" class="description-modal">
+
+<!-- Modal for BIP39 info -->
+<div id="bip39Modal" class="description-modal">
   <div class="modal-content">
-    <span class="close-icon" onclick="closeGameModal()">&times;</span>
-    <h4 style="text-align:center;">How Game39 Works</h4>
-    <p>
-      The <strong>Game39</strong> - a fast-paced memory game inspired by Bitcoin’s 
-      <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank">BIP-39 EN wordlist</a>. 
-      It’s not about Bitcoin. It’s not about cryptography. It’s just you, your brain, and a bunch of suspicious-looking words.
-    </p>
-    
-    <p>
-      The game is simple: you’ll be shown a word and ask yourself one bold question:
-      <strong>“Is this a BIP39 word?”</strong>
-    </p>
-
-    <p>
-      For those who don't know what <strong>BIP39</strong> is - it's a fancy way of saying: a special word from a standardized list used to represent 
-      Bitcoin private keys in a human-readable format. You know, those 12 or 24 words you're supposed to keep secret? for you eyes only!
-      Yeah, those. Serious cryptography stuff - but here, it's just fun.
-    </p>
-
-    <p>
-      The game mixes real english<strong>BIP39</strong> words with sneaky imposters (non-BIP39s), and it's up to you to guess! 
-      For each round, you’ll have <strong>7 seconds</strong> to answer. A correct answer earns you a point. A wrong one? 
-      Minus one. No answer? Zero. No pressure... but actually, lots of pressure. <br><br>
-      If you end up in the negatives, it’s either because you haven't gone through 
-      <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank">the official BIP-39 wordlist</a> 
-      or you just really, really suck. No offense.
-    </p>
-<hr>
-    <p>You can:</p>
-    <ul>
-      <li>• Host a game and share the link</li><br>
-      <li>• Choose how many words to play (if you’re the host)</li><br>
-      <li>• Join a game via a room code or shared link</li><br>
-      <li>• Watch a match if you join while a game is already in progress</li><br>
-      <li>• Jump into the player pool and get matched instantly</li>
-    </ul>
-
-    <p>
-      Sometimes a button click might lag or miss a beat — but hey, that’s life. Imperfection is the real boss fight.
-      Also the pool counter have no cleanup logic so the number might represent abandoned rooms. (I'll work on this someday in the future.)
-    </p>
-<hr>
-    <p>
-      Win by thinking fast. Lose by hesitating. Or just have fun shouting “BIP!” or “NOT BIP!” at your screen. Either way, the point is to have fun.
-    </p>
-
-    <p style="text-align:center;">Ready to play? Then get to it, Satoshi cowboy!</p>
+    <span class="close-icon" id="closeBipModal">&times;</span>
+    <h4 style="text-align:center;">Under</h4>
+    <p>Construction</p>
   </div>
 </div>
 
@@ -259,7 +182,8 @@
 <script src="index.js"></script>
 <script src="burgerMenu.js"></script>
 <script src="slip.js"></script>
-<script src="game39.js"></script>
+<script src="isBip39.js"></script>
+
 
 </body>
 </html>
