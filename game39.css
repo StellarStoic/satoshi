@@ -242,6 +242,18 @@ ul, li {
     display: none;
   }
 
+  .go-back-link {
+    display: inline-block;
+    margin-top: 1em;
+    color: #f7931a;
+    text-decoration: underline;
+    font-family: monospace;
+    font-size: 0.95rem;
+  }
+  .go-back-link:hover {
+    color: #ffd700;
+  }
+
   /* === Word Loader Between Rounds === */
 .loader {
   display: inline-flex;

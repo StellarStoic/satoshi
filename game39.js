@@ -94,6 +94,7 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     
     // Set the banner content
     roomInfoDiv.innerText = `Room link copied to clipboard: ${roomLink} (click to dismiss)`;
+    roomInfoDiv.style.color = "#f2a900"; // Whole text will be orange/bold
     
     // Try to copy link to clipboard
     navigator.clipboard.writeText(roomLink)
@@ -125,13 +126,15 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
         host: true, // Mark this room as hosted
         ready: false, // Joiner hasn't connected yet
         roundLimit: roundLimit,   // Save round count in DB
-        players: { player1: playerId } // Store host's ID
+        players: { player1: playerId }, // Store host's ID
+        createdAt: Date.now() // <- timestamp in ms for the room cleanups
       });
 
         //  Add this room to matchmaking pool
       db.ref("matchmaking").child(roomId).set({
         createdAt: Date.now(), // Used to prioritize oldest
-        hostId: playerId
+        hostId: playerId,
+        status: "waiting"
       });
 
       // Listen for room updates
@@ -201,6 +204,7 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     setupGameScreen(); // Switch UI to the game screen
   
       send({ ready: true }); // Notify the host that the joiner is ready
+      console.log("✅ Sent ready:true to host from joinRoom");
 
       // Subscribe to room updates in real time
       db.ref(`rooms/${roomId}`).on("value", snap => {
@@ -216,7 +220,23 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
   // ---------------------------------------------------------//
 
   // When clicking the "Join Game Pool" button
-document.getElementById("joinPool").onclick = async () => {
+  async function joinPool() {
+  resetGameState(); // ✅ This clears everything before joining
+
+  isSpectator = false; // ✅ Player is no longer a spectator, will join as participant
+
+  // Hide the modal (if visible)
+  const modal = document.getElementById("game39Modal");
+  if (modal) modal.classList.remove("active");
+  document.body.classList.remove("modal-open");
+
+  // Remove spectator message UI
+  const buttons = document.getElementById("answer-buttons");
+  if (buttons && buttons.querySelector(".spectator-message")) {
+    buttons.innerHTML = "";
+    buttons.style.display = "none";
+  }
+
   const poolRef = db.ref("matchmaking");
 
   // Try to find an open game in the pool
@@ -230,6 +250,8 @@ document.getElementById("joinPool").onclick = async () => {
     joinRoom(availableRoomId); // Auto join existing open game
     await poolRef.child(availableRoomId).remove(); // Remove it from pool once claimed
   } else {
+
+
     // No rooms waiting, so become host and add self to matchmaking
     isHost = true;
     roomId = crypto.randomUUID().split("-")[0];
@@ -241,7 +263,8 @@ document.getElementById("joinPool").onclick = async () => {
       host: true,
       ready: false,
       roundLimit: roundLimit,
-      players: { player1: playerId }
+      players: { player1: playerId },
+      createdAt: Date.now() // <- timestamp in ms for the cleanups
     });
 
     await poolRef.child(roomId).set({
@@ -260,13 +283,19 @@ document.getElementById("joinPool").onclick = async () => {
   }
 };
 
-  
+
   // Starts a 10-second countdown before the game begins (host triggers this)
   function startPreGameCountdown() {
+
     let count = 10; // Start from n seconds
     const display = document.getElementById("word-display");
     display.innerText = `Starting in ${count}...`; // Initial message
-  
+
+    if (!isHost) {
+      console.log("🧹 Joiner cleaning state before game begins");
+      clearJoinerViewState()
+    }
+
     const countdown = setInterval(() => {
       count--; // Decrease the timer each second
       display.innerText = `Starting in ${count}...`; // Update display
@@ -313,7 +342,7 @@ document.getElementById("joinPool").onclick = async () => {
       buttons.innerHTML = `<div class="spectator-message">
       This game is already in progress. You can watch it, 
       <a href="/game39.html">create</a> your own game, 
-      or <a href="#" onclick="joinPool()">join the pool where (<span id="spectator-pool-count">${poolCount}</span> others) are waiting</a>.
+      or <a href="#" onclick="event.preventDefault(); autoJoinPoolFromSpectator()">join the pool where (<span id="spectator-pool-count">${poolCount}</span> others) are waiting</a>.
     </div>`;
     
       buttons.style.display = "block";
@@ -336,6 +365,7 @@ document.getElementById("joinPool").onclick = async () => {
   
     // Host detects that player 2 joined and starts the countdown
     if (data.ready && isHost && currentRound === 0 && !gameStarted) {
+      console.log("🎮 Host received ready:true — starting countdown");
         log("Player 2 joined. Starting game...");
         gameStarted = true;
 
@@ -666,8 +696,126 @@ document.getElementById("joinPool").onclick = async () => {
       }
     }
   // Show the final outcome message in the result box
-    resultBox.innerText = resultText;
+  const resultTextEl = document.getElementById("result-text");
+  if (resultTextEl) resultTextEl.innerText = resultText;
   }
+
+
+  // === Cleans up old unjoined rooms from Firebase to avoid clutter ===
+// This function checks for rooms that were created a long time ago (default 10 minutes)
+// and removes them if no second player ever joined.
+// // 🔧 Cleans up rooms that were never joined after X minutes
+// Parameters:
+// - maxAgeMinutes (number): How old (in minutes) a room must be to be considered expired
+function cleanupOldRooms(maxAgeMinutes = 10) {
+  // Calculate cutoff timestamp in milliseconds
+  const cutoff = Date.now() - maxAgeMinutes * 60 * 1000; // timestamp 10 minutes ago
+
+  // Read all rooms from the Firebase Realtime Database
+  db.ref("rooms").once("value").then(snapshot => {
+    const rooms = snapshot.val(); // get all room data
+    if (!rooms) return; // if no rooms, nothing to clean
+
+    // Loop through each room and check if it's expired and unused
+    Object.entries(rooms).forEach(([roomId, roomData]) => {
+      // Check if the room is old based on its 'createdAt' timestamp
+      const isOld = roomData.createdAt && roomData.createdAt < cutoff;
+
+      // Check if the room has NOT been joined (no player2 exists)
+      const hasNoJoiner = !roomData.players || !roomData.players.player2;
+
+      // If both conditions are met, clean up the room
+      if (isOld && hasNoJoiner) {
+        console.log(`🧹 Cleaning up room ${roomId}`);
+        db.ref(`rooms/${roomId}`).remove(); // remove the stale room itself
+        db.ref(`matchmaking/${roomId}`).remove(); // also remove it from the pool if it’s there
+      }
+    });
+  });
+}
+
+function resetUI() {
+  const resultBox = document.getElementById("final-result");
+  const countdown = document.getElementById("countdown");
+  const wordDisplay = document.getElementById("word-display");
+  const buttons = document.getElementById("answer-buttons");
+
+  if (resultBox) resultBox.style.display = "none";
+  if (countdown) {
+    countdown.innerText = "";
+    countdown.style.display = "block";
+  }
+  if (wordDisplay) {
+    wordDisplay.innerText = "";
+    wordDisplay.style.display = "block";
+  }
+
+  if (buttons) {
+    buttons.innerHTML = `
+      <button id="yes-btn">YES</button>
+      <button id="no-btn">NO</button>
+    `;
+    buttons.style.display = "none";
+    document.getElementById("yes-btn").onclick = () => handleAnswer(true);
+    document.getElementById("no-btn").onclick = () => handleAnswer(false);
+  }
+
+  updateScores();
+}
+
+
+function clearJoinerViewState() {
+  currentRound = 0;
+  player1Score = 0;
+  player2Score = 0;
+  currentIsBip39 = null;
+  answeredThisRound = false;
+  joinerAnswers = {};
+  clearInterval(countdownInterval);
+  clearTimeout(wordLoopTimeout);
+
+  resetUI(); // 🔁 Use shared UI reset
+}
+
+
+function resetGameState() {
+  isHost = false;
+  isSpectator = false;
+  gameStarted = false;
+
+  player1Score = 0;
+  player2Score = 0;
+  currentRound = 0;
+  answeredThisRound = false;
+  joinerAnswers = {};
+  currentIsBip39 = null;
+  currentWord = "";
+  roundDisplayedOnce = false;
+
+  clearInterval(countdownInterval);
+  clearTimeout(wordLoopTimeout);
+
+  if (roomId) db.ref(`rooms/${roomId}`).off();
+  roomId = "";
+
+  resetUI(); // 🔁 Use shared UI reset
+}
+
+
+function autoJoinPoolFromSpectator() {
+  console.log("🚪 Leaving spectator and joining pool...");
+
+  // Full reset (this also clears buttons, scores, words, listeners, etc.)
+  resetGameState();
+
+  // Hide old UI just in case
+  document.getElementById("answer-buttons").style.display = "none";
+  document.getElementById("gameSetup").style.display = "block";
+  document.getElementById("game39-container").style.display = "none";
+
+  // Immediately call joinPool()
+  joinPool();
+}
 
   // Randomly shuffle the elements of an array
   // Used to mix BIP39 and non-BIP39 word lists before starting the game
@@ -721,10 +869,25 @@ document.getElementById("joinPool").onclick = async () => {
   window.openGameModal = openGameModal;
   window.closeGameModal = closeGameModal;
 
+
   document.addEventListener('DOMContentLoaded', () => {
+
+    const poolBtn = document.getElementById("joinPool");
+    if (poolBtn) {
+      poolBtn.addEventListener("click", joinPool);
+    }
+
+    window.joinPool = joinPool;
+
+    window.autoJoinPoolFromSpectator = autoJoinPoolFromSpectator;
+
     const helpBtn = document.getElementById("openGameInfoModal");
     if (helpBtn) {
       helpBtn.addEventListener("click", openGameModal);
     }
+
+    // 🔄 Clean up any stale, unjoined rooms (older than 10 mins)
+    cleanupOldRooms(10);
+
   });
 
