@@ -59,8 +59,16 @@
     </div>
 
     <div class="centered-input-container">
-      <input type="text" id="bip39Input" placeholder="Enter word..." autocomplete="off">
-      <div id="suggestions" class="suggestions-box"></div>
+      <div class="input-wrapper">
+        
+        <input type="text" id="bip39Input" placeholder="Enter a BIP39 word..." autocomplete="off">
+
+        <div class="bip39-helper-zone">
+          <div id="suggestions" class="suggestions-box"></div>
+          <div id="repetitionWarning" class="repetition-warning"></div>
+          <div id="wordFrequencyInfo" class="word-frequency-info"></div>
+        </div>
+      </div>
     </div>
     
 
@@ -73,6 +81,7 @@
     <p>Construction</p>
   </div>
 </div>
+
 
 
 <!-- ---------------------------------------------------------------------- -->

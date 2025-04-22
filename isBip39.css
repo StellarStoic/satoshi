@@ -2,7 +2,7 @@
 
 .isBip39questionTitle {
     position: fixed;
-    top: calc(50% - 80px); /* 40px above input */
+    top: calc(50% - 250px); /* 40px above input */
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
@@ -16,20 +16,25 @@
   
   .isBip39questionTitle h4 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: 600;
   }
   
 
-.centered-input-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    width: 90vw;
-    max-width: 400px;
-    padding: 0 10px;
+  .centered-input-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh; /* Center on screen nicely */
+    flex-direction: column;
+  }
+  
+  .input-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   
   #bip39Input {
@@ -47,30 +52,62 @@
   }
   
   #bip39Input.valid {
-    color: rgb(0, 123, 0);
-    border-color: rgb(20, 77, 20);
-    box-shadow: 0 0 8px 2px rgb(20, 77, 20);
+    color: rgb(1, 115, 1);
+    border-color: rgb(39, 199, 39);
+    box-shadow: 0 0 15px 4px rgb(39, 199, 39);
   }
   
   #bip39Input.invalid {
-    color: rgb(145, 0, 0);
-    border-color: rgb(129, 16, 38);
-    box-shadow: 0 0 8px 2px rgb(129, 16, 38);
+    color: rgb(111, 0, 0);
+    border-color: rgb(186, 6, 42);
+    box-shadow: 0 0 15px 4px rgb(186, 6, 42);
   }
   
-  .suggestions-box {
-    height: 1.6em;
+  .bip39-helper-zone {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
     margin-top: 6px;
-    color: gray;
-    font-family: "Roboto Mono", monospace;
-    font-style: italic;
-    font-size: 0.95rem;
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+  
+  .suggestions-box,
+  .repetition-warning,
+  .word-frequency-info {
+    min-height: 1.2em;
+    font-size: 0.9rem;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    width: 100%;
   }
 
-  .suggestions-box .suggestion:hover {
-    background-color: #a3a3a3;
+  #suggestions {
+    color: #ccc;
   }
+  
+  .suggestions-box.active,
+  .repetition-warning.visible,
+  .word-frequency-info.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .repetition-warning {
+    color: #c78d19;
+    margin-top: 30px;
+  }
+
+  .word-frequency-info {
+    color: #c5ba9e;
+  }
+  
 
   .info-modal-trigger {
     position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
@@ -79,5 +116,21 @@
     font-size: 24px;
     color: #888; /* Icon color */
     cursor: pointer;
+}
+
+/* .word-frequency-info {
+  position: fixed;
+  bottom: 20px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 6px;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+  min-height: 1em;
+} */
+
+.word-frequency-info.visible {
+  opacity: 1;
 }
   
