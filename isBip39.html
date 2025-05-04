@@ -49,7 +49,7 @@
       </ul>
     </div>
 
-    <!-- Question mark icon shown only during game setup -->
+    <!-- Question mark icon for basic info -->
     <div class="info-modal-trigger" id="openBipInfoModal">
       <i class="lni lni-question-mark-circle"></i>
     </div>
@@ -77,8 +77,30 @@
 <div id="bip39Modal" class="description-modal">
   <div class="modal-content">
     <span class="close-icon" id="closeBipModal">&times;</span>
-    <h4 style="text-align:center;">Under</h4>
-    <p>Construction</p>
+    <h4 style="text-align:center;">What is this tool?</h4>
+    <p>
+      This tool helps you check if a word is part of the official <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank" rel="noopener"><strong>BIP39 English word list</strong></a> used in Bitcoin wallets for generating seed phrases (mnemonics).
+    </p>
+
+    <p>
+      We currently only support the <strong>English</strong> version of the BIP39 word list, which contains exactly 2048 unique words standardized for secure phrase generation.
+    </p>
+
+    <p>
+      As you type, the input will validate whether the word is part of the list, and show suggestions that match what you're typing.
+    </p>
+
+    <p>
+      If the word isn't valid, we suggest similar English words using the <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener">Datamuse API</a> — an open API for finding related words based on spelling and pronunciation.
+    </p>
+
+    <p>
+      When a valid word is found, we also show how frequently it appears in written English using data from <a href="https://books.google.com/ngrams" target="_blank" rel="noopener">Google Books Ngram Viewer</a>. For example: <em>"alien" appears 9.42 times per million words</em>.
+    </p>
+
+    <p>
+      This frequency is just an indicator of how common the word is in books, and has no effect on its strength or suitability in a BIP39 seed phrase.
+    </p>
   </div>
 </div>
 

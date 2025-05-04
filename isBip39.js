@@ -239,6 +239,13 @@ function fetchSimilarEnglishWords(inputWord) {
     .catch(() => []);
 }
 
+function closeAllModals() {
+  document.querySelectorAll('.description-modal.active').forEach(modal => {
+    modal.classList.remove('active');
+  });
+  document.body.classList.remove('modal-open');
+}
+
 
 // Open the modal
 function openBipModal(event) {
@@ -264,7 +271,7 @@ function openBipModal(event) {
     const openBtn = document.getElementById("openBipInfoModal");
     const closeBtn = document.getElementById("closeBipModal");
     const modal = document.getElementById("bip39Modal");
-  
+
     if (openBtn) {
       openBtn.addEventListener("click", openBipModal);
     }

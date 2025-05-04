@@ -116,6 +116,7 @@
     font-size: 24px;
     color: #888; /* Icon color */
     cursor: pointer;
+    z-index: 2;
 }
 
 /* .word-frequency-info {
