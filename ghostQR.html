@@ -5,8 +5,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="isBip39.css">
+    <link rel="stylesheet" href="ghostQR.css">
     <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+    <script src="qrCodeGenerator_1_4_4.js"></script>
+    <script src="jsZip_3_10_1.js"></script>
+
 
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -41,67 +44,170 @@
         <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
         <li><a href="quotes.html">Words of Satoshi</a></li>
         <li><a href="nip05.html">NIP-05</a></li>
-        <li><a href="ghostQR.html">GhostQR</a></li>
+        <li><a href="#">QR code seed hider</a></li>
         <li><a href="game39.html">Game39</a></li>
         <li><a href="converter.html">Converter</a></li>
-        <li><a href="#">Is BIP39 word?</a></li>
+        <li><a href="bip39.html">Is BIP39 word?</a></li>
         <li><a href="MoscowTime.html">Moscow time</a></li>
-
       </ul>
     </div>
 
     <!-- Question mark icon for basic info -->
-    <div class="info-modal-trigger" id="openBipInfoModal">
+    <div class="info-modal-trigger" id="openSeedQrInfoModal">
       <i class="lni lni-question-mark-circle"></i>
     </div>
 
-    <div class="isBip39questionTitle">
-      <p>Is a BIP39 word?</p>
+    <!-- alert dropdown Banner  -->
+    <div id="alert-banner"></div>
+
+    <div class="ghost-qr-title">
+      <h1>Ghost QR</h1>
+      <p>Split your QR code in fractions</p>
     </div>
 
     <div class="centered-input-container">
-      <div class="input-wrapper">
-        
-        <input type="text" id="bip39Input" placeholder="Enter a BIP39 word..." autocomplete="off">
+      <!-- QR Seed Hider Tool Form -->
+      <div class="qr-seed-form">
 
-        <div class="bip39-helper-zone">
-          <div id="suggestions" class="suggestions-box"></div>
-          <div id="repetitionWarning" class="repetition-warning"></div>
-          <div id="wordFrequencyInfo" class="word-frequency-info"></div>
+        <!-- Upper and Lower Text Inputs -->
+        <label for="upper-text">Top Text (e.g. ID, code):</label>
+        <input type="text" id="upper-text" maxlength="25" placeholder="Will be split across layers (max 25)">
+
+        <!-- True Seed Input -->
+        <label for="true-seed">Enter data for the QR code</label>
+        <textarea id="true-seed" rows="4" placeholder="Enter QR content here... (max 1000)"></textarea>
+
+        <label for="lower-text">Bottom Text (e.g. hint, label):</label>
+        <input type="text" id="lower-text" maxlength="25" placeholder="Will be split across layers (max 25)">
+
+        <!-- Layer Count Selector -->
+        <label for="layer-count">How many layers to create?</label>
+        <select id="layer-count">
+          <!-- Options will be populated by JS -->
+        </select>
+
+        <!-- include logo -->
+        <div class="upload-logo-wrapper">
+          <label for="logo-file" class="upload-label">
+            <span class="upload-icon"><i class="lni lni-upload"></i></span>
+            Upload Logo for QR Code
+          </label>
+          <input type="file" id="logo-file" accept="image/*" />
+          <small id="logo-upload-status" class="upload-status"></small> <!-- Status line -->
         </div>
+
+        <!-- Generate Button -->
+        <button id="generate-qr-layers">Generate QR Layer Templates</button>
+
       </div>
     </div>
-    
 
+<!-- Wrapper for all generated output (QRs + buttons) -->
+<div id="qr-output-wrapper">
+
+  <!-- Top action buttons -->
+  <div id="qr-output-buttons-top"></div>
+
+  <!-- QR canvases will be inserted here by JavaScript -->
+  <div id="qr-output-container"></div>
+
+  <!-- Bottom action buttons -->
+  <div id="qr-output-buttons-bottom"></div>
+
+</div>
 
 <!-- Modal for BIP39 info -->
-<div id="bip39Modal" class="description-modal">
+<div id="SeedQrInfoModal" class="description-modal">
   <div class="modal-content">
-    <span class="close-icon" id="closeBipModal">&times;</span>
-    <h4 style="text-align:center;">What is this tool?</h4>
-    <p>
-      This tool helps you check if a word is part of the official <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank" rel="noopener"><strong>BIP39 English word list</strong></a> used in Bitcoin wallets for generating seed phrases (mnemonics).
-    </p>
+    <span class="close-icon" id="closeSeedQrInfoModal">&times;</span>
+    <h3 style="text-align:center;">What is ghostQR?</h3>
 
     <p>
-      We currently only support the <strong>English</strong> version of the BIP39 word list, which contains exactly 2048 unique words standardized for secure phrase generation.
+      GhostQR lets you create <strong>layered (fragmented) QR codes</strong> that hide sensitive information 
+      across multiple printable fragments. It’s inspired by the principles of <a href="https://seedsigner.com" 
+      target="_blank" style="color:#f7931a;">SeedSigner</a>. I wanted to add another layer of protection with fragmented QR 
+      code layering. Yes, yes, I know I could simply secure my seed with a passphrase, but where’s the fun in that? 
+      Soon after, however, I discovered that this tool could also have more creative and artistic applications than I ever imagined.
     </p>
-
+    
+    <h4>What does ghostQR do?</h4>
     <p>
-      As you type, the input will validate whether the word is part of the list, and show suggestions that match what you're typing.
+      Instead of encoding your entire secret (like an entropy, passphrase, or private note) into a single QR code, 
+      this generator splits the information across multiple visual "layers". Each layer is mostly noise on its own 
+      — but when <strong>you stack them together physically</strong> (ex. using transparent sheets), the original QR code becomes visible.
     </p>
-
+    
+    <h4>How does it work?</h4>
+    <ul>
+      <li>• You enter your <strong>data for QR code</strong>.</li><br>
+      <li>• You choose the number of layers (max 69).</li><br>
+      <li>• The data is randomly distributed into multiple QR canvases.</li><br>
+      <li>• Each canvas is printable and includes optional <strong>text above and below (max 25 characters)</strong> 
+        the QR — this text is also <strong>redistributed</strong> across layers (like the QR), allowing full sentences 
+        to appear only when all layers are stacked (e.g. hints, labels, or SeedSigner fingerprint and password). 
+        But you should never keep real passwords in the same place anyway!</li>
+    </ul>
+    
+    <h4>Example use cases</h4>
+    <ul>
+      <li>• Store each layer in a separate location — like a multisig setup.</li><br>
+      <li>• Share layers with family members — no one holds the full key alone.</li><br>
+      <li>• Hiding secrets or creating puzzle games...</li>
+    </ul>
+    
+    <h4>! About optional text</h4>
     <p>
-      If the word isn't valid, we suggest similar English words using the <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener">Datamuse API</a> — an open API for finding related words based on spelling and pronunciation.
+      Each QR layer lets you add a small line of text (25 characters max) at the top and bottom. These text fields are:
+      <ul>
+        <li><strong>Evenly distributed</strong> across layers (like the QR itself).</li>
+        <li>Useful for organizing or identifying pieces.</li>
+        <li>Visibly aligned and offset to build a readable sentence when stacked.</li>
+      </ul>
+      Max text length is limited to <strong>25 characters</strong> for print clarity.
+      Layer orientation and alignment can be done with two <strong>+</strong> characters next to the dashed borders .
     </p>
-
+    
+    <h4>Output options</h4>
     <p>
-      When a valid word is found, we also show how frequently it appears in written English using data from <a href="https://books.google.com/ngrams" target="_blank" rel="noopener">Google Books Ngram Viewer</a>. For example: <em>"alien" appears 9.42 times per million words</em>.
+      After generating the QR layers, you can:
     </p>
-
+    <ul>
+      <li><strong>Preview</strong> them in your browser.</li>
+      <li><strong>Print</strong> a clean A4 sheet for backup.</li>
+      <li><strong>Download</strong> each layer as a transparent PNG for laser-printing on plastic sheets or film.</li>
+    </ul>
+    
+    <h4>Optional: Add custom logo</h4>
     <p>
-      This frequency is just an indicator of how common the word is in books, and has no effect on its strength or suitability in a BIP39 seed phrase.
+      Want to personalize the QR layers? Upload a small logo image — it will be embedded into the center 
+      of each QR code before export. Make sure it has good contrast and is not too large (12% size is ideal).
     </p>
+    
+    <hr>
+    <h4>Share Your GhostQR Creations</h4>
+    <p>
+      Have you built something awesome using this tool? Maybe a physical <strong>3D QR cube</strong>, 
+      a multi-layered <strong>puzzle</strong>, or a visually artistic <strong>printout</strong> that hides data in plain sight?
+    </p>
+    <p>
+      GhostQR was made for plebs who like to build and experiment with freedom. 
+      I’d love to see what creative use cases you've discovered!
+    </p>
+    <p>Here are some examples to inspire:</p>
+    <ul>
+      <li>• A stealthy <strong>paper QR multisig box</strong> with hidden secrets inside</li>
+      <li>• Visually creative QR overlays using <strong>transparency or light filters</strong></li>
+      <li>• A reveal animation where all layers align in a <strong>video effect</strong></li>
+      <li>• Hidden QR in plain sight seen only from certain<strong>perspective</strong></li>
+    </ul>
+    <p>
+      If you’ve made something cool, especially if it’s <strong>FOSS (Free and Open Source)</strong>, 
+      please let me know! I’d love to include it in a list of creative collections.
+        </p>
+    <p>
+      Your idea might inspire someone else’s project. Reach out and help keep this tool alive through pleb-powered innovation.
+    </p>
+    
   </div>
 </div>
 
@@ -207,14 +313,26 @@
         </div>
       </div>
 
+      <!-- <script>
+        const layerSelect = document.getElementById('layer-count');
+        for (let i = 2; i <= 21; i++) {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = `${i} Layers`;
+          layerSelect.appendChild(opt);
+        }
+      </script> -->
+
+
+
 <script src="coockieConsent.js"></script>
-<script src="copyonclick.js"></script>
+<!-- <script src="copyonclick.js"></script> -->
 <script src="mempoolWebSocket.js"></script>
 <script src="sintraWebSocket.js"></script>
 <script src="index.js"></script>
 <script src="burgerMenu.js"></script>
 <script src="slip.js"></script>
-<script src="isBip39.js"></script>
+<script src="ghostQR.js"></script>
 
 
 </body>
