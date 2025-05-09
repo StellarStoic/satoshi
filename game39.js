@@ -730,9 +730,9 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
 // // 🔧 Cleans up rooms that were never joined after X minutes
 // Parameters:
 // - maxAgeMinutes (number): How old (in minutes) a room must be to be considered expired
-function cleanupOldRooms(maxAgeMinutes = 10) {
+function cleanupOldRooms(maxAgeMinutes = 60) {
   // Calculate cutoff timestamp in milliseconds
-  const cutoff = Date.now() - maxAgeMinutes * 60 * 1000; // timestamp 10 minutes ago
+  const cutoff = Date.now() - maxAgeMinutes * 60 * 1000; // ← 1 hour ago in milliseconds
 
   // Read all rooms from the Firebase Realtime Database
   db.ref("rooms").once("value").then(snapshot => {
@@ -909,8 +909,9 @@ function autoJoinPoolFromSpectator() {
       helpBtn.addEventListener("click", openGameModal);
     }
 
-    // 🔄 Clean up any stale, unjoined rooms (older than 10 mins)
-    cleanupOldRooms(10);
+    // 🔄 Clean up any stale, unjoined rooms (older than 60 mins)
+    cleanupOldRooms(60); // 🕒 60 minutes = 1 hour
+
 
   });
 
