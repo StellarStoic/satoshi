@@ -94,7 +94,7 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     }
     if (value > 210) {
       roundInput.value = 210;
-      alert("⚠️ Max allowed rounds is 50.");
+      alert("⚠️ Max allowed rounds is 210.");
     } else if (value < 5) {
       roundInput.value = 5;
       alert("⚠️ Minimum rounds is 5.");
