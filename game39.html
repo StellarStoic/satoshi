@@ -63,11 +63,14 @@
     </div>
 
     <div id="gameSetup">
-      <input id="roundCount" type="number" placeholder="Number of words to play" min="5" />
+      <div class="round-input">
+        <label id="roundText" for="roundCount">Rounds:</label>
+        <input id="roundCount" type="number" min="5" max="210" value="21">
+      </div>
       <button id="hostGame">Host Game</button>
       <button id="joinPool">Join Game Pool</button>
       <button id="joinGame">Join Game</button>
-      <input id="peerIdInput" placeholder="Enter host ID" />
+      <input id="peerIdInput" placeholder="Enter game ID or a link" />
       <div id="yourId"></div>
     </div>
 

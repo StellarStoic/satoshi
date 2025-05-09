@@ -78,6 +78,29 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
   // ---------------- HOST GAME -------------------------//
   // ---------------------------------------------------------//
 
+  // prevent users from entering an excessively large number of rounds before the host game button is clicked
+
+  const roundInput = document.getElementById("roundCount");
+
+  roundInput.addEventListener("blur", validateRoundInput);
+  roundInput.addEventListener("change", validateRoundInput);
+  roundInput.addEventListener("wheel", e => e.preventDefault());
+
+  function validateRoundInput() {
+    let value = parseInt(roundInput.value);
+    if (isNaN(value)) {
+      roundInput.value = 21;
+      return;
+    }
+    if (value > 210) {
+      roundInput.value = 210;
+      alert("⚠️ Max allowed rounds is 50.");
+    } else if (value < 5) {
+      roundInput.value = 5;
+      alert("⚠️ Minimum rounds is 5.");
+    }
+  }
+
   // Host and Join buttons: set up a new game room or join an existing one
   // When the "Host Game" button is clicked...
   document.getElementById("hostGame").onclick = () => {
