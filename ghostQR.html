@@ -313,15 +313,49 @@
         </div>
       </div>
 
-      <!-- <script>
-        const layerSelect = document.getElementById('layer-count');
-        for (let i = 2; i <= 21; i++) {
-          const opt = document.createElement('option');
-          opt.value = i;
-          opt.textContent = `${i} Layers`;
-          layerSelect.appendChild(opt);
+    <!-- Ghost floating on entire page -->
+    <div id="ghost-layer">
+      <div class="ghost-qr-fade">
+        <img src="/img/ghostQR.png" alt="Ghost QR" />
+      </div>
+    </div>
+
+      <script>
+        function triggerGhostQR() {
+          const ghost = document.querySelector('.ghost-qr-fade');
+          const img = ghost.querySelector('img');
+      
+          const ghostSize = 120;
+          const padding = 30;
+      
+          // Viewport safe area
+          const vw = window.innerWidth - ghostSize - padding;
+          const vh = window.innerHeight - ghostSize - padding;
+      
+          const startX = Math.random() * vw;
+          const startY = Math.random() * vh;
+          ghost.style.left = `${startX}px`;
+          ghost.style.top = `${startY}px`;
+      
+          // Random drift and tilt
+          const driftX = (Math.random() * 200 - 100).toFixed(0) + 'px';
+          const driftY = (Math.random() * 200 - 100).toFixed(0) + 'px';
+          const tilt = (Math.random() * 80 - 40).toFixed(0) + 'deg';
+      
+          img.style.setProperty('--drift-x', driftX);
+          img.style.setProperty('--drift-y', driftY);
+          img.style.setProperty('--tilt', tilt);
+      
+          // Trigger animation
+          img.classList.remove('fade-animate');
+          void img.offsetWidth;
+          img.classList.add('fade-animate');
         }
-      </script> -->
+      
+        triggerGhostQR();
+        setInterval(triggerGhostQR, 50000); // 50 sec
+      </script>
+      
 
 
 

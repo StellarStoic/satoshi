@@ -14,21 +14,66 @@
 .ghost-qr-title {
   text-align: center;
   margin: 40px 0 10px;
-	font-family: "Roboto Mono", monospace;
+  font-family: "Roboto Mono", monospace;
+  position: relative;
+  color: #888;
+  /* overflow: hidden; */
 }
 
-.ghost-qr-title h1 {
-  font-size: 2.2rem;
-  margin: 0;
-  color: #7d6950; /* Bitcoin orange */
-  font-weight: bold;
+#ghost-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
 }
 
+.ghost-qr-fade {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
+.ghost-qr-fade img {
+  width: 120px;
+  height: 120px;
+  opacity: 0;
+  transform: translate(0, 0) scale(1);
+}
+
+.fade-animate {
+  animation: fadeOutGhost 10s ease-in-out forwards;
+}
+
+@keyframes fadeOutGhost {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1)  rotate(0deg);
+  }
+  10% {
+    opacity: 0.05;
+  }
+  50% {
+    opacity: 0.1;
+  }
+  80% {
+    opacity: 0.15;
+  }
+  90% {
+    opacity: 0.05;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift-x), var(--drift-y)) scale(1.5) rotate(var(--tilt));
+  }
+}
+
+.ghost-qr-title h1,
 .ghost-qr-title p {
-  font-size: 1rem;
-  margin: 4px 0 0;
-  color: #6b6b6b;
-  letter-spacing: 0.5px;
+  position: relative;
+  z-index: 1;
 }
 
 /* Centering the container both vertically and horizontally */
