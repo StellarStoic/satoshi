@@ -91,24 +91,6 @@ function closeMoscowTimeModal() {
     }
 }
 
-async function fetchMoscowTime() {
-  try {
-    const response = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=Europe/Moscow");
-    const data = await response.json();
-
-    const timeString = `${data.hour.toString().padStart(2, '0')}:${data.minute.toString().padStart(2, '0')}:${data.seconds.toString().padStart(2, '0')}`;
-    document.getElementById("moscow-current-time").textContent = timeString;
-  } catch (error) {
-    document.getElementById("moscow-current-time").textContent = "Could not load Moscow time.";
-  }
-}
-
-// Run the function once the page loads
-document.addEventListener('DOMContentLoaded', () => {
-  fetchMoscowTime();
-  setInterval(fetchMoscowTime, 1000); // optional: live clock every second
-});
-
 // element to trigger opening the Moscow Time modal
 const moscowTrigger = document.querySelector('.info-modal-trigger');
 if (moscowTrigger) {
