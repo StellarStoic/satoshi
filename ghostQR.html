@@ -70,18 +70,20 @@
       <div class="qr-seed-form">
 
         <!-- Upper and Lower Text Inputs -->
-        <label for="upper-text">Top Text (e.g. ID, code):</label>
-        <input type="text" id="upper-text" maxlength="25" placeholder="Will be split across layers (max 25)">
+        <label for="upper-text">Text above QR code:</label>
+        <label style="font-size: x-small;" for="upper-text">Will be split across layers </label>
+        <input type="text" id="upper-text" maxlength="25" placeholder="Max 25 characters">
 
         <!-- True Seed Input -->
         <label for="true-seed">Enter data for the QR code</label>
         <textarea id="true-seed" rows="4" placeholder="Enter QR content here... (max 1000)"></textarea>
 
-        <label for="lower-text">Bottom Text (e.g. hint, label):</label>
-        <input type="text" id="lower-text" maxlength="25" placeholder="Will be split across layers (max 25)">
+        <label for="lower-text">Text bellow QR code:</label>
+        <label style="font-size: x-small;" for="lower-text">Will be split across layers </label>
+        <input type="text" id="lower-text" maxlength="25" placeholder="Max 25 characters">
 
         <!-- Layer Count Selector -->
-        <label for="layer-count">How many layers to create?</label>
+        <label for="layer-count">How many layers?</label>
         <select id="layer-count">
           <!-- Options will be populated by JS -->
         </select>
