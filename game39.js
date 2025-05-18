@@ -15,12 +15,28 @@ console.log("Firebase:", typeof firebase); // logs the type of Firebase to verif
   // Initialize the Firebase app and stores a reference to the Realtime Database.
   // All game state (like scores, answers, countdowns) are written/read through this `db` object.
   firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
   const db = firebase.database();
+
+
+  auth.onAuthStateChanged(user => {
+  if (user) {
+    console.log("✅ Signed in as:", user.uid);
+    window.authUserId = user.uid;
+  } else {
+    auth.signInAnonymously()
+      .then(() => console.log("🔐 Anonymous sign-in successful"))
+      .catch(error => console.error("❌ Auth error:", error));
+  }
+});
 
   // 👥 Listen to matchmaking pool changes and update UI with live count
   db.ref("matchmaking").on("value", snapshot => {
     const pool = snapshot.val() || {};
     poolCount = Object.keys(pool).length;
+
+    console.log("🔥 DOM loaded — pool count updated:", poolCount);
 
     // Update any UI showing pool info
     updatePoolLabels(poolCount);
@@ -70,7 +86,8 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
     log(`Sending to room ${roomId}: ${JSON.stringify(data)}`); // Log the outgoing data payload
     db.ref(`rooms/${roomId}`).update({ // Send update to Firebase under the current room
       ...data,
-      senderId: playerId // Used to identify who sent the update
+      senderId: auth.currentUser.uid || playerId // Used to identify who sent the update
+      // senderId: playerId // Used to identify who sent the update
     }); 
   }
 
@@ -149,7 +166,8 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
         host: true, // Mark this room as hosted
         ready: false, // Joiner hasn't connected yet
         roundLimit: roundLimit,   // Save round count in DB
-        players: { player1: playerId }, // Store host's ID
+        players: { player1: firebase.auth().currentUser.uid }, // Store host's ID
+        // players: { player1: playerId }, // Store host's ID
         createdAt: Date.now() // <- timestamp in ms for the room cleanups
       });
 
@@ -216,9 +234,10 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       const players = roomData.players || {};
       const playerIds = Object.keys(players);
 
-          // If no joiners yet, assign this user as the first joiner (Player 2)
+    // If no joiners yet, assign this user as the first joiner (Player 2)
     if (!playerIds.includes("player2")) {
-      db.ref(`rooms/${roomId}/players/player2`).set(playerId);
+      db.ref(`rooms/${roomId}/players/player2`).set(firebase.auth().currentUser.uid);
+      // db.ref(`rooms/${roomId}/players/player2`).set(playerId);
       isSpectator = false;
     } else {
       isSpectator = true; // Everyone else is a spectator
@@ -286,7 +305,8 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
       host: true,
       ready: false,
       roundLimit: roundLimit,
-      players: { player1: playerId },
+      players: { player1: firebase.auth().currentUser.uid },
+      // players: { player1: playerId },
       createdAt: Date.now() // <- timestamp in ms for the cleanups
     });
 
@@ -386,6 +406,12 @@ if (rawRoom && /^[a-zA-Z0-9_-]+$/.test(rawRoom)) {
   function handleIncomingData(data) {
     log(`Data from room: ${JSON.stringify(data)}`);
   
+    // ✅ AUTH VALIDATION — ignore any messages not sent by the current user (optional, based on context)
+    if (data.senderId && data.senderId !== firebase.auth().currentUser.uid) {
+      console.warn("⚠️ Ignored data from other user:", data.senderId);
+      return;
+    }
+
     // Host detects that player 2 joined and starts the countdown
     if (data.ready && isHost && currentRound === 0 && !gameStarted) {
       console.log("🎮 Host received ready:true — starting countdown");
