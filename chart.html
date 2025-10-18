@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="chart.css">
+    <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet"> <!--this might needed to be updated in the future https://lineicons.com/docs/cdn-->
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <!-- Web Manifest -->
+    <link rel="manifest" href="/site.webmanifest">
+
+    <!-- Windows Tile Icon -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff">
+
+    
+    <title>Hi Satoshi</title>
+</head>
+<body>
+  <!-- Copy text notification -->
+  <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
+    <!-- Burger menu -->
+    <a href="#menu" id="toggle"><span></span></a>
+
+    <div id="menu">
+      <ul>
+        <li><a href="index.html">home</a></li>
+        <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+        <li><a href="quotes.html">Words of Satoshi</a></li>
+        <li><a href="nip05.html">NIP-05</a></li>
+        <li><a href="ghostQR.html">GhostQR</a></li>
+        <li><a href="game39.html">Game39</a></li>
+        <li><a href="converter.html">converter</a></li>
+        <li><a href="#">Chart</a></li>
+        <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        <li><a href="MoscowTime">Moscow time</a></li>
+      </ul>
+    </div>
+<!-- -----------------------------chart----------------------------------------- -->
+
+<!-- -----------------------------chart----------------------------------------- -->
+<div class="center-container">
+    <div class="chart-container">
+        <div class="chart-controls">
+            <div class="control-group">
+            <label for="currencySelect">Currency:</label>
+            <select id="currencySelect" onchange="loadChartData()">
+                <option value="AUD" title="Australian Dollar">AUD</option>
+                <option value="BGN" title="Bulgarian Lev">BGN</option>
+                <option value="BRL" title="Brazilian Real">BRL</option>
+                <option value="CAD" title="Canadian Dollar">CAD</option>
+                <option value="CNY" title="Chinese Yuan">CNY</option>
+                <option value="DKK" title="Danish Krone">DKK</option>
+                <option value="EUR" title="Euro" selected>EUR</option>
+                <option value="HKD" title="Hong Kong Dollar">HKD</option>
+                <option value="HUF" title="Hungarian Forint">HUF</option>
+                <option value="ILS" title="Israeli Shekel">ILS</option>
+                <option value="ISK" title="Icelandic Króna">ISK</option>
+                <option value="JPY" title="Japanese Yen">JPY</option>
+                <option value="MXN" title="Mexican Peso">MXN</option>
+                <option value="NOK" title="Norwegian Krone">NOK</option>
+                <option value="NZD" title="New Zealand Dollar">NZD</option>
+                <option value="PLN" title="Polish Złoty">PLN</option>
+                <option value="RON" title="Romanian Leu">RON</option>
+                <option value="SEK" title="Swedish Krona">SEK</option>
+                <option value="SGD" title="Singapore Dollar">SGD</option>
+                <option value="THB" title="Thai Baht">THB</option>
+                <option value="USD" title="United States Dollar">USD</option>
+            </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="eventFilter">History Events:</label>
+                <select id="eventFilter" onchange="onEventFilterChange()">
+                    <option value="hide">Hide</option>
+                    <option value="all">All</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Market">Market</option>
+                    <option value="Adoption">Adoption</option>
+                    <option value="Regulation">Regulation</option>
+                    <option value="Security">Security</option>
+                    <option value="Halving">Halving</option>
+                </select>
+            </div>
+
+            <!-- <div class="control-group">
+                <label for="priceType">Price Type:</label>
+                <select id="priceType" onchange="loadChartData()">
+                    <option value="average">Average Price</option>
+                    <option value="bitstamp">Bitstamp</option>
+                    <option value="coinbase">Coinbase</option>
+                    <option value="kraken">Kraken</option>
+                    <option value="paymium">Paymium</option>
+                    <option value="others">Others</option>
+                </select>
+            </div> -->
+            
+            <div class="control-group">
+                <label for="timeRange">Time Range:</label>
+                <select id="timeRange" onchange="loadChartData()">
+                    <option value="all">All Time</option>
+                    <option value="5years">Last 5 Years</option>
+                    <option value="2years">Last 2 Years</option>
+                    <option value="1year">Last Year</option>
+                    <option value="6months">Last 6 Months</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="scaleType">Scale:</label>
+                <select id="scaleType" onchange="toggleScaleType()">
+                    <option value="log" title="📈 Logarithmic scale - Shows percentage changes and makes trends easier to see">Logarithmic</option>
+                    <option value="linear" title="📊 Linear scale - Shows absolute changes and actual values">Linear</option>
+                </select>
+            </div>
+            
+            <button onclick="takeSnapshot()" class="snapshot-btn">
+                <i class="lni lni-camera"></i> Take Snapshot
+            </button>
+            <button onclick="showExportModal()" style="background: #4CAF50;">Export Data</button>            
+        </div>
+
+        <div class="sats-display-container">
+            <div class="sats-display" id="currentSats">
+                1 USD = Loading...
+            </div>
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div class="chart-wrapper">
+            <div id="loading" class="loading" style="display: none;">
+                <i class="lni lni-spinner-solid spinning"></i> Loading chart data...
+            </div>
+            <canvas id="priceChart"></canvas>
+            <!-- 🎯 Zoom Reset Button -->
+            <button id="zoomResetBtn" class="zoom-reset-btn" onclick="resetZoom()" title="Reset Zoom">
+                <i class="lni lni-arrow-all-direction"></i>
+            </button>
+        </div>
+        
+        <div class="chart-legend" id="chartLegend"></div>
+        <div id="dataInfo" class="data-info"></div>
+        
+        <!-- Historical Events Timeline -->
+        <div class="events-section">
+            <h3>Bitcoin Historical Events</h3>
+            <div class="events-timeline" id="eventsTimeline"></div>
+        </div>
+
+        <!-- Event Details Modal -->
+        <div id="eventModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEventModal()">&times;</span>
+                <h2 id="eventTitle">Event Title</h2>
+                <div class="event-meta">
+                    <span id="eventDate">Date</span>
+                </div>
+                <div class="event-description-modal">
+                    <p id="eventDescription">Short description</p>
+                </div>
+                <div class="event-long-description">
+                    <p id="eventLongDescription">Long description</p>
+                </div>
+                <div class="event-link">
+                    <a id="eventLink" href="#" target="_blank" style="display: none;">Read More</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Format Modal -->
+        <div id="exportModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeExportModal()">&times;</span>
+                <h2 id="exportModalTitle">Export Data</h2>
+                <p>Choose export format:</p>
+                <div class="export-options">
+                    <button class="export-option-btn csv-option" onclick="exportDataAs('csv')">
+                        <i class="lni lni-spreadsheet"></i>
+                        <span>CSV Format</span>
+                        <small>Spreadsheet compatible • Calculating...</small>
+                    </button>
+                    <button class="export-option-btn json-option" onclick="exportDataAs('json')">
+                        <i class="lni lni-json"></i>
+                        <span>JSON Format</span>
+                        <small>For developers & APIs • Calculating...</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
+<footer class="footer">
+    <!-- Email Link -->
+    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank">
+      one@satoshi.si
+    </a>
+  
+    <!-- Block Height Display (Left Side) -->
+    <span id="block-height"  title="Block Height" onclick="openMempoolTinyDataModal()">
+    </span>
+  
+    <!-- Fee Rate Display (Right Side) -->
+    <span id="fee-rate" title="Network fee rate" onclick="openMempoolTinyDataModal()">
+    </span>
+    
+    <!-- Lightning Icon -->
+    <i class="lni lni-bolt-2" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+  </footer>
+
+
+<!-- Mempool Tiny Data Modal -->
+<div id="mempoolTinyDataModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close-icon" onclick="closeMempoolTinyDataModal()">&times;</span>
+        <div class="modal-navigation">
+            <span class="left-arrow" title="Previous Block">&larrfs;</span>
+            <h2 class="modal-title"></h2>
+            <span class="right-arrow" title="Next Block">&rarrfs;</span>
+        </div>
+        
+
+        <!-- Block Data Content -->
+        <div class="block-data" style="display: none;">
+            <div class="avg-fee-rate" title="Median fee rate"></div>
+            <div class="fee-range" title="Fee Range from Lowest to Highest"></div>
+            <div class="total-fees-btc" title="Total fees in Bitcoin"></div>
+            <div class="total-fees-sats" title="Total fees in Satoshis"></div>
+            <div class="tx-count" title="Number of transactions"></div>
+            <div class="time-passed" title="Time passed since this block was mined"></div>
+            <div class="mined-by" title="Miner of the block"></div>
+        </div>
+
+        <!-- Fee Rate Content -->
+        <div class="fee-data" style="display: none;">
+            <!-- <div class="fee-info" title="Current Half-Hour Fee Rate"></div> -->
+            <div class="economy-fee" title="Economy Fee Rate"></div>
+            <div class="fastest-fee" title="Fastest Fee Rate"></div>
+            <div class="half-hour-fee" title="Half-Hour Fee Rate"></div>
+            <div class="hour-fee" title="Hourly Fee Rate"></div>
+            <div class="minimum-fee" title="Minimum Fee Rate"></div>
+        </div>
+    </div>
+</div>
+
+
+
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+      <div class="modal-content">
+          <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+          <h4 id="gratitudeHeader">If you find this website valuable, consider contributing a sat or two. Thank you.</h4>
+          <div class="qr-code-container">
+              <!-- Lightning QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                  <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+              </div>
+              
+              <!-- Onchain QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                  <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+    <!-- Cookie Consent Modal -->
+    <div id="cookieConsentModal" class="description-modal">
+        <div class="modal-content">
+            <h4>Listen Up, Cookie Crunchers!</h4>
+            <h6>The G.D.P.R. (Greatly Demanding Privacy Rules) requires us to share this with you...</h6>
+            <p>We don't really give a damn about cookies. But some settings, like our fancy currency rates converter, store your preferences so you don't have to waste time setting things up every damn time you visit.</p>
+            <br>
+            <p>But seriously, we don't track you, we don't sell your data, and we definitely don't care about what you're doing online (unless you're baking actual cookies, in which case, send some our way digitally in sats. <span style="color: aliceblue">⚡</span>)</p>
+            <br>
+            <p>If you're cool with us making your life a little bit easier, click the button below. If not, hey, that's cool too. Just remember! stay humble and stack sats.</p>
+            <br>
+            <!-- Button container with Flexbox -->
+            <div class="consent-button-container">
+                <button onclick="acceptCookies()" class="consent-icon-button green-check" title="Yeah, whatever, just do it!">
+                    &#10004; <!-- Unicode checkmark -->
+                </button>
+                <button onclick="declineCookies()" class="consent-icon-button red-cross" title="Nope, delete all none essential cookies">
+                    &#10008; <!-- Unicode cross -->
+                </button>
+            </div>
+        </div>
+      </div>
+
+
+<!-- chart JS scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<!-- Compatible Zoom Plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+<script src="coockieConsent.js"></script>
+<script src="copyonclick.js"></script>
+<script src="mempoolWebSocket.js"></script>
+<script src="sintraWebSocket.js"></script>
+<script src="index.js"></script>
+<script src="chart.js"></script>
+<script src="burgerMenu.js"></script>
+<!-- <script src="slip.js"></script> -->
+
+
+</body>
+</html>

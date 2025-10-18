@@ -1,0 +1,326 @@
+[
+  {
+    "id": "Original Bitcoin Whitepaper",
+    "date": "2008-10-31",
+    "category": "Technology",
+    "title": "📜 Bitcoin Whitepaper",
+    "shortDescription": "Satoshi Nakamoto publishes the whitepaper: 'Bitcoin: A Peer-to-Peer Electronic Cash System.' The document that started it all!",
+    "longDescription": "On October 31, 2008, at the height of the global financial crisis, an anonymous figure under the pseudonym of Satoshi Nakamoto published a document titled 'Bitcoin: A Peer-to-Peer Electronic Cash System.' This nine-page whitepaper presented a solution to the double-spending problem without the need for a central authority, such as a bank or government. Instead, it proposed a 'peer-to-peer' network where transactions would be verified by a network of nodes and recorded in a public, immutable ledger, the 'blockchain.'\n\nThis document was not only a technical proposal but also an ideological statement. Born from discontent with the traditional banking system that had failed, Bitcoin was conceived as a decentralized and transparent alternative. The idea that money could be managed by code rather than human institutions resonated deeply with the 'cypherpunk' community and privacy advocates.\n\nAlthough the whitepaper went largely unnoticed outside of very specific circles, it laid the foundation for the beginning of a revolution. It was the conceptual origin of Bitcoin, the roadmap that would guide the first pioneers of cryptography and software in building the network that would eventually become a global phenomenon.",
+    "externalLink": "https://bitcoin.org/bitcoin.pdf"
+  },
+  {
+    "id": "Genesis block",
+    "date": "2009-01-03",
+    "category": "Technology",
+    "title": "🚀 Genesis Block",
+    "shortDescription": "The first Bitcoin block is mined with a hidden message about the banking crisis. The origin of the network!",
+    "longDescription": "On January 3, 2009, the Bitcoin network came to life with the creation of the genesis block, the first block of the chain. This block is a crucial milestone because it not only marked the official start of the network, but also contained an encrypted message from Satoshi Nakamoto. The embedded text, 'The Times 03/Jan/2009 Chancellor on brink of second bailout for banks,' was the headline of that day's 'The Times' newspaper.\n\nThis reference directly alluded to the 2008 financial crisis and the bank bailout policies implemented by governments. The message was a declaration of intent, a reminder that Bitcoin was created as a response to the instability and lack of trust in the traditional financial system. It showed that Bitcoin was not just a technological tool, but an ideological movement.\n\nFrom that moment on, every block added to the chain has tracked the complete history of transactions, creating a public, immutable, and decentralized record. The genesis block is the starting point of this record, a symbol of resistance and a testament to the original vision of its creator.",
+    "externalLink": "https://en.bitcoin.it/wiki/Genesis_block"
+  },
+  {
+    "id": "First Bitcoin Transaction",
+    "date": "2009-01-12",
+    "category": "Technology",
+    "title": "👨‍💻 First Transaction",
+    "shortDescription": "Satoshi sends 10 BTC to Hal Finney, a cryptography pioneer. The first BTC transfer in history!",
+    "longDescription": "On January 12, 2009, the first Bitcoin transaction outside the testing phase took place. The anonymous creator, Satoshi Nakamoto, sent 10 BTC to developer Hal Finney. Finney, a cryptographer and activist of the 'cypherpunk' movement, was one of the first to download the Bitcoin software and collaborate with Satoshi in its early days. This exchange proved that the Bitcoin network worked in practice, allowing for direct value transfers between two people without intermediaries.\n\nHal Finney is a legendary figure in Bitcoin history. He died in 2014, but his contributions were fundamental. In a blog post, Finney recalled how he 'mined the first blocks and was rewarded with 50 bitcoins' and how he received that first transaction from Satoshi. His early involvement earned him a place of honor in the history of cryptography and blockchain technology.\n\nThis transaction marked the starting point for Bitcoin's functionality as an electronic cash system. It proved that the concept of peer-to-peer digital money was viable, laying the groundwork for the network to grow and develop. It was a small step for Satoshi and Finney, but a giant leap for information technology and finance.",
+    "externalLink": "https://www.guinnessworldrecords.es/world-records/696243-first-bitcoin-transaction"
+  },
+  {
+    "id": "Exchange Rate Announcement",
+    "date": "2009-10-05",
+    "category": "Market",
+    "title": "💱 First USD Value",
+    "shortDescription": "The first exchange rate is established: 1 USD = 1309.03 BTC. For less than a dollar, you could buy a lot of Bitcoin!",
+    "longDescription": "On October 5, 2009, the New Liberty Standard platform established the first exchange rate for Bitcoin against the US dollar. This calculation was based on the cost of electricity needed to mine one bitcoin. The result was 1 USD for 1309.03 BTC, a value that is astonishing today but had little economic meaning at the time.\n\nThis milestone was the first attempt to assign a monetary value to Bitcoin beyond its utility as a software tool. It opened the door for people to begin seeing Bitcoin not only as a technological experiment but also as an asset with exchange potential. Although the value was minuscule, it was the first step in its transformation from an idea to a commodity.\n\nEstablishing this symbolic exchange rate was a crucial moment in Bitcoin's history, as it marked the transition from the 'hobby project' phase to the 'financial asset' phase. Although it was not yet a liquid market, this event laid the groundwork for the creation of exchanges and the subsequent development of the cryptocurrency trading ecosystem.",
+    "externalLink": "https://bitcointalk.org/index.php?topic=19.0"
+  },
+  {
+    "id": "Bitcoin Exchange Milestones",
+    "date": "2010-02-06",
+    "category": "Adoption",
+    "title": "🛒 First Exchange",
+    "shortDescription": "BitcoinMarket.com launches, the first Bitcoin exchange. This is where people started to buy and sell BTC for real!",
+    "longDescription": "On February 6, 2010, BitcoinMarket.com launched as the first cryptocurrency 'exchange.' This platform allowed users to buy and sell bitcoins using fiat money, which marked a before and after in Bitcoin's history. Before this, buying and selling BTC was done in a 'peer-to-peer' manner through forums, a slow and risky process.\n\nThe creation of a centralized exchange greatly facilitated Bitcoin's liquidity and accessibility for a wider audience. Although fees were high and trading volumes were minimal compared to today's standards, the platform provided a place where people could assign a real market value to the digital currency. This helped Bitcoin mature as a financial asset and attracted the first speculators and enthusiasts.\n\nBitcoinMarket.com was an experiment that, despite its limitations, demonstrated the potential of a cryptocurrency market. Its existence set a precedent for the proliferation of exchanges that would emerge in the following years, from Mt. Gox to Coinbase, forming the essential infrastructure of the crypto ecosystem we know today.",
+    "externalLink": "https://www.coindesk.com/policy/2013/05/27/a-brief-history-of-bitcoin-exchanges/"
+  },
+  {
+    "id": "Original Bitcoin Forum Thread",
+    "date": "2010-05-22",
+    "category": "Adoption",
+    "title": "🍕 Bitcoin Pizza Day",
+    "shortDescription": "Laszlo Hanyecz pays 10,000 BTC for two pizzas. Today they would be worth millions 💸. The most expensive pizza in history!",
+    "longDescription": "On May 22, 2010, programmer Laszlo Hanyecz made what is considered the first commercial transaction with Bitcoin in the real world. Hanyecz offered 10,000 BTC on a forum for someone to order him two Papa John's pizzas. A network enthusiast accepted the deal and sent him the pizzas, completing a transaction that would go down in history.\n\nAt the time, 10,000 BTC were worth about 41 dollars. Over time and with the exponential increase in Bitcoin's value, that transaction has become a legendary anecdote. At Bitcoin's all-time high prices, those two pizzas would have cost over 600 million dollars. This event, now known as 'Bitcoin Pizza Day,' is celebrated annually as a reminder of Bitcoin's humble origins and its journey from a technological curiosity to a global asset.\n\nAlthough Hanyecz might regret the amount of money he spent on those pizzas today, his action was fundamental. It proved that Bitcoin could be used as a real medium of exchange for goods and services, not just as a speculative asset. It was the proof of concept that the ecosystem needed to start building a future where decentralized digital transactions were a reality.",
+    "externalLink": "https://bitcointalk.org/index.php?topic=137.0"
+  },
+  {
+    "id": "Slashdot Article",
+    "date": "2010-07-11",
+    "category": "Adoption",
+    "title": "🧠 Bitcoin on Slashdot",
+    "shortDescription": "Bitcoin is featured on Slashdot, attracting many curious geeks and miners. The Slashdot effect took Bitcoin to the next level!",
+    "longDescription": "On July 11, 2010, Bitcoin was featured on the front page of Slashdot, a popular news and technology website known as 'the main news portal for geeks.' The article generated enormous interest among programmers, engineers, and technology enthusiasts. This event, often called the 'Slashdot effect,' attracted a wave of new users and, more importantly, new miners.\n\nThe sudden increase in the number of participants in the network strengthened Bitcoin's security and helped its decentralization. As more people downloaded the software and mined blocks, the network became more robust and resistant to potential attacks. This early adoption surge was crucial for the project's survival in its early years, as it showed that the concept of a decentralized digital currency could capture the imagination of a technical community.\n\nThe appearance on Slashdot was a key moment in Bitcoin's history. It served as a springboard that brought it out of the obscurity of cryptography forums and exposed it to a wider audience. It was the first step towards its recognition beyond a small circle of visionaries and helped sow the seeds of what would become a global movement.",
+    "externalLink": "https://slashdot.org/story/11/02/10/189246/online-only-currency-bitcoin-reaches-dollar-parity"
+  },
+  {
+    "id": "Explanation of the Bug",
+    "date": "2010-08-15",
+    "category": "Security",
+    "title": "⚠️ First Critical Bug",
+    "shortDescription": "184 billion BTC are exploited due to a bug. It's fixed with an urgent hard fork. A scare that demonstrated the network's resilience!",
+    "longDescription": "On August 15, 2010, a serious bug in the Bitcoin code allowed 184 billion BTC to be illegitimately created. The error, known as the 'value overflow bug,' was quickly discovered by a community developer who noticed the suspicious transaction. Without the developers' swift response, this could have destroyed trust in the network and rendered it unusable.\n\nThe Bitcoin community reacted decisively and efficiently. Developers worked together to create a patch, and the network underwent a 'hard fork' (a software update that is not compatible with the previous version). The blockchain split, and the community of miners and nodes decided to follow the new chain that ignored the fraudulent transaction. This process required unprecedented coordination in a decentralized network, demonstrating the community's ability to protect the system's integrity.\n\nAlthough it was a moment of great vulnerability, the event became a demonstration of Bitcoin's resilience. The network's ability to autonomously detect and correct a critical error without a central authority reinforced confidence in the system. It showed that the community could act as the guardian of the network, a fundamental principle of Bitcoin's philosophy.",
+    "externalLink": "https://en.wikipedia.org/wiki/Bitcoin_history#Transaction_overload_bug"
+  },
+  {
+    "id": "News on the Milestone",
+    "date": "2011-02-09",
+    "category": "Market",
+    "title": "💵 Parity with the Dollar",
+    "shortDescription": "1 BTC reaches the same value as 1 USD for the first time. A milestone that made many raise their eyebrows!",
+    "longDescription": "On February 9, 2011, Bitcoin reached a crucial psychological and symbolic milestone: its price equaled the value of one US dollar. On the Mt. Gox exchange, which at the time was the main trading platform, 1 BTC was traded for 1 USD. This event was a moment of great celebration for the early Bitcoin community, as it showed that the asset had real value potential beyond its utility as a niche technology.\n\nParity with the dollar attracted the attention of a wider audience. People began to see Bitcoin as a potential investment and not just a curiosity. Although the trading volume was still relatively low, the milestone served as a turning point. It was a sign that the market was beginning to mature and recognize the inherent value of digital gold.\n\nThis moment was not only a symbolic victory, but also paved the way for the future growth of the cryptocurrency. From this point on, Bitcoin's price would begin to experience boom and bust cycles, attracting a mix of investors, speculators, and enthusiasts who would forge the path to mass adoption.",
+    "externalLink": "https://bitbo.io/calendar/dollar-parity/"
+  },
+  {
+    "id": "Mt. Gox on Wikipedia",
+    "date": "2011-06-13",
+    "category": "Security",
+    "title": "🔓 Mt. Gox Hacked",
+    "shortDescription": "The most popular exchange is hacked, with the price dropping from $17 to nearly zero 😱. A bitter pill for the community, but a lesson learned!",
+    "longDescription": "On June 13, 2011, the Mt. Gox exchange was the victim of a large-scale hack. The security breach allowed attackers to steal thousands of bitcoins and manipulate the platform's price. The price of Bitcoin, which was around 17 dollars at the time, plummeted to almost zero in an instant. The attack did not compromise the security of the Bitcoin network itself, but that of a centralized entity that managed users' funds.\n\nThis event was a hard blow for the community, which suffered significant financial losses. However, it also served as an invaluable lesson. It highlighted the inherent risk of trusting centralized platforms to hold funds and reinforced the need for users to take control of their own private keys. The famous saying 'Not your keys, not your coins' became popular after these types of incidents, fostering a culture of self-custody and security.\n\nThe Mt. Gox hack was the first of many security incidents that would plague the crypto industry in its early years. It served as a reminder that while the Bitcoin network is secure, third-party platforms that interact with it can be vulnerable. Although it was a bitter pill for many, it prompted the community to develop better security practices and build a more resilient industry.",
+    "externalLink": "https://en.wikipedia.org/wiki/Mt._Gox"
+  },
+  {
+    "id": "What is Bitcoin Halving",
+    "date": "2012-11-28",
+    "category": "Halving",
+    "title": "🪙 First Halving",
+    "shortDescription": "The block reward drops from 50 to 25 BTC, reducing system inflation. Supply shrinks, scarcity increases!",
+    "longDescription": "On November 28, 2012, the first Bitcoin halving occurred. This event, programmed into the network's code, halves the reward that miners receive for validating a block. The reward dropped from 50 BTC to 25 BTC. The halving is a key deflationary mechanism, designed to control the supply of new bitcoins and maintain their scarcity.\n\nThe halving is an event that happens approximately every four years or every 210,000 blocks. Its purpose is to mimic the extraction of finite resources like gold. As the mining reward decreases, the supply of new bitcoins shrinks, which has historically been correlated with an increase in demand and, therefore, in price. This first halving was a crucial experiment to see if the market would react as expected.\n\nThe success of the first halving reinforced the community's faith in Bitcoin's economics. It showed that the system was working as designed by Satoshi Nakamoto. This event marked the beginning of a new market cycle and was the catalyst for the first major bull market that took Bitcoin to new all-time highs.",
+    "externalLink": "https://academy.binance.com/es/glossary/halving"
+  },
+  {
+    "id": "News on the Cyprus Crisis",
+    "date": "2013-03-28",
+    "category": "Regulation",
+    "title": "🏦 Cyprus Banking Crisis",
+    "shortDescription": "The banking crisis in Cyprus sparks interest in Bitcoin as an alternative to the traditional financial system. People seek refuge!",
+    "longDescription": "In March 2013, the financial crisis in Cyprus reached its peak. To prevent bank failures, the Cypriot government and the European Central Bank imposed a 'haircut' and confiscated a portion of savers' bank deposits. This event caused a wave of panic and outrage, as it showed that money stored in the bank was not completely safe.\n\nThe crisis in Cyprus served as a powerful validation of the Bitcoin concept. Many citizens, who had lost faith in the banking system, began to look for an alternative. Bitcoin, a decentralized digital currency not subject to government confiscation, presented itself as a solution. The demand for Bitcoin increased, and its price skyrocketed on exchanges.\n\nThis incident was a turning point, as Bitcoin was no longer seen solely as a technological tool but became a potential 'safe haven' asset in times of financial instability. It demonstrated to the world that Bitcoin's value proposition was real and that its existence was more relevant than ever in a context of economic crisis and a loss of trust in traditional institutions.",
+    "externalLink": "https://www.theguardian.com/world/2013/mar/25/cyprus-bailout-deal-eu-closes-bank"
+  },
+  {
+    "id": "News on the Arrest",
+    "date": "2013-10-02",
+    "category": "Regulation",
+    "title": "👮‍♂️ Silk Road Shutdown",
+    "shortDescription": "The FBI shuts down the black market Silk Road. Ross Ulbricht is arrested. A blow to the Dark Web, but not to Bitcoin itself!",
+    "longDescription": "On October 2, 2013, the FBI shut down Silk Road, a black market on the Dark Web that used Bitcoin for illicit goods and services transactions. Its founder, Ross Ulbricht, known as 'Dread Pirate Roberts,' was arrested. This event was a major blow to Bitcoin's reputation, as it associated it with illegality in the public's mind.\n\nHowever, the shutdown of Silk Road had a dual effect. On one hand, it showed that Bitcoin is not completely anonymous. Authorities were able to trace users and, ultimately, identify Ulbricht through activity on the blockchain. This helped debunk the popular belief that Bitcoin was an untraceable tool for crime. On the other hand, the massive media coverage of the case exposed Bitcoin to millions of people who had never heard of it before.\n\nAlthough Bitcoin's price temporarily dropped after the news, the event was positive in the long run. It helped clean up the cryptocurrency's image, gradually disassociating it from the Dark Web and allowing its potential as legitimate technology to emerge. The Silk Road shutdown was a reminder that while technology is neutral, how it is used defines its public perception.",
+    "externalLink": "https://www.wired.com/2013/10/silk-road/"
+  },
+  {
+    "id": "Historical Price Chart",
+    "date": "2013-11-29",
+    "category": "Market",
+    "title": "🚀 BTC Breaks $1,000",
+    "shortDescription": "Bitcoin surpasses $1,000, driven by demand in China. The dragon enters the scene!",
+    "longDescription": "In late 2013, the price of Bitcoin experienced a meteoric rise, surpassing the $1,000 mark for the first time. This increase was largely driven by growing demand in China, where people were looking for an alternative to strict capital controls. Chinese exchanges saw a massive surge in volume, which catapulted the price to unprecedented levels.\n\nBreaking the $1,000 barrier was an important psychological milestone. It demonstrated that Bitcoin's value could be sustained and was not just a 'bubble' that would quickly fade. It attracted the attention of larger investors and mainstream media, creating a feedback loop of interest and adoption.\n\nThis 2013 bull run, although brief, put Bitcoin on the map as a risky financial asset with explosive growth potential. Although the price would drop dramatically in the following years, the $1,000 milestone showed that Bitcoin was a serious player on the global financial stage, capable of attracting capital from all over the world.",
+    "externalLink": "https://www.coindesk.com/price/bitcoin"
+  },
+  {
+    "id": "News on the Bankruptcy",
+    "date": "2014-02-24",
+    "category": "Security",
+    "title": "🧨 Mt. Gox Collapse",
+    "shortDescription": "The world's largest exchange declares bankruptcy after 'losing' 850,000 BTC. Mt. Gox imploded, leaving many heartbroken!",
+    "longDescription": "On February 24, 2014, Mt. Gox, which at the time handled over 70% of Bitcoin's trading volume, declared bankruptcy. The reason was the 'loss' of 850,000 bitcoins, valued at hundreds of millions of dollars at the time. Although the exchange blamed a hack, the lack of transparency and poor management practices later revealed caused trust in centralized platforms to plummet.\n\nThe collapse of Mt. Gox was the most traumatic event in Bitcoin's early history. Thousands of users lost their funds, and the cryptocurrency's price crashed, beginning a long bear market known as 'crypto winter.' The debacle was a painful reminder that Bitcoin's decentralization did not protect users from the risks of centralized intermediaries. The famous slogan 'Not your keys, not your coins' became more relevant than ever.\n\nThe fall of Mt. Gox was a turning point. While the event caused significant damage to Bitcoin's reputation, it also prompted the community to seek safer and more decentralized solutions. New exchanges and projects that emerged afterward focused on transparency and security, learning from Mt. Gox's mistakes. In a way, the bankruptcy was a catalyst for the maturation and professionalization of the crypto ecosystem.",
+    "externalLink": "https://www.bloomberg.com/news/articles/2014-02-28/mt-gox-files-for-bankruptcy-after-850-000-bitcoins-disappear"
+  },
+  {
+    "id": "Official Ethereum Page",
+    "date": "2015-07-30",
+    "category": "Technology",
+    "title": "🌐 Ethereum is Born",
+    "shortDescription": "Launch of Ethereum: a new era of smart contracts opens up. Bitcoin's little brother (or rival) arrives in the neighborhood!",
+    "longDescription": "On July 30, 2015, the Ethereum network was launched. Created by programmer Vitalik Buterin, Ethereum introduced a revolutionary functionality: smart contracts. Unlike Bitcoin, which focused on being a digital cash system, Ethereum was designed as a platform to build decentralized applications (DApps) and execute code immutably. This opened the doors to a new era of blockchain technology.\n\nEthereum was not just a new cryptocurrency; it was a paradigm shift. The ability to program the blockchain to perform complex functions attracted a new generation of developers and entrepreneurs. It became the foundation for the decentralized finance (DeFi) movement and the rise of non-fungible tokens (NFTs), expanding the possibilities of what blockchain technology could achieve beyond money.\n\nAlthough Bitcoin and Ethereum are often seen as rivals, they actually complement each other. Bitcoin remains the store-of-value asset, while Ethereum has become the 'world computer' for innovation in the crypto space. The launch of Ethereum was a milestone that showed that the potential of blockchain technology was much broader than previously thought, and its success propelled the entire cryptocurrency ecosystem into a new phase of growth and development.",
+    "externalLink": "https://ethereum.org/en/whitepaper/"
+  },
+  {
+    "id": "Origin of 'HODL' on the Forum",
+    "date": "2016-01-01",
+    "category": "Adoption",
+    "title": "📈 'HODL' Meme Solidifies",
+    "shortDescription": "The 'I AM HODLING' typo becomes the battle cry for Bitcoin investors not to sell. Hodl on, brothers!",
+    "longDescription": "The term 'HODL' (a typo of 'hold') solidified as an investment philosophy in the Bitcoin community. It originated in a Bitcoin forum in 2013, when a user who made a typing mistake encouraged others not to sell their bitcoins despite a price drop. The term went viral and became a battle cry.\n\nThe philosophy of 'HODL' is based on the belief that, despite market volatility, Bitcoin's long-term value will increase. 'HODLers' are those investors who hold their assets for the long term, ignoring price fluctuations and alarming news. In a market as volatile as cryptocurrencies, this strategy is often considered the most prudent.\n\nThe 'HODL' meme is an example of the unique and collaborative culture that has grown around Bitcoin. It is not just an investment strategy, but a community identity that has helped many investors get through long and harsh 'crypto winters.' It has become a symbol of faith in Bitcoin's transformative potential and the conviction that, despite the downturns, the future of the cryptocurrency is bright.",
+    "externalLink": "https://bitcointalk.org/index.php?topic=375643.0"
+  },
+  {
+    "id": "Bitbo Article on the Event",
+    "date": "2016-07-09",
+    "category": "Halving",
+    "title": "⚒️ Second Halving",
+    "shortDescription": "The reward drops to 12.5 BTC per block. Another step towards programmed scarcity!",
+    "longDescription": "On July 9, 2016, the second Bitcoin halving occurred. The reward for mining a block was reduced from 25 BTC to 12.5 BTC. This event, programmed into Bitcoin's code, was the second of the four main halvings and another step on the path towards the total supply of 21 million bitcoins.\n\nThe reduction in the supply of new bitcoins was a key factor in the bull market that began in 2016 and culminated in the 2017 peak. The halving creates an artificial scarcity that, if demand is maintained or increased, tends to push prices upward. The success of this second halving demonstrated the effectiveness of Bitcoin's economic model and reinforced the community's trust in the system's mechanics.\n\nThe second halving was a crucial milestone that consolidated Bitcoin as one of the most important cryptocurrencies in the world. It showed that Satoshi Nakamoto's design was robust and that the system could handle important events like a programmed reduction in supply. From this point on, halvings became highly anticipated events and were credited with the ability to predict market cycles.",
+    "externalLink": "https://bitbo.io/calendar/2016-halving/"
+  },
+  {
+    "id": "Explanation of the Fork",
+    "date": "2017-08-01",
+    "category": "Technology",
+    "title": "🔀 Bitcoin Cash Forks",
+    "shortDescription": "Bitcoin splits over scalability disagreements. Bitcoin Cash (BCH) is born. A family saga with drama included!",
+    "longDescription": "On August 1, 2017, the Bitcoin network underwent a 'hard fork' that resulted in a new cryptocurrency: Bitcoin Cash (BCH). The split was the result of a long and heated debate in the community about how to scale the network to increase the number of transactions per second. A group of developers and miners advocated for increasing the block size, while another group, mostly Bitcoin Core developers, preferred second-layer solutions like Lightning Network.\n\nThe group that advocated for larger blocks decided to split and create its own blockchain, giving rise to Bitcoin Cash. This new cryptocurrency had an 8 MB block size, which allowed it to process more transactions than Bitcoin. The event was a moment of great tension in the community, which was divided between Bitcoin and Bitcoin Cash proponents.\n\nThe Bitcoin Cash fork was a historic event that demonstrated the ideological divisions in the Bitcoin community and the decentralized nature of the network, where there is no final authority to impose a decision. Although Bitcoin Cash never achieved the popularity of Bitcoin, the event served as a reminder that cryptocurrencies are open-source software projects that can fork and evolve in different ways.",
+    "externalLink": "https://www.investopedia.com/terms/b/bitcoin-cash.asp"
+  },
+  {
+    "id": "Bitcoin Price History",
+    "date": "2017-12-17",
+    "category": "Market",
+    "title": "📈 2017 ATH",
+    "shortDescription": "Bitcoin reaches nearly $20,000 for the first time after a meteoric rise. Everyone wanted a piece of the pie!",
+    "longDescription": "On December 17, 2017, Bitcoin reached a new all-time high (ATH), approaching $20,000. This rally was driven by a mix of retail speculation, massive media coverage, and the growing adoption of cryptocurrencies. Everyday people, who had no idea what Bitcoin was until then, started buying it in droves, pushing the price to stratospheric levels.\n\nThe 2017 frenzy was a cultural phenomenon. People talked about Bitcoin at dinner parties, taxi drivers gave investment advice, and the media couldn't ignore the story. This 'rally' not only benefited Bitcoin but also boosted the entire 'altcoin' market, creating an unprecedented market capitalization boom.\n\nHowever, the 2017 peak was also the beginning of a brutal crash. What went up parabolically, fell with the same force. Despite this, the event served to put Bitcoin on the global map and to demonstrate its growth potential. Although many investors lost money in the crash, the 2017 boom left an indelible mark on the history of finance and blockchain technology development.",
+    "externalLink": "https://es.wikipedia.org/wiki/Anexo:Historial_de_precios_de_bitcoin"
+  },
+  {
+    "id": "What is a Crypto Winter",
+    "date": "2018-01-16",
+    "category": "Market",
+    "title": "🧊 Crypto Winter",
+    "shortDescription": "A prolonged price drop begins. Bitcoin loses over 80% of its value. The winter is harsh for the 'new rich'!",
+    "longDescription": "After the 2017 all-time high, the cryptocurrency market entered a long and painful bear market known as 'crypto winter.' During this period, Bitcoin's price fell more than 80% from its peak, and the total crypto market capitalization shrank by hundreds of billions of dollars. The speculation that had driven prices in 2017 faded, and enthusiasm turned into skepticism.\n\nCrypto winter was a period of consolidation and cleansing. Many of the 'meme' projects and scams that had emerged during the 2017 boom disappeared. Cryptocurrency companies struggled to survive, and many retail investors left the market. However, for the true believers, it was a time of opportunity. Developers continued to build, and long-term investors took advantage of the opportunity to accumulate assets at low prices.\n\nThis period of price calm was crucial for the industry's maturation. It allowed developers to focus on the underlying technology without the distraction of speculation. It was during the crypto winter that important advances were made in areas like the Lightning Network and scalability solutions. The crypto winter was a 'fire test' that showed that the Bitcoin ecosystem could survive and thrive even in the most adverse conditions.",
+    "externalLink": "https://academy.binance.com/en/glossary/crypto-winter"
+  },
+  {
+    "id": "2018 Price Chart",
+    "date": "2018-12-15",
+    "category": "Market",
+    "title": "📉 Bear Market Bottom",
+    "shortDescription": "Bitcoin bottoms out at $3,200 after a year of declines. The true believers bought the dip!",
+    "longDescription": "On December 15, 2018, Bitcoin bottomed out in the long bear market that began after the 2017 peak. The cryptocurrency's price fell to $3,200, a loss of almost 85% of its value from its all-time high. This low marked the lowest point of the 'crypto winter' and was a moment of great despair for many investors. However, for Bitcoin's most ardent supporters, it was a unique opportunity.\n\nInvestors who believed in Bitcoin's long-term vision, often nicknamed 'HODLers,' saw this drop as a golden opportunity to buy at low prices. It was at this moment that the motto 'Buy the dip' became popular. The conviction that Bitcoin would rebound was maintained, even when the overall market sentiment was extremely negative. This low was the turning point that marked the beginning of the market's recovery.\n\nThe 2018 bottom is a reminder of Bitcoin's extreme volatility, but also of its ability to recover. Investors who remained calm and bought during this period were rewarded with the next major bull run. This event showed that Bitcoin is an asset for long-term investors and that patience is one of the most important virtues in the world of cryptocurrencies.",
+    "externalLink": "https://www.coindesk.com/price/bitcoin"
+  },
+  {
+    "id": "News on 'Black Thursday'",
+    "date": "2020-03-12",
+    "category": "Market",
+    "title": "😷 COVID and Brutal Crash",
+    "shortDescription": "The price of BTC drops 50% in a single day due to global financial panic. 'Black Thursday' also hit crypto!",
+    "longDescription": "On March 12, 2020, the global cryptocurrency market experienced a brutal crash. With the declaration of the COVID-19 pandemic and global financial panic, investors liquidated risky assets en masse. In a single day, Bitcoin's price dropped almost 50%, an event the community dubbed 'Crypto's Black Thursday.' Many thought this was the end of Bitcoin.\n\nHowever, Bitcoin's story in 2020 did not end there. As governments worldwide printed trillions of dollars to stimulate their economies, fear of inflation grew, and many investors began to see Bitcoin as a hedge against fiat currency devaluation. The narrative of Bitcoin as 'digital gold' was greatly strengthened.\n\nThe Black Thursday crash was a stress test for the Bitcoin ecosystem. It showed that while the cryptocurrency is sensitive to macroeconomic shocks, it is also incredibly resilient. The rapid recovery that followed the event laid the groundwork for the next bull market and consolidated Bitcoin's role as a reserve asset for investors seeking protection from global economic instability.",
+    "externalLink": "https://news.bit2me.com/en/Bitcoin-crash-on-Black-Thursday-and-historic-resurgence"
+  },
+  {
+    "id": "The Bitcoin Halving and the Bitcoin Market Cycle",
+    "date": "2020-05-11",
+    "category": "Halving",
+    "title": "⛏️ Third Halving",
+    "shortDescription": "The reward is reduced to 6.25 BTC. A new bull cycle begins. The programmed scarcity continues its course!",
+    "longDescription": "On May 11, 2020, the third Bitcoin halving occurred, reducing the block reward from 12.5 BTC to 6.25 BTC. This event was one of the most anticipated in Bitcoin's history, as its arrival coincided with the market's recovery after the 'Black Thursday' of COVID-19 and the narrative of Bitcoin as a hedge against inflation.\n\nThe reduction in the supply of new bitcoins was a catalyst for the bull market that would culminate in 2021. Bitcoin's programmed scarcity, along with increased demand from institutional investors who saw Bitcoin as a store-of-value asset, pushed the price to unprecedented levels. The third halving proved that Bitcoin's economic model was still working perfectly, just as Satoshi Nakamoto had designed it.\n\nThis event marked the beginning of a new era for Bitcoin. The narrative of 'digital gold' became stronger than ever, attracting large companies and investment fund managers. The third halving was not just a technical event but an economic milestone that solidified Bitcoin's role as a serious investment asset on the global financial stage.",
+    "externalLink": "https://www.bitcoinsuisse.com/learn/bitcoin-halving-market-cycle"
+  },
+  {
+    "id": "News on Breaking the High",
+    "date": "2020-12-16",
+    "category": "Market",
+    "title": "🚨 Breaks $20K",
+    "shortDescription": "BTC surpasses the 2017 high, marking the start of the 2021 rally. The fever rises again!",
+    "longDescription": "On December 16, 2020, Bitcoin surpassed the all-time high of $20,000 it had reached in 2017. This event was a huge psychological milestone for the community, as it showed that Bitcoin's price could not only recover from a long bear market but also exceed its previous peaks. Breaking this level was a sign that the 2021 bull market was in full swing.\n\nThe 2021 rally was different from that of 2017. While retail speculation was still a factor, the price increase was largely driven by institutional adoption. Companies like MicroStrategy and Square (now Block) began investing large sums of money in Bitcoin, which showed traditional investors that Bitcoin was a legitimate asset class.\n\nBreaking the $20,000 barrier marked the beginning of a new phase in Bitcoin's history, one where the asset began to be perceived by Wall Street and investment fund managers. The entry of large capital and institutional trust changed the narrative, moving from a technological curiosity to a serious investment. This event was a harbinger of the great growth that would be seen in the following months.",
+    "externalLink": "https://www.cnbc.com/2020/12/16/bitcoin-breaks-above-20000-for-the-first-time-ever.html"
+  },
+  {
+    "id": "News on Tesla's Purchase",
+    "date": "2021-02-08",
+    "category": "Adoption",
+    "title": "🚗 Tesla Buys BTC",
+    "shortDescription": "Tesla invests $1.5B in Bitcoin and announces it will accept it as payment. Elon Musk at it again!",
+    "longDescription": "On February 8, 2021, Tesla, the electric vehicle company led by Elon Musk, made an announcement that shook the financial world: it had invested $1.5 billion in Bitcoin. Additionally, the company announced that it would accept Bitcoin as a payment method for its products. This move was an unprecedented vote of confidence from one of the world's most influential companies and was a catalyst for a massive increase in Bitcoin's price.\n\nTesla's investment and the support of its CEO, Elon Musk, legitimized Bitcoin to millions of people and companies. The announcement that a company as important as Tesla considered Bitcoin a store-of-value asset and a valid means of payment was a sign that the cryptocurrency was moving towards mass adoption. The news pushed Bitcoin's price to new all-time highs and encouraged other companies to consider investing in cryptocurrencies.\n\nAlthough Tesla later reversed its decision to accept Bitcoin as payment (citing environmental concerns), the initial investment was a historic milestone. It marked the beginning of the 'institutional fever' for Bitcoin, with more and more companies and hedge funds exploring the possibility of adding the cryptocurrency to their balance sheets. The Tesla event was a harbinger of the paradigm shift that was taking place in the world of finance.",
+    "externalLink": "https://www.cnbc.com/2021/02/08/tesla-buys-1point5-billion-in-bitcoin.html"
+  },
+  {
+    "id": "News on Coinbase's Listing",
+    "date": "2021-04-14",
+    "category": "Adoption",
+    "title": "📊 Coinbase on NASDAQ",
+    "shortDescription": "Coinbase becomes the first major crypto company to go public. A bridge between Wall Street and the crypto space!",
+    "longDescription": "On April 14, 2021, Coinbase, the largest cryptocurrency exchange in the United States, went public on the NASDAQ stock market with the ticker symbol 'COIN'. This IPO was a historic event, as it marked the first time a major cryptocurrency company was listed on the stock exchange. It was a symbolic bridge between the world of traditional Wall Street finance and the new crypto ecosystem.\n\nCoinbase's listing was a moment of validation for the entire industry. It showed that cryptocurrency companies could be legitimate and profitable businesses. The valuation of Coinbase at the time of the IPO, over $85 billion, was a sign of the enormous growth potential that traditional investors saw in the sector. This event attracted the attention of a wider audience and helped to further legitimize cryptocurrencies.\n\nCoinbase's listing was a crucial milestone that showed the industry's maturation. It demonstrated that cryptocurrencies had moved from a geeky niche to a legitimate financial sector with the potential to generate billions of dollars in revenue. This event was a reminder that blockchain technology and cryptocurrencies were not just a passing fad, but a force that was redefining the future of finance.",
+    "externalLink": "https://www.nytimes.com/live/2021/04/14/business/stock-market-today"
+  },
+  {
+    "id": "News on the Law in El Salvador",
+    "date": "2021-06-09",
+    "category": "Adoption",
+    "title": "🇸🇻 Bitcoin Legal in El Salvador",
+    "shortDescription": "El Salvador becomes the first country to accept Bitcoin as official currency. A bold national experiment!",
+    "longDescription": "On June 9, 2021, El Salvador made history by becoming the first country in the world to adopt Bitcoin as legal tender. The decision, driven by President Nayib Bukele, was made with the goal of boosting financial inclusion, as a large part of the Salvadoran population does not have access to banking services. The law required all businesses to accept Bitcoin as a payment method and allowed citizens to use the cryptocurrency to pay taxes and debts.\n\nThis bold experiment was met with a mix of enthusiasm and skepticism. Bitcoin advocates celebrated it as a monumental step towards mass adoption. They argued that using Bitcoin in a sovereign country would demonstrate its potential as money, not just as an investment asset. However, critics warned about Bitcoin's volatility, the risk to the country's finances, and the lack of infrastructure for its mass use. The adoption of Bitcoin in El Salvador was an important symbolic milestone. It put Bitcoin at the center of the global political and economic conversation and showed that the cryptocurrency could be more than a speculative asset. Although the experiment has had its challenges, it set a precedent for national Bitcoin adoption and opened a global debate about the future of money.",
+    "externalLink": "https://www.nytimes.com/es/2021/09/07/espanol/bitcoin-el-salvador.html"
+  },
+  {
+    "id": "Analysis of the Terra Collapse",
+    "date": "2022-05-12",
+    "category": "Security",
+    "title": "🌪️ Terra/Luna Collapse",
+    "shortDescription": "One of the biggest stablecoins collapses. It drags BTC and the entire market down. An earthquake in the crypto ecosystem!",
+    "longDescription": "In May 2022, the Terra ecosystem, which included the algorithmic 'stablecoin' TerraUSD (UST) and its token LUNA, collapsed in one of the biggest financial disasters in the crypto space. The collapse occurred when UST's value lost its peg to the dollar, triggering a 'death spiral' that caused the value of LUNA and UST to fall to zero in a matter of days. This event caused tens of billions of dollars in losses.\n\nThe Terra collapse had a contagion effect throughout the crypto market. Panic seized investors, and many assets, including Bitcoin, fell dramatically. This event was a reminder of the inherent risks in the crypto space and the importance of stability and transparency. The fall of Terra sparked a wave of skepticism about the future of algorithmic 'stablecoins' and led to a tightening of regulatory scrutiny worldwide.\n\nThe Terra collapse was a dark moment in the history of cryptocurrencies, but it also served as an important lesson. It highlighted the fundamental difference between Bitcoin, with its programmed scarcity and robust protocol, and newer, more experimental projects. The event reinforced the narrative of Bitcoin as a decentralized and resilient asset, while the rest of the cryptocurrency ecosystem had to deal with the consequences of a lack of trust.",
+    "externalLink": "https://corpgov.law.harvard.edu/2023/05/22/anatomy-of-a-run-the-terra-luna-crash/"
+  },
+  {
+    "id": "News on FTX's Bankruptcy",
+    "date": "2022-11-11",
+    "category": "Security",
+    "title": "💥 FTX Bankruptcy",
+    "shortDescription": "FTX, one of the largest exchanges, collapses due to fraud. Millions lose funds. Another scandal that shook trust!",
+    "longDescription": "On November 11, 2022, the cryptocurrency exchange FTX filed for bankruptcy after serious liquidity problems and alleged massive fraud were revealed. The collapse of FTX, which at the time was one of the largest and most respected exchanges in the world, caused a shock throughout the crypto market. Millions of users lost their funds, and the industry's reputation was severely damaged. The founder, Sam Bankman-Fried, was arrested and charged with fraud.\n\nThe fall of FTX was a painful reminder of the inherent risks of centralized exchanges. Despite its size and public image, the company turned out to be a black box of corruption and mismanagement. The event reinforced the slogan 'Not your keys, not your coins' and led to a new wave of self-custody and greater scrutiny of centralized platforms. It also prompted a wake-up call to regulators around the world, who began working on creating a stricter regulatory framework for the sector.\n\nThe FTX collapse was a crucial moment in the history of cryptocurrencies. Although it caused significant short-term damage, it was also a catalyst for the industry's maturation. It showed that for the ecosystem to grow sustainably, a greater degree of transparency and accountability is necessary. The fall of FTX was a reminder that while the technology is decentralized, the entities that operate on it are not, and that vigilance is essential to protect users.",
+    "externalLink": "https://www.reuters.com/breakingviews/ftx-crash-is-old-lesson-financial-newcomers-2022-11-10/"
+  },
+  {
+    "id": "Collapse of Silicon Valley Bank",
+    "date": "2023-03-10",
+    "category": "Market",
+    "title": "🏦 USA Banking Crisis",
+    "shortDescription": "Bitcoin rises after the collapse of traditional banks like SVB and Signature Bank. Bitcoin as a safe haven, once again!",
+    "longDescription": "In March 2023, the U.S. banking system was shaken by the failure of several banks, including Silicon Valley Bank (SVB) and Signature Bank. The crisis was triggered when customers, in a mass panic, withdrew their deposits, causing a bank run. The failure of these banks, despite being regulated and insured, was a reminder of the fragility of the traditional financial system. In this context of uncertainty, Bitcoin experienced a significant rebound.\n\nBitcoin's price soared, reinforcing the narrative that the cryptocurrency could function as a 'safe haven' asset in times of financial instability. People, who had lost faith in traditional banks, looked for an alternative. Bitcoin, with its decentralized, immutable, and censorship-resistant nature, presented itself as a viable solution. This event was a validation of the concept of Bitcoin as a hedge against a lack of trust in financial institutions.\n\nThe 2023 banking crisis was a turning point. It showed that Bitcoin's value is not only in its growth potential but also in its role as an alternative asset to the traditional financial system. The event helped solidify the narrative of Bitcoin as a tool for financial freedom and a store-of-value asset in the 21st century. The banking crisis was a reminder of why Satoshi Nakamoto created Bitcoin in the first place.",
+    "externalLink": "https://en.wikipedia.org/wiki/Collapse_of_Silicon_Valley_Bank"
+  },
+  {
+    "id": "Reuters Article on BlackRock's Filing",
+    "date": "2023-10-01",
+    "category": "Adoption",
+    "title": "🟢 BlackRock Files for ETF",
+    "shortDescription": "BlackRock and other asset managers file for Bitcoin ETFs. New optimism begins. The big players are joining!",
+    "longDescription": "In October 2023, the Bitcoin market was revitalized by the news that BlackRock, the world's largest asset manager, had filed an application for a spot Bitcoin ETF (exchange-traded fund). This application was joined by other renowned asset managers like Fidelity and WisdomTree. The filing of these ETFs was a catalyst for a new cycle of optimism and anticipation in the market.\n\nThe entry of financial giants like BlackRock was a historic milestone, as it demonstrated that institutional interest in Bitcoin was stronger than ever. A spot Bitcoin ETF would allow traditional investors, such as pension funds and financial advisors, to access Bitcoin safely and easily, without having to buy and custody it directly. This would open the doors to a new wave of capital in the ecosystem, with the potential to dramatically increase the price.\n\nBlackRock's filing was a turning point that changed the market narrative. It shifted from a market driven by news from the SEC (U.S. Securities and Exchange Commission) about regulation to a market driven by anticipation of an ETF approval. This event was a reminder that, as Bitcoin matures, the big players in the traditional financial world are ready to join the game.",
+    "externalLink": "https://www.reuters.com/business/finance/blackrock-close-filing-bitcoin-etf-coindesk-2023-06-15/"
+  },
+  {
+    "id": "Explaining the Fourth Halving",
+    "date": "2024-04-20",
+    "category": "Halving",
+    "title": "🔻 Fourth Halving",
+    "shortDescription": "The block reward is reduced to 3.125 BTC. The daily supply of new bitcoins is cut. The most anticipated event by 'Bitcoin maximalists'!",
+    "longDescription": "On April 20, 2024, the Bitcoin network experienced its fourth halving. The reward that miners receive for validating a block was reduced from 6.25 BTC to 3.125 BTC. This event, which occurs approximately every four years, is one of the most important in the Bitcoin ecosystem, as it has a direct impact on the supply and scarcity of the cryptocurrency. The reduction in the supply of new bitcoins is a key deflationary mechanism, designed to preserve Bitcoin's value in the long term.\n\nThe fourth halving was highly anticipated, as it coincided with the beginning of the era of spot Bitcoin ETFs. The combination of a reduced supply and growing demand from institutional investors laid the groundwork for the next bull market. Bitcoin advocates, often called 'maximalists', celebrated the event as a milestone that demonstrates the soundness of Satoshi Nakamoto's original design and the inevitability of Bitcoin as a store-of-value asset.\n\nThe fourth halving was a reminder that Bitcoin's code is immutable and its monetary policy is predictable. While central banks around the world continue with money-printing policies, Bitcoin's programmed scarcity makes it a unique and valuable asset. The 2024 halving was a milestone that marked the beginning of a new phase in Bitcoin's history, one where its value will be driven by the combination of scarcity and mass adoption.",
+    "externalLink": "https://insights.glassnode.com/the-week-onchain-week-17-2024/"
+  },
+  {
+    "id": "What is a Bitcoin Lightweight Node",
+    "date": "2025-01-01",
+    "category": "Technology",
+    "title": "🌍 1 Million Light Nodes",
+    "shortDescription": "It is estimated that there are over one million mobile or light nodes operating worldwide. Bitcoin becomes more decentralized and accessible!",
+    "longDescription": "In a significant milestone for network decentralization, the number of Bitcoin light nodes, also known as 'SPV clients,' is estimated to have surpassed one million worldwide. Unlike full nodes that download the entire 'blockchain,' light nodes allow users to verify the validity of transactions without needing to store the entire history. This functionality is crucial for mobile devices and wallet applications, making Bitcoin more accessible to the global population.\n\nThe growth of light nodes is a key metric of Bitcoin's mass adoption. As more people run these nodes on their phones and computers, the network becomes more decentralized and censorship-resistant. Each node is an independent validation point that helps maintain the network's integrity, making it more secure and robust. This increase in the number of nodes is an indication that Bitcoin is becoming a truly global and distributed network.\n\nThe one million light nodes milestone is a reminder of Satoshi Nakamoto's original vision of a 'peer-to-peer electronic cash system.' It shows that the Bitcoin network is evolving to be more user-friendly and accessible, without compromising its principles of security and decentralization. This growth is a harbinger of a future where Bitcoin will be used by billions of people worldwide, each contributing to the network's security from their own device.",
+    "externalLink": "https://en.bitcoin.it/wiki/Lightweight_node"
+  },
+  {
+    "id": "Explanation of Ordinals",
+    "date": "2025-05-01",
+    "category": "Technology",
+    "title": "🖼️ Rise of Ordinals and NFTs on Bitcoin",
+    "shortDescription": "Ordinals and NFTs on the Bitcoin blockchain become even more popular, demonstrating new functionalities for the network. Bitcoin is not just money, it's digital art!",
+    "longDescription": "In 2025, the phenomenon of Ordinals and NFTs (non-fungible tokens) on the Bitcoin blockchain experiences a massive boom. Ordinals, a protocol that allows 'inscribing' digital data like images, videos, and text directly onto satoshis (the smallest unit of Bitcoin), have become a popular way to create and collect digital art. This movement, which began in 2023, has shown that the Bitcoin blockchain can be used for more than just financial transactions.\n\nThe rise of Ordinals has sparked a debate in the Bitcoin community. Some see it as a way to breathe new life into the network and attract a new generation of artists and collectors. Others, however, are concerned about the increase in the blockchain's size and transaction costs. Despite the controversy, the movement has demonstrated the network's versatility and Bitcoin's ability to adapt to new functionalities.\n\nThe growth of Ordinals is an important milestone that shows how Bitcoin technology is evolving. It proves that Bitcoin is not just 'digital gold' but a platform for innovation. The rise of NFTs on Bitcoin has opened the door to a new wave of development and creativity on the network, and it is a reminder that the Bitcoin ecosystem is a place of constant innovation and experimentation.",
+    "externalLink": "https://www.coinbase.com/es-es/learn/crypto-glossary/what-are-bitcoin-ordinals"
+  },
+  {
+    "id": "Lightning Network Capacity",
+    "date": "2025-07-20",
+    "category": "Technology",
+    "title": "⚡️ Lightning Network Reaches 5,000 BTC Capacity",
+    "shortDescription": "The capacity of the Lightning Network, Bitcoin's fast payments layer, exceeds 5,000 BTC. Instant and cheap payments are becoming more and more a reality!",
+    "longDescription": "In a major milestone for Bitcoin scalability, the total capacity of the Lightning Network surpasses 10,000 BTC. The Lightning Network is a 'layer 2' built on Bitcoin that enables instant and low-cost payments. This increase in capacity means that more bitcoins are being locked in the Lightning Network, allowing more users to make fast and secure transactions without having to wait for confirmation on the main chain.\n\nThe growth of the Lightning Network is a crucial development for the mass adoption of Bitcoin as a means of payment. As the main Bitcoin network becomes congested and transaction costs increase, the Lightning Network offers a scalable solution that allows users to make microtransactions efficiently. This growth is an indication that the network is becoming more mature and robust, and that more and more businesses and users are using it for their daily payments.\n\nThe 5,000 BTC milestone is a reminder of Satoshi Nakamoto's vision of an 'electronic cash system.' It shows that the Bitcoin community is actively working on solving scalability problems and that the future of instant payments with Bitcoin is becoming more and more a reality. The growth of the Lightning Network is a key milestone that shows that Bitcoin is evolving to be not only a store-of-value asset but also a currency for daily use.",
+    "externalLink": "https://www.bitcoinmagazinepro.com/charts/lightning-network-capacity/"
+  }
+]
