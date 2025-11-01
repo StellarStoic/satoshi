@@ -151,6 +151,64 @@ li a:focus {
 	color: #fff;
 }
 
+/* SUBMENU STYLES - NEW CODE */
+.has-submenu {
+    position: relative; /* Needed for absolute positioning of submenu */
+}
+
+/* Style for menu items that have submenus */
+.has-submenu > a {
+    position: relative;
+    padding-right: 20px; /* Make space for the arrow */
+}
+
+/* Add a small arrow to indicate submenu */
+.has-submenu > a::after {
+    content: "▼";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #888;
+    transition: transform 0.3s ease;
+}
+
+/* Rotate arrow when submenu is active */
+.has-submenu.active > a::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* Submenu styles */
+.submenu {
+    max-height: 0; /* Start collapsed */
+    overflow: hidden; /* Hide overflow when collapsed */
+    transition: max-height 0.3s ease; /* Smooth expand/collapse */
+    background: rgb(45, 45, 45); /* Slightly different background */
+    margin: 5px -10px; /* Adjust margins to align with parent menu */
+    border-radius: 3px;
+}
+
+/* When submenu is active */
+.has-submenu.active .submenu {
+    max-height: 200px; /* Adjust based on your content height */
+}
+
+/* Submenu items */
+.submenu li a {
+    padding: 8px 15px;
+    font-size: 0.9em;
+    color: #aaa;
+    border-left: 3px solid transparent;
+}
+
+/* Hover effects for submenu items */
+.submenu li a:hover {
+    background: #333;
+    color: #f2a900;
+    border-left: 3px solid #f2a900;
+}
+
 
 
 /* quotes */
@@ -258,7 +316,7 @@ p, #text {
 }
 
 /* Styles for modals */
-.description-modal, #uploadModal, #infoModal, #qrCodeModal, #cookieConsentModal, #mempoolTinyDataModal, #game39Modal, #bip39Modal {
+.description-modal, #uploadModal, #infoModal, #qrCodeModal, #cookieConsentModal, #mempoolTinyDataModal, #game39Modal, #bip39Modal, #lotteryExplainerModal {
     display: none;
     position: fixed;
     word-break: keep-all;
@@ -292,7 +350,7 @@ p, #text {
 	font-family: "Roboto Mono", monospace;
 }
 
-.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active, #cookieConsentModal.active, #mempoolTinyDataModal.active, #game39Modal.active, #bip39Modal.active {
+.description-modal.active, #uploadModal.active, #infoModal.active, #qrCodeModal.active, #cookieConsentModal.active, #mempoolTinyDataModal.active, #game39Modal.active, #bip39Modal.active, #lotteryExplainerModal.active {
     display: flex; /* Use flex to center content */
 }
 

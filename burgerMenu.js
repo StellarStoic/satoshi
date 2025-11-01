@@ -40,3 +40,41 @@ theToggle.onclick = function() {
    toggleClass(this, 'on');
    return false;
 }
+
+// NEW CODE: Submenu functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Get all menu items that have submenus
+    var submenuItems = document.querySelectorAll('.has-submenu > a');
+    
+    // Add click event to each submenu trigger
+    submenuItems.forEach(function(menuItem) {
+        menuItem.addEventListener('click', function(e) {
+            // Prevent the link from navigating if it's just '#'
+            if (this.getAttribute('href') === '#') {
+                e.preventDefault();
+            }
+            
+            var parentLi = this.parentElement;
+            
+            // Close other open submenus
+            document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
+                if (activeItem !== parentLi) {
+                    removeClass(activeItem, 'active');
+                }
+            });
+            
+            // Toggle current submenu
+            toggleClass(parentLi, 'active');
+        });
+    });
+    
+    // Optional: Close submenus when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#menu')) {
+            // Click was outside the menu, close all submenus
+            document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
+                removeClass(activeItem, 'active');
+            });
+        }
+    });
+});
