@@ -1,0 +1,42 @@
+.info-modal-trigger {
+    position: fixed; /* Positioned absolutely relative to the nearest positioned ancestor */
+    top: 17px; /* 25px from the top of the nearest positioned ancestor */
+    right: 25px; /* 25px from the left of the nearest positioned ancestor */
+    font-size: 24px;
+    z-index: 100000;
+    color: #888; /* Icon color */
+    cursor: pointer;
+    pointer-events: auto !important; /* Force clickability */
+}
+@media (max-width: 768px) {
+    .info-modal-trigger {
+        top: 10px;
+        right: 10px;
+        width: 50px;
+        height: 50px;
+        font-size: 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .info-modal-trigger {
+        top: 5px;
+        right: 5px;
+        width: 45px;
+        height: 45px;
+        font-size: 25px;
+    }
+}
+
+.red {
+    color: red;
+}
+
+.green {
+    color: green;
+}
+
+.yellow {
+    color: yellow;
+}
+
