@@ -360,7 +360,7 @@ p, #text {
 }
 
 .description-modal a:hover {
-    color: #f2a900; /* Even brighter on hover for emphasis */
+    background-color: #f2a90089; /* Even brighter on hover for emphasis */
 }
 
 /* Close icon for modal */

@@ -57,13 +57,13 @@
 
 .drop-content i {
     font-size: 30px;
-    margin-top: 30px;
+    margin-top: 10px;
     margin-bottom: 5px;
     color: #888;
 }
 
 .drop-content h5 {
-    margin-bottom: 15px;
+    margin-bottom: 5px;
     font-size: 18px;
     line-height: 1.4;
     color: #888;
@@ -75,8 +75,19 @@
 
 
 .drop-content p {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     font-size: 14px;
+}
+
+.drop-zone-quote {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    right: 0;
+    margin: 0 auto; /* Auto margins center the element */
+    color: #deac08;
+    width: fit-content; /* Or set a specific width */
+    font-size: 1.2em;
 }
 
 .upload-btn {
@@ -85,7 +96,7 @@
     border: 1px solid #888;
     padding: 10px 20px;
     border-radius: 5px;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.3s ease;
