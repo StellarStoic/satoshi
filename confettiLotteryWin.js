@@ -2,6 +2,20 @@
 class ConfettiLotteryWin {
     constructor() {
         this.confetti = window.confetti;
+        this.ensureConfettiCanvas();
+    }
+
+    // Ensure confetti canvas has proper z-index
+    ensureConfettiCanvas() {
+        // This runs after confetti creates its canvas
+        setTimeout(() => {
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+                canvas.style.zIndex = '99999';
+                canvas.style.position = 'fixed';
+                canvas.style.pointerEvents = 'none';
+            }
+        }, 100);
     }
 
     // Trigger confetti for winning tickets
@@ -10,6 +24,9 @@ class ConfettiLotteryWin {
             console.warn('Confetti library not loaded');
             return;
         }
+
+        // First, ensure canvas is on top
+        this.ensureConfettiCanvas();
 
         console.log(`🎉 Celebrating ${winCount} win(s) at tier ${tierLevel}!`);
 
@@ -39,7 +56,8 @@ class ConfettiLotteryWin {
                 particleCount: 100,
                 angle: 60,
                 spread: 55,
-                origin: { x: 0 }
+                origin: { x: 0 },
+                zIndex: 99999
             });
 
             // Launch from right edge
@@ -47,14 +65,16 @@ class ConfettiLotteryWin {
                 particleCount: 100,
                 angle: 120,
                 spread: 55,
-                origin: { x: 1 }
+                origin: { x: 1 },
+                zIndex: 99999
             });
 
             // Center burst
             this.confetti({
                 particleCount: 150,
                 spread: 100,
-                origin: { y: 0.6 }
+                origin: { y: 0.6 },
+                zIndex: 99999
             });
 
             if (Date.now() < end) {
@@ -72,7 +92,8 @@ class ConfettiLotteryWin {
                     spread: 360,
                     startVelocity: 45,
                     shapes: ['circle', 'square'],
-                    colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+                    colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
+                    zIndex: 99999
                 });
             }, 1000);
         }
@@ -88,14 +109,16 @@ class ConfettiLotteryWin {
                 particleCount: 80,
                 angle: 60,
                 spread: 55,
-                origin: { x: 0 }
+                origin: { x: 0 },
+                zIndex: 99999
             });
 
             this.confetti({
                 particleCount: 80,
                 angle: 120,
                 spread: 55,
-                origin: { x: 1 }
+                origin: { x: 1 },
+                zIndex: 99999
             });
 
             if (Date.now() < end) {
@@ -110,7 +133,8 @@ class ConfettiLotteryWin {
             this.confetti({
                 particleCount: 100,
                 spread: 70,
-                origin: { y: 0.6 }
+                origin: { y: 0.6 },
+                zIndex: 99999
             });
         }, 500);
     }
@@ -121,7 +145,8 @@ class ConfettiLotteryWin {
         this.confetti({
             particleCount: 100,
             spread: 70,
-            origin: { y: 0.6 }
+            origin: { y: 0.6 },
+            zIndex: 99999
         });
 
         // Additional burst for multiple wins
@@ -130,7 +155,8 @@ class ConfettiLotteryWin {
                 this.confetti({
                     particleCount: 50,
                     spread: 50,
-                    origin: { y: 0.6 }
+                    origin: { y: 0.6 },
+                    zIndex: 99999
                 });
             }, 500);
         }
@@ -141,7 +167,8 @@ class ConfettiLotteryWin {
         this.confetti({
             particleCount: 150,
             spread: 70,
-            origin: { y: 0.6 }
+            origin: { y: 0.6 },
+            zIndex: 99999
         });
     }
 
@@ -179,14 +206,16 @@ class ConfettiLotteryWin {
                 angle: 60,
                 spread: 55,
                 origin: { x: 0 },
-                colors: colors
+                colors: colors,
+                zIndex: 99999
             });
             confetti({
                 particleCount: 2,
                 angle: 120,
                 spread: 55,
                 origin: { x: 1 },
-                colors: colors
+                colors: colors,
+                zIndex: 99999
             });
 
             if (Date.now() < end) {
