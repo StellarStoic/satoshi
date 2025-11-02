@@ -155,6 +155,8 @@
     padding: 20px;
     margin-top: 20px;
     color: #888;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .results-container h3 {
@@ -273,4 +275,79 @@
     padding: 4px 8px;
     border-radius: 4px;
     border: 1px solid #ffd700;
+}
+
+.no-wins {
+    text-align: center;
+    padding: 25px;
+    background: rgba(244, 67, 54, 0.1);
+    border-left: 4px solid #f44336;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.no-wins h4 {
+    color: #f44336;
+    margin-bottom: 15px;
+    font-size: 1.4em;
+}
+
+.no-wins p {
+    margin: 12px 0;
+    line-height: 1.5;
+}
+
+.lottery-details {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 6px;
+    margin: 20px 0;
+    text-align: left;
+}
+
+.lottery-details p {
+    margin: 8px 0;
+}
+
+.hash-monospace {
+    font-family: monospace;
+    font-size: 0.9em;
+    word-break: break-all;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.encouragement {
+    font-style: italic;
+    color: #888;
+    margin-top: 20px !important;
+    font-size: 1.1em;
+}
+
+.address-note {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.address-note small {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.play-again-link {
+    color: #4CAF50;
+    font-weight: bold;
+    text-decoration: none;
+    border-bottom: 1px dashed #4CAF50;
+    transition: all 0.3s ease;
+}
+
+.play-again-link:hover {
+    color: #45a049;
+    border-bottom: 1px solid #45a049;
+    text-decoration: none;
 }

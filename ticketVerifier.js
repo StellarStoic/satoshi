@@ -447,9 +447,9 @@ displayResults(results, totalNumbers, endBlockNumber, blockHash, lightningAddres
     const hashDisplay = this.createHighlightedHash(blockHash);
     
     let resultsHTML = `
-        <p><strong>End Block Number:</strong> <a href="https://mempool.space/block/${endBlockNumber}" target="_blank" class="block-link">${endBlockNumber.toLocaleString()}</a></p>
+        <p><strong>Ticket for Block Number:</strong> <a href="https://mempool.space/block/${endBlockNumber}" target="_blank" title="DON'T TRUST VERIFY" class="block-link">${endBlockNumber.toLocaleString()}</a></p>
         <p><strong>Block Hash:</strong> ${hashDisplay}</p>
-        <p><strong>Winning Digits (last 8):</strong> <span class="winning-digits">${last8Digits}</span></p>
+        <p><strong>Winning Digits:</strong> <span class="winning-digits">${last8Digits}</span></p>
         <p><strong>Numbers checked:</strong> ${totalNumbers}</p>
         <hr>
     `;
@@ -457,7 +457,7 @@ displayResults(results, totalNumbers, endBlockNumber, blockHash, lightningAddres
     // Add lightning address info if found
     if (lightningAddress) {
         resultsHTML += `
-            <p><strong>Jackpot Payee Address:</strong> <span class="lightning-address">${lightningAddress}</span></p>
+            <p><strong>Reward Payee Address:</strong> <span class="lightning-address">${lightningAddress}</span></p>
         `;
     }
     
@@ -486,7 +486,21 @@ displayResults(results, totalNumbers, endBlockNumber, blockHash, lightningAddres
     if (!anyWins) {
         resultsHTML = `
             <div class="no-wins">
-                💔 No winning combinations found in your ${totalNumbers} numbers.
+                <h4>💔 No Winning Combinations Found</h4>
+                <p>Unfortunately, none of your <strong>${totalNumbers} numbers</strong> matched the winning digits from block <a href="https://mempool.space/block/${endBlockNumber}" target="_blank" class="block-link">${endBlockNumber.toLocaleString()}</a>.</p>
+                
+                <div class="lottery-details">
+                    <p><strong>Block Hash:</strong> <span class="hash-monospace">${blockHash}</span></p>
+                    <p><strong>Winning Digits (last 8):</strong> <span class="winning-digits">${last8Digits}</span></p>
+                </div>
+                
+                <p class="encouragement">Better luck next time! Tik Tok next block. <a href="lottery.html" class="play-again-link">Play again</a> 🎰</p>
+                
+                ${lightningAddress ? `
+                <div class="address-note">
+                    <small>Your registered lightning address: <span class="lightning-address">${lightningAddress}</span></small>
+                </div>
+                ` : ''}
             </div>
         `;
     } else {
