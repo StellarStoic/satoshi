@@ -1149,7 +1149,7 @@ function createPaymentMethodBubbles(paymentMethods, offerSide) {
         return '';
     }
     
-    // Limit to first 5 payment methods to avoid clutter
+    // Limit to first 50 payment methods
     const displayMethods = paymentMethods.slice(0, 50);
     
     return displayMethods.map(method => {
@@ -1253,36 +1253,61 @@ function setModalDeclined() {
 
 function showSignupModal() {
     const modal = document.getElementById('signupModal');
-    if (modal) {
+    if (modal && modal.style.display !== 'block') {
         modal.style.display = 'block';
         
-        // Add event listeners for modal buttons
-        document.getElementById('visitHodlHodlBtn').addEventListener('click', function() {
-            setModalVisited(); // Set to visited with timestamp
+        // Use one-time event listeners
+        const visitHandler = function() {
+            setModalVisited();
             window.open(CONFIG.REFERRAL_LINK, '_blank');
             modal.style.display = 'none';
-        });
+            // Remove listeners after use
+            visitBtn.removeEventListener('click', visitHandler);
+            skipBtn.removeEventListener('click', skipHandler);
+            closeBtn.removeEventListener('click', closeHandler);
+            modal.removeEventListener('click', modalHandler);
+        };
         
-        document.getElementById('skipBtn').addEventListener('click', function() {
-            setModalDeclined(); // Set to declined with timestamp
+        const skipHandler = function() {
+            setModalDeclined();
             modal.style.display = 'none';
-        });
+            // Remove listeners after use
+            visitBtn.removeEventListener('click', visitHandler);
+            skipBtn.removeEventListener('click', skipHandler);
+            closeBtn.removeEventListener('click', closeHandler);
+            modal.removeEventListener('click', modalHandler);
+        };
         
-        // Close modal when clicking X - treat as decline
-        modal.querySelector('.close-modal').addEventListener('click', function() {
-            setModalDeclined(); // Set to declined with timestamp
+        const closeHandler = function() {
+            setModalDeclined();
             modal.style.display = 'none';
-        });
+            // Remove listeners after use
+            visitBtn.removeEventListener('click', visitHandler);
+            skipBtn.removeEventListener('click', skipHandler);
+            closeBtn.removeEventListener('click', closeHandler);
+            modal.removeEventListener('click', modalHandler);
+        };
         
-        // Close modal when clicking outside - treat as decline
-        modal.addEventListener('click', function(e) {
+        const modalHandler = function(e) {
             if (e.target === modal) {
-                setModalDeclined(); // Set to declined with timestamp
+                setModalDeclined();
                 modal.style.display = 'none';
+                // Remove listeners after use
+                visitBtn.removeEventListener('click', visitHandler);
+                skipBtn.removeEventListener('click', skipHandler);
+                closeBtn.removeEventListener('click', closeHandler);
+                modal.removeEventListener('click', modalHandler);
             }
-        });
-        // Prevent event listeners from being added multiple times
-        modal.dataset.listenersAdded = 'true';
+        };
+        
+        const visitBtn = document.getElementById('visitHodlHodlBtn');
+        const skipBtn = document.getElementById('skipBtn');
+        const closeBtn = modal.querySelector('.close-modal');
+        
+        visitBtn.addEventListener('click', visitHandler);
+        skipBtn.addEventListener('click', skipHandler);
+        closeBtn.addEventListener('click', closeHandler);
+        modal.addEventListener('click', modalHandler);
     }
 }
 
