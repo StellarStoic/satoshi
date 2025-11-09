@@ -21,6 +21,8 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/MOONING_001.gif',
             './img/bitcoinMoodMemes/MOONING_002.gif',
             './img/bitcoinMoodMemes/MOONING_003.gif',
+            './img/bitcoinMoodMemes/MOONING_004.gif',
+            './img/bitcoinMoodMemes/MOONING_005.gif',
         ]
     },
     
@@ -45,6 +47,8 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/BULLISH_007.gif',
             './img/bitcoinMoodMemes/BULLISH_008.gif',
             './img/bitcoinMoodMemes/BULLISH_009.gif',
+            './img/bitcoinMoodMemes/BULLISH_010.gif',
+            './img/bitcoinMoodMemes/BULLISH_011.webp',
         ]
     },
     
@@ -102,7 +106,8 @@ const MOOD_CATEGORIES = {
         memes: [
             './img/bitcoinMoodMemes/BEARISH_001.gif',
             './img/bitcoinMoodMemes/BEARISH_002.gif',
-            './img/bitcoinMoodMemes/BEARISH_003.gif'
+            './img/bitcoinMoodMemes/BEARISH_003.gif',
+            './img/bitcoinMoodMemes/BEARISH_004.gif'
         ]
     }
 };
@@ -118,7 +123,7 @@ const SPECIAL_DATES = {
         memes: [
             './img/bitcoinMoodMemes/HAPPYBIRTHDAYBITCON.jpg',
         ],
-        frequency: 0.5 // 50% chance to show birthday meme
+        frequency: 0.6 // 50% chance to show birthday meme
     },
     '10-31': { // October 31 - Whitepaper Day
         name: '📄 Happy Bitcoin Whitepaper Day!',
@@ -135,7 +140,7 @@ const SPECIAL_DATES = {
             './img/bitcoinMoodMemes/BITCOINPIZZADAY_003',
             './img/bitcoinMoodMemes/BITCOINPIZZADAY_004',
         ],
-        frequency: 0.7 // Very high chance - this is THE meme day
+        frequency: 0.6 // Very high chance - this is THE meme day
     },
     // '11-09': { // any date - test
     //     name: '🍕 Test!',
@@ -170,13 +175,13 @@ let athState = {
     initialized: false
 };
 
-// NEW: Update ATH from ANY successful API
+// Update ATH from ANY successful API
 function updateATHFromPrice(currentPrice, source) {
     console.log(`🎯 Checking ATH from ${source}: $${currentPrice.toLocaleString()}`);
     
     if (!currentPrice || currentPrice <= 0) return;
     
-    // CRITICAL: Don't celebrate if ATH never loaded properly
+    // Don't celebrate if ATH never loaded properly
     if (!athState.initialized) {
         console.log('⚠️ ATH not initialized, skipping celebration');
         athState.sessionATH = Math.max(athState.sessionATH, currentPrice);
@@ -187,7 +192,7 @@ function updateATHFromPrice(currentPrice, source) {
     if (currentPrice > athState.historicalATH) {
         console.log(`🎉 REAL NEW ATH DETECTED: $${currentPrice.toLocaleString()}!`);
         athState.historicalATH = currentPrice;
-        celebrateATH(); // Safe to call now
+        celebrateATH();
     }
 }
 
@@ -204,7 +209,7 @@ async function fetchHistoricalATH() {
         
         if (newATH && newATH > 0) {
             athState.historicalATH = newATH;
-            athState.initialized = true; // CRITICAL: Mark as successfully loaded
+            athState.initialized = true; // Mark as successfully loaded
             console.log(`✅ ATH initialized: $${newATH.toLocaleString()}`);
         }
     } catch (error) {
@@ -265,7 +270,7 @@ function calculateMood(priceChangePercent, volatilityPercent, timeframe) {
     return 'NEUTRAL'; // Boring sideways
 }
 
-// SIMPLIFIED THRESHOLDS
+// THRESHOLDS
 function getThresholds(timeframe) {
     const base = {
         daily:      { mooning: 5,  highVolatility: 8 },
@@ -281,7 +286,6 @@ function getThresholds(timeframe) {
 // MEME & DISPLAY FUNCTIONS
 // ============================================================
 
-// Helper to get any celebration for today (static OR dynamic)
 // Get today's celebration (static or dynamic)
 function getTodaysCelebration() {
     const today = new Date();
@@ -341,7 +345,6 @@ function updateActiveButton(selectedTimeframe) {
 
 // DISPLAY & MODAL
 function displayMood(currentPrice, priceChange, volatility, mood, timeframe, source) {
-    // ✅ ONLY update elements that exist in your HTML
     
     // Update modal title with timeframe
     document.getElementById('modal-timeframe-title').textContent = 
@@ -355,9 +358,9 @@ function displayMood(currentPrice, priceChange, volatility, mood, timeframe, sou
     // Update MEME (exists in HTML)
     const memeImage = document.getElementById('meme-image');
     memeImage.setAttribute('data-mood', mood);
-    memeImage.src = getRandomMeme(mood);
+    memeImage.src = getRandomMeme(mood, false);
     memeImage.alt = `${mood} meme`;
-    memeImage.onclick = nextMeme; // click handler
+    // memeImage.onclick = nextMeme; // click handler
     memeImage.style.cursor = 'pointer';
     
     // Update CELEBRATION (exists in HTML)
@@ -366,7 +369,7 @@ function displayMood(currentPrice, priceChange, volatility, mood, timeframe, sou
     document.getElementById('celebration-text').textContent = celebrationText;
     document.getElementById('celebration-text').classList.toggle('hidden', !celebration);
     
-    // ✅ Update MODAL elements (these exist in the modal HTML)
+    // MODAL elements (these exist in the modal HTML)
     document.getElementById('modal-current-price').textContent = 
         currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('modal-price-change').textContent = `${priceChange.toFixed(2)}%`;
@@ -637,12 +640,6 @@ function closePriceModal() {
     modal.style.display = 'none';
 }
 
-// // Close modal when clicking outside content
-// document.getElementById('priceInfoModal').addEventListener('click', function(e) {
-//     if (e.target === this) {
-//         closePriceModal();
-//     }
-// });
 
 // ESC key to close modal
 document.addEventListener('keydown', function(e) {
@@ -661,7 +658,12 @@ const GUARANTEED_FALLBACK = './img/bitcoinMoodMemes/TITCOIN.gif';
 // Track last displayed meme per mood to prevent repeats
 const lastMemeDisplayed = {};
 
-function getRandomMeme(moodKey) {
+function getRandomMeme(moodKey, isErrorRetry) {
+    // Handle missing second parameter (for older JS engines)
+    if (isErrorRetry === undefined) {
+        isErrorRetry = false;
+    }
+    
     const celebration = getTodaysCelebration();
     let memes;
 
@@ -672,12 +674,10 @@ function getRandomMeme(moodKey) {
         memes = mood?.memes || MOOD_CATEGORIES.NEUTRAL.memes;
     }
 
-    // Skip repeat prevention if only one meme exists
     if (memes.length <= 1) {
         return memes[0];
     }
 
-    // Try to find a different meme than last time
     let selectedMeme;
     let attempts = 0;
     const maxAttempts = 10;
@@ -686,13 +686,16 @@ function getRandomMeme(moodKey) {
         selectedMeme = memes[Math.floor(Math.random() * memes.length)];
         attempts++;
     } while (
+        !isErrorRetry && 
         lastMemeDisplayed[moodKey] === selectedMeme && 
         attempts < maxAttempts
     );
 
-    // Store this meme as the last displayed
-    lastMemeDisplayed[moodKey] = selectedMeme;
-    
+    // Only update history on user clicks (not error retries)
+    if (!isErrorRetry) {
+        lastMemeDisplayed[moodKey] = selectedMeme;
+    }
+
     return selectedMeme;
 }
 
@@ -711,7 +714,8 @@ function setupImageErrorHandling() {
             return;
         }
         
-        this.src = getRandomMeme(mood);
+        // PASS TRUE to skip history update
+        this.src = getRandomMeme(mood, true);
     };
     
     memeImage.onload = function() {
@@ -777,15 +781,15 @@ function getTimeframeDisplayName(timeframe) {
     return names[timeframe] || timeframe;
 }
 
-// Add a "Next Meme" button function
-// Update nextMeme to use data attribute
+
+// nextMeme to use data attribute
 function nextMeme() {
     const moodElement = document.getElementById('mood-text');
     const currentMood = moodElement.getAttribute('data-mood');
     const memeImage = document.getElementById('meme-image');
-    const newMemePath = getRandomMeme(currentMood);
+    const newMemePath = getRandomMeme(currentMood, false);
     memeImage.src = newMemePath;
-    console.log('🎲 Next meme:', newMemePath); // Optional: log for debugging
+    console.log('🎲 Next meme:', newMemePath);
 }
 
 // UI helper functions
@@ -817,25 +821,44 @@ function hideError() {
     document.getElementById('error').classList.add('hidden');
 }
 
-// 8. INITIALIZATION
+// INITIALIZATION
 document.addEventListener('DOMContentLoaded', function() {
     setupImageErrorHandling();
-    document.getElementById('priceInfoModal').addEventListener('click', function(e) {
-        if (e.target === this) closePriceModal();
-    });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closePriceModal();
-    });
-    document.getElementById('mood-info-modal-btn').addEventListener('click', openPriceModal);
+    
+    // Modal click handlers (only attach once)
+    if (!document.getElementById('priceInfoModal').hasAttribute('data-handler-attached')) {
+        document.getElementById('priceInfoModal').addEventListener('click', function(e) {
+            if (e.target === this) closePriceModal();
+        });
+        document.getElementById('priceInfoModal').setAttribute('data-handler-attached', 'true');
+    }
 
-    //Make meme clickable
-    document.getElementById('meme-image').addEventListener('click', nextMeme);
-    document.getElementById('meme-image').style.cursor = 'pointer'; // Show hand cursor
-    document.getElementById('meme-image').title = 'Click for next meme'; // Tooltip
+    // ESC key handler (only attach once)
+    if (!document.body.hasAttribute('data-esc-handler-attached')) {
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closePriceModal();
+        });
+        document.body.setAttribute('data-esc-handler-attached', 'true');
+    }
+
+    // Info button (only attach once)
+    const infoBtn = document.getElementById('mood-info-modal-btn');
+    if (!infoBtn.hasAttribute('data-click-attached')) {
+        infoBtn.addEventListener('click', openPriceModal);
+        infoBtn.setAttribute('data-click-attached', 'true');
+    }
+
+        // Remove existing handler before adding new one (prevents duplicates)
+        const memeImage = document.getElementById('meme-image');
+        memeImage.removeEventListener('click', nextMeme);
+        memeImage.addEventListener('click', nextMeme);
+        memeImage.style.cursor = 'pointer';
+        memeImage.title = 'Click for next meme';
 
     // Set daily button as active by default
     updateActiveButton('daily');
     
+    // Start data loading
     fetchHistoricalATH().then(() => {
         return fetchHalvingDate();
     }).then(() => {
