@@ -119,49 +119,76 @@ Lottery"> </iframe>
 
         <p><span class="red">By playing the lottery, you agree to our <a href="lotteryTOS.html" target="_blank" rel="noopener">Terms of Service</a>.</span></p>
 
-        <h4>What is a Lightning Address?</h4>
-        <p>A Lightning Address looks like an email: <code>username@walletprovider.com</code></p>
-        
-        <p>The Bitcoin ecosystem is vast, but to keep things simple, here are two popular custodial 
-            wallets that let you buy Bitcoin or Bitcoin Lightning directly with a credit card:
+        <h4>Quick tutorial on how to play?</h4>
+
+        <p>
+            For playing this lottery you'll first need a <strong><a href="https://lightningaddress.com/" target="_blank" rel="noopener noreferrer">Bitcoin Lightning address</a></strong>. And
+            You can get one by installing a wallet like:
         </p>
+
         <ul>
-            <li><strong><a href="https://strike.me/" target="_blank" rel="noopener">Strike:</a></strong> user@strike.me</li>
-            <li><strong><a href="https://www.walletofsatoshi.com/" target="_blank" rel="noopener">Wallet of Satoshi:</a></strong> user@walletofsatoshi.com</li>
+            <li>
+            <strong><a href="https://strike.me/" target="_blank" rel="noopener">Strike:</a></strong>
+            user@strike.me
+            </li>
+            <li>
+            <strong><a href="https://www.walletofsatoshi.com/" target="_blank" rel="noopener">Wallet of Satoshi:</a></strong>
+            user@walletofsatoshi.com
+            </li>
         </ul>
-        
-        <h4>How does matching work?</h4>
-        <p><strong>Numbers match from the RIGHT side only!</strong></p>
-        <p>If winning number is <strong>12345678</strong>:</p>
-        
-        <ul>
-            <li><strong>Tier 1 (8 matches) - 40% of the prize pool:</strong><br>
-                <code><span class="green">12345678</span></code></li>
-            <li><strong>Tier 2 (7 matches) - 25% of the prize pool:</strong><br>
-                <code><span class="red">9</span><span class="green">2345678</span></code></li>
-            <li><strong>Tier 3 (6 matches) - 15% of the prize pool:</strong><br>
-                <code><span class="red">99</span><span class="green">345678</span></code></li>
-            <li><strong>Tier 4 (5 matches) - 10% of the prize pool:</strong><br>
-                <code><span class="red">999</span><span class="green">45678</span></code></li>
-            <li><strong>Tier 5 (4 matches) - 6% of the prize pool:</strong><br>
-                <code><span class="red">9999</span><span class="green">5678</span></code></li>
-            <li><strong>Tier 6 (3 matches) - 4% of the prize pool:</strong><br>
-                <code><span class="red">99999</span><span class="green">678</span></code></li>
-        </ul>
-        
-        <p><em>Remember: Only consecutive matches from the right count!</em></p>
-        
-        <p><strong>Prize Splitting:</strong> If multiple players bet on the same winning number, the prize for that tier is split equally among all winning players.</p>
+
+        <p>
+            Don't be scared if you're not familiar with Bitcoin Lightning ⚡.
+            It is still Bitcoin — just on a faster highway where payments are nearly instant.
+            So much about Bitcoin being slow, ha — as you often hear from bankers!
+        </p>
+
+        <p>
+
+            Once you have your Lightning address, top up some Bitcoin.
+            <em>(Both of these wallets have options to purchase Bitcoin directly inside the app.)</em>
+        </p>
+
+        <p>
+            Now that you’ve got your Lightning address, enter it where it says
+            <em>“Enter your Lightning address”</em> and lock it by clicking the yellow button.
+        </p>
+
+        <p>
+            You can now select options for your numbers:
+            <strong style="color: azure;">Single</strong>, <strong style="color: azure;">Range</strong>, or <strong style="color: azure;">Random</strong>.
+            Choose the option that suits you best.
+        </p>
+
+        <p>
+            After choosing your numbers, it’s time to pay with Lightning by clicking the big yellow button
+            below the total cost of the ticket price.
+        </p>
+
+        <p>
+            After clicking this button, a new window opens with the invoice.
+            There you can either scan the QR code or copy the Lightning invoice string.
+        </p>
+
+        <p>
+            After a successful payment, the receipt in PDF format will be downloaded automatically.<strong>Make sure you save it!</strong>
+            This receipt contains all the information about your ticket.
+        </p>
+
+        <p>
+            To make verifying your numbers easier, you can use the
+            <a href="ticketVerifier.html"><span style="color: azure;">Ticket Verifier tool</a></span>, where you'll see whether your ticket is a winner or not.
+        </p>
 
         <h4>How are winning numbers generated?</h4>
         <p>Winners are determined using Bitcoin block hashes - completely transparent and verifiable!</p>
         
         <p><strong>Process:</strong></p>
         <ol>
-            <li>At block 100 of each round, we take the block hash</li>
-            <li>Remove all letters (a-f), keeping only digits (0-9)</li>
-            <li>Take the last 8 digits as the winning number</li>
-            <li>Match your numbers from the right side</li>
+            <li>&#8226; At block 100 of each round, we take the block hash</li>
+            <li>&#8226; Remove all letters (a-f), keeping only digits (0-9)</li>
+            <li>&#8226; Take the last 8 digits as the winning number</li>
+            <li>&#8226; Match your numbers from the right side</li>
         </ol>
         
         <p><strong>Example:</strong>Block <a href="https://mempool.space/block/000000000000000000011203a39881ce5781e6905cd6456640495e09d09b5dcb" target="_blank"  rel="noopener" title="Bitcoin block no. 921700 details">921700</a> hash<br>
@@ -170,6 +197,30 @@ Lottery"> </iframe>
         
         <p>This ensures fairness - no one can manipulate Bitcoin block hashes!</p>
         
+
+                <h4>How does matching work?</h4>
+        <p><strong>Numbers match from the RIGHT side only!</strong></p>
+        <p>If winning number is <strong>12345678</strong>:</p>
+        
+        <ul>
+            <li>&#8226; <strong>Tier 1 (8 matches) - 40% of the prize pool:</strong><br>
+                <code><span class="green">12345678</span></code></li>
+            <li>&#8226; <strong>Tier 2 (7 matches) - 25% of the prize pool:</strong><br>
+                <code><span class="red">9</span><span class="green">2345678</span></code></li>
+            <li>&#8226; <strong>Tier 3 (6 matches) - 15% of the prize pool:</strong><br>
+                <code><span class="red">99</span><span class="green">345678</span></code></li>
+            <li>&#8226; <strong>Tier 4 (5 matches) - 10% of the prize pool:</strong><br>
+                <code><span class="red">999</span><span class="green">45678</span></code></li>
+            <li>&#8226; <strong>Tier 5 (4 matches) - 6% of the prize pool:</strong><br>
+                <code><span class="red">9999</span><span class="green">5678</span></code></li>
+            <li>&#8226; <strong>Tier 6 (3 matches) - 4% of the prize pool:</strong><br>
+                <code><span class="red">99999</span><span class="green">678</span></code></li>
+        </ul>
+        
+        <p><em>Remember: Only consecutive matches from the right count!</em></p>
+        
+        <p><strong>Prize Splitting:</strong> If multiple players bet on the same winning number, the prize for that tier is split equally among all winning players.</p>
+
         <h4>When do Draws happen?</h4>
         <p><strong>Every 100 Bitcoin blocks (approximately 16-17 hours)</strong></p>
         
@@ -186,16 +237,17 @@ Lottery"> </iframe>
         <p><strong>Instant automatic payments via Lightning Network!</strong></p>
         
         <ul>
-            <li>Winners are identified immediately after each draw</li>
-            <li>Payments sent automatically to your Lightning Address</li>
-            <li>You receive 86% of your prize tier amount</li>
-            <li>14% goes to operators for system maintenance</li>
-            <li>Official receipt with proof provided for all transactions</li>
+            <li>&#8226; Winners are identified immediately after each draw</li>
+            <li>&#8226; Payments sent automatically to your Lightning Address</li>
+            <li>&#8226; You receive 86% of your prize tier amount</li>
+            <li>&#8226; 14% goes to operators for system maintenance</li>
+            <li>&#8226; Official receipt as PDF with proof provided for all transactions</li>
         </ul>
         
         <p><strong>No waiting, no manual claims needed!</strong></p>
         
-        <p><strong>Documentation:</strong> Every bet and payout includes an official receipt with transaction proof that you can download and keep for your records.</p>
+        <p><strong style="color: azure;">Documentation:</strong> Every bet and payout includes an official receipt with transaction 
+            proof that you can download and keep for your records. You can always verify your PDF receipt at <a href="ticketVerifier.html"><span style="color: azure;">Ticket Verifier tool</a></span> </p>
         
         <h4>What if there are no winners?</h4>
         <p>All bet money stays in the jackpot and rolls over to the next round, making it even bigger! This continues until someone wins.</p>
@@ -205,9 +257,9 @@ Lottery"> </iframe>
         
         <p><strong>Examples:</strong></p>
         <ul>
-            <li>5 random numbers = 5 sats</li>
-            <li>100 numbers = 100 sats</li>
-            <li>5000 numbers = 5000 sats</li>
+            <li>&#8226; 5 random numbers = 5 sats</li>
+            <li>&#8226; 100 numbers = 100 sats</li>
+            <li>&#8226; 5000 numbers = 5000 sats</li>
         </ul>
         
         <p>Payment is via Lightning Network - fast and cheap!</p>
