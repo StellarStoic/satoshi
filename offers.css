@@ -68,6 +68,17 @@ header h5 {
     border-color: #667eea;
 }
 
+.refresh-countdown {
+    color: #829271;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.refresh-countdown.warning {
+    color: #e67e22;
+}
+
 #refreshBtn {
     padding: 10px 20px;
     background: #888;

@@ -172,6 +172,10 @@ let availablePaymentMethods = new Map(); // Use Map to avoid duplicates by ID
 // Global variable to track if we've loaded initial payment methods
 let initialPaymentMethodsLoaded = false;
 
+// Auto-refresh countdown variables
+let refreshInterval;
+let countdownSeconds = 330; // 5 minutes 30 seconds
+
 
 // DOM elements
 const elements = {
@@ -190,6 +194,7 @@ const elements = {
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
+    initializeCountdown();
 
     // Add load more button event listener
     const loadMoreBtn = document.getElementById('loadMoreBtn');
@@ -199,21 +204,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Event listeners
-elements.refreshBtn.addEventListener('click', loadOffers);
-elements.sideFilter.addEventListener('change', loadOffers);
-elements.currencyFilter.addEventListener('change', function() {
-    // Update the price display AND reload offers with new currency
-    updateCurrentPriceDisplay();
-    loadOffers(true); // true = first load (reset offers)
+// Update manual refresh to reset countdown
+elements.refreshBtn.addEventListener('click', function() {
+    loadOffers();
+    resetCountdown(); // Reset countdown when manually refreshing
 });
-elements.countryFilter.addEventListener('change', loadOffers);
-elements.paymentMethodFilter.addEventListener('change', loadOffers);
+elements.sideFilter.addEventListener('change', function() {
+    loadOffers(true);
+    resetCountdown();
+});
+elements.currencyFilter.addEventListener('change', function() {
+    updateCurrentPriceDisplay();
+    loadOffers(true);
+    resetCountdown();
+});
+elements.countryFilter.addEventListener('change', function() {
+    loadOffers(true);
+    resetCountdown();
+});
+elements.paymentMethodFilter.addEventListener('change', function() {
+    loadOffers(true);
+    resetCountdown();
+});
 elements.amountFilter.addEventListener('input', function() {
-    // Add slight delay to avoid too many API calls while typing
     clearTimeout(window.amountFilterTimeout);
     window.amountFilterTimeout = setTimeout(() => {
         loadOffers(true);
-    }, 1500);
+        resetCountdown();
+    }, 2222);
 });
 
 // initializeApp to load first batch
@@ -1368,10 +1386,62 @@ additionalStyles.textContent = `
 `;
 document.head.appendChild(additionalStyles);
 
-// Auto-refresh every 2 minutes
-setInterval(() => {
-    loadOffers();
-}, 330000);
+
+// Initialize countdown when app starts
+function initializeCountdown() {
+    startCountdown();
+}
+
+// Start the countdown timer
+function startCountdown() {
+    clearInterval(refreshInterval);
+    countdownSeconds = 330; // Reset to 5:30
+    
+    refreshInterval = setInterval(() => {
+        countdownSeconds--;
+        
+        if (countdownSeconds <= 0) {
+            // Time's up - refresh offers
+            loadOffers();
+            countdownSeconds = 330; // Reset to 5:30
+        }
+        
+        updateCountdownDisplay();
+    }, 1000);
+    
+    // Initial display update
+    updateCountdownDisplay();
+}
+
+// Update the countdown display
+// Update the countdown display
+function updateCountdownDisplay() {
+    const countdownElement = document.getElementById('refreshCountdown');
+    if (countdownElement) {
+        const minutes = Math.floor(countdownSeconds / 60);
+        const seconds = countdownSeconds % 60;
+        const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        countdownElement.textContent = timeString;
+        
+        // Add warning style when under 1 minute
+        if (countdownSeconds <= 60) {
+            countdownElement.classList.add('warning');
+        } else {
+            countdownElement.classList.remove('warning');
+        }
+    }
+}
+
+// Reset countdown when manually refreshing
+function resetCountdown() {
+    startCountdown();
+}
+
+// // Auto-refresh every 2 minutes
+// setInterval(() => {
+//     loadOffers();
+// }, 330000);
 
 // Add keyboard shortcut for refresh (Ctrl/Cmd + R)
 document.addEventListener('keydown', (event) => {
