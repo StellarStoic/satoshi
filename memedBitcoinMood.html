@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="memedBitcoinMood.css">
+    <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <!-- Web Manifest -->
+    <link rel="manifest" href="/site.webmanifest">
+
+    <!-- Windows Tile Icon -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff">
+
+    
+    <title>Bitcoin Mood in Memes</title>
+</head>
+<body>
+  <!-- Copy text notification -->
+  <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
+    <!-- Burger menu -->
+    <a href="#menu" id="toggle"><span></span></a>
+
+    <div id="menu">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+
+        <!-- Bitcoin Knowlage submenu -->
+        <li class="has-submenu">
+        <a href="#">Knowlage</a>
+        <ul class="submenu">
+            <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+        <!-- Lottery with submenu -->
+        <li class="has-submenu">
+        <a href="#">Lottery</a>
+        <ul class="submenu">
+            <li><a href="lottery.html">Play</a></li>
+            <li><a href="ticketVerifier.html">Ticket Verifier</a></li>
+            <li><a href="lotteryTOS.html" target="_blank"  rel="noopener">Lottery Terms of service</a></li>
+        </ul>
+        </li>
+
+        <!-- Price related submenu -->
+        <li class="has-submenu">
+        <a href="#">Price Related</a>
+        <ul class="submenu">
+            <li><a href="converter.html">Converter</a></li>
+            <li><a href="MoscowTime.html">Moscow time</a></li>
+            <li><a href="#">Memed Bitcoin Mood</a></li>
+            <li><a href="chart.html">History chart</a></li>
+            <li><a href="offers.html">P2P Bitcoin Offers</a></li>
+        </ul>
+        </li>
+
+        <!-- Nostr submenu -->
+        <li class="has-submenu">
+        <a href="#">Nostr</a>
+        <ul class="submenu">
+            <li><a href="nip05.html">NIP-05</a></li>
+        </ul>
+        </li>
+
+        <!-- Games submenu -->
+        <li class="has-submenu">
+        <a href="#">Game</a>
+        <ul class="submenu">
+            <li><a href="game39.html">Game39</a></li>   
+        </ul>
+        </li>
+
+        <!-- Tools submenu -->
+        <li class="has-submenu">
+        <a href="#">tools</a>
+        <ul class="submenu">
+            <li><a href="ghostQR.html">GhostQR</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+      </ul>
+    </div>
+
+        <!-- -----------------------------MEME STUFF----------------------------------------- -->
+
+<div class="container">
+    <!-- Title always visible -->
+    <h1>Bitcoin Mood in Memes</h1>
+    
+    <!-- Fixed Question Mark Icon -->
+    <div class="mood-info-btn" id="mood-info-modal-btn" style="position: fixed; top: 20px; right: 20px; cursor: pointer; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: bold;">
+        <i class="lni lni-question-mark-circle"></i>
+    </div>
+
+    <!-- Controls always visible -->
+    <div class="controls">
+        <button onclick="fetchMood('daily')" data-timeframe="daily" title="Daily Mood">T</button>
+        <button onclick="fetchMood('weekly')" data-timeframe="weekly" title="Weekly Mood">W</button>
+        <button onclick="fetchMood('monthly')" data-timeframe="monthly" title="Monthly Mood">M</button>
+        <button onclick="fetchMood('yearly')" data-timeframe="yearly" title="Yearly Mood">Y</button>
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loading" class="hidden">Loading Bitcoin data...</div>
+
+    <!-- Meme display - always visible -->
+    <div id="mood-display" class="hidden">
+        <!-- Celebration text - moved above meme but still visible -->
+        <div id="celebration-text" class="celebration hidden"></div>
+        
+        <div class="mood-result">
+            <div id="meme-container">
+                <img id="meme-image" src="" alt="Bitcoin Mood Meme">
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Error display -->
+    <div id="error" class="hidden error">Failed to fetch Bitcoin data. Please try again.</div>
+    
+</div>
+
+<!-- NEW: Price Info Modal (moved outside container) -->
+<div id="priceInfoModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close" onclick="closePriceModal()">&times;</span>
+        <h3 id="modal-timeframe-title">Mood</h3>
+        <h2>Mood: <span id="mood-text">-</span></h2>
+        <div class="modal-price-info">
+            <h2>Current Price: $<span id="modal-current-price">-</span></h2>
+            <p>Timeframe: <span id="modal-timeframe-text">-</span> <span id="modal-source-text"></span></p>
+            <p>Price Change: <span id="modal-price-change">-</span></p>
+            <p>Volatility: <span id="modal-volatility">-</span></p>
+        </div>
+        <div id="modal-celebration-text" class="celebration hidden"></div>
+    </div>
+</div>
+
+        <!-- ---------------------------------------------------------------------- -->
+
+<!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
+<footer class="footer">
+    <!-- Email Link -->
+    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank" rel="noopener">
+      one@satoshi.si
+    </a>
+  
+    <!-- Block Height Display (Left Side) -->
+    <span id="block-height"  title="Block Height" onclick="openMempoolTinyDataModal()">
+    </span>
+  
+    <!-- Fee Rate Display (Right Side) -->
+    <span id="fee-rate" title="Network fee rate" onclick="openMempoolTinyDataModal()">
+    </span>
+    
+    <!-- Lightning Icon -->
+    <i class="lni lni-bolt-2" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+  </footer>
+
+<!-- Mempool Tiny Data Modal -->
+<div id="mempoolTinyDataModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close-icon" onclick="closeMempoolTinyDataModal()">&times;</span>
+        <div class="modal-navigation">
+            <span class="left-arrow" title="Previous Block">&larrfs;</span>
+            <h2 class="modal-title"></h2>
+            <span class="right-arrow" title="Next Block">&rarrfs;</span>
+        </div>
+        
+
+        <!-- Block Data Content -->
+        <div class="block-data" style="display: none;">
+            <div class="avg-fee-rate" title="Median fee rate"></div>
+            <div class="fee-range" title="Fee Range from Lowest to Highest"></div>
+            <div class="total-fees-btc" title="Total fees in Bitcoin"></div>
+            <div class="total-fees-sats" title="Total fees in Satoshis"></div>
+            <div class="tx-count" title="Number of transactions"></div>
+            <div class="time-passed" title="Time passed since this block was mined"></div>
+            <div class="mined-by" title="Miner of the block"></div>
+        </div>
+
+        <!-- Fee Rate Content -->
+        <div class="fee-data" style="display: none;">
+            <!-- <div class="fee-info" title="Current Half-Hour Fee Rate"></div> -->
+            <div class="economy-fee" title="Economy Fee Rate"></div>
+            <div class="fastest-fee" title="Fastest Fee Rate"></div>
+            <div class="half-hour-fee" title="Half-Hour Fee Rate"></div>
+            <div class="hour-fee" title="Hourly Fee Rate"></div>
+            <div class="minimum-fee" title="Minimum Fee Rate"></div>
+        </div>
+    </div>
+</div>
+
+
+
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+      <div class="modal-content">
+          <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+          <h4 id="gratitudeHeader">If you find this website valuable, consider contributing a sat or two. Thank you.</h4>
+          <div class="qr-code-container">
+              <!-- Lightning QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN">
+                  <p class="qr-code-text" id="lightningAddress">LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN</p>
+              </div>
+              
+              <!-- Onchain QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                  <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+    <!-- Cookie Consent Modal -->
+    <div id="cookieConsentModal" class="description-modal">
+        <div class="modal-content">
+            <h4>Listen Up, Cookie Crunchers!</h4>
+            <h6>The G.D.P.R. (Greatly Demanding Privacy Rules) requires us to share this with you...</h6>
+            <p>We don't really give a damn about cookies. But some settings, like our fancy currency rates converter, store your preferences so you don't have to waste time setting things up every damn time you visit.</p>
+            <br>
+            <p>But seriously, we don't track you, we don't sell your data, and we definitely don't care about what you're doing online (unless you're baking actual cookies, in which case, send some our way digitally in sats. <span style="color: aliceblue">⚡</span>)</p>
+            <br>
+            <p>If you're cool with us making your life a little bit easier, click the button below. If not, hey, that's cool too. Just remember! stay humble and stack sats.</p>
+            <br>
+            <!-- Button container with Flexbox -->
+            <div class="consent-button-container">
+                <button onclick="acceptCookies()" class="consent-icon-button green-check" title="Yeah, whatever, just do it!">
+                    &#10004; <!-- Unicode checkmark -->
+                </button>
+                <button onclick="declineCookies()" class="consent-icon-button red-cross" title="Nope, delete sll none essential cookies">
+                    &#10008; <!-- Unicode cross -->
+                </button>
+            </div>
+        </div>
+      </div>
+
+
+
+<script src="coockieConsent.js"></script>
+<script src="copyonclick.js"></script>
+<script src="memedBitcoinMood.js"></script>
+<script src="mempoolWebSocket.js"></script>
+<script src="lottery.js"></script>
+<script src="sintraWebSocket.js"></script>
+<script src="index.js"></script>
+<script src="burgerMenu.js"></script>
+<script src="slip.js"></script>
+
+
+</body>
+</html>
