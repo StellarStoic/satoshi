@@ -82,8 +82,14 @@
         // Expand the app to full screen
         tg.expand();
         
-        // Set background color to match Telegram theme
+        // Set background color using Telegram's method - THIS IS KEY!
         tg.setBackgroundColor('#000000');
+        
+        // Also set the header color to match
+        tg.setHeaderColor('#000000');
+        
+        // Call ready() to apply changes
+        tg.ready();
         
         // Wait for iframe to load
         document.getElementById('lotteryIframe').onload = function() {
@@ -93,12 +99,13 @@
             document.getElementById('iframeContainer').style.display = 'block';
         };
         
-        // Handle back button (if needed)
-        tg.BackButton.onClick(function() {
-            // You can add navigation logic here
-            tg.close();
+        // Handle theme changes dynamically
+        tg.onEvent('themeChanged', function() {
+            // Re-apply background color when theme changes
+            tg.setBackgroundColor('#000000');
         });
         
+
         // Optional: Send data to parent window (your widget)
         window.addEventListener('message', function(event) {
             // Handle messages from your iframe if needed
