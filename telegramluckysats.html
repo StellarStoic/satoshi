@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Sats Lottery</title>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #000000);
+            color: var(--tg-theme-text-color, #ffffff);
+        }
+        
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .iframe-container {
+            flex: 1;
+            border: none;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        /* Loading spinner */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        .spinner {
+            border: 4px solid #000000;
+            border-top: 4px solid #f2a900;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading indicator -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+        </div>
+        
+        <!-- Your widget in iframe -->
+        <div class="iframe-container" id="iframeContainer" style="display: none;">
+            <iframe 
+                src="https://playtdt.com/widget/LUCKYSATS" 
+                id="lotteryIframe"
+                title="Daily Thunder Lottery"
+                allow="fullscreen">
+            </iframe>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Telegram Web App
+        const tg = window.Telegram.WebApp;
+        
+        // Expand the app to full screen
+        tg.expand();
+        
+        // Set background color to match Telegram theme
+        tg.setBackgroundColor('#000000');
+        
+        // Wait for iframe to load
+        document.getElementById('lotteryIframe').onload = function() {
+            // Hide loading spinner
+            document.getElementById('loading').style.display = 'none';
+            // Show iframe
+            document.getElementById('iframeContainer').style.display = 'block';
+        };
+        
+        // Handle back button (if needed)
+        tg.BackButton.onClick(function() {
+            // You can add navigation logic here
+            tg.close();
+        });
+        
+        // Optional: Send data to parent window (your widget)
+        window.addEventListener('message', function(event) {
+            // Handle messages from your iframe if needed
+            console.log('Message from iframe:', event.data);
+        });
+    </script>
+</body>
+</html>
