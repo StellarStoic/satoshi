@@ -111,7 +111,7 @@
             margin-bottom: 20px;
         }
         
-        .popup-url {
+        /* .popup-url {
             color: #f2a900;
             font-weight: bold;
             background: #2a2a2a;
@@ -119,7 +119,7 @@
             border-radius: 8px;
             margin: 15px 0;
             word-break: break-all;
-        }
+        } */
         
         .popup-button {
             background: #f2a900;
@@ -213,18 +213,19 @@
     <!-- Info Popup -->
     <div class="custom-popup" id="infoPopup">
         <div class="popup-content">
-            <div class="popup-title">⚠️ Important Notice ⚠️</div>
+            <div class="popup-title">Feeling Lucky? 🍀</div>
             <div class="popup-message">
-                This smart widget is a Bitcoin lightning lottery mirrored from...
+                The fairest lottery in the world is here!<br>
+                Powered by the Bitcoin Lightning and transparent block hashes.<br>
             </div>
-            <div class="popup-url" onclick="copyToClipboard()" style="cursor: pointer;">
+            <!-- <div class="popup-url" onclick="copyToClipboard()" style="cursor: pointer;">
                 www.satoshi.si/lottery.html
                 <br>
                 <small style="color: #888; font-size: 12px;">(Click to copy)</small>
             </div>
             <div id="copyMessage" style="color: #4CAF50; font-size: 14px; margin: 10px 0; display: none;">
                 ✅ URL copied to clipboard!
-            </div>
+            </div> -->
             
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="faq-button" onclick="showFAQ()" style="flex: 1;">
@@ -307,6 +308,7 @@
                 <strong>🔒 VERIFICATION</strong><br>
                 • Play this lottery only if you agree to our <a href="https://satoshi.si/lotteryTOS.html" target="_blank" rel="noopener">TOS</a><br>
                 • You can verify your lucky ticket at <a href="https://satoshi.si/ticketVerifier" target="_blank" rel="noopener">ticket verifier</a><br>
+                • Are we legit? Yes! We are <a href="https://playtdt.com/989AT4YN" target="_blank" rel="noopener"><strong>The Daily Thunder</strong></a> partner<br><br>
 
                 <strong>Good luck 🍀</strong>
             </div>
@@ -357,31 +359,31 @@
             }
         });
 
-        function copyToClipboard() {
-            const url = 'www.satoshi.si/lottery.html';
-            navigator.clipboard.writeText(url).then(function() {
-                const message = document.getElementById('copyMessage');
-                message.style.display = 'block';
-                setTimeout(() => {
-                    message.style.display = 'none';
-                }, 3000);
-            }).catch(function(err) {
-                console.error('Failed to copy: ', err);
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = url;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
+        // function copyToClipboard() {
+        //     const url = 'www.satoshi.si/lottery.html';
+        //     navigator.clipboard.writeText(url).then(function() {
+        //         const message = document.getElementById('copyMessage');
+        //         message.style.display = 'block';
+        //         setTimeout(() => {
+        //             message.style.display = 'none';
+        //         }, 3000);
+        //     }).catch(function(err) {
+        //         console.error('Failed to copy: ', err);
+        //         // Fallback for older browsers
+        //         const textArea = document.createElement('textarea');
+        //         textArea.value = url;
+        //         document.body.appendChild(textArea);
+        //         textArea.select();
+        //         document.execCommand('copy');
+        //         document.body.removeChild(textArea);
                 
-                const message = document.getElementById('copyMessage');
-                message.style.display = 'block';
-                setTimeout(() => {
-                    message.style.display = 'none';
-                }, 3000);
-            });
-        }
+        //         const message = document.getElementById('copyMessage');
+        //         message.style.display = 'block';
+        //         setTimeout(() => {
+        //             message.style.display = 'none';
+        //         }, 3000);
+        //     });
+        // }
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {

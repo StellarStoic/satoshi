@@ -2,7 +2,7 @@
     "pubkey": "000000005e9dda01479c76c5f4fccbaebe4e7856e02f8e85adba05ad62ad6927",
     "widget": {
         "title": "Bitcoin Lightning Lottery - LuckySats",
-        "appUrl": " https://satoshi.si/luckysats.html",
+        "appUrl": "https://satoshi.si/luckysats.html",
         "iconUrl": "https://satoshi.si/icons/lso.png",
         "imageUrl": "https://satoshi.si/icons/lso.png",
         "buttonTitle": "Play ⚡ Lottery",
