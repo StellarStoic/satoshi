@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Sats Lottery</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000000 !important;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #000000;
+        }
+        
+        .iframe-container {
+            flex: 1;
+            border: none;
+            background: #000000;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #000000;
+        }
+        
+        .spinner {
+            border: 4px solid #333333;
+            border-top: 4px solid #f2a900;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        
+        /* Custom popup styles */
+        .custom-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10001;
+        }
+
+        code {
+                display: inline-block;
+                max-width: 100%;
+                overflow-wrap: break-word;
+                word-break: break-all;
+                font-family: monospace;
+                font-size: 12px;
+                background: #2a2a2a;
+                padding: 4px 6px;
+                border-radius: 4px;
+                margin: 2px 0;
+            }
+
+            /* For the FAQ popup specifically */
+            .popup-content code {
+                font-size: 11px;
+                line-height: 1.3;
+            }
+        
+        .popup-content {
+            overflow-wrap: break-word;
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 320px;
+            text-align: center;
+            border: 2px solid #f2a900;
+            margin: 20px;
+        }
+        
+        .popup-title {
+            color: #f2a900;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .popup-message {
+            color: #ffffff;
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        
+        .popup-url {
+            color: #f2a900;
+            font-weight: bold;
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 15px 0;
+            word-break: break-all;
+        }
+        
+        .popup-button {
+            background: #f2a900;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .popup-button:hover {
+            background: #e69a00;
+        }
+        .faq-button {
+            background: #333333;
+            color: #ffffff;
+            border: 2px solid #f2a900;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .faq-button:hover {
+            background: #444444;
+        }
+
+        .popup-message a {
+            color: #f2a900;
+            text-decoration: underline;
+        }
+
+        .block-example {
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        .red {
+            color: red;
+        }
+
+        .green {
+            color: rgb(58, 184, 58);
+        }
+
+        .yellow {
+            color: yellow;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 360px) {
+            .popup-content {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            code {
+                font-size: 10px;
+            }
+            
+            .popup-message {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+        </div>
+        
+        <div class="iframe-container" id="iframeContainer" style="display: none;">
+            <iframe 
+                src="https://playtdt.com/widget/LUCKYSATS" 
+                id="lotteryIframe"
+                title="Daily Thunder Lottery"
+                allow="fullscreen">
+            </iframe>
+        </div>
+    </div>
+    <!-- Info Popup -->
+    <div class="custom-popup" id="infoPopup">
+        <div class="popup-content">
+            <div class="popup-title">⚠️ Important Notice ⚠️</div>
+            <div class="popup-message">
+                This smart widget is a Bitcoin lightning lottery mirrored from...
+            </div>
+            <div class="popup-url" onclick="copyToClipboard()" style="cursor: pointer;">
+                www.satoshi.si/lottery.html
+                <br>
+                <small style="color: #888; font-size: 12px;">(Click to copy)</small>
+            </div>
+            <div id="copyMessage" style="color: #4CAF50; font-size: 14px; margin: 10px 0; display: none;">
+                ✅ URL copied to clipboard!
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="faq-button" onclick="showFAQ()" style="flex: 1;">
+                    How to Play
+                </button>
+                <button class="popup-button" onclick="closePopup()" style="flex: 1;">
+                    Got it! Let's Play
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ Popup -->
+    <div class="custom-popup" id="faqPopup" style="display: none;">
+        <div class="popup-content" style="max-width: 400px; max-height: 80vh; overflow-y: auto;">
+            <div class="popup-title">🎰 Lucky Sats Lottery FAQ</div>
+            <div class="popup-message" style="text-align: left; font-size: 14px; line-height: 1.4;">
+                <strong>📖 HOW TO PLAY?</strong><br>
+                • First, you need a Bitcoin Lightning address<br>
+                • Get wallets like <strong><a href="https://strike.me/" target="_blank" rel="noopener">Strike</a></strong> (user@strike.me) or <strong><a href="https://www.walletofsatoshi.com/" target="_blank" rel="noopener">Wallet of Satoshi</a></strong> (user@walletofsatoshi.com)<br>
+                • Top up Bitcoin in your wallet<br>
+                • Now let's play<br>
+                • Enter your Lightning address and lock it<br>
+                • Select numbers: Single, Range, or Random<br>
+                • Clicking the big yellow button to get the lightning invoice<br>
+                • Scan QR code or copy Lightning invoice and pay it<br>
+                • Play responsibly and for fun only. Don't gamble all your sats!<br><br>
+
+                <strong>🔢 HOW ARE WINNING NUMBERS GENERATED?</strong><br>
+                • Winners determined using Bitcoin block hashes<br>
+                • At block 100 of each round, we take the block hash<br>
+                • Remove all letters (a-f), keeping only digits (0-9)<br>
+                • Take the last 8 digits as the winning number<br>
+                • Match your numbers from the right side<br>
+
+                <p><strong class="block-example">Example:</strong> Block 
+                <a href="https://mempool.space/block/000000000000000000011203a39881ce5781e6905cd6456640495e09d09b5dcb" 
+                target="_blank" rel="noopener" 
+                title="Bitcoin block no. 921700 details">921700</a> hash:<br>
+                <code>000000000000000000011203<span class="red">a</span>39881<span class="red">ce</span>5781<span class="red">e</span>6905<span class="red">cd</span>6456640<span class="green">495</span><span class="red">e</span><span class="green">09</span><span class="red">d</span><span class="green">09</span><span class="red">b</span><span class="green">5</span><span class="red">dcb</span></code><br>
+                becomes <code><span class="green">49509095</span></code> (winning number)</p>
+
+                • Completely transparent and verifiable!<br><br>
+
+                <strong>🎯 HOW DOES MATCHING WORK?</strong><br>
+                • Numbers match from the RIGHT side only!<br>
+                • 8 matches: 40% of prize pool<br>
+                • 7 matches: 25% of prize pool<br>
+                • 6 matches: 15% of prize pool<br>
+                • 5 matches: 10% of prize pool<br>
+                • 4 matches: 6% of prize pool<br>
+                • 3 matches: 4% of prize pool<br>
+                
+                <p>We believe this is the fairest lottery that has ever existed. No one can manipulate Bitcoin block hashes!</p>
+
+                • If multiple winners, prize is split equally<br><br>
+
+                <strong>⏰ WHEN DO DRAWS HAPPEN?</strong><br>
+                • Every 100 Bitcoin blocks (approx 16-17 hours)<br>
+                • Blocks 1-96: Betting window open<br>
+                • Blocks 97-99: Betting closed, system preparation<br>
+                • Block 100: Draw happens automatically<br><br>
+
+                <strong>💰 HOW DO PAYOUTS WORK?</strong><br>
+                • Instant automatic payments via Lightning Network to your Lightning Address!<br>
+                • You receive 86% of your prize tier amount<br>
+                • 14% goes to operators for system maintenance<br><br>
+
+                <strong>❓ WHAT IF THERE ARE NO WINNERS?</strong><br>
+                • All bet money stays in the Prize Pool<br>
+                • Rolls over to the next round, making it even bigger!<br>
+                • Continues until someone wins<br><br>
+
+                <strong>💸 HOW MUCH DOES IT COST TO PLAY?</strong><br>
+                • Just 1 satoshi per 8 digit number!<br>
+                • 5 random numbers = 5 sats<br>
+                • 100 numbers = 100 sats<br>
+                • 5000 numbers = 5000 sats<br><br>
+
+                <strong>🔒 VERIFICATION</strong><br>
+                • Play this lottery only if you agree to our <a href="https://satoshi.si/lotteryTOS.html" target="_blank" rel="noopener">TOS</a><br>
+                • You can verify your lucky ticket at <a href="https://satoshi.si/ticketVerifier" target="_blank" rel="noopener">ticket verifier</a><br>
+
+                <strong>Good luck 🍀</strong>
+            </div>
+            <button class="popup-button" onclick="closeFAQ()" style="margin-top: 20px;">
+                Close FAQ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Wait for iframe to load
+        document.getElementById('lotteryIframe').onload = function() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('iframeContainer').style.display = 'block';
+        };
+
+        // Show popup after 3 seconds
+        setTimeout(function() {
+            document.getElementById('infoPopup').style.display = 'flex';
+        }, 3000);
+
+        // Close popup function
+        function closePopup() {
+            document.getElementById('infoPopup').style.display = 'none';
+        }
+
+        // FAQ functions
+        function showFAQ() {
+            document.getElementById('infoPopup').style.display = 'none';
+            document.getElementById('faqPopup').style.display = 'flex';
+        }
+
+        function closeFAQ() {
+            document.getElementById('faqPopup').style.display = 'none';
+            document.getElementById('infoPopup').style.display = 'flex';
+        }
+
+        // Optional: Also close popup when clicking outside content
+        document.getElementById('infoPopup').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePopup();
+            }
+        });
+
+        document.getElementById('faqPopup').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeFAQ();
+            }
+        });
+
+        function copyToClipboard() {
+            const url = 'www.satoshi.si/lottery.html';
+            navigator.clipboard.writeText(url).then(function() {
+                const message = document.getElementById('copyMessage');
+                message.style.display = 'block';
+                setTimeout(() => {
+                    message.style.display = 'none';
+                }, 3000);
+            }).catch(function(err) {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const message = document.getElementById('copyMessage');
+                message.style.display = 'block';
+                setTimeout(() => {
+                    message.style.display = 'none';
+                }, 3000);
+            });
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // App is ready
+            console.log('Lucky Sats Lottery Nostr Widget Ready');
+        });
+    </script>
+</body>
+</html>
