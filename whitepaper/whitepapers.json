@@ -1190,5 +1190,33 @@
         "path": "whitepaper/AL/bitcoin_al.pdf"
       },
       "active": true
+    },
+    {
+      "index": 49,
+      "country": "Somalia",
+      "language": {
+        "en": "Somali",
+        "native": "أَف صَوْمَالِ",
+        "alpha-2": "SO"
+      },
+      "translators": {
+        "note": "translated by",
+        "translator": [
+          {
+            "t_name": "CryptoYahan",
+            "t_link": "https://cryptoyahan.com/"
+          },
+          {
+            "t_name": "supplemental explanatory document",
+            "t_link": "whitepaper/SO/bitcoin_so_explanation.pdf"
+          }
+        ]
+      },
+      "PDF": {
+        "hash": "e6b047e4d4dbe215076feab21c51b2a333f45d6e800c6e030ba57fd666d0afe5",
+        "virusTotal_link": "https://www.virustotal.com/gui/file/e6b047e4d4dbe215076feab21c51b2a333f45d6e800c6e030ba57fd666d0afe5",
+        "path": "whitepaper/SO/bitcoin_so.pdf"
+      },
+      "active": true
     }
   ]
