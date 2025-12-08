@@ -7,34 +7,83 @@ async function fetchAndDisplayStats() {
         const response = await fetch('https://lottery-api.satoshi.si/api/stats');
         const statsData = await response.json();
 
-        // Example: Update elements in your HTML. You'll need to add these IDs to your lotteryStats.html.
-        document.getElementById('total-rounds').textContent = statsData.total_rounds;
-        document.getElementById('latest-round').textContent = statsData.latest_round;
-        document.getElementById('total-payout').textContent = statsData.total_payout_sats.toLocaleString() + ' 丰';
-        document.getElementById('avg-payout').textContent = statsData.average_payout_per_round.toFixed(2) + ' 丰';
-        document.getElementById('last-updated').textContent = new Date(statsData.last_updated).toLocaleString();
+        // Check if we have the new scraped overview stats
+        if (statsData.total_rounds && statsData.total_bets && statsData.total_winners) {
+            // New format: scraped overview stats
+            document.getElementById('total-rounds').textContent = statsData.total_rounds;
+            document.getElementById('latest-round').textContent = statsData.current_round;
+            document.getElementById('total-payout').textContent = statsData.total_paid_sats.toLocaleString() + ' 丰';
+            
+            // ADD THESE MISSING UPDATES:
+            document.getElementById('total-bets').textContent = statsData.total_bets;
+            document.getElementById('total-winners').textContent = statsData.total_winners;
+            document.getElementById('current-jackpot').textContent = statsData.current_prize_pool + ' 丰';
+            
+            // Use the new average payout field for last 21 rounds
+            if (statsData.average_payout_last_21_rounds) {
+                document.getElementById('avg-payout').textContent = statsData.average_payout_last_21_rounds.toFixed(2) + ' 丰';
+            } else {
+                document.getElementById('avg-payout').textContent = 'N/A';
+            }
+            
+            // Set round range - use last 15 rounds for navigation
+            currentRoundNumber = statsData.current_round;
+            minRoundNumber = statsData.current_round - 14; // Assuming last 15 rounds
+            maxRoundNumber = statsData.current_round;
+            
+        } else if (statsData.total_rounds_shown) {
+            // Old format: calculated stats from last 15 rounds
+            document.getElementById('total-rounds').textContent = statsData.total_rounds_shown;
+            document.getElementById('latest-round').textContent = statsData.latest_round;
+            document.getElementById('total-payout').textContent = statsData.total_payout_sats.toLocaleString() + ' 丰';
+            document.getElementById('avg-payout').textContent = statsData.average_payout_per_round.toFixed(2) + ' 丰';
+            
+            // Set round range
+            currentRoundNumber = statsData.latest_round;
+            minRoundNumber = statsData.oldest_round_shown;
+            maxRoundNumber = statsData.latest_round;
+        }
 
-        // Set round range
-        currentRoundNumber = statsData.latest_round;
-        minRoundNumber = statsData.oldest_round;
-        maxRoundNumber = statsData.latest_round;
+        document.getElementById('last-updated').textContent = new Date(statsData.last_updated).toLocaleString();
 
     } catch (error) {
         console.error('Error fetching stats:', error);
-        // Display an error message to the user on the page
     }
 }
 
-async function fetchAndDisplayLatestRound(roundNumber) {
+async function fetchAndDisplayLatestRound() {
     try {
         const response = await fetch('https://lottery-api.satoshi.si/api/latest');
         const roundData = await response.json();
 
-        // Use the new function to display the round
-        fetchAndDisplayRound(roundData.round_number);
+        // Check if we got an array (15 rounds) or a single object
+        if (Array.isArray(roundData) && roundData.length > 0) {
+            // We got an array of rounds - display the first (latest) one
+            const latestRound = roundData[0];
+            fetchAndDisplayRound(latestRound.round_number);
+            document.getElementById('current-round-number').textContent = latestRound.round_number;
+            
+            // Update round range based on the array
+            minRoundNumber = roundData[roundData.length - 1].round_number; // Oldest in the array
+            maxRoundNumber = roundData[0].round_number; // Latest in the array
+            currentRoundNumber = latestRound.round_number;
+            
+        } else if (roundData.round_number) {
+            // We got a single round object (old format)
+            fetchAndDisplayRound(roundData.round_number);
+            document.getElementById('current-round-number').textContent = roundData.round_number;
+            currentRoundNumber = roundData.round_number;
+        } else {
+            // Fallback: If we get unexpected data, try to fetch round 1
+            console.warn('Unexpected data format from /api/latest, attempting to fetch round 1');
+            fetchAndDisplayRound(1);
+        }
 
-        // Update round overview
-        document.getElementById('current-round-number').textContent = roundData.round_number;
+        // // Use the new function to display the round
+        // fetchAndDisplayRound(roundData.round_number);
+
+        // // Update round overview
+        // document.getElementById('current-round-number').textContent = roundData.round_number;
 
         // Extract block number from "Block 926800" format
         const blockNumber = roundData.block.replace('Block ', '');
@@ -271,8 +320,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // New: Fetch and display API data
     showLoading();
-    fetchAndDisplayStats();
-    fetchAndDisplayLatestRound();
+    // First fetch stats, then fetch and display the latest round
+    fetchAndDisplayStats().then(() => {
+        fetchAndDisplayLatestRound();
+    });
     setupRoundNavigation();
 
     // Element to trigger opening the Lottery Explainer modal
