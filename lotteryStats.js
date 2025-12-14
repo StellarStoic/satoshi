@@ -11,7 +11,7 @@ async function fetchAndDisplayStats() {
         if (statsData.total_rounds && statsData.total_bets && statsData.total_winners) {
             // New format: scraped overview stats
             document.getElementById('total-rounds').textContent = statsData.total_rounds;
-            document.getElementById('current-round').textContent = statsData.current_round;
+            document.getElementById('latest-round').textContent = statsData.current_round;
             document.getElementById('total-payout').textContent = statsData.total_paid_sats.toLocaleString() + ' 丰';
             
             // ADD THESE MISSING UPDATES:
@@ -34,7 +34,7 @@ async function fetchAndDisplayStats() {
         } else if (statsData.total_rounds_shown) {
             // Old format: calculated stats from last 15 rounds
             document.getElementById('total-rounds').textContent = statsData.total_rounds_shown;
-            document.getElementById('current-round').textContent = statsData.latest_round;
+            document.getElementById('latest-round').textContent = statsData.latest_round;
             document.getElementById('total-payout').textContent = statsData.total_payout_sats.toLocaleString() + ' 丰';
             document.getElementById('avg-payout').textContent = statsData.average_payout_per_round.toFixed(2) + ' 丰';
             
