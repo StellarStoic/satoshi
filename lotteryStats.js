@@ -34,7 +34,7 @@ async function fetchAndDisplayStats() {
         } else if (statsData.total_rounds_shown) {
             // Old format: calculated stats from last 15 rounds
             document.getElementById('total-rounds').textContent = statsData.total_rounds_shown;
-            document.getElementById('latest-round').textContent = statsData.latest_round;
+            document.getElementById('current-round').textContent = statsData.latest_round;
             document.getElementById('total-payout').textContent = statsData.total_payout_sats.toLocaleString() + ' 丰';
             document.getElementById('avg-payout').textContent = statsData.average_payout_per_round.toFixed(2) + ' 丰';
             
