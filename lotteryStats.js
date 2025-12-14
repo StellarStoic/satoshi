@@ -11,7 +11,7 @@ async function fetchAndDisplayStats() {
         if (statsData.total_rounds && statsData.total_bets && statsData.total_winners) {
             // New format: scraped overview stats
             document.getElementById('total-rounds').textContent = statsData.total_rounds;
-            document.getElementById('latest-round').textContent = statsData.current_round;
+            document.getElementById('current-round').textContent = statsData.current_round;
             document.getElementById('total-payout').textContent = statsData.total_paid_sats.toLocaleString() + ' 丰';
             
             // ADD THESE MISSING UPDATES:
