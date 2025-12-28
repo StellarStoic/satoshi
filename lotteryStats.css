@@ -329,6 +329,118 @@
     100% { opacity: 0.7; }
 }
 
+/* Progress Bar Styles */
+.progress-bar-container {
+    background: rgb(45, 45, 45);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 30px 0;
+    border-left: 4px solid #f2a900;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.progress-bar-container h3 {
+    color: #c5ba9e;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.progress-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 15px;
+    height: 30px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.block-segment {
+    flex: 1;
+    background: #333;
+    transition: background-color 0.3s ease;
+}
+
+.block-segment.open {
+    background: rgb(58, 184, 58); /* Green */
+}
+
+.block-segment.closed {
+    background: red; /* Red */
+}
+
+.block-segment.draw {
+    background: yellow; /* Yellow */
+}
+
+.progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8em;
+    color: #c5ba9e;
+}
+
+.progress-labels span {
+    display: flex;
+    align-items: center;
+}
+
+.progress-labels span::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 5px;
+    border-radius: 2px;
+}
+
+.label-open::before { background: rgb(58, 184, 58); }
+.label-closed::before { background: red; }
+.label-draw::before { background: yellow; }
+
+/* Add washed-off effect for unmined blocks */
+.block-segment.unmined {
+    opacity: 0.4;
+    filter: grayscale(60%) brightness(0.7);
+}
+
+/* Keep the current block fully visible even if unmined */
+.block-segment.unmined.current {
+    opacity: 0.8;
+    filter: grayscale(30%) brightness(0.9);
+}
+
+/* Add pulse animation to current block */
+.block-segment.current-pulse {
+    animation: pulse 1.5s infinite;
+    box-shadow: 0 0 0 2px white, 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.provider-status {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 0.7em;
+    color: #888;
+}
+
+#current-provider {
+    color: #f2a900;
+    font-weight: bold;
+}
+
+/* Optional: Add a subtle animation when provider changes */
+#current-provider.changed {
+    animation: highlight 1s ease;
+}
+
+@keyframes highlight {
+    0% { color: #f2a900; }
+    50% { color: #ffd700; }
+    100% { color: #f2a900; }
+}
+
 .loading {
     animation: pulse 1.5s infinite;
     background: linear-gradient(90deg, #333 25%, #444 50%, #333 75%);

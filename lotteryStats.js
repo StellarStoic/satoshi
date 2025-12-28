@@ -2,6 +2,242 @@ let currentRoundNumber = 0;
 let minRoundNumber = 0;
 let maxRoundNumber = 0;
 
+// List of blockchain API providers with their endpoints
+const BLOCKCHAIN_PROVIDERS = [
+    {
+        name: 'mempool.space',
+        url: 'https://mempool.space/api/blocks/tip/height',
+        timeout: 5000
+    },
+        {
+        name: 'mempool.emzy.de',
+        url: 'https://mempool.emzy.de/api/blocks/tip/height',
+        timeout: 5000
+    },
+    {
+        name: 'blockchain.info',
+        url: 'https://blockchain.info/q/getblockcount',
+        timeout: 5000
+    },
+    {
+        name: 'blockstream.info',
+        url: 'https://blockstream.info/api/blocks/tip/height',
+        timeout: 5000
+    }
+];
+
+// Function to fetch block height with multiple fallbacks
+async function getCurrentBlockHeight() {
+    const errors = [];
+    
+    // Try each provider in order
+    for (const provider of BLOCKCHAIN_PROVIDERS) {
+        try {
+            console.log(`Trying ${provider.name}...`);
+            const blockHeight = await fetchWithTimeout(provider);
+            
+            if (blockHeight !== null && blockHeight !== undefined) {
+                console.log(`Success from ${provider.name}: Block ${blockHeight}`);
+                // Return both the block height and the provider name
+                return {
+                    height: blockHeight,
+                    provider: provider.name
+                };
+            }
+        } catch (error) {
+            console.warn(`Failed to fetch from ${provider.name}:`, error.message);
+            errors.push(`${provider.name}: ${error.message}`);
+        }
+    }
+    
+    // If all providers fail
+    console.error('All blockchain providers failed:', errors);
+    return null;
+}
+
+// Helper function with timeout
+async function fetchWithTimeout(provider) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), provider.timeout);
+    
+    try {
+        const response = await fetch(provider.url, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        // Use custom parser if provided, otherwise default JSON parsing
+        if (provider.parser) {
+            return await provider.parser(response);
+        } else {
+            const text = await response.text();
+            // Try to parse as JSON first, then as plain text
+            try {
+                return JSON.parse(text);
+            } catch {
+                // If not JSON, try to parse as plain number
+                const parsed = parseInt(text.trim(), 10);
+                if (!isNaN(parsed)) {
+                    return parsed;
+                }
+                throw new Error('Invalid response format');
+            }
+        }
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
+// Function to calculate time until next draw
+function calculateTimeToDraw(currentBlockHeight) {
+    // Lottery draws happen every 100 blocks
+    const blocksUntilNextDraw = 100 - (currentBlockHeight % 100);
+    const minutesUntilDraw = blocksUntilNextDraw * 10; // 10 minutes per block
+    const hours = Math.floor(minutesUntilDraw / 60);
+    const minutes = minutesUntilDraw % 60;
+    
+    return {
+        blocksUntilNextDraw,
+        hours,
+        minutes,
+        totalMinutes: minutesUntilDraw
+    };
+}
+
+// Function to update progress bar
+function updateProgressBar(currentBlockHeight) {
+    const progressBar = document.getElementById('block-progress-bar');
+    if (!progressBar) return;
+    
+    // Clear existing blocks
+    progressBar.innerHTML = '';
+    
+    const currentBlockInCycle = currentBlockHeight % 100 || 100;
+    
+    // Calculate the next block to be mined (first unmined block)
+    const nextBlockToMine = (currentBlockInCycle === 100) ? 1 : currentBlockInCycle + 1;
+    
+    // Create 100 block segments
+    for (let i = 1; i <= 100; i++) {
+        const blockSegment = document.createElement('div');
+        blockSegment.className = 'block-segment';
+        
+        // Determine block status
+        if (i <= 96) {
+            blockSegment.classList.add('open');
+        } else if (i <= 99) {
+            blockSegment.classList.add('closed');
+        } else {
+            blockSegment.classList.add('draw');
+        }
+        
+        // Add washed-off effect for blocks that haven't been mined yet
+        if (i > currentBlockInCycle) {
+            blockSegment.classList.add('unmined');
+        }
+        
+        // Highlight the NEXT block to be mined (not the current/last mined block)
+        if (i === nextBlockToMine) {
+            blockSegment.style.boxShadow = '0 0 0 2px white';
+            blockSegment.style.zIndex = '1';
+            blockSegment.classList.add('current-pulse');
+            // Also add unmined class if it's an unmined block
+            if (i > currentBlockInCycle) {
+                blockSegment.classList.add('unmined');
+            }
+        }
+        
+        progressBar.appendChild(blockSegment);
+    }
+}
+
+// Function to update time display
+function updateTimeDisplay(timeData) {
+    const timeElement = document.getElementById('time-to-draw');
+    if (!timeElement) return;
+    
+    if (timeData.blocksUntilNextDraw === 0) {
+        timeElement.textContent = 'Drawing now!';
+        timeElement.style.color = '#f2a900'; // Gold color
+    } else {
+        let timeText = '';
+        if (timeData.hours > 0) {
+            timeText += `${timeData.hours}h `;
+        }
+        timeText += `${timeData.minutes}m`;
+        timeElement.textContent = timeText;
+        timeElement.style.color = '#f2a900'; // Gold color
+    }
+}
+
+// Main function to update draw countdown
+async function updateDrawCountdown() {
+    const result = await getCurrentBlockHeight();
+    
+    if (result && result.height) {
+        const currentBlockHeight = result.height;
+        const providerName = result.provider;
+        
+        const timeData = calculateTimeToDraw(currentBlockHeight);
+        
+        // Update progress bar
+        updateProgressBar(currentBlockHeight);
+        
+        // Update time display in stat card
+        updateTimeDisplay(timeData);
+        
+        // Update the blocks-left counter in progress bar title
+        const blocksLeftElement = document.getElementById('blocks-left');
+        if (blocksLeftElement) {
+            blocksLeftElement.textContent = timeData.blocksUntilNextDraw;
+        }
+        
+        // UPDATE PROVIDER STATUS
+        const providerElement = document.getElementById('current-provider');
+        if (providerElement) {
+            providerElement.textContent = providerName;
+        }
+        
+    } else {
+        // Handle case when all providers fail
+        console.error('Unable to fetch block height from any provider');
+        
+        // Show error in UI
+        const timeElement = document.getElementById('time-to-draw');
+        if (timeElement) {
+            timeElement.textContent = 'API Error';
+            timeElement.style.color = 'red';
+        }
+        
+        const blocksLeftElement = document.getElementById('blocks-left');
+        if (blocksLeftElement) {
+            blocksLeftElement.textContent = 'Error';
+        }
+        
+        // Update provider status to show error
+        const providerElement = document.getElementById('current-provider');
+        if (providerElement) {
+            providerElement.textContent = 'All APIs failed';
+            providerElement.style.color = 'red';
+        }
+    }
+}
+
+// Function to start periodic updates
+function startCountdownUpdates() {
+    // Update immediately
+    updateDrawCountdown();
+    
+    // Update every 60 seconds (60000 milliseconds)
+    setInterval(updateDrawCountdown, 60000);
+}
+
 async function fetchAndDisplayStats() {
     try {
         const response = await fetch('https://lottery-api.satoshi.si/api/stats');
@@ -56,6 +292,14 @@ async function fetchAndDisplayLatestRound() {
         const response = await fetch('https://lottery-api.satoshi.si/api/latest');
         const roundData = await response.json();
 
+        console.log('API Response:', roundData); // Debug log
+
+                // Check if we got valid data
+        if (!roundData) {
+            console.error('No data received from /api/latest');
+            return;
+        }
+        
         // Check if we got an array (15 rounds) or a single object
         if (Array.isArray(roundData) && roundData.length > 0) {
             // We got an array of rounds - display the first (latest) one
@@ -325,6 +569,8 @@ document.addEventListener('DOMContentLoaded', function() {
         fetchAndDisplayLatestRound();
     });
     setupRoundNavigation();
+
+    startCountdownUpdates();
 
     // Element to trigger opening the Lottery Explainer modal
     const lotteryTrigger = document.getElementById('lotteryInfoTrigger');
