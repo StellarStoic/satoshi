@@ -68,6 +68,9 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/NEUTRAL_002.gif',
             './img/bitcoinMoodMemes/NEUTRAL_003.gif',
             './img/bitcoinMoodMemes/NEUTRAL_004.gif',
+            './img/bitcoinMoodMemes/NEUTRAL_005.gif',
+            './img/bitcoinMoodMemes/NEUTRAL_006.gif',
+            './img/bitcoinMoodMemes/NEUTRAL_007.gif',
         ]
     },
     
@@ -88,6 +91,7 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/CHOPPY_002.gif',
             './img/bitcoinMoodMemes/CHOPPY_003.gif',
             './img/bitcoinMoodMemes/CHOPPY_004.gif',
+            './img/bitcoinMoodMemes/CHOPPY_005.gif',
         ]
     },
     
@@ -107,7 +111,10 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/BEARISH_001.gif',
             './img/bitcoinMoodMemes/BEARISH_002.gif',
             './img/bitcoinMoodMemes/BEARISH_003.gif',
-            './img/bitcoinMoodMemes/BEARISH_004.gif'
+            './img/bitcoinMoodMemes/BEARISH_004.gif',
+            './img/bitcoinMoodMemes/BEARISH_005.gif',
+            './img/bitcoinMoodMemes/BEARISH_006.gif',
+            './img/bitcoinMoodMemes/BEARISH_007.gif',
         ]
     }
 };
