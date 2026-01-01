@@ -5,6 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="nip05.css">
     <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
 
     <!-- Apple Touch Icon -->
@@ -23,11 +24,74 @@
 
     <!-- Theme Color -->
     <meta name="theme-color" content="#ffffff">
-    
-    <title>Satoshi Quotes</title>
-</head>
-<body>
 
+    <title>Nostr Digital Identifier NIP-05</title>
+</head>
+<style>
+
+
+.info-modal-trigger {
+    position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
+    top: 17px; /* 25px from the top of the nearest positioned ancestor */
+    right: 25px; /* 25px from the left of the nearest positioned ancestor */
+    font-size: 40px;
+    color: #888; /* Icon color */
+    cursor: pointer;
+}
+
+/* Normal (unvisited) link */
+#modal-links{
+    color: #f2a900;                  /* Bitcoin gold */
+    text-decoration: none;           /* Remove underline */
+    transition: 
+        color 0.2s ease,
+        text-decoration-color 0.2s ease;
+}
+
+/* Visited link */
+#modal-links a:visited {
+    color: #d89a00;                  /* Slightly darker gold */
+}
+
+/* Hover (mouse over) */
+#modal-links a:hover {
+    color: #ffffff;                  /* Bright on hover */
+    text-decoration: underline;      /* Clear feedback */
+}
+
+/* Active (while clicking) */
+#modal-links a:active {
+    color: #fde08a;                  /* Pressed effect */
+}
+
+/* Container wrapping the iframe */
+.shitcoinExchange-container {
+    display: flex;                  /* Enables flexbox */
+    justify-content: center;        /* Center horizontally */
+    align-items: center;            /* Center vertically */
+    min-height: 100vh;              /* Full viewport height */
+    width: 100%;
+}
+
+/* Small screens */
+@media (max-width: 768px) {
+    .shitcoinExchange-container {
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .shitcoinExchange-container {
+        padding: 4rem;              /* Safe breathing room */
+    }
+}
+</style>
+
+<body>
+    <!-- Copy text notification -->
+    <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
     <!-- Burger menu -->
     <a href="#menu" id="toggle"><span></span></a>
 
@@ -40,7 +104,7 @@
         <a href="#">Knowlage</a>
         <ul class="submenu">
             <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
-            <li><a href="#">Words of Satoshi</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
             <li><a href="isBip39.html">Is BIP39 word?</a></li>
         </ul>
         </li>
@@ -52,7 +116,7 @@
             <li><a href="lottery.html">Play</a></li>
             <li><a href="https://t.me/bitcoinlightninglotterybot" target="_blank" rel="noopener">Play on Telegram</a></li>
             <li><a href="https://nosta.me/npub10tteryu88lw060vnljwr0m8du3l533dg33wh8sq57rw40u69u43szykhqv" target="_blank" rel="noopener">Follow Nostr bot</a></li>
-            <li><a href="lotteryStats.html">Results & Stats</a></li>
+            <li><a href="lotteryStats.html">Results & Stats</a></li>            
             <li><a href="ticketVerifier.html">Ticket Verifier</a></li>
             <li><a href="lotteryTOS.html" target="_blank"  rel="noopener">Lottery Terms of service</a></li>
         </ul>
@@ -69,11 +133,11 @@
         </ul>
         </li>
 
-        <!-- exchange submenu -->
+        <!-- exchanage submenu -->
         <li class="has-submenu">
         <a href="#">Exchange</a>
         <ul class="submenu">
-            <li><a href="exchangeShitcoins.html">Exchange Shitcoins</a></li>
+            <li><a href="#">Exchange Shitcoins</a></li>
             <li><a href="offers.html">P2P Bitcoin Offers</a></li>
         </ul>
         </li>
@@ -82,7 +146,7 @@
         <li class="has-submenu">
         <a href="#">Nostr</a>
         <ul class="submenu">
-            <li><a href="nip05.html">NIP-05</a></li>
+            <li><a href="#">NIP-05</a></li>
         </ul>
         </li>
 
@@ -106,13 +170,49 @@
       </ul>
     </div>
 
-    <!-- quote text -->
-    <div id="quotes">
-            <p id="text"></p>
-            <p id="date"></p>
-            <p id="author">Satoshi Nakamoto</p>
-    </div>
+<div class="shitcoinExchange-container">
+        <div class="info-modal-trigger"><i class="lni lni-question-mark-circle"></i></div>
+    <iframe id='iframe-widget' src='https://changenow.io/embeds/exchange-widget/v2/widget.html?FAQ=true&amount=378000000&amountFiat&backgroundColor=4d4d4e&darkMode=true&from=pepe&horizontal=false&isFiat=false&lang=en-US&link_id=8eac6c66bcf1a5&locales=true&logo=false&primaryColor=f2a900&to=btc&toTheMoon=false' style="height: 356px; width: 100%; border: none"></iframe> <script defer type='text/javascript' src='https://changenow.io/embeds/exchange-widget/v2/stepper-connector.js'></script>
 
+
+</div>
+<!-- Exchange Shitcoins Explainer Modal  -->
+<div id="exchangeShitcoinsModal" class="description-modal">
+    <span class="close-icon" onclick="closeExchangeShitcoinsModal()">&times;</span>
+    <div class="modal-content">
+        <h4>Exchange Shitcoins</h4>
+        <h5>
+            With fair rates powered by 
+            <a id="modal-links" href="https://changenow.app.link/referral?link_id=8eac6c66bcf1a5" target="_blank" rel="noopener">
+                ChangeNOW
+            </a>
+        </h5>
+
+        <p>
+            Got a bag of questionable coins collecting digital dust?
+            You’re in the right place.
+        </p>
+
+        <p>
+            This exchange lets you swap nearly <strong>1,000 different coins and tokens</strong>
+            for what actually matters: <strong>Bitcoin</strong>.
+            No accounts, no sign-ups, no KYC nonsense — just trade and move on.
+        </p>
+
+        <p>
+            Think of it as a recycling center for your crypto past.
+            Turn old experiments, airdrop leftovers, and “what was I thinking?” tokens
+            into hard sats.
+        </p>
+
+        <p>
+            We’re not here to judge your journey.
+            We’re just here to help you end it… on a Bitcoin standard.
+        </p>
+
+        <p>Study Bitcoin!</p>
+    </div>
+</div>
 
 <!-- ---------------------------------------------------------------------- -->
 <!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
@@ -190,9 +290,6 @@
         </div>
     </div>
 
-    <!-- Copy text notification -->
-    <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
-
     <!-- Cookie Consent Modal -->
     <div id="cookieConsentModal" class="description-modal">
         <div class="modal-content">
@@ -216,13 +313,51 @@
         </div>
       </div>
 
+<script>
+    // Handle opening the Moscow Time modal
+function openexchangeShitcoinsModal(event) {
+    event.stopPropagation();  // Stop the click from propagating to more general handlers
+    const moscowModal = document.getElementById('exchangeShitcoinsModal');
+    if (moscowModal) {
+        closeAllModals();  // Close all other modals
+        moscowModal.classList.add('active');
+        document.body.classList.add('modal-open');
+    } else {
+        console.error('Moscow Time Modal not found!');
+    }
+}
 
+// Function to close the Moscow Time modal
+function closeExchangeShitcoinsModal() {
+    const moscowModal = document.getElementById('exchangeShitcoinsModal');
+    if (moscowModal) {
+        moscowModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+    } else {
+        console.error('Moscow Time Modal not found!');
+    }
+}
+
+// element to trigger opening the Moscow Time modal
+const moscowTrigger = document.querySelector('.info-modal-trigger');
+if (moscowTrigger) {
+    moscowTrigger.addEventListener('click', openexchangeShitcoinsModal);
+}
+
+document.querySelector('#exchangeShitcoinsModal .close').addEventListener('click', function() {
+    closeExchangeShitcoinsModal();
+});
+
+document.querySelector('.info-modal-trigger').addEventListener('click', function() {
+    showModal('exchangeShitcoinsModal'); // Pass the ID of the modal if needed
+});
+</script>
     <script src="coockieConsent.js"></script>
-    <script src="quotes.js"></script>
+    <script defer type='text/javascript' src='https://changenow.io/embeds/exchange-widget/v2/stepper-connector.js'></script>
     <script src="copyonclick.js"></script>
     <script src="mempoolWebSocket.js"></script>
-    <script src="index.js"></script>
     <script src="burgerMenu.js"></script>
-
+    <script src="index.js"></script>
+    <script src="nip05.js"></script>
 </body>
 </html>
