@@ -25,18 +25,18 @@
     <!-- Theme Color -->
     <meta name="theme-color" content="#ffffff">
 
-    <title>Nostr Digital Identifier NIP-05</title>
+    <title>Exchange</title>
 </head>
 <style>
-
-
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;1,300&display=swap');
 .info-modal-trigger {
-    position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
-    top: 17px; /* 25px from the top of the nearest positioned ancestor */
-    right: 25px; /* 25px from the left of the nearest positioned ancestor */
-    font-size: 40px;
-    color: #888; /* Icon color */
+    position: fixed;        /* 👈 THIS is the key */
+    top: 33px;
+    right: 16px;
+    font-size: 33px;
+    color: #888;
     cursor: pointer;
+    z-index: 9999;
 }
 
 /* Normal (unvisited) link */
@@ -64,13 +64,54 @@
     color: #fde08a;                  /* Pressed effect */
 }
 
-/* Container wrapping the iframe */
+/* Main exchange container */
 .shitcoinExchange-container {
-    display: flex;                  /* Enables flexbox */
-    justify-content: center;        /* Center horizontally */
-    align-items: center;            /* Center vertically */
-    min-height: 100vh;              /* Full viewport height */
-    width: 100%;
+    display: flex;
+    flex-direction: column;     /* Stack items vertically */
+    align-items: center;        /* Center horizontally */
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding-top: 5rem;          /* Space from top */
+    text-align: center;
+}
+
+/* Headings above the widget */
+.exchange-headings {
+    font-family: "Roboto Mono", monospace;
+    max-width: 720px;
+    margin-bottom: 3rem;          /* Space before iframe */
+    padding: 0 1rem;
+    min-height: 7.5rem;           /* Reserve enough space for tallest title */
+    display: flex;
+    align-items: center;           /* Center text vertically */
+    justify-content: center;
+    text-align: center;
+}
+
+/* Start all headings invisible */
+.exchange-headings h1,
+.exchange-headings h3,
+.exchange-headings h6 {
+    font-size: clamp(1.2rem, 5vw, 1.7rem);
+    opacity: 0;                     /* Hidden by default */
+    transition: opacity 2s ease;    /* Smooth fade in & out */
+    color: #bf9739;
+}
+
+/* Loader styling */
+.widget-loader {
+    border: 5px solid #f2a900; /* Yellow border */
+    border-top: 5px solid #4d4d4e; /* Dark border for contrast */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 1rem auto; /* Center */
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Small screens */
@@ -79,12 +120,22 @@
         padding-top: 4rem;
         padding-bottom: 4rem;
     }
+    .exchange-headings h1 {
+    font-size: clamp(1rem, 5vw, 1.5rem);
+    margin-bottom: 0.75rem;
+    color: #bf9739;
+    }
 }
 
 /* Very small screens */
 @media (max-width: 480px) {
     .shitcoinExchange-container {
-        padding: 4rem;              /* Safe breathing room */
+        padding-top: 4rem;
+        padding-bottom: 4rem;             /* Safe breathing room */
+    }
+    .exchange-headings h1 {
+    font-size: clamp(0.8rem, 5vw, 1.3rem);
+    color: #bf9739;
     }
 }
 </style>
@@ -170,9 +221,32 @@
       </ul>
     </div>
 
+
+
 <div class="shitcoinExchange-container">
-        <div class="info-modal-trigger"><i class="lni lni-question-mark-circle"></i></div>
-    <iframe id='iframe-widget' src='https://changenow.io/embeds/exchange-widget/v2/widget.html?FAQ=true&amount=378000000&amountFiat&backgroundColor=4d4d4e&darkMode=true&from=pepe&horizontal=false&isFiat=false&lang=en-US&link_id=8eac6c66bcf1a5&locales=true&logo=false&primaryColor=f2a900&to=btc&toTheMoon=false' style="height: 356px; width: 100%; border: none"></iframe> <script defer type='text/javascript' src='https://changenow.io/embeds/exchange-widget/v2/stepper-connector.js'></script>
+
+            <!-- info modal trigger  -->
+    <div class="info-modal-trigger">
+        <i class="lni lni-question-mark-circle"></i>
+    </div>
+
+    <!-- Titles -->
+    <div class="exchange-headings">
+        <h1 id="animated-title"></h1>
+    </div>
+
+    <!-- Loader -->
+    <div id="widget-loader" class="widget-loader"></div>
+
+    <iframe id='iframe-widget'
+            src='https://changenow.io/embeds/exchange-widget/v2/widget.html?FAQ=true&amount=378000000&amountFiat&backgroundColor=4d4d4e&darkMode=true&from=pepe&horizontal=false&isFiat=false&lang=en-US&link_id=8eac6c66bcf1a5&locales=true&logo=false&primaryColor=f2a900&to=btc&toTheMoon=false'
+            style="height: 356px; width: 100%; border: none">
+    </iframe>
+
+        <!-- Error message container -->
+    <div id="widget-error" style="display:none; color:#f2a900; margin-top:1rem; font-weight:bold;">
+        ⚠️ Widget failed to load. Please check the Javascript permissions and refresh the page or try again later.
+    </div>
 
 
 </div>
@@ -210,7 +284,7 @@
             We’re just here to help you end it… on a Bitcoin standard.
         </p>
 
-        <p>Study Bitcoin!</p>
+        <p>Study ₿itcoin!</p>
     </div>
 </div>
 
@@ -314,43 +388,100 @@
       </div>
 
 <script>
-    // Handle opening the Moscow Time modal
-function openexchangeShitcoinsModal(event) {
+document.addEventListener("DOMContentLoaded", function () {
+    const iframe = document.getElementById("iframe-widget");
+    const loader = document.getElementById("widget-loader");
+    const errorMsg = document.getElementById("widget-error");
+
+    let loaded = false;
+
+    // Widget loaded successfully
+    iframe.onload = function () {
+        loaded = true;
+        loader.style.display = "none"; // hide loader
+        console.log("Widget loaded successfully.");
+    };
+
+    // Timeout for failure (10 seconds)
+    setTimeout(() => {
+        if (!loaded) {
+            loader.style.display = "none"; // hide loader
+            errorMsg.style.display = "block"; // show error
+            console.warn("Widget failed to load within timeout.");
+        }
+    }, 10000); // 10 seconds
+});
+
+
+document.addEventListener("DOMContentLoaded", async function () {
+    const animatedTitle = document.getElementById("animated-title");
+
+    // Fetch JSON file
+    const response = await fetch('exchangeShitcoins.json');
+    const data = await response.json();
+
+    // Randomly pick one 3-line title set
+    const randomSet = data.titles[Math.floor(Math.random() * data.titles.length)];
+
+    let current = 0;
+
+    function fadeIn(el) {
+        el.style.opacity = "1";
+    }
+
+    function fadeOut(el) {
+        el.style.opacity = "0";
+    }
+
+    function showNextTitle() {
+        animatedTitle.textContent = randomSet[current];
+        fadeIn(animatedTitle);
+
+        if (current < randomSet.length - 1) {
+            setTimeout(() => {
+                fadeOut(animatedTitle);
+                setTimeout(() => {
+                    current++;
+                    showNextTitle();
+                }, 2000); // fade-out duration
+            }, 5000); // visible duration
+        }
+        // Last line stays visible
+    }
+
+    showNextTitle();
+});
+
+// Handle opening the Exchange Shitcoins modal
+function openExchangeShitcoinsModal(event) {
     event.stopPropagation();  // Stop the click from propagating to more general handlers
-    const moscowModal = document.getElementById('exchangeShitcoinsModal');
-    if (moscowModal) {
+    const exchangeModal = document.getElementById('exchangeShitcoinsModal');
+    if (exchangeModal) {
         closeAllModals();  // Close all other modals
-        moscowModal.classList.add('active');
+        exchangeModal.classList.add('active');
         document.body.classList.add('modal-open');
     } else {
-        console.error('Moscow Time Modal not found!');
+        console.error('Exchange Shitcoins Modal not found!');
     }
 }
 
-// Function to close the Moscow Time modal
+// Function to close the Exchange Shitcoin modal
 function closeExchangeShitcoinsModal() {
-    const moscowModal = document.getElementById('exchangeShitcoinsModal');
-    if (moscowModal) {
-        moscowModal.classList.remove('active');
+    const exchangeModal = document.getElementById('exchangeShitcoinsModal');
+    if (exchangeModal) {
+        exchangeModal.classList.remove('active');
         document.body.classList.remove('modal-open');
     } else {
-        console.error('Moscow Time Modal not found!');
+        console.error('Exchange Shitcoins Modal not found!');
     }
 }
 
-// element to trigger opening the Moscow Time modal
-const moscowTrigger = document.querySelector('.info-modal-trigger');
-if (moscowTrigger) {
-    moscowTrigger.addEventListener('click', openexchangeShitcoinsModal);
+// element to trigger opening the EExchange Shitcoins modal
+const exchangeTrigger = document.querySelector('.info-modal-trigger');
+if (exchangeTrigger) {
+    exchangeTrigger.addEventListener('click', openExchangeShitcoinsModal);
 }
 
-document.querySelector('#exchangeShitcoinsModal .close').addEventListener('click', function() {
-    closeExchangeShitcoinsModal();
-});
-
-document.querySelector('.info-modal-trigger').addEventListener('click', function() {
-    showModal('exchangeShitcoinsModal'); // Pass the ID of the modal if needed
-});
 </script>
     <script src="coockieConsent.js"></script>
     <script defer type='text/javascript' src='https://changenow.io/embeds/exchange-widget/v2/stepper-connector.js'></script>
