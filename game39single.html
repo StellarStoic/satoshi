@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game39Single</title>
+    <!-- Include the same CSS file -->
+    <link rel="stylesheet" href="styles.css">   
+    <link rel="stylesheet" href="game39.css">
+    <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+
+        <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <!-- Web Manifest -->
+    <link rel="manifest" href="/site.webmanifest">
+
+    <!-- Windows Tile Icon -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff">
+    <style>
+        #gameSetup h1 {
+            color: #bdbdbd;
+        }
+        /* Additional styles for single-player mode */
+        #best-score, #best-streak {
+            font-size: 1.2rem;
+            color: #f7931a;
+            margin-top: 0.5rem;
+            font-family: "Roboto Mono", monospace;
+        }
+
+        /* For the final score display */
+        #final-score div {
+            margin: 0.5rem 0;
+        }
+        
+        #final-score {
+            font-size: 2rem;
+            color: #fff;
+            margin: 1rem 0;
+        }
+        
+        #play-again {
+            margin-top: 2rem;
+            padding: 0.8rem 2rem;
+            background-color: #f7931a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            font-family: "Roboto Mono", monospace;
+        }
+        
+        #play-again:hover {
+            background-color: #c47710;
+        }
+
+        /* Notification animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+/* Single Player Game Status - Now with 3 columns */
+#sp-game-status {
+    position: relative;
+    top: 1.5rem;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 5rem;
+    box-sizing: border-box;
+    z-index: 10;
+    gap: 1rem; /* Space between columns */
+    align-items: flex-end;
+}
+
+/* All three containers: score, countdown, round */
+#sp-score-container,
+#sp-countdown,
+#sp-round-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex: 1; /* Equal width for all three */
+    max-width: 120px; /* Prevent from getting too wide */
+}
+
+/* Specific alignments */
+#sp-score-container {
+    align-items: flex-start;
+}
+
+#sp-countdown {
+    align-items: center;
+}
+
+#sp-round-container {
+    align-items: flex-end;
+}
+
+.sp-score-label,
+.sp-round-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.2rem;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+/* Countdown styling - no label needed */
+#sp-countdown {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #f7931a;
+    font-family: "Roboto Mono", monospace;
+    white-space: nowrap;
+}
+
+.sp-score-value,
+.sp-round-value {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #f7931a;
+    white-space: nowrap;
+}
+
+/* Center the word display vertically and horizontally */
+#word-display {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4rem;
+    color: #c47710;
+    text-align: center;
+    /* width: 90%; */
+    padding: 0 1rem;
+    box-sizing: border-box;
+    background-size: contain;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+    #sp-game-status {
+        margin-top: 2.3rem;
+        padding: 0 1rem;
+        gap: 0.8rem;
+    }
+    
+    #sp-score-container,
+    #sp-countdown,
+    #sp-round-container {
+        min-width: 70px;
+        padding: 0.4rem 0.8rem;
+        max-width: 100px;
+    }
+    
+    .sp-score-label,
+    .sp-round-label {
+        font-size: 0.7rem;
+    }
+    
+    #sp-countdown {
+        font-size: 1.6rem;
+    }
+    
+    .sp-score-value,
+    .sp-round-value {
+        font-size: 1.2rem;
+    }
+    
+    #word-display {
+        font-size: 3rem;
+    }
+
+    #final-result {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #sp-game-status {
+        margin-top: 2.3rem;
+        padding: 0 0.8rem;
+        gap: 0.6rem;
+    }
+    
+    #sp-score-container,
+    #sp-countdown,
+    #sp-round-container {
+        min-width: 60px;
+        padding: 0.3rem 0.6rem;
+        max-width: 85px;
+    }
+    
+    .sp-score-label,
+    .sp-round-label {
+        font-size: 0.65rem;
+    }
+    
+    #sp-countdown {
+        font-size: 1.3rem;
+    }
+    
+    .sp-score-value,
+    .sp-round-value {
+        font-size: 1.1rem;
+    }
+    
+    #word-display {
+        font-size: 3rem;
+    }
+
+        #final-result {
+        font-size: 1rem;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+    #sp-game-status {
+        margin-top: 2.3rem;
+        padding: 0 0.5rem;
+        gap: 0.5rem;
+    }
+    
+    #sp-score-container,
+    #sp-countdown,
+    #sp-round-container {
+        min-width: 55px;
+        padding: 0.25rem 0.4rem;
+        max-width: 70px;
+    }
+    
+    .sp-score-label,
+    .sp-round-label {
+        font-size: 0.6rem;
+    }
+    
+    #sp-countdown {
+        font-size: 1.1rem;
+    }
+    
+    .sp-score-value,
+    .sp-round-value {
+        font-size: 1rem;
+    }
+    
+    #word-display {
+        font-size: 3rem;
+    }
+
+    #final-result {
+        font-size: 1rem;
+    }
+}
+    </style>
+</head>
+<body>
+    <!-- Copy text notification -->
+  <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
+    <!-- Burger menu -->
+    <a href="#menu" id="toggle"><span></span></a>
+
+    <div id="menu">
+      <ul>
+        <li><a href="#">Home</a></li>
+
+        <!-- Bitcoin Knowlage submenu -->
+        <li class="has-submenu">
+        <a href="#">Knowlage</a>
+        <ul class="submenu">
+            <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+        <!-- Lottery with submenu -->
+        <li class="has-submenu">
+        <a href="#">Lottery</a>
+        <ul class="submenu">
+            <li><a href="lottery.html">Play</a></li>
+            <li><a href="https://t.me/bitcoinlightninglotterybot" target="_blank" rel="noopener">Play on Telegram</a></li>
+            <li><a href="https://nosta.me/npub10tteryu88lw060vnljwr0m8du3l533dg33wh8sq57rw40u69u43szykhqv" target="_blank" rel="noopener">Follow Nostr bot</a></li>
+            <li><a href="lotteryStats.html">Results & Stats</a></li>
+            <li><a href="ticketVerifier.html">Ticket Verifier</a></li>
+            <li><a href="lotteryTOS.html" target="_blank"  rel="noopener">Lottery Terms of service</a></li>
+        </ul>
+        </li>
+
+        <!-- Price related submenu -->
+        <li class="has-submenu">
+        <a href="#">Price Related</a>
+        <ul class="submenu">
+            <li><a href="converter.html">Converter</a></li>
+            <li><a href="MoscowTime.html">Moscow time</a></li>
+            <li><a href="memedBitcoinMood.html">Memed Bitcoin Mood</a></li>
+            <li><a href="chart.html">History chart</a></li>
+        </ul>
+        </li>
+
+        <!-- exchange submenu -->
+        <li class="has-submenu">
+        <a href="#">Exchange</a>
+        <ul class="submenu">
+            <li><a href="exchangeShitcoins.html">Exchange Shitcoins</a></li>
+            <li><a href="offers.html">P2P Bitcoin Offers</a></li>
+        </ul>
+        </li>
+
+        <!-- Nostr submenu -->
+        <li class="has-submenu">
+        <a href="#">Nostr</a>
+        <ul class="submenu">
+            <li><a href="nip05.html">NIP-05</a></li>
+        </ul>
+        </li>
+
+        <!-- Games submenu -->
+        <li class="has-submenu">
+        <a href="#">Game</a>
+        <ul class="submenu">
+            <li><a href="game39.html">Game39 Multi Player</a></li>   
+            <li><a href="#">Game39 Single Player</a></li>   
+        </ul>
+        </li>
+
+        <!-- Tools submenu -->
+        <li class="has-submenu">
+        <a href="#">tools</a>
+        <ul class="submenu">
+            <li><a href="ghostQR.html">GhostQR</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+      </ul>
+    </div>
+
+    <!-- Fixed Question Mark Icon -->
+    <div class="info-modal-trigger" id="lotteryInfoTrigger" onclick="openGameModal(event)" style="position: fixed; top: 20px; right: 20px; cursor: pointer; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: bold;">
+        <i class="lni lni-question-mark-circle"></i>
+    </div>
+
+    <!-- alert dropdown Banner  -->
+    <div id="alert-banner"></div>
+
+    <!---------------- Game Setup Screen ------------------------------->
+    <div id="gameSetup">
+        <h1 >Game39 - Single Player</h1>
+        <p>Test your BIP39 word recognition skills!</p>
+        
+        <div class="round-input">
+            <label for="roundCount" id="roundText">Rounds:</label>
+            <input type="number" id="roundCount" value="21" min="7" max="21">
+        </div>
+        
+        <div id="best-score">
+            Best Score: <span id="best-score-value">0</span>
+        </div>
+        <div id="best-streak">
+            Best Streak: <span id="best-streak-value">0</span>
+        </div>
+        
+        <button id="startGame">Start Game</button>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game39single-container" style="display: none;">
+        <!-- Game Status -->
+        <div id="sp-game-status">
+            <div id="sp-score-container">
+                <div class="sp-score-label">Score</div>
+                <div class="sp-score-value">0</div>
+            </div>
+            
+            <!-- Countdown Timer (now inside game status) -->
+            <div id="sp-countdown">0.00</div>
+            
+            <div id="sp-round-container">
+                <div class="sp-round-label">Round</div>
+                <div class="sp-round-value">0 / 0</div>
+            </div>
+        </div>
+        
+        <!-- Word Display -->
+        <div id="word-display">Ready?</div>
+        
+        <!-- Answer Buttons -->
+        <div id="answer-buttons" style="display: none;">
+            <button id="yes-btn">YES</button>
+            <button id="no-btn">NO</button>
+        </div>
+        
+        <!-- Final Result -->
+        <div id="final-result" style="display: none;">
+            <div id="result-text"></div>
+            <div id="final-score"></div>
+            <button id="play-again">Play Again</button>
+        </div>
+    </div>
+
+<!-- Modal for game instructions -->
+<div id="game39Modal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeGameModal()">&times;</span>
+        <h2>How to Play</h2>
+        <p>You'll be shown a word and have 5 seconds to decide:</p>
+        <p><strong>Is this a BIP39 word?</strong></p>
+
+        <h3>Scoring System:</h3>
+        <ul>
+            <li><strong>Correct answer within time:</strong>
+                <ul>
+                    <li>Points = (5000 - your response time in milliseconds) + 500 bonus</li>
+                    <li>Example: Answer in 1200ms = (3800 + 500) = 4300 points</li>
+                </ul>
+            </li>
+            <li><strong>Wrong answer within time:</strong>
+                <ul>
+                    <li>Points = - (your response time in milliseconds)</li>
+                    <li>Example: Wrong answer in 800ms = -800 points</li>
+                </ul>
+            </li>
+            <li><strong>No answer in 5 seconds:</strong> -5000 points</li>
+        </ul>
+        
+        <h3>Streak Bonuses:</h3>
+        <ul>
+            <li>Every 3 consecutive correct answers earns +999 streak bonus</li>
+            <li>Streaks reset on wrong answers or timeouts</li>
+            <li>Your best streak is saved locally</li>
+        </ul>
+        
+        <p>BIP39 words are from the standardized list used for Bitcoin seed phrases.</p>
+        <p>Your best score and longest streak are saved locally in your browser!</p>
+
+        <h3>Keyboard Controls:</h3>
+        <ul>
+            <li><strong>← Left Arrow or A:</strong> YES (It is a BIP39 word)</li>
+            <li><strong>→ Right Arrow or D:</strong> NO (It is NOT a BIP39 word)</li>
+        </ul>
+        
+        <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(247, 147, 26, 0.1); border-radius: 8px;">
+            <p><strong>💡 Pro Tip:</strong> The faster you answer correctly, the more points you earn! 
+            But accuracy matters too - wrong answers cost you time-based points.</p>
+        </div>
+    </div>
+</div>
+
+    <!-- ---------------------------------------------------------------------- -->
+<!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
+<footer class="footer">
+    <!-- Email Link -->
+    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank" rel="noopener">
+      one@satoshi.si
+    </a>
+  
+    <!-- Block Height Display (Left Side) -->
+    <span id="block-height"  title="Block Height" onclick="openMempoolTinyDataModal()">
+    </span>
+  
+    <!-- Fee Rate Display (Right Side) -->
+    <span id="fee-rate" title="Network fee rate" onclick="openMempoolTinyDataModal()">
+    </span>
+    
+    <!-- Lightning Icon -->
+    <i class="lni lni-bolt-2" onclick="openQRCodeModal()" title="Support me with a sat or two!"></i>
+  </footer>
+
+<!-- Mempool Tiny Data Modal -->
+<div id="mempoolTinyDataModal" class="description-modal">
+    <div class="modal-content">
+        <span class="close-icon" onclick="closeMempoolTinyDataModal()">&times;</span>
+        <div class="modal-navigation">
+            <span class="left-arrow" title="Previous Block">&larrfs;</span>
+            <h2 class="modal-title"></h2>
+            <span class="right-arrow" title="Next Block">&rarrfs;</span>
+        </div>
+        
+
+        <!-- Block Data Content -->
+        <div class="block-data" style="display: none;">
+            <div class="avg-fee-rate" title="Median fee rate"></div>
+            <div class="fee-range" title="Fee Range from Lowest to Highest"></div>
+            <div class="total-fees-btc" title="Total fees in Bitcoin"></div>
+            <div class="total-fees-sats" title="Total fees in Satoshis"></div>
+            <div class="tx-count" title="Number of transactions"></div>
+            <div class="time-passed" title="Time passed since this block was mined"></div>
+            <div class="mined-by" title="Miner of the block"></div>
+        </div>
+
+        <!-- Fee Rate Content -->
+        <div class="fee-data" style="display: none;">
+            <!-- <div class="fee-info" title="Current Half-Hour Fee Rate"></div> -->
+            <div class="economy-fee" title="Economy Fee Rate"></div>
+            <div class="fastest-fee" title="Fastest Fee Rate"></div>
+            <div class="half-hour-fee" title="Half-Hour Fee Rate"></div>
+            <div class="hour-fee" title="Hourly Fee Rate"></div>
+            <div class="minimum-fee" title="Minimum Fee Rate"></div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Modal for QR Code donation -->
+    <div id="qrCodeModal" class="description-modal">
+      <div class="modal-content">
+          <span class="close-icon" onclick="closeQRCodeModal()">&times;</span>
+          <h4 id="gratitudeHeader">If you find this website valuable, consider contributing a sat or two. Thank you.</h4>
+          <div class="qr-code-container">
+              <!-- Lightning QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" title="one@satoshi.si">
+                  <p class="qr-code-text" id="lightningAddress">one@satoshi.si</p>
+              </div>
+              
+              <!-- Onchain QR Code -->
+              <div class="qr-code-wrapper">
+                  <img src="/img/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e">
+                  <p class="qr-code-text" id="onchainAddress">bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</p>
+              </div>
+          </div>
+      </div>
+  </div>
+
+    <!-- Cookie Consent Modal -->
+    <div id="cookieConsentModal" class="description-modal">
+      <div class="modal-content">
+          <h4>Listen Up, Cookie Crunchers!</h4>
+          <h6>The G.D.P.R. (Greatly Demanding Privacy Rules) requires us to share this with you...</h6>
+          <p>We don't really give a damn about cookies. But some settings, like our fancy currency rates converter, store your preferences so you don't have to waste time setting things up every damn time you visit.</p>
+          <br>
+          <p>But seriously, we don't track you, we don't sell your data, and we definitely don't care about what you're doing online (unless you're baking actual cookies, in which case, send some our way digitally in sats. <span style="color: aliceblue">⚡</span>)</p>
+          <br>
+          <p>If you're cool with us making your life a little bit easier, click the button below. If not, hey, that's cool too. Just remember! stay humble and stack sats.</p>
+          <br>
+          <!-- Button container with Flexbox -->
+          <div class="consent-button-container">
+              <button onclick="acceptCookies()" class="consent-icon-button green-check" title="Yeah, whatever, just do it!">
+                  &#10004; <!-- Unicode checkmark -->
+              </button>
+              <button onclick="declineCookies()" class="consent-icon-button red-cross" title="Nope, delete sll none essential cookies">
+                  &#10008; <!-- Unicode cross -->
+              </button>
+          </div>
+      </div>
+    </div>
+
+
+
+
+<script src="coockieConsent.js"></script>
+<script src="copyonclick.js"></script>
+<script src="mempoolWebSocket.js"></script>
+<script src="text.js"></script>
+<script src="index.js"></script>
+<script src="burgerMenu.js"></script>
+<script src="nameForm.js"></script>
+
+    <script>
+    // ========== GLOBAL VARIABLES ==========
+    let roundLimit = 21;
+    let currentRound = 0;
+    let score = 0;
+    let bestScore = 0;
+    let gameStarted = false;
+    let currentIsBip39 = null;
+    let answeredThisRound = false;
+    let wordLoopTimeout;
+    let countdownInterval;
+    let allWords = [];
+    let wordStartTime = 0;
+    const TIME_LIMIT = 5000; // 5 seconds in milliseconds
+    let streakCount = 0;
+    let correctStreak = 0; // For tracking consecutive correct answers
+    let bestStreak = 0; // Track the highest streak during the game
+    let savedBestStreak = 0; // Track saved best streak from localStorage
+    let responseTimes = [];
+
+// ========== LOAD BEST SCORE FROM LOCAL STORAGE ==========
+    function loadBestRecords() {
+        // Load best score
+        const savedScore = localStorage.getItem('game39_best_score');
+        bestScore = savedScore ? parseInt(savedScore) : 0;
+
+        // update element reference
+        const bestScoreValue = document.getElementById('best-score-value');
+        if (bestScoreValue) {
+            bestScoreValue.textContent = bestScore;
+        }
+        
+        // Load best streak
+        const savedStreak = localStorage.getItem('game39_best_streak');
+        savedBestStreak = savedStreak ? parseInt(savedStreak) : 0;
+
+        // update element reference  
+        const bestStreakValue = document.getElementById('best-streak-value');
+        if (bestStreakValue) {
+            bestStreakValue.textContent = savedBestStreak;
+        }
+
+    }
+
+
+    // ========== SAVE BEST RECORDS TO LOCAL STORAGE ==========
+    function saveBestRecords(currentNormalizedScore) {
+        let newRecord = false;
+        let newStreakRecord = false;
+        
+        // Check and save best score (using normalized score)
+        if (currentNormalizedScore > bestScore) {
+            bestScore = currentNormalizedScore;
+            localStorage.setItem('game39_best_score', bestScore.toString());
+            newRecord = true;
+        }
+        
+        // Check and save best streak
+        if (bestStreak > savedBestStreak) {
+            savedBestStreak = bestStreak;
+            localStorage.setItem('game39_best_streak', savedBestStreak.toString());
+            newStreakRecord = true;
+        }
+        
+        // Return both results for notification
+        return { newRecord, newStreakRecord };
+    }
+
+    // ========== VALIDATE ROUND INPUT ==========
+    document.getElementById('roundCount').addEventListener('change', validateRoundInput);
+    document.getElementById('roundCount').addEventListener('wheel', e => e.preventDefault());
+
+    function validateRoundInput() {
+        const roundInput = document.getElementById('roundCount');
+        let value = parseInt(roundInput.value);
+        
+        if (isNaN(value)) {
+            roundInput.value = 21;
+            return;
+        }
+        
+        if (value > 21) {
+            roundInput.value = 21;
+            alert("⚠️ Max allowed rounds is 21.");
+        } else if (value < 7) {
+            roundInput.value = 7;
+            alert("⚠️ Minimum rounds is 7.");
+        }
+    }
+
+    // ========== KEYBOARD CONTROLS ==========
+    function setupKeyboardControls() {
+        // Add event listener for keydown events
+        document.addEventListener('keydown', handleKeyPress);
+    }
+
+    function removeKeyboardControls() {
+        // Remove event listener when game ends
+        document.removeEventListener('keydown', handleKeyPress);
+    }
+
+    function handleKeyPress(event) {
+        // Only process if game is active and user hasn't answered this round
+        if (!gameStarted || answeredThisRound) return;
+        
+        switch(event.key) {
+            case 'ArrowLeft':
+            case 'a':
+                event.preventDefault(); // Prevent scrolling
+                handleAnswer(true); // YES
+                break;
+            case 'ArrowRight':
+            case 'd':
+                event.preventDefault(); // Prevent scrolling
+                handleAnswer(false); // NO
+                break;
+            case ' ':
+                // Optional: Space bar as quick answer (if you want it)
+                // You could make space bar correspond to the most common answer
+                break;
+        }
+    }
+
+    // ========== START GAME ==========
+    document.getElementById('startGame').onclick = async () => {
+        // Set round limit from input
+        roundLimit = Math.max(7, parseInt(document.getElementById('roundCount').value) || 21);
+        
+        // Switch to game screen
+        document.getElementById('gameSetup').style.display = 'none';
+        document.getElementById('game39single-container').style.display = 'block';
+        
+        // Update round display
+        const roundValueElement = document.querySelector('.sp-round-value');
+        if (roundValueElement) {
+            roundValueElement.textContent = `0 / ${roundLimit}`;
+        }
+        
+        // Start the game
+        startGame();
+    };
+
+    // ========== CREATE BALANCED WORD LIST ==========
+    function createBalancedWordList(rounds) {
+        // Ensure we have enough words from both lists
+        const maxWords = Math.min(bip39Words.length, nonBip39Words.length, rounds);
+        const availableRounds = Math.min(rounds, maxWords * 2);
+        
+        // Randomly decide the ratio between 30% and 70% for true words
+        const minTruePercent = 30;
+        const maxTruePercent = 70;
+        const truePercent = Math.floor(Math.random() * (maxTruePercent - minTruePercent + 1)) + minTruePercent;
+        
+        // Calculate how many true words we need
+        const trueCount = Math.floor(availableRounds * (truePercent / 100));
+        const falseCount = availableRounds - trueCount;
+        
+        console.log(`Creating word list: ${trueCount} true (${truePercent}%), ${falseCount} false (${100-truePercent}%)`);
+        
+        // Get random selection from each list
+        const shuffledTrueWords = shuffleArray([...bip39Words]).slice(0, trueCount);
+        const shuffledFalseWords = shuffleArray([...nonBip39Words]).slice(0, falseCount);
+        
+        // Create word objects with their type
+        const trueWordObjects = shuffledTrueWords.map(word => ({ word, isBip39: true }));
+        const falseWordObjects = shuffledFalseWords.map(word => ({ word, isBip39: false }));
+        
+        // Combine and shuffle
+        const combined = shuffleArray([...trueWordObjects, ...falseWordObjects]);
+        
+        return combined;
+    }
+
+    // ========== START GAME LOGIC ==========
+    async function startGame() {
+        // Reset game state
+        currentRound = 0;
+        score = 0;
+        streakCount = 0;
+        correctStreak = 0;
+        bestStreak = 0;
+        gameStarted = true;
+        answeredThisRound = false;
+        responseTimes = [];
+        
+        // Update score display
+        updateScore();
+
+        // Update round display
+        document.querySelector('.sp-round-value').textContent = `0 / ${roundLimit}`;
+        
+        // Load word lists
+        await loadWordLists();
+        
+        // Create balanced word list with proper ratio
+        allWords = createBalancedWordList(roundLimit);
+        
+        // Verify the distribution
+        const trueWords = allWords.filter(w => w.isBip39).length;
+        const falseWords = allWords.filter(w => !w.isBip39).length;
+        console.log(`Final distribution: ${trueWords} true, ${falseWords} false`);
+        
+        // Show answer buttons
+        document.getElementById('answer-buttons').style.display = 'flex';
+        
+        // Setup keyboard controls - ADD THIS LINE
+        setupKeyboardControls();
+
+        // Start first round
+        nextWord();
+    }
+
+    // ========== LOAD WORD LISTS ==========
+    let bip39Words = [];
+    let nonBip39Words = [];
+
+    async function loadWordLists() {
+        try {
+            // Try to load from same paths as original
+            const [bipRes, nonRes] = await Promise.all([
+                fetch('/docs/bip39.json'),
+                fetch('/docs/nonBip39.json')
+            ]);
+            
+            const bipData = await bipRes.json();
+            const nonData = await nonRes.json();
+            
+            bip39Words = Array.isArray(bipData) ? bipData : bipData.words || [];
+            nonBip39Words = Array.isArray(nonData) ? nonData : nonData.words || [];
+            
+        } catch (error) {
+            console.error('Error loading word lists:', error);
+            
+            // Fallback: use small sample if files can't be loaded
+            bip39Words = ['abandon', 'ability', 'able', 'about', 'above', 'absent'];
+            nonBip39Words = ['apple', 'banana', 'computer', 'elephant', 'guitar', 'mountain'];
+        }
+    }
+
+    // ========== NEXT WORD ==========
+    function nextWord() {
+        if (currentRound >= roundLimit) {
+            endGame();
+            return;
+        }
+        
+        const wordObj = allWords[currentRound];
+        currentRound++;
+        currentIsBip39 = wordObj.isBip39;
+        
+        // Display word
+        document.getElementById('word-display').innerText = wordObj.word;
+        document.querySelector('.sp-round-value').textContent = `${currentRound} / ${roundLimit}`;
+        
+        // Reset answer state
+        answeredThisRound = false;
+        enableAnswerButtons();
+        
+        // Record start time for this word
+        wordStartTime = Date.now();
+        
+        // Clear any existing timer
+        if (wordLoopTimeout) clearTimeout(wordLoopTimeout);
+        
+        // Start the millisecond timer display
+        startMillisecondTimer();
+        
+        // Set timeout for automatic penalty if no answer in 5 seconds
+        wordLoopTimeout = setTimeout(() => {
+            if (!answeredThisRound) {
+                // No answer submitted within 5 seconds
+                answeredThisRound = true;
+                disableAnswerButtons();
+
+                if (correctStreak > bestStreak) {
+                    bestStreak = correctStreak;
+                }
+                
+                // Apply penalty but ensure score doesn't go below 0
+                const penalty = Math.min(5000, score);
+                score -= penalty;
+                
+                // Reset streak (timeout breaks streak)
+                streakCount = 0;
+                correctStreak = 0;
+                
+                // Show feedback
+                const penaltyMessage = penalty === 0 ? 
+                    "Time's up! (Score already at 0)" : 
+                    `Time's up! -${penalty} points`;
+                showFeedback(penaltyMessage, "red", 0, -penalty);
+                
+                // Update score
+                updateScore();
+                
+                // Move to next word after delay
+                setTimeout(() => {
+                    nextWord();
+                }, 2000);
+            }
+        }, TIME_LIMIT);
+    }
+
+    // ========== START MILLISECOND TIMER DISPLAY ==========
+    function startMillisecondTimer() {
+        let start = Date.now();
+        let lastUpdate = start;
+        
+        function updateTimer() {
+            if (answeredThisRound) return; // Stop if answered
+            
+            const now = Date.now();
+            const elapsed = now - start;
+            const timeLeft = TIME_LIMIT - elapsed;
+            
+            if (timeLeft <= 0) {
+                document.getElementById('countdown').innerText = "0.00";
+                return;
+            }
+            
+            // Update display every 16ms (~60fps)
+            if (now - lastUpdate >= 16) {
+                const secondsLeft = (timeLeft / 1000).toFixed(2);
+                document.getElementById('sp-countdown').innerText = secondsLeft;
+                lastUpdate = now;
+            }
+            
+            requestAnimationFrame(updateTimer);
+        }
+        
+        updateTimer();
+    }
+
+    // ========== HANDLE ANSWER ==========
+    function handleAnswer(userAnswer) {
+        if (answeredThisRound || !gameStarted) return;
+        
+        answeredThisRound = true;
+        disableAnswerButtons();
+        
+        // Stop the millisecond timer
+        // (it stops automatically when answeredThisRound is true)
+        
+        // Calculate response time
+        const responseTime = Date.now() - wordStartTime; // Milliseconds taken
+        let pointsEarned = 0;
+        let streakBonus = 0;
+        responseTimes.push(responseTime);
+        
+        // Check if answer is correct
+        const correct = currentIsBip39;
+        const isCorrect = (userAnswer === correct);
+        
+        if (responseTime > TIME_LIMIT) {
+            // No answer within 5 seconds (should be caught by timeout, but handle just in case)
+            pointsEarned = Math.max(-score, -5000); // Can't go below 0
+            streakCount = 0;
+            correctStreak = 0;
+            showFeedback("Time's up! -5000 points", "red", responseTime, pointsEarned);
+        } else if (isCorrect) {
+            // Correct answer within time
+            const timeBonus = TIME_LIMIT - responseTime; // Milliseconds left
+            pointsEarned = timeBonus + 500;
+            
+            // Add streak bonus logic
+            correctStreak++;
+
+            // Update best streak if current streak is higher
+            if (correctStreak > bestStreak) {
+                bestStreak = correctStreak;
+            }
+
+            if (correctStreak >= 3) {
+                // Every 3 consecutive correct answers gives bonus
+                streakBonus = Math.floor(correctStreak / 3) * 999;
+                pointsEarned += streakBonus;
+                streakCount = Math.floor(correctStreak / 3); // Track streak count for display
+            }
+            
+            score += pointsEarned;
+            
+            let bonusText = streakBonus > 0 ? ` + ${streakBonus} streak` : '';
+            showFeedback(`✓ +${pointsEarned} (${timeBonus}ms + 500${bonusText})`, "green", responseTime, pointsEarned);
+        } else {
+            // Wrong answer within time
+            pointsEarned = -Math.min(responseTime, score); // Can't go below 0
+            score += pointsEarned;
+
+            // Update best streak before resetting (in case this was the end of a good run)
+            if (correctStreak > bestStreak) {
+                bestStreak = correctStreak;
+            }
+            
+            // Reset streaks on wrong answer
+            correctStreak = 0;
+            streakCount = 0;
+            
+            showFeedback(`✗ -${responseTime} points`, "red", responseTime, pointsEarned);
+        }
+        
+        updateScore();
+        
+        // Clear the timeout since we answered
+        if (wordLoopTimeout) clearTimeout(wordLoopTimeout);
+        
+        // Move to next word after delay
+        setTimeout(() => {
+            nextWord();
+        }, 1000);
+    }
+
+    // ========== SHOW FEEDBACK ==========
+    function showFeedback(message, color, responseTime, points) {
+        const wordDisplay = document.getElementById('word-display');
+        const originalWord = wordDisplay.innerText;
+        
+        // Create feedback display
+        wordDisplay.innerHTML = `
+            <div style="font-size: 2rem; margin-bottom: 0.5rem; color: ${color};">${message}</div>
+            <div style="font-size: 1.2rem; opacity: 0.8;">
+                Response: ${responseTime}ms
+            </div>
+            ${streakCount > 0 ? `<div style="font-size: 1.2rem; color: #ffd700;">Streak: x${streakCount}</div>` : ''}
+        `;
+        // wordDisplay.style.color = color;
+    }
+
+    // ========== UPDATE SCORE DISPLAY ==========
+    function updateScore() {
+        // Ensure score never goes below 0
+        if (score < 0) {
+            score = 0;
+        }
+        document.querySelector('.sp-score-value').textContent = score;
+    }
+
+    // ========== SHOW NOTIFICATION ==========
+function showNotification(message, type) {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('record-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'record-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'score' ? '#4CAF50' : '#FF9800'};
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        document.body.appendChild(notification);
+    }
+    
+    // Set notification content
+    notification.innerHTML = `
+        <span style="font-size: 1.5rem;">${type === 'score' ? '🏆' : '🔥'}</span>
+        <span>${message}</span>
+    `;
+    notification.style.background = type === 'score' ? '#4CAF50' : '#FF9800';
+    notification.style.display = 'flex';
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            notification.style.display = 'none';
+            notification.style.animation = '';
+        }, 300);
+    }, 3000);
+}
+
+    // ========== END GAME ==========
+    function endGame() {
+        console.log("endGame() called"); // Check if function is being called
+        console.log("resultBox element:", document.getElementById('final-result'));
+        console.log("resultText element:", document.getElementById('result-text'));
+
+        gameStarted = false;
+        clearTimeout(wordLoopTimeout);
+
+        // Remove keyboard controls
+        removeKeyboardControls();
+        
+        // Hide game elements
+        document.getElementById('answer-buttons').style.display = 'none';
+        document.getElementById('word-display').style.display = 'none';
+        document.getElementById('sp-countdown').style.display = 'none';
+        
+        let averageResponseTime = 0;
+        if (responseTimes.length > 0) {
+            const sum = responseTimes.reduce((a, b) => a + b, 0);
+            averageResponseTime = Math.round(sum / responseTimes.length);
+        }
+
+        // Calculate normalized score (score per round, then normalized to 21 rounds for comparison)
+        const scorePerRound = score / roundLimit;
+        const normalizedScore = Math.round(scorePerRound * 21); // Normalized to 21 rounds
+
+        // Show final result
+        const resultBox = document.getElementById('final-result');
+        const resultText = document.getElementById('result-text');
+        const finalScore = document.getElementById('final-score');
+        
+        resultText.innerText = `Game Over!`;
+        
+        // Calculate streak level (how many 3x bonuses achieved)
+        const streakLevel = Math.floor(bestStreak / 3);
+        // Save records and check for new highs - use normalized score for comparison
+        const records = saveBestRecords(normalizedScore);
+        
+        // Prepare final score display with record indicators
+        let finalScoreHTML = `
+            <div style="font-size: 1.2rem; margin-bottom: 0.5rem; color: #aaaaaa;">
+                Played ${roundLimit} rounds
+            </div>
+            <div style="font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;">
+                Total Score: ${score}
+            </div>
+            <div style="font-size: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px; color: #f7931a;">
+                Normalized Score: ${normalizedScore} (per 21 rounds)
+                ${records.newRecord ? '<span style="color: #FFD700; font-size: 1rem;">🏆 NEW RECORD!</span>' : ''}
+            </div>
+            <div style="font-size: 0.8rem; color: #ffd700; display: flex; align-items: center; gap: 10px;">
+                Best streak: ${bestStreak} correct in a row
+                ${records.newStreakRecord ? '<span style="color: #FFD700; font-size: 0.6rem;">🔥 NEW BEST!</span>' : ''}
+            </div>
+        `;
+        finalScoreHTML += `
+            <div style="font-size: 0.8rem; color: #aaaaaa; margin-top: 0.3rem;">
+                Average Response Time: ${averageResponseTime}ms
+            </div>
+            <div style="font-size: 0.8rem; color: #888; margin-top: 0.2rem;">
+                Score per round: ${Math.round(scorePerRound)}
+            </div>
+        `;
+        
+        // Add streak level if applicable
+        if (streakLevel > 0) {
+            finalScoreHTML += `
+                <div style="font-size: 0.8rem; color: #4CAF50; margin-top: 0.3rem;">
+                    Streak bonus level: x${streakLevel}
+                </div>
+            `;
+        }
+        
+        // Add saved records for comparison
+        finalScoreHTML += `
+            <div style="margin-top: 1rem; padding-top: 0.6rem; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 0.8rem; opacity: 0.8;">
+                    Saved Records:
+                </div>
+                <div style="font-size: 0.7rem; margin-top: 0.3rem;">
+                    <div>Highest Score: ${bestScore}</div>
+                    <div>Longest Streak: ${savedBestStreak}</div>
+                </div>
+            </div>
+        `;
+        
+        finalScore.innerHTML = finalScoreHTML;
+        
+        // Show notifications for new records
+        if (records.newRecord) {
+            setTimeout(() => {
+                showNotification(`New High Score: ${normalizedScore} points!`, 'score');
+            }, 4000);
+        }
+        
+        if (records.newStreakRecord) {
+            setTimeout(() => {
+                showNotification(`New Best Streak: ${bestStreak} words!`, 'streak');
+            }, 8000);
+        }
+        
+        // Show result box
+        resultBox.style.display = 'block';
+    }
+
+
+
+    // ========== PLAY AGAIN ==========
+    document.getElementById('play-again').onclick = () => {
+        // Reset UI
+        document.getElementById('final-result').style.display = 'none';
+        document.getElementById('word-display').style.display = 'block';
+        document.getElementById('sp-countdown').style.display = 'block';
+        document.getElementById('word-display').style.color = '#c47710';
+        
+        // Go back to setup screen
+        document.getElementById('game39single-container').style.display = 'none';
+        document.getElementById('gameSetup').style.display = 'flex';
+        
+        // Load updated best score
+        loadBestRecords();
+    };
+
+    // ========== UTILITY FUNCTIONS ==========
+    function shuffleArray(arr) {
+        return [...arr].sort(() => Math.random() - 0.5);
+    }
+
+    function enableAnswerButtons() {
+        document.getElementById('yes-btn').disabled = false;
+        document.getElementById('no-btn').disabled = false;
+    }
+
+    function disableAnswerButtons() {
+        document.getElementById('yes-btn').disabled = true;
+        document.getElementById('no-btn').disabled = true;
+    }
+
+    // ========== SETUP ANSWER BUTTONS ==========
+    document.getElementById('yes-btn').onclick = () => handleAnswer(true);
+    document.getElementById('no-btn').onclick = () => handleAnswer(false);
+
+    // ========== MODAL FUNCTIONS ==========
+    function openGameModal(event) {
+        if (event) event.stopPropagation();
+        document.getElementById('game39Modal').style.display = 'block';
+    }
+
+    function closeGameModal() {
+        document.getElementById('game39Modal').style.display = 'none';
+    }
+
+    // ========== INITIALIZATION ==========
+    document.addEventListener('DOMContentLoaded', () => {
+        // Load best records
+        loadBestRecords();
+        
+        // Add best streak display to setup screen
+        const bestScoreDiv = document.getElementById('best-score');
+        if (bestScoreDiv && !document.getElementById('best-streak')) {
+            const bestStreakDiv = document.createElement('div');
+            bestStreakDiv.id = 'best-streak';
+            bestStreakDiv.style.cssText = bestScoreDiv.style.cssText;
+            bestStreakDiv.innerHTML = 'Best Streak: <span id="best-streak-value">0</span>';
+            bestScoreDiv.parentNode.insertBefore(bestStreakDiv, bestScoreDiv.nextSibling);
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = (event) => {
+            const modal = document.getElementById('game39Modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    });
+    </script>
+</body>
+</html>
