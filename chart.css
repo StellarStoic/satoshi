@@ -135,6 +135,29 @@ button:disabled {
     display: none !important;
 }
 
+/* Style for optgroups in dropdown */
+optgroup {
+    font-weight: bold;
+    font-style: normal;
+    color: #a0a0a0;
+    background-color: #00000087;
+    padding: 5px 0;
+}
+
+/* Style for options within optgroups */
+optgroup option {
+    font-weight: normal;
+    font-style: normal;
+    padding-left: 20px;
+    color: #666;
+}
+
+/* Style for selected option */
+option:checked {
+    font-weight: bold;
+    color: #f2a900;
+}
+
 /* Loading indicator for auto-load */
 .auto-loading {
     position: absolute;

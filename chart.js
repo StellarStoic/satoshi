@@ -22,6 +22,99 @@ const eventCategoryColors = {
     'Halving': '#ffffff'        // White
 };
 
+// Asset type configuration - ADD THIS SECTION
+const assetConfig = {
+    // Currencies (existing)
+    'AUD': { type: 'currency', unit: 'dollar', displayName: 'Australian Dollar' },
+    'BRL': { type: 'currency', unit: 'real', displayName: 'Brazilian Real' },
+    'CAD': { type: 'currency', unit: 'dollar', displayName: 'Canadian Dollar' },
+    'CHF': { type: 'currency', unit: 'franc', displayName: 'Swiss Franc' },
+    'CNY': { type: 'currency', unit: 'yuan', displayName: 'Chinese Yuan' },
+    'CZK': { type: 'currency', unit: 'koruna', displayName: 'Czech Koruna' },
+    'DKK': { type: 'currency', unit: 'krone', displayName: 'Danish Krone' },
+    'EUR': { type: 'currency', unit: 'euro', displayName: 'Euro' },
+    'GBP': { type: 'currency', unit: 'pound', displayName: 'British Pound' },
+    'HKD': { type: 'currency', unit: 'dollar', displayName: 'Hong Kong Dollar' },
+    'HUF': { type: 'currency', unit: 'forint', displayName: 'Hungarian Forint' },
+    'IDR': { type: 'currency', unit: 'rupiah', displayName: 'Indonesian Rupiah' },
+    'ILS': { type: 'currency', unit: 'shekel', displayName: 'Israeli New Shekel' },
+    'INR': { type: 'currency', unit: 'rupee', displayName: 'Indian Rupee' },
+    'ISK': { type: 'currency', unit: 'króna', displayName: 'Icelandic Króna' },
+    'JPY': { type: 'currency', unit: 'yen', displayName: 'Japanese Yen' },
+    'KRW': { type: 'currency', unit: 'won', displayName: 'South Korean Won' },
+    'MXN': { type: 'currency', unit: 'peso', displayName: 'Mexican Peso' },
+    'MYR': { type: 'currency', unit: 'ringgit', displayName: 'Malaysian Ringgit' },
+    'NOK': { type: 'currency', unit: 'krone', displayName: 'Norwegian Krone' },
+    'NZD': { type: 'currency', unit: 'dollar', displayName: 'New Zealand Dollar' },
+    'PHP': { type: 'currency', unit: 'peso', displayName: 'Philippine Peso' },
+    'PLN': { type: 'currency', unit: 'zloty', displayName: 'Polish Zloty' },
+    'RON': { type: 'currency', unit: 'leu', displayName: 'Romanian Leu' },
+    'SEK': { type: 'currency', unit: 'krona', displayName: 'Swedish Krona' },
+    'SGD': { type: 'currency', unit: 'dollar', displayName: 'Singapore Dollar' },
+    'THB': { type: 'currency', unit: 'baht', displayName: 'Thai Baht' },
+    'TRY': { type: 'currency', unit: 'lira', displayName: 'Turkish Lira' },
+    'ZAR': { type: 'currency', unit: 'rand', displayName: 'South African Rand' },
+  
+// --- PRECIOUS METALS ---
+    'GCF': { type: 'commodity', unit: 'oz', displayName: 'Gold', category: 'Precious Metals' },
+    'SIF': { type: 'commodity', unit: 'oz', displayName: 'Silver', category: 'Precious Metals' },
+    'PLF': { type: 'commodity', unit: 'oz', displayName: 'Platinum', category: 'Precious Metals' },
+    'PAF': { type: 'commodity', unit: 'oz', displayName: 'Palladium', category: 'Precious Metals' },
+
+    // --- BASE METALS ---
+    'HGF': { type: 'commodity', unit: 'lb', displayName: 'Copper', category: 'Base Metals' },
+    'ALIF': { type: 'commodity', unit: 'mt', displayName: 'Aluminum', category: 'Base Metals' },
+
+    // --- ENERGY ---
+    'CLF': { type: 'commodity', unit: 'bbl', displayName: 'Crude Oil WTI', category: 'Energy' },
+    'BZF': { type: 'commodity', unit: 'bbl', displayName: 'Brent Crude', category: 'Energy' },
+    'NGF': { type: 'commodity', unit: 'MMBtu', displayName: 'Natural Gas', category: 'Energy' },
+    'RBF': { type: 'commodity', unit: 'gal', displayName: 'Gasoline', category: 'Energy' },
+
+    // --- AGRICULTURE & SOFTS ---
+    'SBF': { type: 'commodity', unit: 'cent/lb', displayName: 'Sugar No. 11', category: 'Softs' },
+    'ZCF': { type: 'commodity', unit: 'bu', displayName: 'Corn', category: 'Softs' },
+    'ZSF': { type: 'commodity', unit: 'bu', displayName: 'Soybeans', category: 'Softs' },
+    'KCF': { type: 'commodity', unit: 'cent/lb', displayName: 'Coffee', category: 'Softs' },
+    'CTF': { type: 'commodity', unit: 'cent/lb', displayName: 'Cotton', category: 'Softs' },
+    'CCF': { type: 'commodity', unit: 'mt', displayName: 'Cocoa', category: 'Softs' },
+
+    // --- LIVESTOCK ---
+    'LEF': { type: 'commodity', unit: 'cent/lb', displayName: 'Live Cattle', category: 'Livestock' },
+    'GFF': { type: 'commodity', unit: 'cent/lb', displayName: 'Feeder Cattle', category: 'Livestock' },
+    'HEF': { type: 'commodity', unit: 'cent/lb', displayName: 'Lean Hogs', category: 'Livestock' },
+
+    // --- INDICES ---
+    'GSPC': { type: 'index', unit: 'pts', displayName: 'S&P 500', category: 'Market Indices' },
+    'DJI':  { type: 'index', unit: 'pts', displayName: 'Dow Jones', category: 'Market Indices' },
+    'IXIC': { type: 'index', unit: 'pts', displayName: 'Nasdaq', category: 'Market Indices' },
+    'RUT': { type: 'index', unit: 'pts', displayName: 'Russell 2000', category: 'Market Indices' },
+    
+    // --- STOCKS ---
+    'MSFT':  { type: 'stock', unit: 'share', displayName: 'Microsoft', category: 'Technology' },
+    'AAPL':  { type: 'stock', unit: 'share', displayName: 'Apple Inc.', category: 'Technology' },
+    'JPM':   { type: 'stock', unit: 'share', displayName: 'JPMorgan', category: 'Finance' },
+    'KO':    { type: 'stock', unit: 'share', displayName: 'Coca-Cola', category: 'Consumer Staples' },
+    'RACE':    { type: 'stock', unit: 'share', displayName: 'Ferrari N.V.', category: 'Auto Manufacturers' },
+
+    // --- BONDS --- 
+    'TLT':  { type: 'bond', unit: 'share', displayName: '20+ Year Treasury Bond', category: 'Bonds' },
+    'IEF':  { type: 'bond', unit: 'share', displayName: '7-10 Year Treasury Bond', category: 'Bonds' },
+    'BND':  { type: 'bond', unit: 'share', displayName: 'Vanguard Total Bond Market', category: 'Bonds' },
+    'TNX': { type: 'bond', unit: '%', displayName: '10Y Treasury Yield', category: 'Bonds' },
+
+    // --- OTHER  ---
+    'VNQ':  { type: 'other', unit: 'share', displayName: 'Vanguard Real Estate ETF', category: 'Real Estate' },
+    'ITB':  { type: 'other', unit: 'share', displayName: 'Homebuilders', category: 'Real Estate' },
+    'REZ':  { type: 'other', unit: 'share', displayName: 'Residential & Multi-sector', category: 'Real Estate' },
+};
+
+// Add this to your helper functions section
+function getAssetType(assetCode) {
+    const config = assetConfig[assetCode];
+    return config ? config.type : 'unknown';
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async function() {
     initializeChart();
@@ -38,7 +131,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 function setupAutoLoad() {
     // Add event listeners for auto-load
-    document.getElementById('currencySelect').addEventListener('change', debounceLoad);
+    document.getElementById('assetSelect').addEventListener('change', debounceLoad);
     document.getElementById('eventFilter').addEventListener('change', debounceLoad);
     document.getElementById('timeRange').addEventListener('change', debounceLoad);
     // Scale changes don't reload data, just update the chart display
@@ -163,7 +256,7 @@ function initializeChart() {
         type: 'line',
         data: {
             datasets: [{
-                label: 'Satoshi per 1 Unit',
+                label: `Satoshis per 1 unit`,
                 data: [],
                 borderColor: '#f2a900',
                 backgroundColor: 'rgba(242, 169, 0, 0.1)',
@@ -388,7 +481,7 @@ function initializeChart() {
                             });
                             return [
                                 `Sats per unit: ${Math.round(value).toLocaleString()}`,
-                                `BTC price: ${btcPrice} ${getSelectedCurrency()}`
+                                `BTC price: ${btcPrice} ${getAssetDisplayName(getSelectedAsset())}`
                             ];
                         }
                     }
@@ -602,7 +695,7 @@ function updateChartScale() {
     if (!chart) return;
     
     const yAxis = chart.options.scales.y;
-    const currency = getSelectedCurrency();
+    const currency = getSelectedAsset();
     
     if (currentScaleType === 'log') {
         yAxis.type = 'logarithmic';
@@ -628,7 +721,10 @@ function updateChartScale() {
 
     // 🆕 Update chart title to reflect current scale
     if (chart.data.datasets[0]) {
-        chart.data.datasets[0].label = `Satoshis per 1 ${currency} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+        const currency = getSelectedAsset();  // Get the current asset
+        const unit = getAssetUnit(currency);
+        const displayName = getAssetDisplayName(currency);
+        chart.data.datasets[0].label = `Satoshis per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
     }
     
     chart.update();
@@ -665,21 +761,22 @@ function getSelectedScaleType() {
 }
 
 async function loadChartData() {
-    const currency = getSelectedCurrency();
+    const assetCode = getSelectedAsset(); // This gets the selected value (USD, EUR, GLD, etc.)
     const timeRange = getSelectedTimeRange();
     
     try {
         showAutoLoading(true);
-        const data = await loadCSVData(currency);
+        const data = await loadCSVData(assetCode); // Pass the asset code
+
         if (!data || data.length === 0) {
-            throw new Error('No data found for ' + currency);
+            throw new Error('No data found for ' + assetCode);
         }
         
         // 🚨 Process data WITHOUT custom start date (always full CSV range)
-        currentData = processData(data, currency, timeRange);
+        currentData = processData(data, assetCode, timeRange);
         
-        updateChart(currentData, currency);
-        updateSatsDisplay(currentData[currentData.length - 1].sats, currency);
+        updateChart(currentData, assetCode);
+        updateSatsDisplay(currentData[currentData.length - 1].sats, assetCode);
         
     } catch (error) {
         console.error('Error loading chart data:', error);
@@ -759,7 +856,7 @@ function addEmblemToSnapshot(ctx, width, height) {
 }
 
 function addInfoToSnapshot(ctx, width, height) {
-    const currency = getSelectedCurrency();
+    const currency = getSelectedAsset();
     const timeRange = getSelectedTimeRange();
     const scaleType = getSelectedScaleType();
     const currentSats = currentData ? Math.round(currentData[currentData.length - 1].sats).toLocaleString() : 'N/A';
@@ -786,7 +883,7 @@ function addInfoToSnapshot(ctx, width, height) {
 }
 
 function generateSnapshotFilename() {
-    const currency = getSelectedCurrency();
+    const currency = getSelectedAsset();
     const timeRange = getSelectedTimeRange();
     const date = new Date().toISOString().split('T')[0];
     
@@ -844,6 +941,7 @@ function showNotification(message) {
         document.body.removeChild(notification);
     }, 3000);
 }
+
 
 function getEarliestEventDate() {
     if (!historicalEvents.length) return null;
@@ -1140,11 +1238,53 @@ async function loadInitialData() {
     await loadChartData();
 }
 
+function getAssetUnit(assetCode) {
+  const config = assetConfig[assetCode];
+  return config ? config.unit : 'unit';
+}
 
-async function loadCSVData(currency) {
+function getAssetDisplayName(assetCode) {
+  const config = assetConfig[assetCode];
+  return config ? config.displayName : assetCode;
+}
+
+function getAssetType(assetCode) {
+  const config = assetConfig[assetCode];
+  return config ? config.type : 'currency';
+}
+
+async function loadCSVData(assetCode) {
+
+      const config = assetConfig[assetCode] || { type: 'currency', unit: 'unit', displayName: assetCode };
+  
+    // Different folder structure for different asset types
+    let folderPath;
+    switch(config.type) {
+        case 'currency':
+        folderPath = './historical_data/currencies/';
+        break;
+        case 'commodity':
+        folderPath = './historical_data/commodities/';
+        break;
+        case 'stock':
+        folderPath = './historical_data/stocks/';
+        break;
+        case 'bond':
+        folderPath = './historical_data/bonds/';
+        break;
+        case 'index':
+        folderPath = './historical_data/indices/';
+        break;
+        case 'other':
+        folderPath = './historical_data/otherInstruments/';
+        break;
+        default:
+        folderPath = './historical_data/';
+    }
+
     // Adjust this path based on your actual folder structure
-    const filename = `satoshi_hist_data_${currency}.csv`;
-    const fullPath = `${DATA_FOLDER}${filename}`;
+    const filename = `satoshi_hist_data_${assetCode}.csv`;
+    const fullPath = `${folderPath}${filename}`;
     
     console.log(`Loading file: ${fullPath}`);  // Debug log
     
@@ -1213,14 +1353,20 @@ function processData(csvData, currency, timeRange) {
 
 
 
-function updateChart(data, currency) {
+function updateChart(data,currency) {
+
+    const unit = getAssetUnit(currency);
+    const displayName = getAssetDisplayName(currency);
+  
+    chart.data.datasets[0].label = `Satoshis per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+
     const chartData = data.map(item => ({
         x: item.date,
         y: item.sats
     }));
 
     chart.data.datasets[0].data = chartData;
-    chart.data.datasets[0].label = `Satoshis per 1 ${currency} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+    // chart.data.datasets[0].label = `Satoshis per 1 ${currency} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
 
     // 🚨 Set x-axis min based on event filter
     const eventFilter = document.getElementById('eventFilter').value;
@@ -1325,8 +1471,8 @@ function showError(message) {
     }
 }
 
-function getSelectedCurrency() {
-    return document.getElementById('currencySelect').value;
+function getSelectedAsset() {
+    return document.getElementById('assetSelect').value;
 }
 
 function getSelectedTimeRange() {
@@ -1352,7 +1498,7 @@ function exportData() {
     const firstDateFormatted = firstDate.toISOString().split('T')[0];
     const lastDateFormatted = lastDate.toISOString().split('T')[0];
     
-    const currency = getSelectedCurrency();
+    const currency = getSelectedAsset();
     const timeRange = getSelectedTimeRange();
     
     if (firstDateFormatted === lastDateFormatted) {
@@ -1424,7 +1570,7 @@ function exportDataAs(format) {
     
     const lastDate = currentData[currentData.length - 1].date;
     const lastDateFormatted = lastDate.toISOString().split('T')[0];
-    const currency = getSelectedCurrency();
+    const currency = getSelectedAsset();
     
     let blob, filename, mimeType;
     
@@ -1461,9 +1607,17 @@ function exportDataAs(format) {
 function convertToJSON(data) {
     if (!data || data.length === 0) return '[]';
     
+    const assetCode = getSelectedAsset();
+    const unit = getAssetUnit(assetCode);
+    const displayName = getAssetDisplayName(assetCode);
+    const assetType = getAssetType(assetCode);
+    
     const exportData = {
         metadata: {
-            currency: getSelectedCurrency(),
+            assetCode: assetCode,
+            displayName: displayName,
+            assetType: assetType,
+            unit: unit,
             timeRange: getSelectedTimeRange(),
             scale: getSelectedScaleType(),
             exportDate: new Date().toISOString(),
@@ -1478,7 +1632,8 @@ function convertToJSON(data) {
             date: item.date.toISOString(),
             btcPrice: item.price,
             satsPerUnit: Math.round(item.sats),
-            currency: item.currency,
+            assetCode: assetCode,
+            unit: unit,
             exchanges: item.exchanges
         }))
     };
@@ -1488,15 +1643,33 @@ function convertToJSON(data) {
 
 // 🆕 Update your existing CSV function for consistency
 function convertToCSV(data) {
-    if (!data || data.length === 0) return '';
+    const assetCode = getSelectedAsset();
+    const unit = getAssetUnit(assetCode);
+    const displayName = getAssetDisplayName(assetCode);
+    const assetType = getAssetType(assetCode);
     
-    const headers = ['Time', 'BTC_Price', 'Sats_Per_Unit', 'Currency'];
+    // Create headers
+    const headers = [
+        'Date', 
+        'Timestamp', 
+        'BTC_Price', 
+        'Sats_Per_Unit', 
+        'Asset_Code', 
+        'Asset_Name', 
+        'Asset_Type', 
+        'Unit'
+    ];
     
+    // Create rows
     const rows = data.map(item => [
         item.date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC'),
+        item.timestamp || '',
         item.price.toFixed(8),
         Math.round(item.sats),
-        item.currency
+        assetCode,
+        displayName,
+        assetType,
+        unit
     ]);
     
     return [headers, ...rows].map(row => row.join(',')).join('\n');

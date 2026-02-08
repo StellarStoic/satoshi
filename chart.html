@@ -116,30 +116,97 @@
     <div class="chart-container">
         <div class="chart-controls">
             <div class="control-group">
-            <label for="currencySelect">Currency:</label>
-            <select id="currencySelect" onchange="loadChartData()">
-                <option value="AUD" title="Australian Dollar">AUD</option>
-                <option value="BGN" title="Bulgarian Lev">BGN</option>
-                <option value="BRL" title="Brazilian Real">BRL</option>
-                <option value="CAD" title="Canadian Dollar">CAD</option>
-                <option value="CNY" title="Chinese Yuan">CNY</option>
-                <option value="DKK" title="Danish Krone">DKK</option>
-                <option value="EUR" title="Euro" selected>EUR</option>
-                <option value="HKD" title="Hong Kong Dollar">HKD</option>
-                <option value="HUF" title="Hungarian Forint">HUF</option>
-                <option value="ILS" title="Israeli Shekel">ILS</option>
-                <option value="ISK" title="Icelandic Króna">ISK</option>
-                <option value="JPY" title="Japanese Yen">JPY</option>
-                <option value="MXN" title="Mexican Peso">MXN</option>
-                <option value="NOK" title="Norwegian Krone">NOK</option>
-                <option value="NZD" title="New Zealand Dollar">NZD</option>
-                <option value="PLN" title="Polish Złoty">PLN</option>
-                <option value="RON" title="Romanian Leu">RON</option>
-                <option value="SEK" title="Swedish Krona">SEK</option>
-                <option value="SGD" title="Singapore Dollar">SGD</option>
-                <option value="THB" title="Thai Baht">THB</option>
-                <option value="USD" title="United States Dollar">USD</option>
-            </select>
+                <label for="assetSelect">Asset:</label>
+                <select id="assetSelect" onchange="loadChartData()">
+                    <!-- Currencies Section -->
+                    <optgroup label="Currencies">
+                        <option value="AUD" title="Australian Dollar">AUD - Australian Dollar</option>
+                        <option value="BGN" title="Bulgarian Lev">BGN - Bulgarian Lev</option>
+                        <option value="BRL" title="Brazilian Real">BRL - Brazilian Real</option>
+                        <option value="CAD" title="Canadian Dollar">CAD - Canadian Dollar</option>
+                        <option value="CNY" title="Chinese Yuan">CNY - Chinese Yuan</option>
+                        <option value="DKK" title="Danish Krone">DKK - Danish Krone</option>
+                        <option value="EUR" title="Euro" selected>EUR - Euro</option>
+                        <option value="HKD" title="Hong Kong Dollar">HKD - Hong Kong Dollar</option>
+                        <option value="HUF" title="Hungarian Forint">HUF - Hungarian Forint</option>
+                        <option value="ILS" title="Israeli Shekel">ILS - Israeli Shekel</option>
+                        <option value="ISK" title="Icelandic Króna">ISK - Icelandic Króna</option>
+                        <option value="JPY" title="Japanese Yen">JPY - Japanese Yen</option>
+                        <option value="MXN" title="Mexican Peso">MXN - Mexican Peso</option>
+                        <option value="NOK" title="Norwegian Krone">NOK - Norwegian Krone</option>
+                        <option value="NZD" title="New Zealand Dollar">NZD - New Zealand Dollar</option>
+                        <option value="PLN" title="Polish Złoty">PLN - Polish Złoty</option>
+                        <option value="RON" title="Romanian Leu">RON - Romanian Leu</option>
+                        <option value="SEK" title="Swedish Krona">SEK - Swedish Krona</option>
+                        <option value="SGD" title="Singapore Dollar">SGD - Singapore Dollar</option>
+                        <option value="THB" title="Thai Baht">THB - Thai Baht</option>
+                        <option value="USD" title="United States Dollar">USD - US Dollar</option>
+                    </optgroup>
+                    
+                    <!-- Commodities Section -->
+                    <optgroup label="Precious Metals">
+                        <option value="GCF" title="Gold (troy ounce)">Gold (oz)</option>
+                        <option value="SIF" title="Silver (troy ounce)">Silver (oz)</option>
+                        <option value="PLF" title="Platinum (troy ounce)">Platinum (oz)</option>
+                        <option value="PAF" title="Palladium (troy ounce)">Palladium (oz)</option>
+                    </optgroup>
+
+                    <optgroup label="Base & Industrial Metals">
+                        <option value="HGF" title="Copper (pound)">Copper (lb)</option>
+                        <option value="ALIF" title="Aluminum (metric ton)">Aluminum (mt)</option>
+                    </optgroup>
+
+                    <optgroup label="Energy">
+                        <option value="CLF" title="Crude Oil WTI (barrel)">Crude Oil WTI (bbl)</option>
+                        <option value="BZF" title="Brent Crude Oil (barrel)">Brent Crude (bbl)</option>
+                        <option value="NGF" title="Natural Gas (MMBtu)">Natural Gas (MMBtu)</option>
+                        <option value="RBF" title="RBOB Gasoline (gallon)">Gasoline (gal)</option>
+                    </optgroup>
+
+                    <optgroup label="Agriculture & Softs">
+                        <option value="SBF" title="Sugar No. 11 (cent/lb)">Sugar (lb)</option>
+                        <option value="ZCF" title="Corn (bushel)">Corn (bu)</option>
+                        <option value="ZSF" title="Soybeans (bushel)">Soybeans (bu)</option>
+                        <option value="KCF" title="Coffee (pound)">Coffee (lb)</option>
+                        <option value="CTF" title="Cotton (pound)">Cotton (lb)</option>
+                        <option value="CCF" title="Cocoa (metric ton)">Cocoa (mt)</option>
+                    </optgroup>
+
+                    <optgroup label="Livestock">
+                        <option value="LEF" title="Live Cattle (pound)">Live Cattle (lb)</option>
+                        <option value="GFF" title="Feeder Cattle (cent/lb)">Feeder Cattle (lb)</option>
+                        <option value="HEF" title="Lean Hogs (pound)">Lean Hogs (lb)</option>
+                    </optgroup>
+                    
+                    <optgroup label="Market Indices">
+                        <option value="GSPC" title="S&P 500 Index">S&P 500 (^GSPC)</option>
+                        <option value="DJI" title="Dow Jones Industrial Average">Dow Jones (^DJI)</option>
+                        <option value="IXIC" title="Nasdaq Composite">Nasdaq (^IXIC)</option>
+                        <option value="RUT" title="Russell 2000 (Small Caps)">Russell 2000 (^RUT)</option>
+                    </optgroup>
+
+                    <optgroup label="Stocks">
+                        <option value="MSFT" title="Microsoft Corporation">MSFT - Microsoft</option>
+                        <option value="AAPL" title="Apple Inc.">AAPL - Apple</option>
+                        <option value="JPM" title="JPMorgan Chase">JPM - JPMorgan</option>
+                        <option value="KO" title="Coca-Cola Company">KO - Coca-Cola</option>
+                        <option value="RACE" title="Ferrari N.V">RACE - Ferrari N.V.</option>
+                    </optgroup>
+                    
+                    <optgroup label="Bonds & Rates">
+                        <option value="TLT" title="20+ Year Treasury Bond">Long-Term Bonds (20yr+)</option>
+                        <option value="IEF" title="7-10 Year Treasury Bond">Intermediate Bonds (7-10yr)</option>
+                        <option value="BND" title="Vanguard Total Bond Market">Total US Bond Market</option>
+                        <option value="TNX" title="10-Year Treasury Yield">10Y Treasury Yield (%)</option>
+                    </optgroup>
+
+                    <!-- Other Assets (you can add more sections as needed) -->
+                    <optgroup label="Real Estate & Housing">
+                        <option value="VNQ" title="Vanguard Real Estate ETF">US Real Estate (Broad)</option>
+                        <option value="ITB" title="iShares US Home Construction">US Homebuilders (Housing)</option>
+                        <option value="REZ" title="Residential & Multi-sector">Apartments & Residential</option>
+                    </optgroup>
+                </select>
             </div>
             
             <div class="control-group">
