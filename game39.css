@@ -80,10 +80,10 @@
     cursor: pointer;
 }
 
-ul, li {
+/* ul, li {
   color: #c5ba9e;
-  font-weight: 600;
-}
+  font-weight: 400;
+} */
   
   /* PEER ID DISPLAY */
   #yourId {
@@ -112,7 +112,7 @@ ul, li {
   overflow: hidden;
   padding: 0;
   margin: 0;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: 'Roboto Mono', monospace;
 }
   
 /* Top fixed scores and center indicators */
@@ -328,9 +328,9 @@ ul, li {
   
   
   /* RESPONSIVE TEXT */
-  body {
+  /* body {
     font-size: clamp(14px, 2.5vw, 18px);
-  }
+  } */
 
   /* Optional: limit max-width of buttons for wide screens */
 @media (min-width: 768px) {

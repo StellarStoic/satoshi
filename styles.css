@@ -151,7 +151,7 @@ li a:focus {
 	color: #fff;
 }
 
-/* SUBMENU STYLES - NEW CODE */
+/* SUBMENU STYLES*/
 .has-submenu {
     position: relative; /* Needed for absolute positioning of submenu */
 }
@@ -181,25 +181,36 @@ li a:focus {
 
 /* Submenu styles */
 .submenu {
+    position: absolute;
+    top: 100%; /* Position below the parent menu item */
+    left: 0;
+    min-width: 200px; /* Minimum width to prevent too narrow menus */
     max-height: 0; /* Start collapsed */
     overflow: hidden; /* Hide overflow when collapsed */
     transition: max-height 0.3s ease; /* Smooth expand/collapse */
     background: rgb(45, 45, 45); /* Slightly different background */
-    margin: 5px -10px; /* Adjust margins to align with parent menu */
+    margin: 0;
     border-radius: 3px;
+    z-index: 10000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* When submenu is active */
 .has-submenu.active .submenu {
-    max-height: 200px; /* Adjust based on your content height */
+    max-height: 500px; /* Adjust based on your content height */
+    overflow-y: auto; /* Add scroll if content is too long */
+    width: 300px;
+
 }
 
 /* Submenu items */
 .submenu li a {
+    display: block; /* Ensure links take full width */
     padding: 8px 15px;
     font-size: 0.9em;
     color: #aaa;
     border-left: 3px solid transparent;
+    white-space: nowrap;
 }
 
 /* Hover effects for submenu items */
@@ -209,7 +220,22 @@ li a:focus {
     border-left: 3px solid #f2a900;
 }
 
-
+/* Add media query for very small screens */
+@media (max-width: 768px) {
+    .submenu {
+        position: fixed; /* On small screens, use fixed positioning */
+        top: auto;
+        left: 10px;
+        right: 10px;
+        max-width: calc(100vw - 20px); /* Ensure it doesn't exceed viewport */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* Stronger shadow for overlay effect */
+    }
+    
+    .has-submenu.active .submenu {
+        max-height: 70vh; /* Limit to 70% of viewport height */
+        overflow-y: auto; /* Make it scrollable if needed */
+    }
+}
 
 /* quotes */
 p, #text {
