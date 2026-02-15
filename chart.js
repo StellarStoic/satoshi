@@ -98,9 +98,9 @@ const assetConfig = {
     'RACE':    { type: 'stock', unit: 'share', displayName: 'Ferrari N.V.', category: 'Auto Manufacturers' },
 
     // --- BONDS --- 
-    'TLT':  { type: 'bond', unit: 'share', displayName: '20+ Year Treasury Bond', category: 'Bonds' },
-    'IEF':  { type: 'bond', unit: 'share', displayName: '7-10 Year Treasury Bond', category: 'Bonds' },
-    'BND':  { type: 'bond', unit: 'share', displayName: 'Vanguard Total Bond Market', category: 'Bonds' },
+    'TLT':  { type: 'bond', unit: 'share', displayName: '20+Y Treasury', category: 'Bonds' },
+    'IEF':  { type: 'bond', unit: 'share', displayName: '7-10Y Treasury', category: 'Bonds' },
+    'BND':  { type: 'bond', unit: 'share', displayName: 'Total Bond Market', category: 'Bonds' },
     'TNX': { type: 'bond', unit: '%', displayName: '10Y Treasury Yield', category: 'Bonds' },
 
     // --- OTHER  ---
@@ -256,7 +256,7 @@ function initializeChart() {
         type: 'line',
         data: {
             datasets: [{
-                label: `Satoshis per 1 unit`,
+                label: `Sats per 1 unit`,
                 data: [],
                 borderColor: '#f2a900',
                 backgroundColor: 'rgba(242, 169, 0, 0.1)',
@@ -724,7 +724,7 @@ function updateChartScale() {
         const currency = getSelectedAsset();  // Get the current asset
         const unit = getAssetUnit(currency);
         const displayName = getAssetDisplayName(currency);
-        chart.data.datasets[0].label = `Satoshis per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+        chart.data.datasets[0].label = `Sats per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
     }
     
     chart.update();
@@ -1358,7 +1358,7 @@ function updateChart(data,currency) {
     const unit = getAssetUnit(currency);
     const displayName = getAssetDisplayName(currency);
   
-    chart.data.datasets[0].label = `Satoshis per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+    chart.data.datasets[0].label = `Sats per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
 
     const chartData = data.map(item => ({
         x: item.date,
@@ -1366,7 +1366,7 @@ function updateChart(data,currency) {
     }));
 
     chart.data.datasets[0].data = chartData;
-    // chart.data.datasets[0].label = `Satoshis per 1 ${currency} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+    // chart.data.datasets[0].label = `Sats per 1 ${currency} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
 
     // 🚨 Set x-axis min based on event filter
     const eventFilter = document.getElementById('eventFilter').value;

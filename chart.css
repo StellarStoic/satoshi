@@ -616,3 +616,46 @@ option:checked {
 .export-option-btn.json-option:hover i {
     color: #FF9800;
 }
+
+/* V4V */
+/* V4V message styling */
+.v4v-message {
+    margin-top: 25px;
+    padding: 15px;
+    background: linear-gradient(135deg, rgba(242, 169, 0, 0.1), rgba(242, 169, 0, 0.05));
+    border-radius: 8px;
+    border-left: 4px solid #f2a900;
+    text-align: center;
+}
+
+.v4v-message p {
+    margin: 8px 0;
+    color: #666;
+    line-height: 1.4;
+}
+
+.v4v-message p:first-child {
+    color: #f2a900;
+    font-weight: bold;
+}
+
+.v4v-message p:last-child {
+    color: #888;
+    font-style: italic;
+}
+
+/* Optional: Add a subtle animation */
+.v4v-message {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
