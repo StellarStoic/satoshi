@@ -318,7 +318,8 @@ class TicketVerifier {
             'tier3': [],  // 6 digits match
             'tier4': [],  // 5 digits match
             'tier5': [],  // 4 digits match
-            'tier6': []   // 3 digits match
+            'tier6': [],   // 3 digits match
+            'tier7': []   // 2 digits match
         };
         
         // Make sure we have enough digits to check
@@ -364,6 +365,11 @@ class TicketVerifier {
             // Tier 6: Check last 3 digits match
             if (number.length >= 3 && number.slice(-3) === last8Digits.slice(-3)) {
                 results.tier6.push(number);
+            }
+
+            // Tier 7: Check last 2 digits match
+            if (number.length >= 2 && number.slice(-2) === last8Digits.slice(-2)) {
+                results.tier7.push(number);
             }
         });
         
@@ -431,12 +437,13 @@ class TicketVerifier {
 
 displayResults(results, totalNumbers, endBlockNumber, blockHash, lightningAddress) {
     const tierNames = {
-        'tier1': 'Tier 1 (8 digits) - 40% of the pool prize',
-        'tier2': 'Tier 2 (7 digits) - 25% of the pool prize', 
-        'tier3': 'Tier 3 (6 digits) - 15% of the pool prize',
-        'tier4': 'Tier 4 (5 digits) - 10% of the pool prize',
-        'tier5': 'Tier 5 (4 digits) - 6% of the pool prize',
-        'tier6': 'Tier 6 (3 digits) - 4% of the pool prize'
+        'tier1': 'Tier 1 (8 digits) - 55% of the prize pool ',
+        'tier2': 'Tier 2 (7 digits) - 20% of the prize pool ', 
+        'tier3': 'Tier 3 (6 digits) - 10% of the prize pool ',
+        'tier4': 'Tier 4 (5 digits) - 5% of the prize pool ',
+        'tier5': 'Tier 5 (4 digits) - 4% of the prize pool ',
+        'tier6': 'Tier 6 (3 digits) - 2% of the prize pool ',
+        'tier7': 'Tier 7 (2 digits) - 1% of the prize pool '
     };
     
     // Extract only the digits from the hash and get last 8
