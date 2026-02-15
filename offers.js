@@ -1,11 +1,11 @@
 // Configuration
 const CONFIG = {
     // Using CORS proxy to bypass browser restrictions
-    HODLHODL_API_BASE: 'https://corsproxy.io/?https://hodlhodl.com/api/v1',
+    // HODLHODL_API_BASE: 'https://corsproxy.io/?https://hodlhodl.com/api/v1',
     // Alternative proxies you can try:
-    // HODLHODL_API_BASE: 'https://api.allorigins.win/raw?url=https://hodlhodl.com/api/v1',
+    HODLHODL_API_BASE: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://hodlhodl.com/api/v1'),
     // HODLHODL_API_BASE: 'https://cors-anywhere.herokuapp.com/https://hodlhodl.com/api/v1',
-    PAYMENT_METHODS_API: 'https://corsproxy.io/?https://hodlhodl.com/api/v1/payment_methods',
+    PAYMENT_METHODS_API: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://hodlhodl.com/api/v1/payment_methods'),
     REFERRAL_LINK: 'https://hodlhodl.com/join/L4HT',
     DEFAULT_CURRENCY: 'USD',
     DEFAULT_SIDE: 'sell',
