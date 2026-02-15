@@ -1,17 +1,42 @@
 // Configuration
 const CONFIG = {
+
     // Using CORS proxy to bypass browser restrictions
-    // HODLHODL_API_BASE: 'https://corsproxy.io/?https://hodlhodl.com/api/v1',
-    // Alternative proxies you can try:
-    HODLHODL_API_BASE: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://hodlhodl.com/api/v1'),
-    // HODLHODL_API_BASE: 'https://cors-anywhere.herokuapp.com/https://hodlhodl.com/api/v1',
-    PAYMENT_METHODS_API: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://hodlhodl.com/api/v1/payment_methods'),
+    // List of proxies to rotate through if one fails
+    PROXIES: [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?url=',
+        'https://thingproxy.freeboard.io/fetch/'
+    ],
+    CURRENT_PROXY_INDEX: 0,
+    
+    // Base API URLs (Clean, no proxy attached here)
+    HODLHODL_API_BASE: 'https://hodlhodl.com/api/v1',
+    PAYMENT_METHODS_API: 'https://hodlhodl.com/api/v1/payment_methods',
     REFERRAL_LINK: 'https://hodlhodl.com/join/L4HT',
     DEFAULT_CURRENCY: 'USD',
     DEFAULT_SIDE: 'sell',
     OFFERS_LIMIT: 100, // Increased to maximum allowed
     MAX_OFFERS: 420 // Total offers we want to load
 };
+
+/**
+ * Helper to get the current proxy URL
+ */
+function getProxiedUrl(apiUrl) {
+    const proxyBase = CONFIG.PROXIES[CONFIG.CURRENT_PROXY_INDEX];
+    const separator = apiUrl.includes('?') ? '&' : '?';
+    const cleanUrl = `${apiUrl}${separator}_cb=${Date.now()}`;
+    return `${proxyBase}${encodeURIComponent(cleanUrl)}`;
+}
+
+/**
+ * Switch to the next proxy in the list if the current one fails
+ */
+function switchToNextProxy() {
+    CONFIG.CURRENT_PROXY_INDEX = (CONFIG.CURRENT_PROXY_INDEX + 1) % CONFIG.PROXIES.length;
+    console.warn(`Proxy failed. Switching to: ${CONFIG.PROXIES[CONFIG.CURRENT_PROXY_INDEX]}`);
+}
 
 // Helper function to get currency name from code
 function getCurrencyName(currencyCode) {
@@ -235,24 +260,34 @@ elements.amountFilter.addEventListener('input', function() {
 });
 
 // initializeApp to load first batch
+// initializeApp to load first batch
 async function initializeApp() {
     try {
+        console.log('Starting initialization...');
+        
         // Clear payment method dropdown initially
         elements.paymentMethodFilter.innerHTML = '<option value="">All Payment Methods</option>';
         
-        // Load currencies and countries first (no auth required)
-        await Promise.all([
+        // Load independent components. allSettled ensures if one fails, the others continue.
+        const results = await Promise.allSettled([
             loadCurrencies(),
             loadCountries(),
-            populatePaymentMethodDropdown() // Load from API now
+            populatePaymentMethodDropdown()
         ]);
+
+        // Log specific failures for debugging
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                const names = ['Currencies', 'Countries', 'PaymentMethods'];
+                console.warn(`${names[index]} failed to load:`, result.reason);
+            }
+        });
         
-        // Try to get current BTC price, but don't fail the whole app if it fails
+        // Try to get current BTC price separately
         try {
             await getCurrentBtcPrice();
         } catch (priceError) {
-            console.warn('BTC price fetch failed, but continuing without prices:', priceError.message);
-            // Show message to user
+            console.warn('BTC price fetch failed, continuing without prices:', priceError.message);
             elements.currentPrice.innerHTML = `
                 <div style="color: #e74c3c; text-align: center;">
                     ⚠️ Current BTC price unavailable - offers will show without spread calculation
@@ -260,12 +295,15 @@ async function initializeApp() {
             `;
         }
         
-        // Then load first batch of offers (which will populate payment methods)
+        // Load the offers batch. This is the main content.
         await loadOffers(true);
         
     } catch (error) {
-        console.error('Error initializing app:', error);
-        showError('Failed to load application. Please refresh the page to try again.');
+        console.error('Critical error during app initialization:', error);
+        // Only show the hard error if the main offers load fails completely
+        if (allOffers.length === 0) {
+            showError('Failed to load application data. Please refresh to try again.');
+        }
     }
 }
 
@@ -482,70 +520,73 @@ function extractPaymentMethodsFromOffers(offers) {
 
 // Load currencies from HodlHodl API (no authentication required)
 async function loadCurrencies() {
-    try {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent('https://hodlhodl.com/api/v1/currencies')}`;
-        
-        console.log('Fetching currencies from:', proxyUrl);
-        
-        const response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-            }
-        });
+    let attempts = 0;
+    const maxAttempts = CONFIG.PROXIES.length;
 
-        if (!response.ok) {
-            throw new Error(`Currency API request failed with status ${response.status}`);
+    while (attempts < maxAttempts) {
+        try {
+            const apiUrl = `${CONFIG.HODLHODL_API_BASE}/currencies`;
+            const proxyUrl = getProxiedUrl(apiUrl);
+            
+            console.log(`Attempt ${attempts + 1}: Fetching currencies...`);
+            
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Proxy returned status ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                populateCurrencyDropdown(data.currencies);
+                return; // Success! Exit the loop
+            }
+            throw new Error('API internal error');
+
+        } catch (error) {
+            attempts++;
+            console.error(`Attempt ${attempts} failed:`, error.message);
+            switchToNextProxy(); // Change proxy for the next attempt
+            if (attempts >= maxAttempts) {
+                console.error('All proxies failed for currencies.');
+            }
         }
-        
-        const data = await response.json();
-        console.log('Currencies API Response:', data);
-        
-        if (data.status === 'success') {
-            populateCurrencyDropdown(data.currencies);
-        } else {
-            throw new Error('Currency API returned error status');
-        }
-        
-    } catch (error) {
-        console.error('Error loading currencies:', error);
-        throw error; // No fallback, let it fail
     }
 }
 
 // Load countries from HodlHodl API (let's try without authentication)
+// Load countries from HodlHodl API with Proxy Fallback
 async function loadCountries() {
-    try {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent('https://hodlhodl.com/api/v1/countries')}`;
-        
-        console.log('Fetching countries from:', proxyUrl);
-        
-        const response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-            }
-        });
+    let attempts = 0;
+    const maxAttempts = CONFIG.PROXIES.length;
 
-        console.log('Countries response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`Countries API request failed with status ${response.status}`);
+    for (let i = 0; i < maxAttempts; i++) {
+        try {
+            const apiUrl = `${CONFIG.HODLHODL_API_BASE}/countries`;
+            const proxyUrl = getProxiedUrl(apiUrl);
+            
+            console.log(`Attempt ${i + 1}: Fetching countries from:`, proxyUrl);
+            
+            const response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                populateCountryDropdown(data.countries);
+                return; // Success! Exit the function
+            }
+            throw new Error('API internal error');
+
+        } catch (error) {
+            console.warn(`Proxy ${i} failed for countries:`, error.message);
+            switchToNextProxy(); // Move to the next proxy in the array
         }
-        
-        const data = await response.json();
-        console.log('Countries API Response:', data);
-        
-        if (data.status === 'success') {
-            populateCountryDropdown(data.countries);
-        } else {
-            throw new Error('Countries API returned error status');
-        }
-        
-    } catch (error) {
-        console.error('Error loading countries:', error);
-        throw error; // No fallback, let it fail
     }
+    console.error('All proxies failed to load countries.');
 }
 
 // Populate currency dropdown with API data
@@ -735,113 +776,118 @@ function updateCurrentPriceDisplay() {
         `;
     }
 }
-
-// Load offers from HodlHodl API with CORS proxy and with pagination
+// Load offers from HodlHodl API with Proxy Fallback and all original filters
 async function loadOffers(isFirstLoad = false) {
+    // PRESERVE: Original UI State Management
     if (isFirstLoad) {
         showLoading();
         hideError();
         allOffers = [];
         currentOffset = 0;
-        availablePaymentMethods.clear(); // Reset payment methods on first load
+        availablePaymentMethods.clear(); 
     } else {
         isLoadingMore = true;
-        document.getElementById('loadMoreBtn').textContent = 'Loading...';
-        document.getElementById('loadMoreBtn').disabled = true;
+        const btn = document.getElementById('loadMoreBtn');
+        if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
     }
 
     try {
+        // PRESERVE: Original Filter Extractions
         const side = elements.sideFilter.value;
         const currency = elements.currencyFilter.value;
         const country = elements.countryFilter.value;
         const paymentMethod = elements.paymentMethodFilter.value;
         const amount = elements.amountFilter.value;
         
-        // Update price display with current currency selection
         updateCurrentPriceDisplay();
 
-        // Build API URL with filters
+        // PRESERVE: Your exact API URL construction
         let apiUrl = `https://hodlhodl.com/api/v1/offers?filters[asset_code]=BTC&filters[side]=${side}&pagination[limit]=${CONFIG.OFFERS_LIMIT}&pagination[offset]=${currentOffset}`;
         
-        // Add currency filter if selected
-        if (currency) {
-            apiUrl += `&filters[currency_code]=${currency}`;
-        }
+        if (currency) apiUrl += `&filters[currency_code]=${currency}`;
         
-        // Add country filter if selected
         if (country) {
-            // When specific country is selected, show offers ONLY from that country
             apiUrl += `&filters[country]=${encodeURIComponent(country)}`;
-            // REMOVED: &filters[include_global]=true
         } else {
-            // When no country selected, show all countries including global
             apiUrl += '&filters[include_global]=true';
         }
         
-        // Add payment method filter if selected
-        if (paymentMethod) {
-            apiUrl += `&filters[payment_method_id]=${paymentMethod}`;
-        }
+        if (paymentMethod) apiUrl += `&filters[payment_method_id]=${paymentMethod}`;
 
-        // ADD AMOUNT FILTER IF ENTERED
         if (amount && !isNaN(amount) && parseFloat(amount) > 0) {
             apiUrl += `&filters[amount]=${encodeURIComponent(amount)}`;
         }
-        
-        // Use CORS proxy
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
 
-        console.log('Fetching offers from:', proxyUrl);
-        
-        const response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
+        // NEW: Proxy Rotation Loop
+        let success = false;
+        let lastError = null;
+
+        for (let i = 0; i < CONFIG.PROXIES.length; i++) {
+            try {
+                const proxyUrl = getProxiedUrl(apiUrl);
+                console.log(`Attempt ${i + 1}: Fetching via ${proxyUrl}`);
+
+                // ADD THIS: 5-second timeout for each proxy attempt
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+
+                const response = await fetch(proxyUrl, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(`Status ${response.status}`);
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // PRESERVE: All data processing logic
+                    allOffers = allOffers.concat(data.offers);
+                    currentOffset += data.offers.length;
+                    
+                    extractPaymentMethodsFromOffers(allOffers);
+                    
+                    if (isFirstLoad || data.offers.length > 0) {
+                        populatePaymentMethodDropdown();
+                    }
+                    
+                    displayOffers(allOffers, side, currency);
+                    toggleLoadMoreButton(data.offers.length);
+                    
+                    success = true;
+                    break; // SUCCESS: Exit the proxy loop
+                } else {
+                    throw new Error('API returned error status');
+                }
+            } catch (error) {
+                console.warn(`Proxy ${i} failed:`, error.message);
+                lastError = error;
+                switchToNextProxy(); // Move pointer to next proxy for future calls
             }
-        });
-
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`API request failed with status ${response.status}`);
         }
-        
-        const data = await response.json();
-        console.log('Offers API Response:', data);
-        
-        if (data.status === 'success') {
-            allOffers = allOffers.concat(data.offers);
-            currentOffset += data.offers.length;
 
-            console.log(`Loaded ${data.offers.length} new offers, total: ${allOffers.length}`);
-            
-            // Extract payment methods from ALL accumulated offers, not just the new ones
-            extractPaymentMethodsFromOffers(allOffers);
-            
-            // Only populate dropdown on first load or when we have new payment methods
-            if (isFirstLoad || data.offers.length > 0) {
-                populatePaymentMethodDropdown();
-            }
-            
-            displayOffers(allOffers, side, currency);
-            toggleLoadMoreButton(data.offers.length);
-            
-        } else {
-            throw new Error('API returned error status');
-        }
-        
+        if (!success) throw lastError || new Error('All proxies failed');
+
     } catch (error) {
+        // PRESERVE: Original Error Handling
         console.error('Error loading offers:', error);
         if (isFirstLoad) {
-            showError('Failed to load offers. Please try again. Error: ' + error.message);
+            showError('Failed to load offers. Error: ' + error.message);
         }
     } finally {
+        // PRESERVE: Original Cleanup
         if (isFirstLoad) {
             hideLoading();
         } else {
             isLoadingMore = false;
-            document.getElementById('loadMoreBtn').textContent = 'Load More Offers';
-            document.getElementById('loadMoreBtn').disabled = false;
+            const btn = document.getElementById('loadMoreBtn');
+            if (btn) {
+                btn.textContent = 'Load More Offers';
+                btn.disabled = false;
+            }
         }
     }
 }
