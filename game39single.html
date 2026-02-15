@@ -471,12 +471,87 @@
     </div>
 </div>
 
-    <!-- ---------------------------------------------------------------------- -->
+<!-- Contact modal -->
+<div id="contactModal" class="contact-modal-wrapper">
+    <div class="contact-modal-content">
+        <span class="close" onclick="closeContactModal()">&times;</span>
+        <h2 style="color: antiquewhite; text-align: center;" >Contact</h2>
+        <p>Choose your preferred way to get in touch:</p>
+        
+        <div class="contact-options">
+            <a href="https://t.me/stellarstoic" target="_blank" rel="noopener" class="contact-option">
+                <div class="contact-icon">
+                    <img src="/icons/telegram.png" alt="Telegram" class="contact-png">
+                </div>
+                <div class="contact-info">
+                    <div class="contact-title">
+                        <span>Telegram</span>
+                    </div>
+                    <div class="contact-details">
+                        <span>https://t.me/stellarstoic</span>
+                        <small>Fast response, great for quick chats</small>
+                    </div>
+                </div>
+            </a>
+            
+            <a href="https://signal.me/#eu/PnoKzE8qAEoLXkfcLEM5CvGNh3xiXmowuazyJLs41M4IfCtQ0W5E1KtmbFd7fMYE" target="_blank" rel="noopener" class="contact-option">
+                <div class="contact-icon">
+                    <img src="/icons/signal.png" alt="Signal" class="contact-png">
+                </div>
+                <div class="contact-info">
+                    <div class="contact-title">
+                        <span>Signal</span>
+                    </div>
+                    <div class="contact-details">
+                        <span>@nonce.01</span>
+                        <small>Private & secure</small>
+                    </div>
+                </div>
+            </a>
+
+            <a href="https://nosta.me/000000005e9dda01479c76c5f4fccbaebe4e7856e02f8e85adba05ad62ad6927" target="_blank" rel="noopener" class="contact-option">
+                <div class="contact-icon">
+                    <img src="/icons/nostr.png" alt="Nostr" class="contact-png">
+                </div>
+                <div class="contact-info">
+                    <div class="contact-title">
+                        <span>Nostr</span>
+                    </div>
+                    <div class="contact-details">
+                        <span>one@satoshi.si</span>
+                        <small>Plebs unite</small>
+                    </div>
+                </div>
+            </a>
+            
+            <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=Contact from satoshi.si" target="_blank" rel="noopener" class="contact-option">
+                <div class="contact-icon">
+                    <img src="/icons/email.png" alt="Email" class="contact-png">
+                </div>
+                <div class="contact-info">
+                    <div class="contact-title">
+                        <span>Email</span>
+                    </div>
+                    <div class="contact-details">
+                        <span>one@satoshi.si</span>
+                        <small>For formal inquiries & detailed discussions</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        
+        <div class="contact-note">
+            <p><small>Telegram is fastest, Signal is for privacy, Nostr is for like-minded plebs and Email for formal stuff.</small></p>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------------- -->
 <!-- Footer with Email, Lightning Icon, Block Height, and Fee Rate -->
 <footer class="footer">
     <!-- Email Link -->
-    <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;?subject=mail to one Satoshi from satoshi.si" target="_blank" rel="noopener">
-      one@satoshi.si
+    <a href="#" onclick="openContactModal(); return false;" style="cursor: pointer;">
+    one@satoshi.si
     </a>
   
     <!-- Block Height Display (Left Side) -->
@@ -578,6 +653,7 @@
 <script src="mempoolWebSocket.js"></script>
 <script src="text.js"></script>
 <script src="index.js"></script>
+<script src="contact.js"></script>
 <script src="burgerMenu.js"></script>
 <script src="nameForm.js"></script>
 
