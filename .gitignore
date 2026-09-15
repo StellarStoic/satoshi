@@ -1,5 +1,7 @@
 /tools/*
 !/tools/bip39/
+!/tools/history/
+__pycache__/
 .vscode
 converter copy.html
 converter copy.js

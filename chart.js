@@ -1,6 +1,11 @@
 // Configuration
 const DATA_FOLDER = './historical_data/';
 const EVENTS_FILE = './historical_data/bitcoinHistoricalEvents.json';
+const historySources = new Map();
+
+function formatBtcFromSats(value) {
+    return (value / 100000000).toLocaleString(undefined, { maximumSignificantDigits: 6 }) + ' BTC';
+}
 
 // Chart variables
 let chart = null;
@@ -108,6 +113,8 @@ const assetConfig = {
     'ITB':  { type: 'other', unit: 'share', displayName: 'Homebuilders', category: 'Real Estate' },
     'REZ':  { type: 'other', unit: 'share', displayName: 'Residential & Multi-sector', category: 'Real Estate' },
 };
+
+const legacyUnits = new Map(Object.entries(assetConfig).map(([code, config]) => [code, config.unit]));
 
 // Add this to your helper functions section
 function getAssetType(assetCode) {
@@ -256,7 +263,7 @@ function initializeChart() {
         type: 'line',
         data: {
             datasets: [{
-                label: `Sats per 1 unit`,
+                label: `BTC per 1 unit`,
                 data: [],
                 borderColor: '#f2a900',
                 backgroundColor: 'rgba(242, 169, 0, 0.1)',
@@ -417,12 +424,7 @@ function initializeChart() {
                     ticks: {
                         color: '#888',
                         callback: function(value) {
-                            if (value >= 1000000) {
-                                return (value / 1000000).toFixed(1) + 'M sats';
-                            } else if (value >= 1000) {
-                                return (value / 1000).toFixed(1) + 'K sats';
-                            }
-                            return value.toLocaleString() + ' sats';
+                            return formatBtcFromSats(value);
                         }
                     }
                 }
@@ -480,7 +482,7 @@ function initializeChart() {
                                 maximumFractionDigits: 2
                             });
                             return [
-                                `Sats per unit: ${Math.round(value).toLocaleString()}`,
+                                `Per unit: ${formatBtcFromSats(value)}`,
                                 `BTC price: ${btcPrice} ${getAssetDisplayName(getSelectedAsset())}`
                             ];
                         }
@@ -700,22 +702,12 @@ function updateChartScale() {
     if (currentScaleType === 'log') {
         yAxis.type = 'logarithmic';
         yAxis.ticks.callback = function(value) {
-            if (value >= 1000000) {
-                return (value / 1000000).toFixed(1) + 'M sats';
-            } else if (value >= 1000) {
-                return (value / 1000).toFixed(1) + 'K sats';
-            }
-            return value.toLocaleString() + ' sats';
+            return formatBtcFromSats(value);
         };
     } else {
         yAxis.type = 'linear';
         yAxis.ticks.callback = function(value) {
-            if (value >= 1000000) {
-                return (value / 1000000).toFixed(1) + 'M sats';
-            } else if (value >= 1000) {
-                return (value / 1000).toFixed(0) + 'K sats';
-            }
-            return value.toLocaleString() + ' sats';
+            return formatBtcFromSats(value);
         };
     }
 
@@ -724,7 +716,7 @@ function updateChartScale() {
         const currency = getSelectedAsset();  // Get the current asset
         const unit = getAssetUnit(currency);
         const displayName = getAssetDisplayName(currency);
-        chart.data.datasets[0].label = `Sats per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+        chart.data.datasets[0].label = `BTC per ${unit}: ${displayName}`;
     }
     
     chart.update();
@@ -774,9 +766,10 @@ async function loadChartData() {
         
         // 🚨 Process data WITHOUT custom start date (always full CSV range)
         currentData = processData(data, assetCode, timeRange);
+        if (!currentData.length) throw new Error('No observations in the selected time range');
         
         updateChart(currentData, assetCode);
-        updateSatsDisplay(currentData[currentData.length - 1].sats, assetCode);
+        updateSatsDisplay(assetCode, currentData[currentData.length - 1].sats);
         
     } catch (error) {
         console.error('Error loading chart data:', error);
@@ -1254,6 +1247,30 @@ function getAssetType(assetCode) {
 }
 
 async function loadCSVData(assetCode) {
+    if (assetCode === 'TNX') {
+        throw new Error('Treasury yield is a percentage, not an asset price. Select a bond ETF instead.');
+    }
+    historySources.delete(assetCode);
+    if (legacyUnits.has(assetCode)) assetConfig[assetCode].unit = legacyUnits.get(assetCode);
+    if (assetConfig[assetCode]?.type !== 'currency') {
+        try {
+            const response = await fetch(`./historical_data/generated/${assetCode}.json`);
+            if (response.ok) {
+                const dataset = await response.json();
+                if (dataset.schemaVersion !== 1 || dataset.asset !== assetCode || dataset.denomination !== 'BTC/unit'
+                    || !Array.isArray(dataset.data) || !dataset.data.length
+                    || !dataset.data.every(([day, value]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(value) && Number.isFinite(1 / value) && value > 0)) {
+                    throw new Error('Invalid generated history');
+                }
+                historySources.set(assetCode, dataset);
+                assetConfig[assetCode].unit = dataset.unit;
+                // The existing chart model stores units/BTC; generated files explicitly store BTC/unit.
+                return dataset.data.map(([day, value]) => ({ Time: `${day}T00:00:00Z`, 'Yahoo Finance': 1 / value }));
+            }
+        } catch (error) {
+            console.warn('Generated history unavailable; using legacy archive', error);
+        }
+    }
 
       const config = assetConfig[assetCode] || { type: 'currency', unit: 'unit', displayName: assetCode };
   
@@ -1358,7 +1375,7 @@ function updateChart(data,currency) {
     const unit = getAssetUnit(currency);
     const displayName = getAssetDisplayName(currency);
   
-    chart.data.datasets[0].label = `Sats per 1 ${unit} of ${displayName} over time - ${currentScaleType === 'log' ? 'logarithmic' : 'linear'} scale`;
+    chart.data.datasets[0].label = `BTC per ${unit}: ${displayName}`;
 
     const chartData = data.map(item => ({
         x: item.date,
@@ -1384,7 +1401,7 @@ function updateChart(data,currency) {
     chart.update();
 
     updateDataInfo(data, currency);
-    updateChartLegend(data);
+    updateChartLegend(data[data.length - 1]);
 
     // Update events based on current filter
     const category = document.getElementById('eventFilter')?.value || 'all';
@@ -1406,7 +1423,26 @@ function updateDataInfo(data, currency) {
     const mode = eventFilter === 'hide' ? 'CSV start' : 'Event start';
     
     infoElement.innerHTML = 
-        `Data from ${firstDate} to ${lastDate} • ${dataPoints} data points • ${exchanges.size} exchanges • ${currency} • ${scaleType} scale • ${mode}`;
+        `Data from ${firstDate} to ${lastDate} • ${dataPoints} data points • ${currency} • ${scaleType} scale • ${mode}`;
+    const source = historySources.get(currency);
+    const details = document.createElement('p');
+    if (source) {
+        const link = document.createElement('a');
+        link.href = `https://finance.yahoo.com/quote/${encodeURIComponent(source.symbol)}/history/`;
+        link.textContent = 'Yahoo Finance via yfinance';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        details.append(link, ` | ${source.kind} | ${source.unit} | Latest observation: ${source.lastObservation} | Refreshed: ${new Date(source.refreshedAt).toLocaleString()}`);
+        details.append(document.createElement('br'), source.method, document.createElement('br'), `BTC reference: ${source.btcSource}`);
+        if (source.kind === 'index') details.append(' | Index-level comparison, not a purchasable asset price.');
+    } else {
+        details.textContent = 'Legacy archive: not automatically refreshed. Historical adjustments and units have not been fully verified.';
+    }
+    const methodology = document.createElement('a');
+    methodology.href = './docs/history-data.md';
+    methodology.textContent = 'Data sources and methodology';
+    details.append(document.createElement('br'), methodology);
+    infoElement.append(details);
 }
 
 // 🔸 Update the legend below the chart
@@ -1421,7 +1457,7 @@ function updateChartLegend(latest) {
     legend.innerHTML = `
         <div class="legend-item">
             <div class="legend-color" style="background:#f2a900;"></div>
-            <span>1 ${latest.currency} = ${Math.round(latest.sats).toLocaleString()} sats</span>
+            <span>1 ${getAssetUnit(latest.currency)} of ${getAssetDisplayName(latest.currency)} = ${formatBtcFromSats(latest.sats)}</span>
         </div>
         <div class="legend-item">
             <div class="legend-color" style="background:#ff4444;"></div>
@@ -1440,7 +1476,7 @@ function updateSatsDisplay(currency, satsPerFiat, btcFiatPrice) {
         : (100000000 / satsPerFiat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     displayElement.innerHTML =
-        `1 ${currency} = ${Math.round(satsPerFiat).toLocaleString()} sats (${btcPrice} ${currency}/BTC)`;
+        `1 ${getAssetUnit(currency)} of ${getAssetDisplayName(currency)} = ${formatBtcFromSats(satsPerFiat)} (${btcPrice} units/BTC)`;
 }
 
 // function showLoading(show) {
@@ -1614,6 +1650,13 @@ function convertToJSON(data) {
     
     const exportData = {
         metadata: {
+            sources: historySources.get(assetCode) ? {
+                provider: historySources.get(assetCode).source,
+                symbol: historySources.get(assetCode).symbol,
+                btcReference: historySources.get(assetCode).btcSource,
+                method: historySources.get(assetCode).method,
+                refreshedAt: historySources.get(assetCode).refreshedAt
+            } : { provider: 'Legacy archive; methodology not fully verified' },
             assetCode: assetCode,
             displayName: displayName,
             assetType: assetType,
@@ -1632,6 +1675,7 @@ function convertToJSON(data) {
             date: item.date.toISOString(),
             btcPrice: item.price,
             satsPerUnit: Math.round(item.sats),
+            btcPerUnit: item.sats / 100000000,
             assetCode: assetCode,
             unit: unit,
             exchanges: item.exchanges
@@ -1652,7 +1696,8 @@ function convertToCSV(data) {
     const headers = [
         'Date', 
         'Timestamp', 
-        'BTC_Price', 
+        'Units_Per_BTC',
+        'BTC_Per_Unit',
         'Sats_Per_Unit', 
         'Asset_Code', 
         'Asset_Name', 
@@ -1665,6 +1710,7 @@ function convertToCSV(data) {
         item.date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC'),
         item.timestamp || '',
         item.price.toFixed(8),
+        item.sats / 100000000,
         Math.round(item.sats),
         assetCode,
         displayName,
