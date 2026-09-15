@@ -29,6 +29,7 @@ const eventCategoryColors = {
 
 // Asset type configuration - ADD THIS SECTION
 const assetConfig = {
+    'USD': { type: 'currency', unit: 'dollar', displayName: 'US Dollar' },
     // Currencies (existing)
     'AUD': { type: 'currency', unit: 'dollar', displayName: 'Australian Dollar' },
     'BRL': { type: 'currency', unit: 'real', displayName: 'Brazilian Real' },
@@ -115,6 +116,12 @@ const assetConfig = {
 };
 
 const legacyUnits = new Map(Object.entries(assetConfig).map(([code, config]) => [code, config.unit]));
+
+function getAmountLabel(code) {
+    return !assetConfig[code] || assetConfig[code].type === 'currency'
+        ? code
+        : `${getAssetUnit(code)} of ${getAssetDisplayName(code)}`;
+}
 
 // Add this to your helper functions section
 function getAssetType(assetCode) {
@@ -434,7 +441,7 @@ function initializeChart() {
                     pan: {
                         enabled: true,
                         mode: 'x',
-                        modifierKey: 'shift',
+                        modifierKey: null,
                     },
                     zoom: {
                         wheel: {
@@ -716,7 +723,7 @@ function updateChartScale() {
         const currency = getSelectedAsset();  // Get the current asset
         const unit = getAssetUnit(currency);
         const displayName = getAssetDisplayName(currency);
-        chart.data.datasets[0].label = `BTC per ${unit}: ${displayName}`;
+        chart.data.datasets[0].label = `BTC per ${getAmountLabel(currency)}`;
     }
     
     chart.update();
@@ -1252,7 +1259,7 @@ async function loadCSVData(assetCode) {
     }
     historySources.delete(assetCode);
     if (legacyUnits.has(assetCode)) assetConfig[assetCode].unit = legacyUnits.get(assetCode);
-    if (assetConfig[assetCode]?.type !== 'currency') {
+    if (assetCode === 'USD' || assetConfig[assetCode]?.type !== 'currency') {
         try {
             const response = await fetch(`./historical_data/generated/${assetCode}.json`);
             if (response.ok) {
@@ -1375,7 +1382,7 @@ function updateChart(data,currency) {
     const unit = getAssetUnit(currency);
     const displayName = getAssetDisplayName(currency);
   
-    chart.data.datasets[0].label = `BTC per ${unit}: ${displayName}`;
+    chart.data.datasets[0].label = `BTC per ${getAmountLabel(currency)}`;
 
     const chartData = data.map(item => ({
         x: item.date,
@@ -1429,7 +1436,7 @@ function updateDataInfo(data, currency) {
     if (source) {
         const link = document.createElement('a');
         link.href = `https://finance.yahoo.com/quote/${encodeURIComponent(source.symbol)}/history/`;
-        link.textContent = 'Yahoo Finance via yfinance';
+        link.textContent = source.source;
         link.target = '_blank';
         link.rel = 'noopener';
         details.append(link, ` | ${source.kind} | ${source.unit} | Latest observation: ${source.lastObservation} | Refreshed: ${new Date(source.refreshedAt).toLocaleString()}`);
@@ -1457,11 +1464,11 @@ function updateChartLegend(latest) {
     legend.innerHTML = `
         <div class="legend-item">
             <div class="legend-color" style="background:#f2a900;"></div>
-            <span>1 ${getAssetUnit(latest.currency)} of ${getAssetDisplayName(latest.currency)} = ${formatBtcFromSats(latest.sats)}</span>
+            <span>1 ${getAmountLabel(latest.currency)} = ${formatBtcFromSats(latest.sats)}</span>
         </div>
         <div class="legend-item">
             <div class="legend-color" style="background:#ff4444;"></div>
-            <span>1 BTC = ${btcPrice} ${latest.currency}</span>
+            <span>1 BTC = ${btcPrice} ${getAmountLabel(latest.currency)}</span>
         </div>
     `;
 }
@@ -1476,7 +1483,7 @@ function updateSatsDisplay(currency, satsPerFiat, btcFiatPrice) {
         : (100000000 / satsPerFiat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     displayElement.innerHTML =
-        `1 ${getAssetUnit(currency)} of ${getAssetDisplayName(currency)} = ${formatBtcFromSats(satsPerFiat)} (${btcPrice} units/BTC)`;
+        `1 ${getAmountLabel(currency)} = ${formatBtcFromSats(satsPerFiat)}<br>1 BTC = ${btcPrice} ${getAmountLabel(currency)}`;
 }
 
 // function showLoading(show) {
@@ -1754,11 +1761,9 @@ async function fetchEUCBRates() {
 
 // Get conversion rate from live EUCB (Frankfurt) data
 function getConversionRate(currency) {
-    if (!eucbRates || Object.keys(eucbRates).length === 0) {
-        console.warn("⚠️ ECB rates not available – defaulting to USD");
-        return 1;
-    }
-    return eucbRates[currency] || 1;
+    if (currency === 'USD') return 1;
+    const rate = eucbRates[currency];
+    return Number.isFinite(rate) && rate > 0 ? rate : null;
 }
 
 function initializeSintraFeed() {
@@ -1769,16 +1774,13 @@ function initializeSintraFeed() {
     };
 
     sintraWebSocket.onmessage = function(event) {
-        const message = JSON.parse(event.data);
+        let message;
+        try { message = JSON.parse(event.data); } catch { return; }
         if (message.event !== "data" || !message.data?.prices) return;
 
-        if (!eucbRates || Object.keys(eucbRates).length === 0) {
-            console.warn("⚠️ ECB rates not ready – defaulting to USD values");
-        }
-
         const prices = message.data.prices;
-        const currencySelect = document.getElementById('currencySelect');
-        const selectedCurrency = currencySelect ? currencySelect.value : 'USD';
+        const selectedCurrency = getSelectedAsset();
+        if (assetConfig[selectedCurrency]?.type !== 'currency') return;
 
         // Supported currencies fetched directly from Sintra
         const sintraSupported = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
@@ -1788,7 +1790,7 @@ function initializeSintraFeed() {
         if (sintraSupported.includes(selectedCurrency)) {
             // Directly use the Sintra price
             btcFiatPrice = parseFloat(prices[selectedCurrency.toLowerCase()]);
-            if (isNaN(btcFiatPrice)) {
+            if (!Number.isFinite(btcFiatPrice) || btcFiatPrice <= 0) {
                 console.warn(`No valid Sintra price for ${selectedCurrency}`);
                 return;
             }
@@ -1796,6 +1798,7 @@ function initializeSintraFeed() {
             // Not supported directly, use BTC/USD and EUCB conversion
             const btcUsdPrice = parseFloat(prices.usd);
             const conversionRate = getConversionRate(selectedCurrency);
+            if (conversionRate === null) return;
             btcFiatPrice = btcUsdPrice * conversionRate;
 
             // Debug logging — remove later
@@ -1803,7 +1806,7 @@ function initializeSintraFeed() {
         }
 
         // Now compute sats per 1 fiat
-        if (!btcFiatPrice || btcFiatPrice <= 0) return;
+        if (!Number.isFinite(btcFiatPrice) || btcFiatPrice <= 0) return;
         const satsPerFiat = 100000000 / btcFiatPrice;
 
         // Update legend and sats display

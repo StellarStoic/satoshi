@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from datetime import date, timedelta
 
-from collect import ASSETS, atomic_json, convert, reference_history, validate, main
+from collect import ASSETS, atomic_json, convert, reference_history, validate, main, publish_reference
 
 
 class CollectorTests(unittest.TestCase):
@@ -52,10 +52,20 @@ class CollectorTests(unittest.TestCase):
                  patch('collect.reference_history', return_value={'2010-07-19': 1}), \
                  patch('collect.download', return_value={yesterday: 100}), \
                  patch('collect.time.sleep'):
-                with self.assertRaises(RuntimeError):
-                    main()
+                main()
             self.assertEqual(target.read_text(), original)
             self.assertIn('GCF', json.loads((Path(folder) / 'status.json').read_text())['failed'])
+
+    def test_reference_is_published_in_correct_direction_and_cannot_shrink(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            publish_reference(output, {'2026-01-01': 100000, '2026-01-02': 50000}, '2026-01-01')
+            original = (output / 'USD.json').read_text()
+            dataset = json.loads(original)
+            self.assertEqual(dataset['data'], [['2026-01-01', 0.00001], ['2026-01-02', 0.00002]])
+            with self.assertRaises(ValueError):
+                publish_reference(output, {'2026-01-02': 50000}, '2026-01-01')
+            self.assertEqual((output / 'USD.json').read_text(), original)
 
 
 if __name__ == '__main__':

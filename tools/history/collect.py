@@ -79,6 +79,23 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
+def publish_reference(output, btc, cutoff):
+    rows = [[day, 1 / price] for day, price in sorted(btc.items())]
+    target = output / 'USD.json'
+    previous = json.loads(target.read_text()) if target.exists() else None
+    validate(rows, previous)
+    atomic_json(target, {
+        'schemaVersion': 1, 'asset': 'USD', 'symbol': 'BTC-USD', 'unit': 'dollar', 'kind': 'currency',
+        'denomination': 'BTC/unit', 'source': 'Bitcoinity archive + Yahoo Finance',
+        'sourceUrl': 'https://finance.yahoo.com/quote/BTC-USD/history/',
+        'btcSource': f'Bitcoinity exchange average through {cutoff}; Yahoo BTC-USD midpoint thereafter',
+        'btcLegacyThrough': cutoff,
+        'method': 'BTC per USD = 1 / BTC-USD reference; daily observations, not live quotes',
+        'refreshedAt': datetime.now(timezone.utc).isoformat(),
+        'firstObservation': rows[0][0], 'lastObservation': rows[-1][0], 'data': rows
+    })
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--assets', nargs='+', choices=sorted(ASSETS))
@@ -92,7 +109,8 @@ def main():
     if (date.fromisoformat(end) - date.fromisoformat(max(fresh_btc))).days > 3:
         raise ValueError('BTC reference is stale; no datasets updated')
     btc.update({day: value for day, value in fresh_btc.items() if day > cutoff})
-    failures, successful = {}, []
+    publish_reference(args.output, btc, cutoff)
+    failures, successful = {}, ['USD']
     for code in args.assets or ASSETS:
         symbol, unit, multiplier, kind = ASSETS[code]
         try:

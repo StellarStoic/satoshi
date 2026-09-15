@@ -33,7 +33,9 @@ Each asset is validated and written through an atomic replacement. An empty, sta
 
 The chart prefers generated non-fiat history and falls back to the legacy CSV when unavailable. It labels legacy data as unverified and shows sources and refresh dates for generated history. Axes and tooltips display BTC per unit; internal chart calculations retain sats for compatibility. JSON exports include both denominations.
 
-Fiat CSVs remain on the existing pipeline and are **not refreshed by this workflow**. The generated history does not silently rewrite their source or methodology. All historical CSVs remain available for comparison.
+The workflow now publishes `generated/USD.json` on every refresh, using the exact same BTC/USD reference as the other generated assets. Values are BTC per USD; the inverse shows USD per BTC. A stale or truncated BTC reference aborts publication before dependent assets update. USD publication can succeed even when individual non-fiat assets fail.
+
+Bitcoinity itself is **not downloaded automatically**: its existing archive is preserved, and newer observations come from Yahoo with the source boundary recorded. Other fiat CSVs are **not refreshed by this workflow**. All historical CSVs remain available for comparison.
 
 ## Run Locally
 
