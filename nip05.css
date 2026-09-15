@@ -81,7 +81,7 @@ body.modal-active {
     transform: translate(-50%, -50%);
     width: 80%;
     max-width: 500px;
-    background-color: rgb(34, 33, 33);
+    background-color: var(--surface);
     color: #fff;
     padding: 20px;
     border-radius: 10px;

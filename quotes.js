@@ -11,15 +11,19 @@ fetch('quotes.json')
       [quotes[i], quotes[j]] = [quotes[j], quotes[i]];
     }
 
-    // Display the first quote
-    quotesContainer.innerHTML = `<p>"${quotes[0].text}"<br><br>~ Satoshi Nakamoto <br>${quotes[0].date}</p>`;
-
-    // Show next quote after 30 seconds
-    let currentQuote = 1;
-    setInterval(() => {
+    let currentQuote = 0;
+    let quoteTimer;
+    function showNextQuote() {
+      clearTimeout(quoteTimer);
       quotesContainer.innerHTML = `<p>"${quotes[currentQuote].text}"<br><br>~ Satoshi Nakamoto <br>${quotes[currentQuote].date}</p>`;
       currentQuote = (currentQuote + 1) % quotes.length;
-    }, 35000);
-  });
+      window.scrollTo(0, 0);
+      quoteTimer = setTimeout(showNextQuote, 120000);
+    }
 
+    showNextQuote();
+    const nextQuoteButton = document.getElementById('next-quote');
+    nextQuoteButton.disabled = false;
+    nextQuoteButton.addEventListener('click', showNextQuote);
+  });
 

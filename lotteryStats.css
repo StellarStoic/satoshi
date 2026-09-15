@@ -73,7 +73,7 @@
 }
 
 .stat-card {
-    background: rgb(45, 45, 45);
+    background: var(--surface-raised);
     border-radius: 10px;
     padding: 20px;
     text-align: center;
@@ -112,7 +112,7 @@
     flex-direction: column;
     align-items: center;
     overflow: hidden;
-    background: rgb(34, 33, 33);
+    background: var(--surface);
     border-radius: 10px;
     padding: 25px;
     margin: 30px 0;
@@ -200,7 +200,7 @@
 }
 
 .meta-item {
-    background: rgb(45, 45, 45);
+    background: var(--surface-raised);
     padding: 15px;
     border-radius: 8px;
 }
@@ -289,14 +289,14 @@
 .winners-table {
     width: 100%;
     border-collapse: collapse;
-    background: rgb(45, 45, 45);
+    background: var(--surface-raised);
     border-radius: 8px;
     overflow-x: auto;
     white-space: nowrap;
 }
 
 .winners-table thead {
-    background: rgb(34, 33, 33);
+    background: var(--surface);
 }
 
 .winners-table th {
@@ -331,7 +331,7 @@
 
 /* Progress Bar Styles */
 .progress-bar-container {
-    background: rgb(45, 45, 45);
+    background: var(--surface-raised);
     border-radius: 10px;
     padding: 20px;
     margin: 30px 0;
@@ -359,7 +359,7 @@
 
 .block-segment {
     flex: 1;
-    background: #333;
+    background: var(--surface-raised);
     transition: background-color 0.3s ease;
 }
 

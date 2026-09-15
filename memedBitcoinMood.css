@@ -26,7 +26,7 @@ h1 {
     position: relative;
     padding: 12px 24px;
     border: 2px solid #444;
-    background: #222;
+    background: var(--surface);
     color: #888;
     border-radius: 8px;
     cursor: pointer;

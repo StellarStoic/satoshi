@@ -1,0 +1,113 @@
+:root {
+    color-scheme: dark;
+    --page-bg: #101112;
+    --page-texture: url('/img/grain.png');
+    --grain-opacity: .55;
+    --surface: #191b1d;
+    --surface-raised: #242628;
+    --border: #414448;
+    --text: #e6e6e6;
+    --text-muted: #b5b5b5;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { min-height: 100%; }
+body {
+    background-color: var(--page-bg);
+    isolation: isolate;
+    color: var(--text);
+    min-height: 100svh;
+    letter-spacing: 0;
+}
+body::before {
+    content: '';
+    position: fixed;
+    inset: -256px;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--page-texture);
+    background-repeat: repeat;
+    background-size: 256px 256px;
+    opacity: var(--grain-opacity);
+    animation: site-grain 0.8s steps(1, end) infinite;
+}
+@keyframes site-grain {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-43px, 61px); }
+    50% { transform: translate(79px, -37px); }
+    75% { transform: translate(-91px, -73px); }
+}
+body:has(.footer) { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+img, video { max-width: 100%; height: auto; }
+/* Match these widgets' default color scheme so their canvases stay transparent. */
+iframe[src^="https://playtdt.com/widget/"],
+iframe[src^="https://changenow.io/embeds/"] { color-scheme: normal; }
+input, textarea, select { max-width: 100%; }
+button, a, input, select, textarea { touch-action: manipulation; }
+:focus-visible { outline: 2px solid #f2a900; outline-offset: 4px; }
+p, h1, h2, h3, h4, a, code { overflow-wrap: anywhere; }
+#menu { max-width: calc(100vw - 32px); }
+#menu { max-height: calc(100dvh - 110px); overflow-y: auto; }
+#menu .submenu { position: static; min-width: 0; width: 100%; }
+#menu .has-submenu.active .submenu { max-height: 45dvh; }
+#menu a { min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.submenu li a { white-space: normal; }
+.footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+.footer > a { grid-column: 2; grid-row: 1; margin: 0; }
+.footer > i.lni.lni-bolt-2 { grid-column: 3; grid-row: 1; margin: 0; }
+.footer #fee-rate, .footer #block-height {
+    position: static;
+    grid-row: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    margin: 0;
+}
+.footer #block-height { grid-column: 1; justify-self: start; text-align: left; }
+.footer #fee-rate { grid-column: 4; justify-self: end; text-align: right; }
+#filters { position: absolute; width: 0; height: 0; pointer-events: none; }
+#quotes { position: relative; top: auto; left: auto; transform: none; margin: 120px auto 48px; font-size: 1rem; }
+.description-modal, #uploadModal, #infoModal, #qrCodeModal, #cookieConsentModal,
+#mempoolTinyDataModal, #game39Modal, #bip39Modal, #lotteryExplainerModal {
+    max-width: min(500px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    z-index: 4000;
+    border-radius: 8px;
+}
+#contactModal { z-index: 4000; }
+.contact-modal-content { border-radius: 8px; margin: 24px auto; }
+.contact-icon { flex: 0 0 40px; margin-right: 16px; }
+.contact-info { min-width: 0; overflow-wrap: anywhere; }
+.contact-option { border-radius: 8px; }
+.currency-input { width: 0; flex: 1 1 0; }
+.qr-seed-form label { color: var(--text); }
+.qr-seed-form input, .qr-seed-form textarea, .qr-seed-form select { background: var(--surface-raised); color: var(--text); border-color: var(--border); }
+.isBip39questionTitle { position: relative; top: auto; left: auto; transform: none; margin: 110px auto 24px; }
+.input-wrapper { width: min(400px, 100%); }
+.centered-input-container { padding-inline: 16px; }
+.bip39-helper-zone { position: relative; top: auto; left: auto; transform: none; }
+.ticket-verifier-container { position: relative; inset: auto; margin: 90px 16px 24px; min-height: 60svh; padding: 64px 16px 24px; border-radius: 8px; }
+.drop-zone { min-height: 220px; width: 100%; padding: 16px; }
+.drop-zone-quote { max-width: calc(100% - 32px); text-align: center; }
+.center-container { position: relative; top: auto; left: auto; transform: none; margin: 120px auto 40px; z-index: auto; }
+.satoshis-display { font-size: 160px; max-width: 100%; }
+@media (max-width: 600px) {
+    #text1, #text2 { font-size: 72px; padding-inline: 16px; }
+    .satoshis-display { font-size: 88px; }
+    .ghost-qr-title { margin-top: 90px; }
+    .currency-container { padding: 12px 8px; width: 100%; }
+    #converter { padding-inline: 12px; }
+    .contact-modal-content { padding: 20px 12px; }
+    .contact-option { padding: 12px; }
+    #gratitudeHeader { max-width: 100%; }
+    .qr-seed-form { padding: 12px 0; }
+    input, textarea, select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

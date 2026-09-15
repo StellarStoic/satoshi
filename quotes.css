@@ -1,0 +1,57 @@
+.quotes-page:has(.footer) {
+    padding-bottom: 0;
+}
+
+.quotes-page::before {
+    inset: 0;
+    animation-name: quotes-grain;
+}
+
+@keyframes quotes-grain {
+    0%, 100% { background-position: 0 0; }
+    25% { background-position: -43px 61px; }
+    50% { background-position: 79px -37px; }
+    75% { background-position: -91px -73px; }
+}
+
+.quotes-stage {
+    min-height: 100svh;
+    display: grid;
+    align-items: center;
+    padding: 104px 24px calc(80px + env(safe-area-inset-bottom));
+}
+
+.quotes-page #quotes {
+    width: 100%;
+    margin: 0 auto;
+    cursor: copy;
+}
+
+#next-quote {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    #next-quote {
+        display: grid;
+        place-items: center;
+        position: fixed;
+        top: 40px;
+        right: 24px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text-muted);
+        opacity: .35;
+        font-size: 20px;
+        cursor: pointer;
+    }
+
+    #next-quote:hover,
+    #next-quote:focus-visible {
+        opacity: 1;
+        color: #f2a900;
+    }
+}

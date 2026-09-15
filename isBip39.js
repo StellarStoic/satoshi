@@ -1,10 +1,5 @@
-let bip39Words = [];
-
-fetch('/docs/bip39.json')
-  .then(res => res.json())
-  .then(data => {
-    bip39Words = data.words || data; // handle both `{"words": [...]} or just [...]`
-  });
+import { wordlist as bip39Words } from './vendor/bip39.mjs';
+import { explainTerms } from './bip39Glossary.mjs';
 
 // From Jameson Lopp's repeated words findings at https://blog.lopp.net/how-many-bitcoin-seed-phrases-are-only-one-repeated-word/
 const repeatedWords12x = new Set([
@@ -31,13 +26,23 @@ const suggestionsBox = document.getElementById('suggestions');
 const warningBox = document.getElementById('repetitionWarning');
 
 let currentMatches = [];
+let inputRevision = 0;
 
 input.addEventListener('input', () => {
   const value = input.value.trim().toLowerCase();
+  const revision = ++inputRevision;
+  const validityInfo = document.getElementById('wordValidityInfo');
+  validityInfo.textContent = '';
+  validityInfo.classList.remove('visible');
+  document.getElementById('lab-use-checked-word').hidden = true;
+  warningBox.textContent = '';
+  warningBox.classList.remove('visible');
+  currentMatches = [];
 
   if (value === "") {
     input.classList.remove('valid', 'invalid');
     suggestionsBox.textContent = "";
+    suggestionsBox.classList.remove('active');
     return;
   }
 
@@ -47,36 +52,32 @@ input.addEventListener('input', () => {
   warningBox.classList.remove('visible');
   warningBox.textContent = '';
 
-  const frequencyInfo = document.getElementById('wordFrequencyInfo');
-
   if (bip39Words.includes(value)) {
     input.classList.add('valid');
     input.classList.remove('invalid');
   
-    fetchWordFrequency(value).then(freq => {
-      if (freq !== null) {
-        const [rand1, rand2] = getRandomBip39Words(value);
-        const ngramQuery = [rand1, value, rand2].join(',');
-        const ngramUrl = `https://books.google.com/ngrams/graph?content=${encodeURIComponent(ngramQuery)}&year_start=1500&year_end=2022&corpus=26&smoothing=3`;
-        
-        const message = `🧠 "${value}" is a ${freq >= 10 ? 'common' : freq >= 1 ? 'moderately common' : 'rare'} English word — it appears about ${freq.toFixed(2)} times per million words in written English <a href="${ngramUrl}" target="_blank" style="color: #aaa; text-decoration: underline;">(based on Google Books data)</a>.`;
-        frequencyInfo.innerHTML = message;
-        frequencyInfo.classList.add('visible');
-      } else {
-      frequencyInfo.innerHTML = '';
-      frequencyInfo.classList.remove('visible');
-      }
-    });
   } else {
     input.classList.add('invalid');
     input.classList.remove('valid');
-    frequencyInfo.innerHTML = '';
-    frequencyInfo.classList.remove('visible');
   }
 
+  const isValid = bip39Words.includes(value);
+  document.getElementById('lab-use-checked-word').hidden = !isValid;
+  const validity = document.createElement('strong');
+  validity.className = isValid ? 'word-valid' : 'word-invalid';
+  validity.textContent = isValid ? 'valid' : 'NOT';
+  validityInfo.append(
+    `${value} is ${isValid ? 'a ' : ''}`,
+    validity,
+    isValid ? ' BIP39 word.' : ' valid BIP39 word.'
+  );
+  validityInfo.classList.add('visible');
+  explainTerms(validityInfo);
+
   // If invalid BIP39 word, fetch similar real words
-  if (!bip39Words.includes(value) && value.length >= 3) {
+  if (!bip39Words.includes(value) && /^[a-z]{3,}$/.test(value)) {
     fetchSimilarEnglishWords(value).then(similarWords => {
+      if (revision !== inputRevision) return;
       let html = '';
   
       // 1. Datamuse Suggestions
@@ -125,6 +126,10 @@ if (currentMatches.length) {
   }).join(', ');
   bip39SuggestionHTML = `Suggestions: ${matchElements}`;
 }
+if (!isValid && bip39SuggestionHTML) {
+  suggestionsBox.innerHTML = bip39SuggestionHTML;
+  suggestionsBox.classList.add('active');
+}
 
 // Repeated seed phrase warning
 let warns12 = repeatedWords12x.has(value);
@@ -145,6 +150,7 @@ if (warns12 || warns24) {
 
   warningBox.textContent = repeatNote;
   warningBox.classList.add('visible');
+  explainTerms(warningBox);
 } else {
   warningBox.textContent = '';
   warningBox.classList.remove('visible');
@@ -161,18 +167,12 @@ suggestionsBox.addEventListener('click', (e) => {
 
 // Autocomplete on TAB if one match
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab' && currentMatches.length === 1) {
+  if (e.key === 'Tab' && !e.shiftKey && currentMatches.length === 1 && currentMatches[0] !== input.value.trim().toLowerCase()) {
     e.preventDefault();
     input.value = currentMatches[0];
     input.dispatchEvent(new Event('input'));
   }
 });
-
-function getRandomBip39Words(excludeWord, count = 2) {
-  const filtered = bip39Words.filter(word => word !== excludeWord);
-  const shuffled = filtered.sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-}
 
 // Levenshtein typo correction for mistyped words
 function getClosestWordsByDistance(input, wordList, maxDistance = 2, maxResults = 5) {
@@ -200,24 +200,6 @@ function getClosestWordsByDistance(input, wordList, maxDistance = 2, maxResults 
     .sort((a, b) => a.distance - b.distance)
     .slice(0, maxResults)
     .map(entry => entry.word);
-}
-
-const frequencyCache = {};
-
-function fetchWordFrequency(word) {
-  if (frequencyCache[word]) {
-    return Promise.resolve(frequencyCache[word]);
-  }
-
-  return fetch(`https://api.datamuse.com/words?sp=${word}&md=f&max=1`)
-    .then(res => res.json())
-    .then(data => {
-      const freqTag = data[0]?.tags?.find(tag => tag.startsWith("f:"));
-      const freq = freqTag ? parseFloat(freqTag.slice(2)) : null;
-      frequencyCache[word] = freq;
-      return freq;
-    })
-    .catch(() => null);
 }
 
 function fetchSimilarEnglishWords(inputWord) {

@@ -18,15 +18,20 @@
     <link rel="manifest" href="/site.webmanifest">
 
     <!-- Windows Tile Icon -->
-    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileColor" content="#101112">
     <meta name="msapplication-config" content="/browserconfig.xml">
 
     <!-- Theme Color -->
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#101112">
     
     <title>Satoshi Quotes</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="quotes.css">
+    <script src="pwa.js" defer></script>
+    <link rel="stylesheet" href="siteEffects.css">
+    <script src="siteEffects.js" defer></script>
 </head>
-<body>
+<body class="quotes-page">
 
     <!-- Burger menu -->
     <a href="#menu" id="toggle"><span></span></a>
@@ -107,12 +112,17 @@
       </ul>
     </div>
 
+    <main class="quotes-stage">
     <!-- quote text -->
     <div id="quotes">
             <p id="text"></p>
             <p id="date"></p>
             <p id="author">Satoshi Nakamoto</p>
     </div>
+    </main>
+    <button id="next-quote" type="button" aria-label="New quote" title="New quote" disabled>
+        <i class="lni lni-refresh-circle-1-clockwise" aria-hidden="true"></i>
+    </button>
 
 <!-- Contact modal -->
 <div id="contactModal" class="contact-modal-wrapper">

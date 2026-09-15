@@ -177,7 +177,7 @@
   top: -100px; /* start hidden above view */
   left: 0;
   width: 100%;
-  background-color: #333;
+  background-color: var(--surface-raised);
   color: #fff;
   font-family: "Roboto Mono", monospace;
   padding: 1rem;
@@ -201,7 +201,7 @@
   font-size: 3.6rem;
   font-weight: bold;
   font-family: 'East Sea Dokdo', cursive;
-  background-color: #333;
+  background-color: var(--surface-raised);
   color: #c47710;
   text-align: center;
   padding: 0 1rem;

@@ -3,7 +3,7 @@
     width: 95%;
     max-width: 1400px;
     margin: 20px auto;
-    background: #303030;
+    background: var(--surface);
     border-radius: 12px;
     padding: 20px;
     overflow-x: hidden;
@@ -37,7 +37,7 @@ select, input, button {
     padding: 10px 15px;
     border: 1px solid #333;
     border-radius: 6px;
-    background: #2a2a2a;
+    background: var(--surface-raised);
     color: #f0f0f0;
     font-size: 14px;
     min-width: 120px;
@@ -261,7 +261,7 @@ option:checked {
 .events-section {
     margin-top: 30px;
     padding: 20px;
-    background: #2a2a2a;
+    background: var(--surface-raised);
     border-radius: 8px;
 }
 
@@ -290,7 +290,7 @@ option:checked {
 
 .event-card:hover {
     transform: translateX(5px);
-    background: #2a2a2a;
+    background: var(--surface-raised);
 }
 
 .event-title {

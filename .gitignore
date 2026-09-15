@@ -1,6 +1,6 @@
-/tools
+/tools/*
+!/tools/bip39/
 .vscode
 converter copy.html
 converter copy.js
 converter copy.css
-

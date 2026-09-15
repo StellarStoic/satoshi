@@ -29,7 +29,7 @@ header h5 {
     gap: 20px;
     margin-bottom: 30px;
     padding: 20px;
-    background: #6e6e6e;
+    background: var(--surface);
     border-radius: 10px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     flex-wrap: wrap;
@@ -156,7 +156,7 @@ header h5 {
     text-align: center;
     padding: 15px;
     color: rgb(197, 186, 158);
-    background: #6e6e6e;
+    background: var(--surface);
     border-radius: 10px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -177,7 +177,7 @@ header h5 {
 
 /* Individual offer card */
 .offer-card {
-    background: #6e6e6e;
+    background: var(--surface);
     border-radius: 10px;
     padding: 20px;
     margin-bottom: 20px;
@@ -306,7 +306,7 @@ header h5 {
 .offer-action {
     text-align: center;
     padding: 8px 16px;
-    background: #515153;
+    background: var(--surface-raised);
     color: white;
     border-radius: 5px;
     font-size: 0.9rem;
@@ -453,7 +453,7 @@ header h5 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgb(34, 33, 33);
+    background-color: var(--surface);
     padding: 0;
     border-radius: 15px;
     max-width: 500px;
@@ -627,7 +627,7 @@ header h5 {
 }
 
 .suggestion {
-    background: #515151;
+    background: var(--surface-raised);
     padding: 20px;
     border-radius: 8px;
     margin: 20px 0;

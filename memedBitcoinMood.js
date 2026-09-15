@@ -405,10 +405,10 @@ function displayMood(currentPrice, priceChange, volatility, mood, timeframe, sou
 const API_TIMEOUT = 5000; // 5 seconds max per API
 const FALLBACK_APIS = [
     { name: 'CoinGecko', func: fetchCoinGeckoData, priority: 1 },
-    { name: 'Binance', func: fetchBinanceData, priority: 2 },
-    { name: 'CoinStats', func: fetchCoinStatsData, priority: 3 },
-    { name: 'CoinPaprika', func: fetchCoinPaprikaData, priority: 4 }
+    { name: 'CoinPaprika', func: fetchCoinPaprikaData, priority: 2 },
+    { name: 'Binance', func: fetchBinanceData, priority: 3, timeframes: ['daily'] }
 ];
+let moodRequestId = 0;
 
 // Helper: Fetch with timeout
 async function fetchWithTimeout(url, options = {}) {
@@ -485,7 +485,7 @@ async function fetchBinanceData(timeframe) {
         if (!priceResp.ok) throw new Error(`HTTP ${priceResp.status}`);
         
         const priceData = await priceResp.json();
-        currentPrice = parseFloat(priceData.price);
+        const currentPrice = parseFloat(priceData.price);
         
         // Get 24h stats
         const statsResp = await fetchWithTimeout('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
@@ -564,7 +564,7 @@ async function fetchCoinPaprikaData(timeframe) {
             yearly: quotes.percent_change_1y
         };
         
-        const priceChange = changeMap[timeframe] || quotes.percent_change_24h;
+        const priceChange = changeMap[timeframe];
         const volatility = Math.abs(priceChange) * 1.3; // Estimate
         
         console.log(`✅ CoinPaprika success: $${currentPrice.toLocaleString()}`);
@@ -580,6 +580,7 @@ async function fetchCoinPaprikaData(timeframe) {
 // MAIN FETCH FUNCTION WITH SEQUENTIAL FALLBACK
 // ============================================================
 async function fetchMood(timeframe) {
+    const requestId = ++moodRequestId;
     currentTimeframe = timeframe; // Store current timeframe
     updateActiveButton(timeframe); // Update button glow
 
@@ -592,31 +593,31 @@ async function fetchMood(timeframe) {
     hideError();
     hideMoodDisplay();
     
-    const apis = [
-        { func: fetchCoinGeckoData, name: 'CoinGecko' },
-        { func: fetchBinanceData, name: 'Binance' },
-        { func: fetchCoinStatsData, name: 'CoinStats' },
-        { func: fetchCoinPaprikaData, name: 'CoinPaprika' }
-    ];
+    const apis = FALLBACK_APIS.filter(api => !api.timeframes || api.timeframes.includes(timeframe));
     
     for (const api of apis) {
+        let result;
         try {
             console.log(`\n🎯 Attempting ${api.name}...`);
-            const result = await api.func(timeframe);
-            
-            // CRITICAL: Update ATH state from this successful API call
-            updateATHFromPrice(result.currentPrice, api.name);
-            
-            const mood = calculateMood(result.priceChange, result.volatility, timeframe);
-            displayMood(result.currentPrice, result.priceChange, result.volatility, mood, timeframe, result.source);
-            return; // Success - exit
-            
+            result = await api.func(timeframe);
+            if (requestId !== moodRequestId) return;
+            if (![result.currentPrice, result.priceChange, result.volatility].every(Number.isFinite)
+                || result.currentPrice <= 0 || result.volatility < 0) {
+                throw new Error('Incomplete market data');
+            }
         } catch (error) {
+            if (requestId !== moodRequestId) return;
             console.warn(`⏭️ ${api.name} failed: ${error.message}`);
+            continue;
         }
+        // Rendering errors must not be reported as provider outages.
+        updateATHFromPrice(result.currentPrice, api.name);
+        const mood = calculateMood(result.priceChange, result.volatility, timeframe);
+        displayMood(result.currentPrice, result.priceChange, result.volatility, mood, timeframe, result.source);
+        return;
     }
     
-    showError('All Bitcoin APIs failed. Please try again later.');
+    showError('Bitcoin market data is temporarily unavailable. Select a timeframe to retry.');
 }
 
 // ============================================================
@@ -866,9 +867,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateActiveButton('daily');
     
     // Start data loading
-    fetchHistoricalATH().then(() => {
-        return fetchHalvingDate();
-    }).then(() => {
-        fetchMood('daily');
-    });
+    fetchMood('daily');
+    fetchHistoricalATH();
+    fetchHalvingDate();
 });

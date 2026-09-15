@@ -13,13 +13,13 @@
     width: 90%;
     max-width: 400px;
   }
-  
+
   .isBip39questionTitle h4 {
     margin: 0;
     font-size: 2rem;
     font-weight: 600;
   }
-  
+
 
   .centered-input-container {
     position: relative;
@@ -29,14 +29,14 @@
     min-height: 60vh; /* Center on screen nicely */
     flex-direction: column;
   }
-  
+
   .input-wrapper {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
-  
+
   #bip39Input {
     width: 100%;
     max-width: 100%;
@@ -50,19 +50,19 @@
     outline: none;
     transition: border-color 0.3s, color 0.3s, box-shadow 0.3s;
   }
-  
+
   #bip39Input.valid {
     color: rgb(1, 115, 1);
     border-color: rgb(39, 199, 39);
     box-shadow: 0 0 15px 4px rgb(39, 199, 39);
   }
-  
+
   #bip39Input.invalid {
     color: rgb(111, 0, 0);
     border-color: rgb(186, 6, 42);
     box-shadow: 0 0 15px 4px rgb(186, 6, 42);
   }
-  
+
   .bip39-helper-zone {
     position: absolute;
     top: 100%;
@@ -75,10 +75,10 @@
     gap: 4px;
     width: 100%;
   }
-  
+
   .suggestions-box,
   .repetition-warning,
-  .word-frequency-info {
+  .word-validity-info {
     min-height: 1.2em;
     font-size: 0.9rem;
     text-align: center;
@@ -91,23 +91,23 @@
   #suggestions {
     color: #ccc;
   }
-  
+
   .suggestions-box.active,
   .repetition-warning.visible,
-  .word-frequency-info.visible {
+  .word-validity-info.visible {
     opacity: 1;
     pointer-events: auto;
   }
-  
+
   .repetition-warning {
     color: #c78d19;
     margin-top: 30px;
   }
 
-  .word-frequency-info {
+  .word-validity-info {
     color: #c5ba9e;
   }
-  
+
 
   .info-modal-trigger {
     position: absolute; /* Positioned absolutely relative to the nearest positioned ancestor */
@@ -119,7 +119,7 @@
     z-index: 2;
 }
 
-/* .word-frequency-info {
+/* .word-validity-info {
   position: fixed;
   bottom: 20px;
   text-align: center;
@@ -131,7 +131,9 @@
   min-height: 1em;
 } */
 
-.word-frequency-info.visible {
+.word-validity-info.visible {
   opacity: 1;
 }
-  
+.word-valid { color: #4ade80; }
+.word-invalid { color: #ff6464; }
+

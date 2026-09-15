@@ -1,0 +1,14 @@
+{
+  "name": "satoshi-bip39-vendor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@scure/bip39": "2.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
