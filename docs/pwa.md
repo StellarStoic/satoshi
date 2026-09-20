@@ -16,6 +16,8 @@ The shared background uses a small transparent noise tile (`img/grain.png`) move
 
 Increment the cache version in `sw.js` when releasing changed precached assets. New workers wait for existing tabs to close before activating; activation removes only older Satoshi caches. No automatic reload interrupts an active form or game.
 
+The Cost of Living page, its electricity/fuel photos and public `historical_data/generated/living-EU-observed.json` snapshot are precached. This snapshot is an explicit exception to the JSON exclusion, using the same network-first/cache-fallback policy. All 26 country selections work offline. The page displays the comparison years and uses reported consumer prices, not inflation-index examples. The schema and filename differ from the old illustrative dataset so it cannot be mistaken for observed prices.
+
 ## Verification
 
 - Inspect the manifest and service worker in browser developer tools.

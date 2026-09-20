@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v8';
+const CACHE = 'satoshi-static-v21';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
@@ -6,7 +6,13 @@ const CORE = [
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
     '/isBip39.html', '/isBip39.css', '/isBip39.js', '/bip39Lab.css',
     '/bip39Lab.mjs', '/bip39LabModel.mjs', '/bip39Glossary.mjs', '/vendor/bip39.mjs',
-    '/img/grain.png', '/siteEffects.js', '/siteEffects.css'
+    '/img/grain.png', '/siteEffects.js', '/siteEffects.css',
+    '/living.html', '/living.css', '/living.mjs', '/livingModel.mjs',
+    '/historical_data/generated/living-EU-observed.json',
+    '/img/living/fuel.jpg', '/img/living/electricity.jpg',
+    '/priceScanner.html', '/priceScanner.css', '/priceScanner.mjs',
+    '/priceScannerModel.mjs', '/priceScannerRates.mjs', '/currencies.json',
+    '/vendor/lucide/lucide.min.js'
 ];
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
@@ -25,7 +31,9 @@ self.addEventListener('fetch', event => {
     // Cache public static resources only; live data and user inputs are excluded.
     const navigation = request.mode === 'navigate';
     const asset = ['style', 'script', 'image', 'font'].includes(request.destination);
-    if ((!navigation && !asset) || url.search) return;
+    const livingData = url.pathname === '/historical_data/generated/living-EU-observed.json';
+    const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/ocr/');
+    if ((!navigation && !asset && !livingData && !scannerAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         try {

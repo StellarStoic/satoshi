@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101112">
+    <title>Cost of Living in Bitcoin | Satoshi.si</title>
+    <link rel="icon" href="/favicon-32x32.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="siteEffects.css">
+    <link rel="stylesheet" href="living.css">
+    <script src="pwa.js" defer></script>
+    <script src="siteEffects.js" defer></script>
+</head>
+<body class="living-page">
+    <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+    <nav id="menu" aria-label="Main navigation">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+
+        <!-- Bitcoin Knowlage submenu -->
+        <li class="has-submenu">
+        <a href="#">Knowlage</a>
+        <ul class="submenu">
+            <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+        <!-- Lottery with submenu -->
+        <li class="has-submenu">
+        <a href="#">Lottery</a>
+        <ul class="submenu">
+            <li><a href="lottery.html">Play</a></li>
+            <li><a href="https://t.me/bitcoinlightninglotterybot" target="_blank" rel="noopener">Play on Telegram</a></li>
+            <li><a href="https://nosta.me/npub10tteryu88lw060vnljwr0m8du3l533dg33wh8sq57rw40u69u43szykhqv" target="_blank" rel="noopener">Follow Nostr bot</a></li>
+            <li><a href="lotteryStats.html">Results & Stats</a></li>
+            <li><a href="ticketVerifier.html">Ticket Verifier</a></li>
+            <li><a href="lotteryTOS.html" target="_blank"  rel="noopener">Lottery Terms of service</a></li>
+        </ul>
+        </li>
+
+        <!-- Price related submenu -->
+        <li class="has-submenu">
+        <a href="#">Price Related</a>
+        <ul class="submenu">
+            <li><a href="converter.html">Converter</a></li>
+            <li><a href="MoscowTime.html">Moscow time</a></li>
+            <li><a href="memedBitcoinMood.html">Memed Bitcoin Mood</a></li>
+            <li><a href="chart.html">History chart</a></li>
+        </ul>
+        </li>
+
+        <!-- exchange submenu -->
+        <li class="has-submenu">
+        <a href="#">Exchange</a>
+        <ul class="submenu">
+            <li><a href="exchangeShitcoins.html">Exchange Shitcoins</a></li>
+            <!-- <li><a href="offers.html">P2P Bitcoin Offers</a></li> -->
+        </ul>
+        </li>
+
+        <!-- Nostr submenu -->
+        <li class="has-submenu">
+        <a href="#">Nostr</a>
+        <ul class="submenu">
+            <li><a href="nip05.html">NIP-05</a></li>
+        </ul>
+        </li>
+
+        <!-- Games submenu -->
+        <li class="has-submenu">
+        <a href="#">Game</a>
+        <ul class="submenu">
+            <li><a href="game39.html">Game39 Multi Player</a></li>   
+            <li><a href="game39single.html">Game39 Single Player</a></li>      
+        </ul>
+        </li>
+
+        <!-- Tools submenu -->
+        <li class="has-submenu">
+        <a href="#">tools</a>
+        <ul class="submenu">
+            <li><a href="ghostQR.html">GhostQR</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+      </ul>
+    </nav>
+    <main class="living-main">
+        <header class="living-heading">
+            <a class="living-brand" href="index.html">satoshi.si</a>
+            <h1>Cost of Living <span>in Bitcoin</span></h1>
+        </header>
+        <div id="living-error" role="alert" hidden></div>
+        <p id="living-loading" role="status">Loading prices...</p>
+        <div id="living-content" hidden>
+            <div class="living-controls">
+                <label>EU country<select id="living-country"></select></label>
+                <label>Living cost<select id="living-item"></select></label>
+            </div>
+            <section class="living-comparison" aria-labelledby="living-item-title" aria-live="polite" aria-atomic="true">
+                <div class="living-subject">
+                    <img id="living-photo" alt="" width="180" height="120">
+                    <div><h2 id="living-item-title"></h2><span id="living-item-unit"></span><p id="living-item-description"></p></div>
+                </div>
+                <p class="living-label">Average reported consumer prices &middot; taxes included</p>
+                <div class="living-totals">
+                    <div><span id="living-then-year" class="total-year"></span><strong id="living-then-fiat"></strong><small>Average price then</small><span id="living-then-btc" class="bitcoin-total"></span></div>
+                    <div><span id="living-now-year" class="total-year"></span><strong id="living-now-fiat"></strong><small>Average price that year</small><span id="living-now-btc" class="bitcoin-total"></span></div>
+                </div>
+                <div class="living-changes">
+                    <span>Category inflation <b id="living-fiat-change"></b><small>This item's price change.</small></span>
+                    <span>Inflation (EU) <b id="living-inflation-loss"></b><small id="living-inflation-meaning">Buying power your money lost.</small></span>
+                    <span class="living-purchasing-power">BTC buying-power increase <b id="living-buying-power"></b><small id="living-buying-meaning">This much BTC purchasing power increased.</small></span>
+                </div>
+                <p id="living-inflation-example" class="living-note"></p>
+            </section>
+            <p class="living-note">Same quantity in both years. Reported national prices in EUR, averaged over each year; not inflation-adjusted. Individual tariffs and pump prices vary.</p>
+            <p class="living-note">BTC uses each year's average available daily price. The 2010 reference starts on 17 July.</p>
+            <p class="living-sources">Sources: <a id="living-price-source" href="https://ec.europa.eu/eurostat/databrowser/view/nrg_pc_204/default/table?lang=en" target="_blank" rel="noopener">Eurostat</a> &middot; <a href="https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_ainr/default/table?lang=en" target="_blank" rel="noopener">EU inflation</a> &middot; <a href="https://frankfurter.dev/" target="_blank" rel="noopener">Frankfurter</a> &middot; <a href="https://data.bitcoinity.org/" target="_blank" rel="noopener">Bitcoinity</a> / <a href="https://finance.yahoo.com/quote/BTC-USD/" target="_blank" rel="noopener">Yahoo Finance</a></p>
+        </div>
+        <p class="living-sources">Illustrative photos: Unsplash.</p>
+    </main>
+    <footer class="footer"><a href="mailto:one@satoshi.si">one@satoshi.si</a></footer>
+    <script src="burgerMenu.js"></script>
+    <script type="module" src="living.mjs"></script>
+</body>
+</html>

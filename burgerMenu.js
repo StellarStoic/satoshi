@@ -43,6 +43,18 @@ theToggle.onclick = function() {
 
 // NEW CODE: Submenu functionality
 document.addEventListener('DOMContentLoaded', function() {
+    const priceLink = document.querySelector('#menu a[href="chart.html"]') ||
+        Array.from(document.querySelectorAll('#menu .submenu a')).find(function(link) {
+            return link.textContent.trim() === 'History chart';
+        });
+    if (priceLink && !document.querySelector('#menu a[href="priceScanner.html"]')) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = 'priceScanner.html';
+        link.textContent = 'Price Scanner';
+        item.append(link);
+        priceLink.closest('li').after(item);
+    }
     // Get all menu items that have submenus
     var submenuItems = document.querySelectorAll('.has-submenu > a');
     

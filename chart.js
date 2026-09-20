@@ -107,7 +107,6 @@ const assetConfig = {
     'TLT':  { type: 'bond', unit: 'share', displayName: '20+Y Treasury', category: 'Bonds' },
     'IEF':  { type: 'bond', unit: 'share', displayName: '7-10Y Treasury', category: 'Bonds' },
     'BND':  { type: 'bond', unit: 'share', displayName: 'Total Bond Market', category: 'Bonds' },
-    'TNX': { type: 'bond', unit: '%', displayName: '10Y Treasury Yield', category: 'Bonds' },
 
     // --- OTHER  ---
     'VNQ':  { type: 'other', unit: 'share', displayName: 'Vanguard Real Estate ETF', category: 'Real Estate' },
@@ -1421,34 +1420,11 @@ function updateDataInfo(data, currency) {
     
     const firstDate = data[0].date.toLocaleDateString();
     const lastDate = data[data.length - 1].date.toLocaleDateString();
-    const dataPoints = data.length;
-    const exchanges = new Set();
-    data.forEach(item => item.exchanges.forEach(ex => exchanges.add(ex)));
-    const scaleType = getSelectedScaleType();
-    
-    const eventFilter = document.getElementById('eventFilter').value;
-    const mode = eventFilter === 'hide' ? 'CSV start' : 'Event start';
-    
-    infoElement.innerHTML = 
-        `Data from ${firstDate} to ${lastDate} • ${dataPoints} data points • ${currency} • ${scaleType} scale • ${mode}`;
-    const source = historySources.get(currency);
+    infoElement.textContent = `${firstDate} to ${lastDate}`;
     const details = document.createElement('p');
-    if (source) {
-        const link = document.createElement('a');
-        link.href = `https://finance.yahoo.com/quote/${encodeURIComponent(source.symbol)}/history/`;
-        link.textContent = source.source;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        details.append(link, ` | ${source.kind} | ${source.unit} | Latest observation: ${source.lastObservation} | Refreshed: ${new Date(source.refreshedAt).toLocaleString()}`);
-        details.append(document.createElement('br'), source.method, document.createElement('br'), `BTC reference: ${source.btcSource}`);
-        if (source.kind === 'index') details.append(' | Index-level comparison, not a purchasable asset price.');
-    } else {
-        details.textContent = 'Legacy archive: not automatically refreshed. Historical adjustments and units have not been fully verified.';
-    }
-    const methodology = document.createElement('a');
-    methodology.href = './docs/history-data.md';
-    methodology.textContent = 'Data sources and methodology';
-    details.append(document.createElement('br'), methodology);
+    details.innerHTML = 'Sources: Markets: <a href="https://finance.yahoo.com/" target="_blank" rel="noopener">Yahoo Finance</a>'
+        + ' &middot; Bitcoin: <a href="https://data.bitcoinity.org/" target="_blank" rel="noopener">Bitcoinity</a> / <a href="https://finance.yahoo.com/quote/BTC-USD/" target="_blank" rel="noopener">Yahoo Finance</a>'
+        + ' &middot; Fiat: <a href="https://frankfurter.dev/" target="_blank" rel="noopener">Frankfurter</a>';
     infoElement.append(details);
 }
 

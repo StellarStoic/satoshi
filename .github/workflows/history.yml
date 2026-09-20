@@ -30,10 +30,17 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r tools/history/requirements.txt
-        if: github.event_name != 'push'
       - run: python -m unittest discover -s tools/history -p 'test_*.py'
       - run: python tools/history/collect.py
         if: github.event_name != 'push'
+      - name: Refresh observed EU living costs
+        id: living
+        if: github.event_name != 'push'
+        continue-on-error: true
+        run: python tools/history/living_eu.py
+      - name: Report living-cost failure
+        if: steps.living.outcome == 'failure'
+        run: echo 'EU living-cost refresh failed. Previous complete snapshot retained; inspect the Eurostat/Commission/FX step.' >> "$GITHUB_STEP_SUMMARY"
       - name: Report provider failures
         if: always()
         run: |

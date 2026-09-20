@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#101112">
+    <title>Price Scanner | Satoshi.si</title>
+    <link rel="icon" href="/favicon-32x32.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="siteEffects.css">
+    <link rel="stylesheet" href="priceScanner.css">
+    <script src="pwa.js" defer></script>
+    <script src="siteEffects.js" defer></script>
+    <script src="vendor/lucide/lucide.min.js" defer></script>
+</head>
+<body class="scanner-page">
+    <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+    <nav id="menu" aria-label="Main navigation">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+
+        <!-- Bitcoin Knowlage submenu -->
+        <li class="has-submenu">
+        <a href="#">Knowlage</a>
+        <ul class="submenu">
+            <li><a href="whitepaper.html">Bitcoin whitepaper</a></li>
+            <li><a href="quotes.html">Words of Satoshi</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+        <!-- Lottery with submenu -->
+        <li class="has-submenu">
+        <a href="#">Lottery</a>
+        <ul class="submenu">
+            <li><a href="lottery.html">Play</a></li>
+            <li><a href="https://t.me/bitcoinlightninglotterybot" target="_blank" rel="noopener">Play on Telegram</a></li>
+            <li><a href="https://nosta.me/npub10tteryu88lw060vnljwr0m8du3l533dg33wh8sq57rw40u69u43szykhqv" target="_blank" rel="noopener">Follow Nostr bot</a></li>
+            <li><a href="lotteryStats.html">Results & Stats</a></li>
+            <li><a href="ticketVerifier.html">Ticket Verifier</a></li>
+            <li><a href="lotteryTOS.html" target="_blank"  rel="noopener">Lottery Terms of service</a></li>
+        </ul>
+        </li>
+
+        <!-- Price related submenu -->
+        <li class="has-submenu">
+        <a href="#">Price Related</a>
+        <ul class="submenu">
+            <li><a href="converter.html">Converter</a></li>
+            <li><a href="MoscowTime.html">Moscow time</a></li>
+            <li><a href="memedBitcoinMood.html">Memed Bitcoin Mood</a></li>
+            <li><a href="chart.html">History chart</a></li>
+        </ul>
+        </li>
+
+        <!-- exchange submenu -->
+        <li class="has-submenu">
+        <a href="#">Exchange</a>
+        <ul class="submenu">
+            <li><a href="exchangeShitcoins.html">Exchange Shitcoins</a></li>
+            <!-- <li><a href="offers.html">P2P Bitcoin Offers</a></li> -->
+        </ul>
+        </li>
+
+        <!-- Nostr submenu -->
+        <li class="has-submenu">
+        <a href="#">Nostr</a>
+        <ul class="submenu">
+            <li><a href="nip05.html">NIP-05</a></li>
+        </ul>
+        </li>
+
+        <!-- Games submenu -->
+        <li class="has-submenu">
+        <a href="#">Game</a>
+        <ul class="submenu">
+            <li><a href="game39.html">Game39 Multi Player</a></li>   
+            <li><a href="game39single.html">Game39 Single Player</a></li>      
+        </ul>
+        </li>
+
+        <!-- Tools submenu -->
+        <li class="has-submenu">
+        <a href="#">tools</a>
+        <ul class="submenu">
+            <li><a href="ghostQR.html">GhostQR</a></li>
+            <li><a href="isBip39.html">Is BIP39 word?</a></li>
+        </ul>
+        </li>
+
+      </ul>
+    </nav>
+    <main class="scanner-main">
+        <header class="scanner-heading"><a href="index.html">satoshi.si</a><h1>Price Scanner</h1></header>
+        <div class="scanner-toolbar">
+            <label class="scanner-currency">Price tag currency<select id="scanner-currency"><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
+            <fieldset class="scanner-units"><legend>Display</legend>
+                <label><input type="radio" name="scanner-unit" value="BTC" checked><span>BTC</span></label>
+                <label><input type="radio" name="scanner-unit" value="sats"><span>Sats</span></label>
+            </fieldset>
+            <div class="scanner-camera-controls">
+                <button id="scanner-start" type="button"><i data-lucide="camera" aria-hidden="true"></i><span>Start camera</span></button>
+                <button id="scanner-flip" class="scanner-icon" type="button" title="Switch camera" aria-label="Switch camera" disabled><i data-lucide="switch-camera" aria-hidden="true"></i></button>
+                <button id="scanner-torch" class="scanner-icon" type="button" title="Torch" aria-label="Torch" aria-pressed="false" disabled><i data-lucide="flashlight" aria-hidden="true"></i></button>
+            </div>
+        </div>
+        <div id="scanner-error" role="alert" hidden></div>
+        <div id="scanner-stage" class="scanner-stage">
+            <video id="scanner-video" autoplay muted playsinline aria-label="Live camera"></video>
+            <div id="scanner-idle" class="scanner-idle" aria-hidden="true"><i data-lucide="scan-line"></i></div>
+            <div id="scanner-overlays" aria-label="Detected Bitcoin prices"></div>
+            <div class="scanner-status"><span id="scanner-status" role="status">Camera off</span><span id="scanner-count"></span></div>
+        </div>
+        <div class="scanner-bottom">
+            <label id="scanner-zoom-control" hidden>Zoom<input id="scanner-zoom" type="range" aria-label="Camera zoom"></label>
+            <div class="scanner-rates"><span id="scanner-rate" role="status">Connecting to Sintra...</span><button id="scanner-refresh" class="scanner-icon" type="button" title="Refresh rates" aria-label="Refresh rates"><i data-lucide="refresh-cw" aria-hidden="true"></i></button></div>
+            <p class="scanner-sources">Rates: <a href="https://www.sintra.fi/api" target="_blank" rel="noopener">Sintra</a> &middot; <a href="https://frankfurter.dev/" target="_blank" rel="noopener">Frankfurter</a></p>
+        </div>
+    </main>
+    <script src="burgerMenu.js"></script>
+    <script type="module" src="priceScanner.mjs"></script>
+</body>
+</html>
