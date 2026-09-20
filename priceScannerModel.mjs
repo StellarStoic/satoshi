@@ -2,6 +2,24 @@ export const BTC_MAX_AGE = 120_000;
 export const FX_MAX_AGE = 86_400_000;
 export const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
+export function hasScannerSettings(storage) {
+    try {
+        const saved = JSON.parse(storage?.getItem('priceScannerSettings'));
+        const currency = storage?.getItem('priceScannerCurrency');
+        return Boolean(saved && ['BTC', 'sats'].includes(saved.unit) && positive(saved.zoom) &&
+            saved.zoom >= 1 && saved.zoom <= 4 && /^[A-Z]{3}$/.test(currency) && currency !== 'BTC');
+    } catch { return false; }
+}
+
+export function scannerSettings(storage) {
+    let saved = {};
+    try { saved = JSON.parse(storage?.getItem('priceScannerSettings')) || {}; } catch {}
+    return {
+        unit: saved.unit === 'sats' ? 'sats' : 'BTC',
+        zoom: positive(saved.zoom) ? Math.max(1, Math.min(4, saved.zoom)) : 1,
+    };
+}
+
 export function fiatToBtc(amount, usdPerBtc, fiatPerUsd) {
     if (![amount, usdPerBtc, fiatPerUsd].every(positive)) return null;
     return amount / fiatPerUsd / usdPerBtc;
@@ -40,11 +58,13 @@ const knownCodes = /\b(USD|EUR|GBP|CAD|AUD|CHF|JPY|CNY|INR|PLN|CZK|SEK|NOK|DKK|H
 
 export function parsePrice(text, currency = 'EUR', explicit = false) {
     let input = text.trim().replace(/\u00a0|\u202f/g, ' ').replace(/[’‘]/g, "'");
+    input = input.replace(/\s*([.,])\s*/g, '$1');
     if (!input || /[%/:=]|\d\s*[-–]\s*\d/.test(input)) return null;
-    const code = input.match(knownCodes)?.[1]?.toUpperCase();
+    const selectedCode = new RegExp(`\\b${currency}\\b`, 'i');
+    const code = input.match(knownCodes)?.[1]?.toUpperCase() || input.match(selectedCode)?.[0]?.toUpperCase();
     if (code && code !== currency) return null;
     let marked = explicit || Boolean(code);
-    if (code) input = input.replace(knownCodes, '').trim();
+    if (code) input = input.replace(new RegExp(`\\b${code}\\b`, 'i'), '').trim();
     for (const [symbol, currencies] of Object.entries(symbolCurrencies)) {
         if (input.includes(symbol)) {
             if (!currencies.includes(currency)) return null;
@@ -94,19 +114,39 @@ export function detectPrices(blocks, currency) {
         const words = line.words || [];
         for (let i = 0; i < words.length; i++) {
             const word = words[i];
-            if (word.confidence < 55 || !word.bbox || !/\d/.test(word.text)) continue;
+            if (word.confidence < 40 || !word.bbox || !/\d/.test(word.text)) continue;
             const prior = words[i - 1], next = words[i + 1];
-            const marker = token => token && (/^[€$£¥₹]$/.test(token.text) || /^[A-Z]{3}$/.test(token.text) && knownCodes.test(token.text));
+            const marker = token => token?.bbox && (/^[€$£¥₹]$/.test(token.text) || /^[A-Z]{3}$/i.test(token.text) && (knownCodes.test(token.text) || token.text.toUpperCase() === currency));
             let text = word.text, box = word.bbox;
             if (marker(prior)) { text = `${prior.text} ${text}`; box = mergeBox(box, prior.bbox); }
             if (marker(next)) { text = `${text} ${next.text}`; box = mergeBox(box, next.bbox); }
+            const cents = words[i + 2];
+            if (/^\d{1,5}[.,]?$/.test(word.text) && next?.bbox &&
+                ((/^[.,]$/.test(next.text) && /^\d{2}$/.test(cents?.text || '') && cents?.bbox) ||
+                 (/[.,]$/.test(word.text) && /^\d{2}$/.test(next.text))) &&
+                next.bbox.x0 - word.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8) {
+                const last = /[.,]$/.test(word.text) ? i + 1 : i + 2;
+                const fraction = words[last];
+                if (fraction.confidence >= 40 && fraction.bbox.x0 - next.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8) {
+                    const suffix = words[last + 1];
+                    text = `${marker(prior) ? prior.text : ''}${word.text.replace(/[.,]$/, '')}.${fraction.text}${marker(suffix) ? suffix.text : ''}`;
+                    box = mergeBox(box, fraction.bbox);
+                    if (marker(suffix)) box = mergeBox(box, suffix.bbox);
+                    const value = parsePrice(text, currency);
+                    if (value !== null) found.push({value, bbox: box, confidence: Math.min(word.confidence, fraction.confidence)});
+                    i = last;
+                    continue;
+                }
+            }
             // Superscript cents are common on shelf labels; only join close, smaller digits.
             if (/^\d{1,5}$/.test(word.text) && /^\d{2}$/.test(next?.text || '') && next.confidence >= 55 &&
                 next.bbox.y1 - next.bbox.y0 < (word.bbox.y1 - word.bbox.y0) * 0.85 &&
                 next.bbox.x0 - word.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8 &&
                 next.bbox.y0 <= word.bbox.y0 + (word.bbox.y1 - word.bbox.y0) * 0.4) {
-                text = `${marker(prior) ? prior.text : ''}${word.text}.${next.text}`;
+                const suffix = words[i + 2];
+                text = `${marker(prior) ? prior.text : ''}${word.text}.${next.text}${marker(suffix) ? suffix.text : ''}`;
                 box = mergeBox(box, next.bbox);
+                if (marker(suffix)) box = mergeBox(box, suffix.bbox);
                 i++;
             } else if (!marker(prior) && !marker(next) && /^[%]|^(kg|g|mg|ml|cl|l|cm|mm|m|pcs)\b/i.test(next?.text || '')) continue;
             const value = parsePrice(text, currency);
@@ -116,10 +156,24 @@ export function detectPrices(blocks, currency) {
     return found.sort((a, b) => b.confidence - a.confidence).slice(0, 6);
 }
 
-export function stableDetections(current, previous, width, height) {
-    return current.filter(candidate => previous.some(old => old.value === candidate.value &&
+export function stableDetections(current, previous, width, height, allowConfident = false) {
+    return current.filter(candidate => (allowConfident && candidate.confidence >= 80) || previous.some(old => old.value === candidate.value &&
         Math.abs(old.bbox.x0 - candidate.bbox.x0) < width * 0.04 &&
         Math.abs(old.bbox.y0 - candidate.bbox.y0) < height * 0.04));
+}
+
+// Crop the same source rectangle used by object-fit: cover and centered digital zoom.
+export function cameraCrop(width, height, viewport, zoom = 1) {
+    const scale = Math.max(viewport.width / width, viewport.height / height) * zoom;
+    const cropWidth = viewport.width / scale, cropHeight = viewport.height / scale;
+    return {x: (width - cropWidth) / 2, y: (height - cropHeight) / 2, width: cropWidth, height: cropHeight};
+}
+
+export function frameDifference(a, b) {
+    if (!a || !b || a.length !== b.length) return 0;
+    let difference = 0;
+    for (let i = 0; i < a.length; i += 4) difference += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+    return difference / (a.length / 4 * 3);
 }
 
 export function containedBox(box, frame, viewport) {

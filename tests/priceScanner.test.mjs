@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parsePrice, detectPrices, fiatToBtc, containedBox, stableDetections, readSharedRates, parseFxResponse, BTC_MAX_AGE, FX_MAX_AGE} from '../priceScannerModel.mjs';
+import {parsePrice, detectPrices, fiatToBtc, containedBox, stableDetections, readSharedRates, parseFxResponse, BTC_MAX_AGE, FX_MAX_AGE, cameraCrop, frameDifference, scannerSettings} from '../priceScannerModel.mjs';
 import {ScannerRates} from '../priceScannerRates.mjs';
+import {hasScannerSettings} from '../priceScannerModel.mjs';
 
 test('currency conversion uses fiat per USD and USD per BTC, never the inverse', () => {
     assert.equal(fiatToBtc(20, 100000, 0.8), 0.00025);
@@ -13,10 +14,38 @@ test('prices handle decimal commas, thousands, currency symbols and whole prices
         ['12.99', 'EUR', 12.99], ['12,99', 'EUR', 12.99], ['EUR 1.234,56', 'EUR', 1234.56],
         ['$1,234.56', 'USD', 1234.56], ['1 234,56 €', 'EUR', 1234.56], ["CHF 1'234.50", 'CHF', 1234.5],
         ['€ 20', 'EUR', 20], ['20,-', 'EUR', 20], ['¥ 1,500', 'JPY', 1500], ['$1,234', 'USD', 1234],
+        ['20 €', 'EUR', 20], ['12 , 99 €', 'EUR', 12.99], ['€12.99', 'EUR', 12.99],
+        ['12.99$', 'USD', 12.99], ['20 AED', 'AED', 20],
     ]) assert.equal(parsePrice(text, currency), expected, text);
     for (const text of ['1234567890123', '500', '20%', '2026-09-20', '20/09/2026', '12.09.2026', '1.5 kg', '-12.99', '1.234', '1,2,3', '0.00', '$12.99', 'USD 12.99']) {
         assert.equal(parsePrice(text, 'EUR'), null, text);
     }
+});
+
+test('confident prices appear immediately; uncertain OCR needs repeat agreement', () => {
+    const confident = [{value: 12.99, confidence: 90, bbox: {x0: 10, y0: 20}}];
+    assert.equal(stableDetections(confident, [], 1000, 1000, true).length, 1);
+    const uncertain = [{...confident[0], confidence: 45}];
+    assert.equal(stableDetections(uncertain, [], 1000, 1000, true).length, 0);
+    assert.equal(stableDetections(uncertain, uncertain, 1000, 1000, true).length, 1);
+});
+
+test('split decimals and currency on either side retain the complete tag', () => {
+    for (const words of [
+        [word('€', 0), word('12.99', 75)],
+        [word('12.99', 0), word('€', 75)],
+        [word('12,', 0), word('99', 75), word('€', 150)],
+        [word('12', 0), word(',', 75), word('99', 150), word('€', 225)],
+        [word('12', 0), word('99', 75, 22), word('€', 150)],
+    ]) assert.equal(detectPrices(blocks(words), 'EUR')[0]?.value, 12.99);
+    assert.equal(detectPrices(blocks([word('12', 0), word('99', 75, 22), word('$', 150)]), 'EUR').length, 0);
+});
+
+test('digital zoom crops exactly the visible camera and tolerates small brightness changes', () => {
+    const crop = cameraCrop(1280, 720, {width: 360, height: 720}, 1);
+    assert.deepEqual(crop, {x: 460, y: 0, width: 360, height: 720});
+    assert.deepEqual(cameraCrop(1280, 720, {width: 360, height: 720}, 2), {x: 550, y: 180, width: 180, height: 360});
+    assert.equal(frameDifference(new Uint8Array([100, 100, 100, 255]), new Uint8Array([112, 112, 112, 255])), 12);
 });
 
 const word = (text, x0, height = 40) => ({text, confidence: 95, bbox: {x0, y0: 100, x1: x0 + 70, y1: 100 + height}});
@@ -38,6 +67,21 @@ test('overlay geometry follows contained video, including portrait letterboxing'
 });
 
 const storage = data => ({getItem: key => data[key] ?? null, setItem: (key, value) => { data[key] = value; }});
+test('first-use detection requires valid saved scanner preferences and currency', () => {
+    const valid = {priceScannerCurrency: 'EUR', priceScannerSettings: JSON.stringify({unit: 'BTC', zoom: 1})};
+    assert.equal(hasScannerSettings(storage(valid)), true);
+    for (const values of [{}, {...valid, priceScannerCurrency: 'BTC'}, {...valid, priceScannerSettings: 'broken'}, {...valid, priceScannerSettings: '{}'}]) {
+        assert.equal(hasScannerSettings(storage(values)), false);
+    }
+    assert.equal(hasScannerSettings({getItem() {throw Error();}}), false);
+});
+test('camera preferences restore safely from local storage', () => {
+    assert.deepEqual(scannerSettings(storage({priceScannerSettings: JSON.stringify({unit: 'sats', facing: 'user', zoom: 2})})), {unit: 'sats', zoom: 2});
+    for (const input of [storage({priceScannerSettings: 'broken'}), {getItem() { throw Error(); }}]) {
+        assert.deepEqual(scannerSettings(input), {unit: 'BTC', zoom: 1});
+    }
+    assert.deepEqual(scannerSettings(storage({priceScannerSettings: '{"unit":"bad","facing":"bad","zoom":99}'})), {unit: 'BTC', zoom: 4});
+});
 test('fresh converter FX cache can be reused, corrupt/expired/wrong-base rates cannot', () => {
     const now = 100000;
     const data = {exchangeRatesCache: JSON.stringify({USD: 1, EUR: 0.8, BTC: 0.00001, JPY: -1}), exchangeRatesCacheExpiry: String(now + 1000)};

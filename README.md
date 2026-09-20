@@ -4,7 +4,7 @@
 
 ## Explore
 
-[Price Scanner](https://satoshi.si/priceScanner.html) overlays BTC or sats values on price tags in a live camera view. On-device OCR keeps frames private, Sintra provides the BTC price, and fresh converter caches or Frankfurter provide currency rates. No photo capture or uploads. Camera controls include switching, torch and zoom where supported. See [scanner notes](docs/price-scanner.md).
+[Price Scanner](https://satoshi.si/priceScanner.html) overlays BTC or sats values on price tags in a full-screen camera view. On-device OCR keeps frames private, Sintra provides the BTC price, and fresh converter caches or Frankfurter provide currency rates. Optional photo downloads include Bitcoin labels and a satoshi.si logo watermark; images are never uploaded. Currency, display unit and pinch zoom are saved locally. Camera selection automatically prefers the rear camera on phones or the available webcam. See [scanner notes](docs/price-scanner.md).
 
 [Cost of Living in Bitcoin](https://satoshi.si/living.html) compares reported consumer prices in 2010 with the latest completed year across the 26 current EU countries that were members in 2010. Electricity, petrol and diesel have consistent quantities and complete annual coverage, using Eurostat and European Commission data including taxes. The page shows one item at a time, with photos, EUR/BTC prices, the item's price change, EU-wide buying power lost to inflation and Bitcoin's purchasing-power increase. A simple EUR100 example explains the separate EU inflation benchmark without altering actual item prices. No invented starting amounts or inflation-index substitutes for retail prices. Snapshots refresh through GitHub Actions and work offline. See [maintenance notes](docs/living-costs.md).
 

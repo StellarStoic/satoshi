@@ -93,31 +93,44 @@
       </ul>
     </nav>
     <main class="scanner-main">
-        <header class="scanner-heading"><a href="index.html">satoshi.si</a><h1>Price Scanner</h1></header>
-        <div class="scanner-toolbar">
-            <label class="scanner-currency">Price tag currency<select id="scanner-currency"><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
+        <header class="scanner-heading"><h1>Price Scanner</h1></header>
+        <dialog id="scanner-settings" class="scanner-dialog" aria-labelledby="scanner-settings-title">
+          <form method="dialog"><h2 id="scanner-settings-title">Camera settings</h2><button class="scanner-icon" title="Close settings" aria-label="Close settings"><i data-lucide="x" aria-hidden="true"></i></button></form>
+          <p id="scanner-settings-notice" role="alert" hidden>No saved scanner settings. Choose your currency and display unit, then save settings before starting the camera.</p>
+          <div class="scanner-toolbar">
+            <label class="scanner-currency">Price tag currency<input id="scanner-currency" type="search" list="scanner-currencies" value="EUR" autocomplete="off" spellcheck="false" aria-label="Price tag currency"><datalist id="scanner-currencies"><option value="EUR">Euro</option><option value="USD">US Dollar</option></datalist></label>
             <fieldset class="scanner-units"><legend>Display</legend>
                 <label><input type="radio" name="scanner-unit" value="BTC" checked><span>BTC</span></label>
                 <label><input type="radio" name="scanner-unit" value="sats"><span>Sats</span></label>
             </fieldset>
-            <div class="scanner-camera-controls">
-                <button id="scanner-start" type="button"><i data-lucide="camera" aria-hidden="true"></i><span>Start camera</span></button>
-                <button id="scanner-flip" class="scanner-icon" type="button" title="Switch camera" aria-label="Switch camera" disabled><i data-lucide="switch-camera" aria-hidden="true"></i></button>
-                <button id="scanner-torch" class="scanner-icon" type="button" title="Torch" aria-label="Torch" aria-pressed="false" disabled><i data-lucide="flashlight" aria-hidden="true"></i></button>
-            </div>
-        </div>
+          </div>
+          <div class="scanner-rates"><span id="scanner-rate" role="status">Connecting to Sintra...</span><button id="scanner-refresh" class="scanner-icon" type="button" title="Refresh rates" aria-label="Refresh rates"><i data-lucide="refresh-cw" aria-hidden="true"></i></button></div>
+          <p class="scanner-sources">Rates: <a href="https://www.sintra.fi/api" target="_blank" rel="noopener">Sintra</a> &middot; <a href="https://frankfurter.dev/" target="_blank" rel="noopener">Frankfurter</a></p>
+          <button id="scanner-start" type="button"><i data-lucide="save" aria-hidden="true"></i><span>Save settings</span></button>
+        </dialog>
         <div id="scanner-error" role="alert" hidden></div>
-        <div id="scanner-stage" class="scanner-stage">
+        <div id="scanner-stage" class="scanner-stage" tabindex="0" aria-label="Live price scanner camera">
             <video id="scanner-video" autoplay muted playsinline aria-label="Live camera"></video>
             <div id="scanner-idle" class="scanner-idle" aria-hidden="true"><i data-lucide="scan-line"></i></div>
             <div id="scanner-overlays" aria-label="Detected Bitcoin prices"></div>
-            <div class="scanner-status"><span id="scanner-status" role="status">Camera off</span><span id="scanner-count"></span></div>
+        </div>
+        <div class="scanner-top-controls">
+            <button id="scanner-stop" class="scanner-icon" type="button" title="Stop camera" aria-label="Stop camera" disabled><i data-lucide="camera-off" aria-hidden="true"></i></button>
+            <button id="scanner-torch" class="scanner-icon" type="button" title="Torch" aria-label="Torch" aria-pressed="false" disabled><i data-lucide="flashlight" aria-hidden="true"></i></button>
         </div>
         <div class="scanner-bottom">
-            <label id="scanner-zoom-control" hidden>Zoom<input id="scanner-zoom" type="range" aria-label="Camera zoom"></label>
-            <div class="scanner-rates"><span id="scanner-rate" role="status">Connecting to Sintra...</span><button id="scanner-refresh" class="scanner-icon" type="button" title="Refresh rates" aria-label="Refresh rates"><i data-lucide="refresh-cw" aria-hidden="true"></i></button></div>
-            <p class="scanner-sources">Rates: <a href="https://www.sintra.fi/api" target="_blank" rel="noopener">Sintra</a> &middot; <a href="https://frankfurter.dev/" target="_blank" rel="noopener">Frankfurter</a></p>
+            <div class="scanner-status"><span id="scanner-status" role="status">Camera off</span><span id="scanner-count"></span></div>
+            <div class="scanner-camera-controls">
+                <button id="scanner-zoom-reset" type="button" title="Reset camera zoom" aria-label="Reset camera zoom" disabled>1.0x</button>
+                <button id="scanner-capture" type="button" title="Start camera" aria-label="Start camera"><i data-lucide="camera" aria-hidden="true"></i></button>
+                <button id="scanner-settings-open" class="scanner-icon" type="button" title="Camera settings" aria-label="Camera settings"><i data-lucide="settings" aria-hidden="true"></i></button>
+            </div>
         </div>
+        <dialog id="scanner-photo" class="scanner-dialog scanner-photo" aria-labelledby="scanner-photo-title">
+            <form method="dialog"><h2 id="scanner-photo-title">Bitcoin snapshot</h2><button class="scanner-icon" title="Close photo" aria-label="Close photo"><i data-lucide="x" aria-hidden="true"></i></button></form>
+            <img id="scanner-photo-image" alt="Captured price tags with Bitcoin prices and satoshi.si watermark">
+            <a id="scanner-photo-download" class="scanner-download" download="satoshi-si-prices.png"><i data-lucide="download" aria-hidden="true"></i>Download photo</a>
+        </dialog>
     </main>
     <script src="burgerMenu.js"></script>
     <script type="module" src="priceScanner.mjs"></script>

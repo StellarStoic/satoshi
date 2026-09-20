@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v21';
+const CACHE = 'satoshi-static-v25';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
@@ -11,7 +11,7 @@ const CORE = [
     '/historical_data/generated/living-EU-observed.json',
     '/img/living/fuel.jpg', '/img/living/electricity.jpg',
     '/priceScanner.html', '/priceScanner.css', '/priceScanner.mjs',
-    '/priceScannerModel.mjs', '/priceScannerRates.mjs', '/currencies.json',
+    '/priceScannerModel.mjs', '/priceScannerRates.mjs', '/priceScannerPhoto.mjs', '/currencies.json',
     '/vendor/lucide/lucide.min.js'
 ];
 self.addEventListener('install', event => {
