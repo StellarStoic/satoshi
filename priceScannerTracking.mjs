@@ -9,6 +9,7 @@ export class PriceTracker {
         this.width = 0;
         this.height = 0;
         this.points = [];
+        this.frameNumber = 0;
         this.generation = (this.generation || 0) + 1;
     }
 
@@ -41,7 +42,8 @@ export class PriceTracker {
             });
         }
         // Replenish corners without replacing IDs still anchoring a visible price.
-        if (this.points.length < 280) {
+        this.frameNumber++;
+        if (this.points.length < 20 || (this.points.length < 280 && this.frameNumber % 4 === 0)) {
             cv.fast_corners.set_threshold(18);
             const found = cv.fast_corners.detect(this.current.data[0], this.corners, 8);
             const candidates = this.corners.slice(0, found).sort((a, b) => b.score - a.score);

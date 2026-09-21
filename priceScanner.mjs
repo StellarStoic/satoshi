@@ -23,6 +23,8 @@ let configured = hasScannerSettings(storage);
 let unit = settings.unit, names = {}, worker, stream, running = false, run = 0, revision = 0;
 let torch = false, detections = [], previous = [];
 let detectedAt = 0, animation, lastMotionAt = 0, ocrScript;
+let enginePromise, engineGeneration = 0, activeOcrJob, preloadTimer;
+let lastVideoTime = -1;
 let zoom = settings.zoom, pinch, overlayLifetime = 4000, takingPhoto = false, photoUrl, photoFile, logoReady = false;
 const pointers = new Map();
 const logo = new Image();
@@ -39,7 +41,7 @@ function saveSettings() {
 function icons() { globalThis.lucide?.createIcons(); }
 function status(text) { $('scanner-status').textContent = text; }
 function showError(text) { $('scanner-error').textContent = text; $('scanner-error').hidden = !text; }
-function clearDetections() { detections = []; previous = []; tracker.reset(); overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = running; }
+function clearDetections() { detections = []; previous = []; tracker.reset(); lastVideoTime = -1; overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = running; }
 
 const rates = new ScannerRates(updateRates, storage);
 function updateRates() {
@@ -116,19 +118,20 @@ function drawCamera(target, width, height) {
 }
 
 function updateTracking() {
-    if (!running || video.readyState < 2) return;
+    if (!running || video.readyState < 2 || video.currentTime === lastVideoTime) return false;
+    lastVideoTime = video.currentTime;
     const ratio = stage.clientWidth / stage.clientHeight;
-    const width = Math.round(Math.min(640, 640 * ratio)), height = Math.round(width / ratio);
+    const width = Math.round(Math.min(480, 480 * ratio)), height = Math.round(width / ratio);
     if (motionCanvas.width !== width || motionCanvas.height !== height) { motionCanvas.width = width; motionCanvas.height = height; }
     drawCamera(motionContext, width, height);
     tracker.update(motionContext.getImageData(0, 0, width, height).data, width, height);
+    return true;
 }
 
 function watchMotion(now) {
     if (!running) return;
     if (video.readyState >= 2 && now - lastMotionAt > 40) {
-        updateTracking();
-        renderOverlays();
+        if (updateTracking()) renderOverlays();
         lastMotionAt = now;
         if (now - detectedAt > overlayLifetime) { overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = true; }
     }
@@ -146,12 +149,55 @@ async function loadOcr() {
     await ocrScript;
 }
 
+function disposeOcr() {
+    engineGeneration++;
+    enginePromise = null;
+    const old = worker; worker = null;
+    old?.terminate().catch(() => {});
+    activeOcrJob = null;
+}
+
+function prepareOcr() {
+    if (enginePromise) return enginePromise;
+    const generation = engineGeneration;
+    enginePromise = (async () => {
+        await loadOcr();
+        if (generation !== engineGeneration) throw new DOMException('Recognition cancelled', 'AbortError');
+        const engine = await Tesseract.createWorker('eng', 1, {
+            workerPath: new URL('vendor/ocr/worker.min.js', location.href).href,
+            corePath: new URL('vendor/ocr/', location.href).href,
+            langPath: new URL('vendor/ocr/', location.href).href,
+            workerBlobURL: false,
+            logger: message => { if (running && generation === engineGeneration && message.status !== 'recognizing text') status(`Loading recognition... ${Math.round((message.progress || 0) * 100)}%`); },
+            errorHandler: () => {
+                if (generation !== engineGeneration) return;
+                disposeOcr();
+                if (running) { stopCamera(); showError('Recognition could not load. Check your connection and retry.'); }
+            },
+        });
+        if (generation !== engineGeneration) { await engine.terminate(); throw new DOMException('Recognition cancelled', 'AbortError'); }
+        worker = engine;
+        await engine.setParameters({tessedit_pageseg_mode: '6'});
+        return engine;
+    })().catch(error => { if (generation === engineGeneration) disposeOcr(); throw error; });
+    return enginePromise;
+}
+
+function warmRecognition() {
+    clearTimeout(preloadTimer);
+    if (!document.hidden && !navigator.connection?.saveData) {
+        preloadTimer = setTimeout(() => prepareOcr().catch(() => {}), 0);
+    }
+}
+
 async function recognize(session) {
-    let layout = '11';
+    let layout = '6';
+    let misses = 0;
     while (running && run === session && worker) {
         if (!video.videoWidth || video.readyState < 2) { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
         const aspect = stage.clientWidth / stage.clientHeight;
-        const width = Math.round(Math.min(1280, 1280 * aspect)), height = Math.round(width / aspect);
+        const longest = misses >= 2 ? 1280 : 960;
+        const width = Math.round(Math.min(longest, longest * aspect)), height = Math.round(width / aspect);
         canvas.width = width; canvas.height = height;
         drawCamera(context, width, height);
         updateTracking();
@@ -166,10 +212,12 @@ async function recognize(session) {
         }
         const started = performance.now(), version = revision, selected = currency;
         try {
-            const {data} = await worker.recognize(canvas, {}, {blocks: true, text: true});
+            activeOcrJob = worker.recognize(canvas, {}, {blocks: true, text: true});
+            const {data} = await activeOcrJob;
             if (!running || session !== run) return;
             if (revision === version && currency === selected) {
                 const current = detectPrices(data.blocks, currency);
+                if (!current.length) misses++;
                 detections = stableDetections(current, previous, width, height, true).map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
                 previous = current;
                 detectedAt = performance.now();
@@ -185,10 +233,10 @@ async function recognize(session) {
                 }
             } else clearDetections();
         } catch {
-            if (running && run === session) { stopCamera(); showError('Text recognition stopped. Start the camera to retry.'); }
+            if (running && run === session) { stopCamera(); disposeOcr(); showError('Text recognition stopped. Start the camera to retry.'); }
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, 180));
+        await new Promise(resolve => setTimeout(resolve, 80));
     }
 }
 
@@ -197,8 +245,6 @@ function stopCamera() {
     cancelAnimationFrame(animation);
     stream?.getTracks().forEach(track => track.stop());
     stream = null; video.srcObject = null;
-    const oldWorker = worker; worker = null;
-    oldWorker?.terminate().catch(() => {});
     clearDetections();
     $('scanner-idle').hidden = false;
     $('scanner-capture').setAttribute('aria-label', 'Start camera');
@@ -225,6 +271,8 @@ async function startCamera() {
     $('scanner-capture').setAttribute('aria-label', 'Take photo with Bitcoin prices');
     $('scanner-capture').title = 'Take photo with Bitcoin prices';
     icons(); status('Requesting camera...');
+    const engineReady = prepareOcr();
+    engineReady.catch(() => {});
     try {
         const camera = await navigator.mediaDevices.getUserMedia({audio: false, video: {
             facingMode: {ideal: 'environment'},
@@ -244,19 +292,11 @@ async function startCamera() {
         setZoom(zoom);
         animation = requestAnimationFrame(watchMotion);
         status('Loading recognition...');
-        await loadOcr();
+        await engineReady;
+        await activeOcrJob?.catch(() => {});
         if (!running || run !== session) return;
-        const engine = await Tesseract.createWorker('eng', 1, {
-            workerPath: new URL('vendor/ocr/worker.min.js', location.href).href,
-            corePath: new URL('vendor/ocr/', location.href).href,
-            langPath: new URL('vendor/ocr/', location.href).href,
-            workerBlobURL: false,
-            logger: message => { if (running && run === session && message.status !== 'recognizing text') status(`Loading recognition... ${Math.round((message.progress || 0) * 100)}%`); },
-            errorHandler: () => { if (running && run === session) { stopCamera(); showError('Recognition could not load. Check your connection and retry.'); } },
-        });
-        if (!running || run !== session) { await engine.terminate(); return; }
-        worker = engine;
-        await worker.setParameters({tessedit_pageseg_mode: '11'});
+        await worker.setParameters({tessedit_pageseg_mode: '6'});
+        if (!running || run !== session) return;
         status('Scanning');
         recognize(session);
     } catch (error) {
@@ -335,16 +375,16 @@ stage.addEventListener('keydown', event => {
     event.preventDefault(); setZoom(event.key === '0' ? 1 : zoom + (event.key === '-' ? -0.25 : 0.25));
 });
 new ResizeObserver(() => { revision++; clearDetections(); }).observe(stage);
-window.addEventListener('pagehide', () => { stopCamera(); rates.stop(); });
-window.addEventListener('pageshow', () => { if (!document.hidden) rates.start(); });
+window.addEventListener('pagehide', () => { clearTimeout(preloadTimer); stopCamera(); disposeOcr(); rates.stop(); });
+window.addEventListener('pageshow', () => { if (!document.hidden) { rates.start(); warmRecognition(); } });
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { stopCamera(); rates.stop(); } else rates.start();
+    if (document.hidden) { clearTimeout(preloadTimer); stopCamera(); disposeOcr(); rates.stop(); } else { rates.start(); warmRecognition(); }
 });
 window.addEventListener('online', () => { rates.refreshBtc(); rates.refreshFx(); });
 window.addEventListener('offline', updateRates);
 fetch('currencies.json').then(response => response.json()).then(data => { names = data.currencies; updateRates(); }).catch(() => {});
 setZoom(zoom);
-icons(); rates.start();
+icons(); rates.start(); warmRecognition();
 
 function releasePhoto() {
     if (photoUrl) URL.revokeObjectURL(photoUrl);

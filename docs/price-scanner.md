@@ -6,13 +6,15 @@ During scanning, photo capture is enabled when a fresh converted price is visibl
 
 ## Recognition and privacy
 
-Tesseract.js 7.0.0 runs in a Web Worker with self-hosted English LSTM data and WebAssembly. Temporary in-memory video frames, at most 1280 pixels wide, are recognized serially. No frames or recognized text are uploaded. They are saved only when the user explicitly downloads a captured photo. Only anonymous price/rate requests leave the browser.
+Tesseract.js 7.0.0 runs in a Web Worker with the original self-hosted English `best_int` model and WebAssembly. The worker initializes in the background when the page opens (except in data-saving mode), without camera access. Temporary in-memory video frames use a 960-pixel longest side, increasing to 1280 after unsuccessful passes, and are recognized serially. A high-contrast pass runs first; a raw sparse-text pass remains available as a fallback. No frames or recognized text are uploaded. They are saved only when the user explicitly downloads or shares a captured photo. Only anonymous price/rate requests leave the browser.
 
 Up to six detected prices are considered; overlapping or untrackable labels are omitted. Recognition and the edge-to-edge preview use the same centered crop and digital zoom. High-confidence readings can appear immediately; lower-confidence readings require two matching results. JSFeat 0.0.8 tracks FAST corners using pyramidal Lucas-Kanade optical flow, with forward/backward consistency checks. A per-tag RANSAC affine fit follows translation, scale and rotation between OCR readings at up to 25 updates per second. Feature IDs from the OCR input frame map late OCR results to the current frame instead of placing them at old positions. Lost features, occlusion and implausible transforms hide the label; currency changes, zoom and resizing reset tracking. This is approximate planar tracking, not a full 3D anchor: blur, glare and large perspective changes can still interrupt it. OCR expiry remains bounded at 4 to 10 seconds. Exported photo labels use the same transforms as the live view.
 
 The parser supports decimal commas/dots (including separated OCR tokens), thousands separators, explicit whole-currency amounts and close superscript cents. Currency symbols and codes may precede or follow the number. Likely barcodes, dates, percentages, quantities and mismatched currency symbols are rejected. Ambiguous unmarked whole numbers are omitted. Printed and handwritten tags use the same parser, but Tesseract is designed for print: clear handwritten digits may work, while general handwriting recognition is not reliable. No ambiguous letters are silently substituted with digits. OCR can still misread reflective, crossed-out, curved or blurry labels; verify the recognized fiat amount beneath each BTC estimate. See the [Tesseract handwriting limitation](https://tesseract-ocr.github.io/tessdoc/FAQ.html#can-i-use-tesseract-for-handwriting-recognition).
 
-Stopping, hiding or leaving the page releases camera tracks and terminates the worker. A pending permission request cannot reactivate scanning after Stop. Permission denial, busy cameras and failed model loads have retryable errors.
+Stopping releases camera tracks immediately and stops recognition, retaining the initialized worker for a fast restart while the page is visible. Hiding or leaving the page also terminates the worker. A pending permission request cannot reactivate scanning after Stop. Initialization is shared so rapid starts never create duplicate workers; a restart waits for any previous recognition job before changing parameters. Permission denial, busy cameras and failed model loads have retryable errors.
+
+Tracking uses frames with a 480-pixel longest side, skips duplicate video frames and replenishes features periodically instead of detecting corners on every frame. Clear-tag tests target overlays within 1-2 seconds once assets are ready; this is not a guarantee for slow first-time downloads, all hardware, blurred tags or handwriting.
 
 ## Rates
 
@@ -29,7 +31,7 @@ BTC values older than two minutes and expired FX caches cannot produce overlays.
 
 ## PWA and testing
 
-The scanner shell and icons are precached. Large OCR files download only on first use, then cache on demand. Offline OCR can subsequently work, but conversions stop when the short-lived BTC cache expires. PWA installation alone does not download the OCR model.
+The scanner shell and icons are precached. Large OCR files download when the scanner page warms recognition (or when the camera starts in data-saving mode), then cache on demand. Offline OCR can subsequently work, but conversions stop when the short-lived BTC cache expires. PWA installation alone does not download the OCR model.
 
 `vendor/ocr` contains pinned upstream distributions and licenses. Lucide 1.47.0 supplies icons. No bundler/application server is needed. Camera access requires HTTPS or localhost; a phone opening an ordinary LAN HTTP address cannot access its camera.
 
