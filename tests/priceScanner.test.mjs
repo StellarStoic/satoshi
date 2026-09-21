@@ -61,6 +61,24 @@ test('OCR bounding boxes filter quantities, join superscript cents and require r
     assert.equal(stableDetections(detected, [{...detected[0], value: 13.99}], 1280, 720).length, 0);
 });
 
+test('up to six price tags are recognized, not three', () => {
+    const detected = detectPrices(blocks(Array.from({length: 8}, (_, i) => word(`${i + 1}.99`, i * 100))), 'EUR');
+    assert.equal(detected.length, 6);
+});
+
+test('repeated conversions read in-memory rates without making API requests', () => {
+    const feed = new ScannerRates(() => {}, storage({}));
+    let requests = 0;
+    feed.request = () => { requests++; throw new Error('Unexpected network request'); };
+    feed.btc = {usd: 100000, at: Date.now()};
+    feed.fx = {rates: {USD: 1, EUR: 0.8}, expiresAt: Date.now() + FX_MAX_AGE};
+    for (let i = 0; i < 1000; i++) {
+        const quote = feed.snapshot('EUR');
+        assert.equal(fiatToBtc(20, quote.usdPerBtc, quote.fiatPerUsd), 0.00025);
+    }
+    assert.equal(requests, 0);
+});
+
 test('overlay geometry follows contained video, including portrait letterboxing', () => {
     const box = containedBox({x0: 100, y0: 100, x1: 200, y1: 200}, {width: 1000, height: 500}, {width: 400, height: 600});
     assert.deepEqual(box, {left: 40, top: 240, width: 40, height: 40});

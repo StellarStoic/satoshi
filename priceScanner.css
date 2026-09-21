@@ -16,9 +16,10 @@
 .scanner-main button svg { width: 20px; height: 20px; flex: 0 0 20px; }
 .scanner-main .scanner-icon { width: 44px; min-width: 44px; padding: 0; }
 #scanner-start { min-width: 144px; color: #f2a900; }
-.scanner-stage { background: #080909; overflow: hidden; touch-action: pan-y; }
-.scanner-stage.is-running { touch-action: none; }
+.scanner-stage { background: transparent; overflow: hidden; touch-action: pan-y; }
+.scanner-stage.is-running { background: #080909; touch-action: none; }
 #scanner-video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.scanner-stage:not(.is-running) #scanner-video { visibility: hidden; }
 .scanner-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #53585d; }
 .scanner-idle svg { width: 80px; height: 80px; stroke-width: 1; }
 #scanner-overlays { position: absolute; inset: 0; pointer-events: none; }
@@ -34,9 +35,8 @@
 
 /* Full-screen camera, with settings and the captured photo in modal dialogs. */
 .scanner-page { overflow: hidden; }
-.scanner-main { position: fixed; inset: 0; height: 100dvh; background: #080909; isolation: isolate; }
-.scanner-heading { position: absolute; z-index: 2; top: calc(14px + env(safe-area-inset-top)); left: 74px; padding: 0; display: block; pointer-events: none; }
-.scanner-heading h1 { margin: 3px 0 0; color: white; font-size: 18px; text-shadow: 0 1px 4px #000; }
+.scanner-main { position: fixed; inset: 0; height: 100dvh; background: transparent; isolation: isolate; }
+.scanner-heading { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .scanner-stage { position: absolute; inset: 0; height: 100%; min-height: 0; }
 .scanner-price { box-sizing: border-box; }
 .scanner-top-controls { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: flex; gap: 8px; z-index: 2; }
@@ -63,14 +63,16 @@
 #scanner-photo-image { display: block; width: 100%; max-height: 65dvh; object-fit: contain; background: #080909; }
 .scanner-download { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin-top: 16px; border: 1px solid var(--border); border-radius: 4px; color: #f2a900; text-decoration: none; }
 .scanner-download svg { width: 20px; height: 20px; }
+.scanner-photo-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.scanner-photo-actions .scanner-download { margin: 0; }
+#scanner-share-status { font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 12px 0 0; }
+#scanner-share-status:empty { display: none; }
 .scanner-main :focus-visible { outline: 2px solid #f2a900; outline-offset: 3px; }
 @media (max-width: 480px) {
-    .scanner-top-controls { top: calc(74px + env(safe-area-inset-top)); }
     .scanner-camera-controls { gap: 24px; }
 }
 @media (max-height: 480px) and (orientation: landscape) {
     .scanner-bottom { left: auto; top: 74px; width: 112px; padding: 8px 12px; display: flex; flex-direction: column; justify-content: end; }
     .scanner-camera-controls { display: flex; flex-direction: column; gap: 12px; }
     .scanner-status { flex-wrap: wrap; gap: 2px; padding-bottom: 8px; }
-    .scanner-heading h1 { font-size: 16px; }
 }

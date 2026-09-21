@@ -1,6 +1,8 @@
-import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, frameDifference, scannerSettings, hasScannerSettings} from './priceScannerModel.mjs';
+import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings} from './priceScannerModel.mjs';
 import {ScannerRates} from './priceScannerRates.mjs';
 import {drawScannerPhoto} from './priceScannerPhoto.mjs';
+import './vendor/jsfeat/jsfeat-min.js';
+import {PriceTracker} from './priceScannerTracking.mjs';
 
 const $ = id => document.getElementById(id);
 const video = $('scanner-video'), stage = $('scanner-stage'), overlays = $('scanner-overlays');
@@ -8,6 +10,7 @@ const canvas = document.createElement('canvas'), context = canvas.getContext('2d
 const motionCanvas = document.createElement('canvas');
 motionCanvas.width = 32; motionCanvas.height = 18;
 const motionContext = motionCanvas.getContext('2d', {willReadFrequently: true});
+const tracker = new PriceTracker(globalThis.jsfeat);
 let storage;
 try { storage = localStorage; } catch {}
 let currency = 'EUR';
@@ -19,8 +22,8 @@ const settings = scannerSettings(storage);
 let configured = hasScannerSettings(storage);
 let unit = settings.unit, names = {}, worker, stream, running = false, run = 0, revision = 0;
 let torch = false, detections = [], previous = [];
-let detectedAt = 0, frame = {width: 1, height: 1}, motionFrame, animation, lastMotionAt = 0, ocrScript;
-let zoom = settings.zoom, pinch, overlayLifetime = 4000, takingPhoto = false, photoUrl, logoReady = false;
+let detectedAt = 0, animation, lastMotionAt = 0, ocrScript;
+let zoom = settings.zoom, pinch, overlayLifetime = 4000, takingPhoto = false, photoUrl, photoFile, logoReady = false;
 const pointers = new Map();
 const logo = new Image();
 logo.onload = () => { logoReady = true; renderOverlays(); };
@@ -36,7 +39,7 @@ function saveSettings() {
 function icons() { globalThis.lucide?.createIcons(); }
 function status(text) { $('scanner-status').textContent = text; }
 function showError(text) { $('scanner-error').textContent = text; $('scanner-error').hidden = !text; }
-function clearDetections() { detections = []; previous = []; overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = running; }
+function clearDetections() { detections = []; previous = []; tracker.reset(); overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = running; }
 
 const rates = new ScannerRates(updateRates, storage);
 function updateRates() {
@@ -77,17 +80,26 @@ function renderOverlays() {
     for (const detection of detections) {
         const btc = fiatToBtc(detection.value, quote.usdPerBtc, quote.fiatPerUsd);
         if (!positive(btc)) continue;
-        const box = containedBox(detection.bbox, frame, viewport);
+        const tracked = tracker.project(detection.anchor);
+        if (!tracked) continue;
+        const scaleX = viewport.width / tracker.width, scaleY = viewport.height / tracker.height;
+        const box = containedBox(detection.anchor.bbox, {width: tracker.width, height: tracker.height}, viewport);
         const label = btcLabel(btc);
         const width = Math.min(viewport.width - 16, Math.max(box.width + 16, label.length * 10 + 24));
         const height = Math.min(viewport.height - 48, Math.max(54, box.height + 12));
-        const left = Math.max(8, Math.min(viewport.width - width - 8, box.left - 8));
-        const top = Math.max(4, Math.min(viewport.height - height - 150, box.top - 6));
-        if (occupied.some(old => left < old.left + old.width && left + width > old.left && top < old.top + old.height && top + height > old.top)) continue;
-        occupied.push({left, top, width, height});
+        const left = box.left - 8, top = box.top - 6;
+        const [a, b, c, d, e, f] = tracked.pose;
+        const matrix = [a, b * scaleY / scaleX, c * scaleX / scaleY, d, e * scaleX, f * scaleY];
+        const corners = [[left, top], [left + width, top], [left + width, top + height], [left, top + height]].map(([x, y]) => ({x: matrix[0] * x + matrix[2] * y + matrix[4], y: matrix[1] * x + matrix[3] * y + matrix[5]}));
+        const bounds = {left: Math.min(...corners.map(p => p.x)), top: Math.min(...corners.map(p => p.y)), right: Math.max(...corners.map(p => p.x)), bottom: Math.max(...corners.map(p => p.y))};
+        if (bounds.left < 0 || bounds.top < 0 || bounds.right > viewport.width || bounds.bottom > viewport.height) continue;
+        if (occupied.some(old => bounds.left < old.right && bounds.right > old.left && bounds.top < old.bottom && bounds.bottom > old.top)) continue;
+        occupied.push(bounds);
         const tag = document.createElement('div');
         tag.className = 'scanner-price';
-        Object.assign(tag.style, {left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`});
+        const transform = [...matrix.slice(0, 4), matrix[0] * left + matrix[2] * top + matrix[4], matrix[1] * left + matrix[3] * top + matrix[5]];
+        Object.assign(tag.style, {left: '0px', top: '0px', width: `${width}px`, height: `${height}px`, transformOrigin: '0 0', transform: `matrix(${transform.join(',')})`});
+        tag.dataset.matrix = JSON.stringify(transform);
         const number = document.createElement('strong'), original = document.createElement('small');
         number.textContent = label;
         original.textContent = new Intl.NumberFormat('en', {style: 'currency', currency}).format(detection.value);
@@ -103,15 +115,20 @@ function drawCamera(target, width, height) {
     target.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, width, height);
 }
 
+function updateTracking() {
+    if (!running || video.readyState < 2) return;
+    const ratio = stage.clientWidth / stage.clientHeight;
+    const width = Math.round(Math.min(640, 640 * ratio)), height = Math.round(width / ratio);
+    if (motionCanvas.width !== width || motionCanvas.height !== height) { motionCanvas.width = width; motionCanvas.height = height; }
+    drawCamera(motionContext, width, height);
+    tracker.update(motionContext.getImageData(0, 0, width, height).data, width, height);
+}
+
 function watchMotion(now) {
     if (!running) return;
-    if (video.readyState >= 2 && now - lastMotionAt > 120) {
-        drawCamera(motionContext, 32, 18);
-        const pixels = motionContext.getImageData(0, 0, 32, 18).data;
-        if (motionFrame) {
-            if (frameDifference(pixels, motionFrame) > 32) { revision++; clearDetections(); }
-        }
-        motionFrame = pixels;
+    if (video.readyState >= 2 && now - lastMotionAt > 40) {
+        updateTracking();
+        renderOverlays();
         lastMotionAt = now;
         if (now - detectedAt > overlayLifetime) { overlays.replaceChildren(); $('scanner-count').textContent = ''; $('scanner-capture').disabled = true; }
     }
@@ -137,6 +154,8 @@ async function recognize(session) {
         const width = Math.round(Math.min(1280, 1280 * aspect)), height = Math.round(width / aspect);
         canvas.width = width; canvas.height = height;
         drawCamera(context, width, height);
+        updateTracking();
+        const trackingSnapshot = tracker.snapshot();
         if (layout === '6') {
             const image = context.getImageData(0, 0, width, height);
             for (let i = 0; i < image.data.length; i += 4) {
@@ -146,15 +165,13 @@ async function recognize(session) {
             context.putImageData(image, 0, 0);
         }
         const started = performance.now(), version = revision, selected = currency;
-        const capturedMotion = motionFrame;
         try {
             const {data} = await worker.recognize(canvas, {}, {blocks: true, text: true});
             if (!running || session !== run) return;
-            if (revision === version && currency === selected && frameDifference(capturedMotion, motionFrame) < 32) {
+            if (revision === version && currency === selected) {
                 const current = detectPrices(data.blocks, currency);
-                detections = stableDetections(current, previous, width, height, true);
+                detections = stableDetections(current, previous, width, height, true).map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
                 previous = current;
-                frame = {width, height};
                 detectedAt = performance.now();
                 overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
                 const quote = rates.snapshot(currency);
@@ -182,7 +199,7 @@ function stopCamera() {
     stream = null; video.srcObject = null;
     const oldWorker = worker; worker = null;
     oldWorker?.terminate().catch(() => {});
-    motionFrame = null; clearDetections();
+    clearDetections();
     $('scanner-idle').hidden = false;
     $('scanner-capture').setAttribute('aria-label', 'Start camera');
     $('scanner-capture').title = 'Start camera';
@@ -292,7 +309,7 @@ function setZoom(value) {
     video.style.transform = `scale(${zoom})`;
     $('scanner-zoom-reset').textContent = `${zoom.toFixed(1)}x`;
     saveSettings();
-    revision++; clearDetections(); motionFrame = null;
+    revision++; clearDetections();
 }
 const distance = () => {
     const [a, b] = [...pointers.values()];
@@ -332,6 +349,8 @@ icons(); rates.start();
 function releasePhoto() {
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     photoUrl = null;
+    photoFile = null;
+    $('scanner-photo-share').disabled = true;
     $('scanner-photo-image').removeAttribute('src');
     $('scanner-photo-download').removeAttribute('href');
 }
@@ -346,7 +365,7 @@ $('scanner-capture').addEventListener('click', async () => {
         startCamera();
         return;
     }
-    renderOverlays();
+    updateTracking(); renderOverlays();
     if ($('scanner-capture').disabled || video.readyState < 2) return;
     takingPhoto = true; $('scanner-capture').disabled = true;
     try {
@@ -354,6 +373,7 @@ $('scanner-capture').addEventListener('click', async () => {
         const labels = [...overlays.children].map(tag => ({
             left: parseFloat(tag.style.left), top: parseFloat(tag.style.top), width: parseFloat(tag.style.width), height: parseFloat(tag.style.height),
             btc: tag.querySelector('strong').textContent, fiat: tag.querySelector('small').textContent,
+            matrix: JSON.parse(tag.dataset.matrix),
         }));
         const photo = document.createElement('canvas');
         drawScannerPhoto(photo, video, cameraCrop(video.videoWidth, video.videoHeight, viewport, zoom), viewport, labels, logo);
@@ -363,7 +383,20 @@ $('scanner-capture').addEventListener('click', async () => {
         $('scanner-photo-image').src = photoUrl;
         $('scanner-photo-download').href = photoUrl;
         $('scanner-photo-download').download = `satoshi-si-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        photoFile = new File([blob], $('scanner-photo-download').download, {type: 'image/png'});
+        const canShare = Boolean(navigator.share && navigator.canShare?.({files: [photoFile]}));
+        $('scanner-photo-share').disabled = !canShare;
+        $('scanner-photo-share').title = canShare ? 'Share photo' : 'Photo sharing is unavailable in this browser; use Download';
+        $('scanner-share-status').textContent = canShare ? '' : 'Photo sharing is unavailable in this browser. Download is available.';
         if (!document.hidden && !$('scanner-photo').open) $('scanner-photo').showModal();
     } catch { showError('The photo could not be created. Please try again.'); }
     finally { takingPhoto = false; renderOverlays(); }
+});
+$('scanner-photo-share').addEventListener('click', async () => {
+    if (!photoFile) return;
+    $('scanner-photo-share').disabled = true;
+    $('scanner-share-status').textContent = '';
+    try { await navigator.share({files: [photoFile], title: 'Bitcoin prices - satoshi.si'}); }
+    catch (error) { if (error.name !== 'AbortError') $('scanner-share-status').textContent = 'Could not share this photo. Download is still available.'; }
+    finally { $('scanner-photo-share').disabled = !photoFile; }
 });

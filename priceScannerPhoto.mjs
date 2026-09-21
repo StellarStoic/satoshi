@@ -6,6 +6,8 @@ export function drawScannerPhoto(canvas, video, crop, viewport, labels, logo) {
     ctx.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
     ctx.scale(scale, scale);
     for (const label of labels) {
+        ctx.save();
+        if (label.matrix) ctx.transform(...label.matrix);
         ctx.fillStyle = '#101112';
         ctx.fillRect(label.left, label.top, label.width, label.height);
         ctx.strokeStyle = '#f2a900';
@@ -18,15 +20,19 @@ export function drawScannerPhoto(canvas, video, crop, viewport, labels, logo) {
         ctx.fillStyle = '#d0d3d5';
         ctx.font = '11px Arial';
         ctx.fillText(label.fiat, label.left + 10, label.top + label.height / 2 + 12, label.width - 20);
+        ctx.restore();
     }
     const width = Math.min(196, viewport.width - 24), height = 52;
     const left = viewport.width - width - 12, top = viewport.height - height - 12;
-    ctx.fillStyle = '#101112e8';
-    ctx.fillRect(left, top, width, height);
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.shadowColor = '#0009';
+    ctx.shadowBlur = 2;
     ctx.drawImage(logo, left + 10, top + 8, 36, 36);
     ctx.font = 'bold 22px Arial';
     ctx.fillStyle = '#f2a900';
     ctx.textBaseline = 'middle';
     ctx.fillText('satoshi.si', left + 56, top + height / 2, width - 66);
+    ctx.restore();
     return canvas;
 }

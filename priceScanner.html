@@ -129,7 +129,11 @@
         <dialog id="scanner-photo" class="scanner-dialog scanner-photo" aria-labelledby="scanner-photo-title">
             <form method="dialog"><h2 id="scanner-photo-title">Bitcoin snapshot</h2><button class="scanner-icon" title="Close photo" aria-label="Close photo"><i data-lucide="x" aria-hidden="true"></i></button></form>
             <img id="scanner-photo-image" alt="Captured price tags with Bitcoin prices and satoshi.si watermark">
-            <a id="scanner-photo-download" class="scanner-download" download="satoshi-si-prices.png"><i data-lucide="download" aria-hidden="true"></i>Download photo</a>
+            <div class="scanner-photo-actions">
+                <a id="scanner-photo-download" class="scanner-download" download="satoshi-si-prices.png"><i data-lucide="download" aria-hidden="true"></i>Download</a>
+                <button id="scanner-photo-share" type="button" disabled><i data-lucide="share-2" aria-hidden="true"></i>Share</button>
+            </div>
+            <p id="scanner-share-status" role="status"></p>
         </dialog>
     </main>
     <script src="burgerMenu.js"></script>
