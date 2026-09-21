@@ -15,9 +15,10 @@ test('prices handle decimal commas, thousands, currency symbols and whole prices
         ['$1,234.56', 'USD', 1234.56], ['1 234,56 €', 'EUR', 1234.56], ["CHF 1'234.50", 'CHF', 1234.5],
         ['€ 20', 'EUR', 20], ['20,-', 'EUR', 20], ['¥ 1,500', 'JPY', 1500], ['$1,234', 'USD', 1234],
         ['20 €', 'EUR', 20], ['12 , 99 €', 'EUR', 12.99], ['€12.99', 'EUR', 12.99],
-        ['12.99$', 'USD', 12.99], ['20 AED', 'AED', 20],
+        ['12.99$', 'USD', 12.99], ['20 AED', 'AED', 20], ['4', 'EUR', 4], ['500', 'EUR', 500],
+        ['$9.30', 'USD', 9.3], ['9,30 USD', 'USD', 9.3], ['77,5', 'EUR', 77.5],
     ]) assert.equal(parsePrice(text, currency), expected, text);
-    for (const text of ['1234567890123', '500', '20%', '2026-09-20', '20/09/2026', '12.09.2026', '1.5 kg', '-12.99', '1.234', '1,2,3', '0.00', '$12.99', 'USD 12.99']) {
+    for (const text of ['1234567890123', '20%', '2026-09-20', '20/09/2026', '12.09.2026', '1.5 kg', '-12.99', '1.234', '1,2,3', '0.00', '$12.99', 'USD 12.99']) {
         assert.equal(parsePrice(text, 'EUR'), null, text);
     }
 });
@@ -38,7 +39,7 @@ test('split decimals and currency on either side retain the complete tag', () =>
         [word('12', 0), word(',', 75), word('99', 150), word('€', 225)],
         [word('12', 0), word('99', 75, 22), word('€', 150)],
     ]) assert.equal(detectPrices(blocks(words), 'EUR')[0]?.value, 12.99);
-    assert.equal(detectPrices(blocks([word('12', 0), word('99', 75, 22), word('$', 150)]), 'EUR').length, 0);
+    assert.equal(detectPrices(blocks([word('12', 0), word('99', 75, 22), word('$', 150)]), 'EUR')[0].currency, 'USD');
 });
 
 test('digital zoom crops exactly the visible camera and tolerates small brightness changes', () => {
@@ -52,7 +53,7 @@ const word = (text, x0, height = 40) => ({text, confidence: 95, bbox: {x0, y0: 1
 const blocks = words => [{paragraphs: [{lines: [{words}]}]}];
 test('OCR bounding boxes filter quantities, join superscript cents and require repeat detections', () => {
     assert.equal(detectPrices(blocks([word('1.50', 10), word('kg', 90)]), 'EUR').length, 0);
-    assert.equal(detectPrices(blocks([word('$', 10), word('12.99', 90)]), 'EUR').length, 0);
+    assert.equal(detectPrices(blocks([word('$', 10), word('12.99', 90)]), 'EUR')[0].currency, 'USD');
     const detected = detectPrices(blocks([word('12', 10), word('99', 83, 22)]), 'EUR');
     assert.equal(detected[0].value, 12.99);
     assert.equal(detected[0].bbox.x1, 153);
@@ -64,6 +65,19 @@ test('OCR bounding boxes filter quantities, join superscript cents and require r
 test('up to six price tags are recognized, not three', () => {
     const detected = detectPrices(blocks(Array.from({length: 8}, (_, i) => word(`${i + 1}.99`, i * 100))), 'EUR');
     assert.equal(detected.length, 6);
+});
+
+test('largest digits take priority and smaller cents join across OCR lines', () => {
+    const big = word('9', 10, 80), cents = word('30', 83, 30), dollar = word('$', 160, 40);
+    const input = [{paragraphs: [{lines: [{words: [cents]}, {words: [big, dollar]}]}]}];
+    const result = detectPrices(input, 'EUR');
+    assert.equal(result.length, 1);
+    assert.equal(result[0].value, 9.3);
+    assert.equal(result[0].currency, 'USD');
+    assert.equal(detectPrices(blocks([word('5.00', 0, 20), word('9.30', 200, 80)]), 'EUR')[0].value, 9.3);
+    assert.equal(detectPrices(blocks([word('$9.30', 0)]), 'CAD')[0].currency, 'CAD');
+    assert.equal(detectPrices(blocks([word('USD', 0), word('9.30', 75)]), 'EUR')[0].currency, 'USD');
+    assert.equal(detectPrices(blocks([word('9.30', 0), word('USD', 75)]), 'EUR')[0].currency, 'USD');
 });
 
 test('repeated conversions read in-memory rates without making API requests', () => {

@@ -4,6 +4,19 @@ import {createRequire} from 'node:module';
 import {PriceTracker} from '../priceScannerTracking.mjs';
 const cv = createRequire(import.meta.url)('../vendor/jsfeat/jsfeat-min.js');
 
+test('short prices with few corners use consistent translation, not an invisible affine fit', () => {
+    const tracker = new PriceTracker(cv);
+    tracker.width = 320; tracker.height = 240;
+    const points = [{id: 1, x: 100, y: 100}, {id: 2, x: 120, y: 110}, {id: 3, x: 140, y: 100}];
+    const anchor = {generation: tracker.generation, points, bbox: {x0: 90, y0: 90, x1: 150, y1: 120}};
+    tracker.byId = new Map(points.map(p => [p.id, {...p, x: p.x + 5, y: p.y + 2}]));
+    assert.deepEqual(tracker.project(anchor).pose, [1, 0, 0, 1, 5, 2]);
+    tracker.byId.get(3).x += 20;
+    assert.equal(tracker.project(anchor), null);
+    tracker.byId.clear();
+    assert.equal(tracker.project(anchor), null);
+});
+
 const width = 320, height = 240;
 const base = new Uint8Array(width * height);
 base.fill(240);

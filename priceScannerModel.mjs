@@ -58,6 +58,7 @@ const knownCodes = /\b(USD|EUR|GBP|CAD|AUD|CHF|JPY|CNY|INR|PLN|CZK|SEK|NOK|DKK|H
 
 export function parsePrice(text, currency = 'EUR', explicit = false) {
     let input = text.trim().replace(/\u00a0|\u202f/g, ' ').replace(/[’‘]/g, "'");
+    input = input.replace(/([A-Za-z])(?=\d)|(?<=\d)([A-Za-z])/g, '$1 $2');
     input = input.replace(/\s*([.,])\s*/g, '$1');
     if (!input || /[%/:=]|\d\s*[-–]\s*\d/.test(input)) return null;
     const selectedCode = new RegExp(`\\b${currency}\\b`, 'i');
@@ -96,7 +97,7 @@ export function parsePrice(text, currency = 'EUR', explicit = false) {
             normalized = input.replace(/[.,]/g, '');
         } else return null;
     } else {
-        if (!marked) return null;
+        if (!marked && input.length > 6) return null;
         normalized = input;
     }
     const value = Number(normalized);
@@ -108,56 +109,68 @@ function mergeBox(a, b) {
     return {x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1)};
 }
 
-export function detectPrices(blocks, currency) {
-    const found = [];
-    for (const block of blocks || []) for (const paragraph of block.paragraphs || []) for (const line of paragraph.lines || []) {
-        const words = line.words || [];
-        for (let i = 0; i < words.length; i++) {
-            const word = words[i];
-            if (word.confidence < 40 || !word.bbox || !/\d/.test(word.text)) continue;
-            const prior = words[i - 1], next = words[i + 1];
-            const marker = token => token?.bbox && (/^[€$£¥₹]$/.test(token.text) || /^[A-Z]{3}$/i.test(token.text) && (knownCodes.test(token.text) || token.text.toUpperCase() === currency));
-            let text = word.text, box = word.bbox;
-            if (marker(prior)) { text = `${prior.text} ${text}`; box = mergeBox(box, prior.bbox); }
-            if (marker(next)) { text = `${text} ${next.text}`; box = mergeBox(box, next.bbox); }
-            const cents = words[i + 2];
-            if (/^\d{1,5}[.,]?$/.test(word.text) && next?.bbox &&
-                ((/^[.,]$/.test(next.text) && /^\d{2}$/.test(cents?.text || '') && cents?.bbox) ||
-                 (/[.,]$/.test(word.text) && /^\d{2}$/.test(next.text))) &&
-                next.bbox.x0 - word.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8) {
-                const last = /[.,]$/.test(word.text) ? i + 1 : i + 2;
-                const fraction = words[last];
-                if (fraction.confidence >= 40 && fraction.bbox.x0 - next.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8) {
-                    const suffix = words[last + 1];
-                    text = `${marker(prior) ? prior.text : ''}${word.text.replace(/[.,]$/, '')}.${fraction.text}${marker(suffix) ? suffix.text : ''}`;
-                    box = mergeBox(box, fraction.bbox);
-                    if (marker(suffix)) box = mergeBox(box, suffix.bbox);
-                    const value = parsePrice(text, currency);
-                    if (value !== null) found.push({value, bbox: box, confidence: Math.min(word.confidence, fraction.confidence)});
-                    i = last;
-                    continue;
-                }
-            }
-            // Superscript cents are common on shelf labels; only join close, smaller digits.
-            if (/^\d{1,5}$/.test(word.text) && /^\d{2}$/.test(next?.text || '') && next.confidence >= 55 &&
-                next.bbox.y1 - next.bbox.y0 < (word.bbox.y1 - word.bbox.y0) * 0.85 &&
-                next.bbox.x0 - word.bbox.x1 < (word.bbox.y1 - word.bbox.y0) * 0.8 &&
-                next.bbox.y0 <= word.bbox.y0 + (word.bbox.y1 - word.bbox.y0) * 0.4) {
-                const suffix = words[i + 2];
-                text = `${marker(prior) ? prior.text : ''}${word.text}.${next.text}${marker(suffix) ? suffix.text : ''}`;
-                box = mergeBox(box, next.bbox);
-                if (marker(suffix)) box = mergeBox(box, suffix.bbox);
-                i++;
-            } else if (!marker(prior) && !marker(next) && /^[%]|^(kg|g|mg|ml|cl|l|cm|mm|m|pcs)\b/i.test(next?.text || '')) continue;
-            const value = parsePrice(text, currency);
-            if (value !== null) found.push({value, bbox: box, confidence: word.confidence});
-        }
+function priceCurrency(text, selected) {
+    text = text.replace(/([A-Za-z])(?=\d)|(?<=\d)([A-Za-z])/g, '$1 $2');
+    const code = text.match(knownCodes)?.[1]?.toUpperCase();
+    if (code) return code;
+    for (const [symbol, currencies] of Object.entries(symbolCurrencies)) {
+        if (text.includes(symbol)) return currencies.includes(selected) ? selected : currencies[0];
     }
-    return found.sort((a, b) => b.confidence - a.confidence).slice(0, 6);
+    return selected;
+}
+
+export function detectPrices(blocks, currency) {
+    // OCR often puts smaller cents and currency symbols on separate text lines.
+    const tokens = (blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
+        (paragraph.lines || []).flatMap(line => line.words || [])))
+        .filter(word => word.bbox && word.text?.trim()).map(word => ({...word, text: word.text.trim()}));
+    const used = new Set();
+    const found = [];
+    const height = word => word.bbox.y1 - word.bbox.y0;
+    const marker = word => word && (/^[€$£¥₹]$/.test(word.text) ||
+        /^[A-Z]{3}$/i.test(word.text) && (knownCodes.test(word.text) || word.text.toUpperCase() === currency));
+    const near = (a, b) => b.bbox.x0 >= a.bbox.x1 - 2 &&
+        b.bbox.x0 - a.bbox.x1 < Math.max(height(a), height(b)) * 0.85 &&
+        Math.min(a.bbox.y1, b.bbox.y1) > Math.max(a.bbox.y0, b.bbox.y0);
+    const right = word => tokens.filter(other => other !== word && !used.has(other) && near(word, other))
+        .sort((a, b) => a.bbox.x0 - b.bbox.x0)[0];
+    for (const word of [...tokens].sort((a, b) => height(b) - height(a) || a.bbox.x0 - b.bbox.x0)) {
+        if (used.has(word) || word.confidence < 40 || !/\d/.test(word.text)) continue;
+        const prior = tokens.filter(other => marker(other) && near(other, word)).sort((a, b) => b.bbox.x1 - a.bbox.x1)[0];
+        const joined = [word];
+        let text = word.text, next = right(word);
+        const mainDigits = text.match(/^(?:[€$£¥₹]|[A-Z]{3})?\s*(\d{1,6}[.,]?)$/i)?.[1];
+        if (mainDigits) {
+            let fraction = next, separator = /[.,]$/.test(text);
+            if (/^[.,]$/.test(next?.text || '')) { fraction = right(next); separator = true; }
+            const split = /^[.,]\d{1,2}$/.test(fraction?.text || '');
+            const smallCents = /^\d{2}$/.test(fraction?.text || '') && height(fraction) < height(word) * 0.85;
+            if (fraction && fraction.confidence >= 40 && (split || (separator && /^\d{1,2}$/.test(fraction.text)) || smallCents)) {
+                text = text.replace(/[.,]$/, '') + '.' + fraction.text.replace(/^[.,]/, '');
+                if (next !== fraction) joined.push(next);
+                joined.push(fraction);
+                next = right({...word, bbox: mergeBox(word.bbox, fraction.bbox)});
+            }
+        }
+        if (!marker(prior) && !marker(next) && /^(%|kg\b|g\b|mg\b|ml\b|cl\b|l\b|cm\b|mm\b|m\b|pcs\b)/i.test(next?.text || '')) {
+            joined.forEach(token => used.add(token));
+            continue;
+        }
+        if (marker(prior)) { text = prior.text + ' ' + text; joined.push(prior); }
+        if (marker(next)) { text += ' ' + next.text; joined.push(next); }
+        const detectedCurrency = priceCurrency(text, currency);
+        const value = parsePrice(text, detectedCurrency);
+        joined.forEach(token => used.add(token));
+        if (value !== null) found.push({value, currency: detectedCurrency,
+            bbox: joined.reduce((box, token) => mergeBox(box, token.bbox), word.bbox),
+            confidence: Math.min(...joined.filter(token => /\d/.test(token.text)).map(token => token.confidence)),
+            size: height(word)});
+    }
+    return found.sort((a, b) => b.size - a.size || b.confidence - a.confidence).slice(0, 6);
 }
 
 export function stableDetections(current, previous, width, height, allowConfident = false) {
-    return current.filter(candidate => (allowConfident && candidate.confidence >= 80) || previous.some(old => old.value === candidate.value &&
+    return current.filter(candidate => (allowConfident && candidate.confidence >= 80) || previous.some(old => old.value === candidate.value && old.currency === candidate.currency &&
         Math.abs(old.bbox.x0 - candidate.bbox.x0) < width * 0.04 &&
         Math.abs(old.bbox.y0 - candidate.bbox.y0) < height * 0.04));
 }

@@ -84,7 +84,20 @@ export class PriceTracker {
             const current = this.byId?.get(point.id);
             if (current) { from.push(point); to.push(current); }
         }
-        if (from.length < 6 || from.length < anchor.points.length * 0.4) return null;
+        if (from.length < 2 || from.length < anchor.points.length * 0.4) return null;
+        // A short price on plain paper may not provide six corners for an affine fit.
+        // Track translation only in that case, requiring agreement among surviving points.
+        if (from.length < 6) {
+            const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+            const dx = median(to.map((point, i) => point.x - from[i].x));
+            const dy = median(to.map((point, i) => point.y - from[i].y));
+            const agreeing = to.filter((point, i) => Math.hypot(point.x - from[i].x - dx, point.y - from[i].y - dy) <= 1.5);
+            if (agreeing.length < 2 || agreeing.length < from.length * 0.8) return null;
+            const {x0, x1, y0, y1} = anchor.bbox;
+            const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => ({x: x + dx, y: y + dy}));
+            if (corners.some(point => point.x < 0 || point.x > this.width || point.y < 0 || point.y > this.height)) return null;
+            return {pose: [1, 0, 0, 1, dx, dy], corners};
+        }
         const matrix = new cv.matrix_t(3, 3, cv.F32_t | cv.C1_t);
         const mask = new cv.matrix_t(from.length, 1, cv.U8_t | cv.C1_t);
         const kernel = new cv.motion_model.affine2d();

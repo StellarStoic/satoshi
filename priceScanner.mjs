@@ -11,6 +11,18 @@ const motionCanvas = document.createElement('canvas');
 motionCanvas.width = 32; motionCanvas.height = 18;
 const motionContext = motionCanvas.getContext('2d', {willReadFrequently: true});
 const tracker = new PriceTracker(globalThis.jsfeat);
+function syncScannerViewport() {
+    const viewport = window.visualViewport;
+    if (viewport && viewport.scale !== 1) return;
+    const height = Math.min(window.innerHeight, viewport?.height || window.innerHeight);
+    document.documentElement.style.setProperty('--scanner-viewport-height', `${height}px`);
+    document.documentElement.style.setProperty('--scanner-viewport-top', `${viewport?.offsetTop || 0}px`);
+}
+syncScannerViewport();
+window.addEventListener('resize', syncScannerViewport);
+window.addEventListener('pageshow', syncScannerViewport);
+window.visualViewport?.addEventListener('resize', syncScannerViewport);
+window.visualViewport?.addEventListener('scroll', syncScannerViewport);
 let storage;
 try { storage = localStorage; } catch {}
 let currency = 'EUR';
@@ -75,11 +87,12 @@ function btcLabel(value) {
 function renderOverlays() {
     overlays.replaceChildren();
     $('scanner-capture').disabled = running;
-    const quote = rates.snapshot(currency);
-    if (!running || !quote.ready || performance.now() - detectedAt > overlayLifetime) { $('scanner-count').textContent = ''; return; }
+    if (!running || performance.now() - detectedAt > overlayLifetime) { $('scanner-count').textContent = ''; return; }
     const viewport = {width: stage.clientWidth, height: stage.clientHeight};
     const occupied = [];
     for (const detection of detections) {
+        const quote = rates.snapshot(detection.currency || currency);
+        if (!quote.ready) continue;
         const btc = fiatToBtc(detection.value, quote.usdPerBtc, quote.fiatPerUsd);
         if (!positive(btc)) continue;
         const tracked = tracker.project(detection.anchor);
@@ -104,7 +117,7 @@ function renderOverlays() {
         tag.dataset.matrix = JSON.stringify(transform);
         const number = document.createElement('strong'), original = document.createElement('small');
         number.textContent = label;
-        original.textContent = new Intl.NumberFormat('en', {style: 'currency', currency}).format(detection.value);
+        original.textContent = new Intl.NumberFormat('en', {style: 'currency', currency: detection.currency || currency}).format(detection.value);
         tag.append(number, original);
         overlays.append(tag);
     }
@@ -190,6 +203,51 @@ function warmRecognition() {
     }
 }
 
+function normalizedPriceCrop(box) {
+    const x = Math.max(0, box.x0 - 3), y = Math.max(0, box.y0 - 3);
+    const width = Math.min(canvas.width - x, box.x1 - x + 3), height = Math.min(canvas.height - y, box.y1 - y + 3);
+    if (width < 8 || height < 12) return null;
+    const pixels = context.getImageData(x, y, width, height).data;
+    const runs = [];
+    let run;
+    // Separate glyph columns, then align smaller cents with the larger whole digits.
+    for (let xx = 0; xx < width; xx++) {
+        let top = height, bottom = -1;
+        for (let yy = 0; yy < height; yy++) {
+            const i = (yy * width + xx) * 4;
+            if (pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114 < 140) {
+                top = Math.min(top, yy); bottom = yy;
+            }
+        }
+        if (bottom >= 0) {
+            if (!run) { run = {left: xx, right: xx, top, bottom}; runs.push(run); }
+            run.right = xx; run.top = Math.min(run.top, top); run.bottom = Math.max(run.bottom, bottom);
+        } else run = null;
+    }
+    if (runs.length < 2 || runs.length > 18) return null;
+    const tallest = Math.max(...runs.map(part => part.bottom - part.top + 1));
+    const glyphs = runs.filter(part => part.bottom - part.top > tallest * 0.4 && part.right - part.left > tallest * 0.12);
+    if (!glyphs.some(part => part.bottom - part.top < tallest * 0.75)) return null;
+    const output = document.createElement('canvas');
+    const pieces = runs.map(part => {
+        const h = part.bottom - part.top + 1, w = part.right - part.left + 1;
+        const scale = glyphs.includes(part) ? 64 / h : 64 / tallest;
+        return {...part, glyph: glyphs.includes(part), w, h, dw: Math.max(1, Math.round(w * scale)), dh: Math.round(h * scale)};
+    });
+    output.width = pieces.reduce((total, part) => total + part.dw + 5, 20);
+    output.height = 96;
+    const target = output.getContext('2d');
+    target.fillStyle = 'white'; target.fillRect(0, 0, output.width, output.height);
+    let left = 10;
+    for (const part of pieces) {
+        target.drawImage(canvas, x + part.left, y + part.top, part.w, part.h, left,
+            part.glyph ? 76 - part.dh : 12 + part.top * 64 / tallest,
+            part.dw, part.dh);
+        left += part.dw + 5;
+    }
+    return output;
+}
+
 async function recognize(session) {
     let layout = '6';
     let misses = 0;
@@ -216,17 +274,41 @@ async function recognize(session) {
             const {data} = await activeOcrJob;
             if (!running || session !== run) return;
             if (revision === version && currency === selected) {
-                const current = detectPrices(data.blocks, currency);
+                let current = detectPrices(data.blocks, currency);
+                const words = (data.blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
+                    (paragraph.lines || []).flatMap(line => line.words || [])));
+                const uncertain = words.filter(word => word.bbox && /\d/.test(word.text) && word.confidence < 80)
+                    .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0))[0];
+                const normalized = uncertain && normalizedPriceCrop(uncertain.bbox);
+                if (normalized) {
+                    await worker.setParameters({tessedit_pageseg_mode: '7'});
+                    activeOcrJob = worker.recognize(normalized, {}, {blocks: true, text: true});
+                    const retry = await activeOcrJob;
+                    if (!running || session !== run) return;
+                    await worker.setParameters({tessedit_pageseg_mode: layout});
+                    if (revision !== version || currency !== selected) continue;
+                    const recovered = detectPrices(retry.data.blocks, currency);
+                    if (recovered.length === 1) {
+                        const candidate = {...recovered[0], bbox: uncertain.bbox, size: uncertain.bbox.y1 - uncertain.bbox.y0};
+                        current = [candidate, ...current.filter(price => price.bbox.x1 < candidate.bbox.x0 || price.bbox.x0 > candidate.bbox.x1 ||
+                            price.bbox.y1 < candidate.bbox.y0 || price.bbox.y0 > candidate.bbox.y1)]
+                            .sort((a, b) => b.size - a.size || b.confidence - a.confidence).slice(0, 6);
+                    }
+                }
                 if (!current.length) misses++;
-                detections = stableDetections(current, previous, width, height, true).map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
+                const confirmed = stableDetections(current, previous, width, height, true);
+                if (confirmed.length) {
+                    detections = confirmed.map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
+                    detectedAt = performance.now();
+                    overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
+                }
                 previous = current;
-                detectedAt = performance.now();
-                overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
-                const quote = rates.snapshot(currency);
+                const quote = rates.snapshot(current[0]?.currency || currency);
                 status(current.length ? (!quote.ready ? 'Price detected; waiting for exchange rates' : detections.length ? 'Scanning' : 'Confirming price...') : 'No price detected');
                 renderOverlays();
-                // Retry a high-contrast block when sparse text misses an isolated price.
-                const nextLayout = current.length ? layout : layout === '11' ? '6' : '11';
+                // Alternate layouts even after a partial match: small cents can otherwise
+                // trap recognition on a fragment while the larger whole amount is missed.
+                const nextLayout = layout === '11' ? '6' : '11';
                 if (nextLayout !== layout && worker) {
                     layout = nextLayout;
                     await worker.setParameters({tessedit_pageseg_mode: layout});
