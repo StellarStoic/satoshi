@@ -1,4 +1,4 @@
-import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings} from './priceScannerModel.mjs';
+import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings, scannerFrameLimit} from './priceScannerModel.mjs';
 import {ScannerRates} from './priceScannerRates.mjs';
 import {drawScannerPhoto} from './priceScannerPhoto.mjs';
 import './vendor/jsfeat/jsfeat-min.js';
@@ -249,12 +249,12 @@ function normalizedPriceCrop(box) {
 }
 
 async function recognize(session) {
-    let layout = '6';
-    let misses = 0;
+    let layout = '6', preferredLayout = '6', passes = 0;
+    let misses = 0, previousWidth = 0, previousHeight = 0;
     while (running && run === session && worker) {
         if (!video.videoWidth || video.readyState < 2) { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
         const aspect = stage.clientWidth / stage.clientHeight;
-        const longest = misses >= 2 ? 1280 : 960;
+        const longest = scannerFrameLimit(misses);
         const width = Math.round(Math.min(longest, longest * aspect)), height = Math.round(width / aspect);
         canvas.width = width; canvas.height = height;
         drawCamera(context, width, height);
@@ -275,11 +275,26 @@ async function recognize(session) {
             if (!running || session !== run) return;
             if (revision === version && currency === selected) {
                 let current = detectPrices(data.blocks, currency);
+                const comparable = previousWidth ? previous.map(price => ({...price, bbox: {
+                    x0: price.bbox.x0 * width / previousWidth, x1: price.bbox.x1 * width / previousWidth,
+                    y0: price.bbox.y0 * height / previousHeight, y1: price.bbox.y1 * height / previousHeight,
+                }})) : previous;
+                const publish = prices => {
+                    const confirmed = stableDetections(prices, comparable, width, height, true);
+                    if (!confirmed.length) return false;
+                    detections = confirmed.map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
+                    detectedAt = performance.now();
+                    overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
+                    renderOverlays();
+                    return true;
+                };
+                const published = publish(current);
+                if (published) preferredLayout = layout;
                 const words = (data.blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
                     (paragraph.lines || []).flatMap(line => line.words || [])));
                 const uncertain = words.filter(word => word.bbox && /\d/.test(word.text) && word.confidence < 80)
                     .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0))[0];
-                const normalized = uncertain && normalizedPriceCrop(uncertain.bbox);
+                const normalized = !published && uncertain && normalizedPriceCrop(uncertain.bbox);
                 if (normalized) {
                     await worker.setParameters({tessedit_pageseg_mode: '7'});
                     activeOcrJob = worker.recognize(normalized, {}, {blocks: true, text: true});
@@ -293,22 +308,19 @@ async function recognize(session) {
                         current = [candidate, ...current.filter(price => price.bbox.x1 < candidate.bbox.x0 || price.bbox.x0 > candidate.bbox.x1 ||
                             price.bbox.y1 < candidate.bbox.y0 || price.bbox.y0 > candidate.bbox.y1)]
                             .sort((a, b) => b.size - a.size || b.confidence - a.confidence).slice(0, 6);
+                        publish(current);
                     }
                 }
-                if (!current.length) misses++;
-                const confirmed = stableDetections(current, previous, width, height, true);
-                if (confirmed.length) {
-                    detections = confirmed.map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
-                    detectedAt = performance.now();
-                    overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
-                }
+                misses = current.length ? 0 : misses + 1;
                 previous = current;
+                previousWidth = width; previousHeight = height;
                 const quote = rates.snapshot(current[0]?.currency || currency);
                 status(current.length ? (!quote.ready ? 'Price detected; waiting for exchange rates' : detections.length ? 'Scanning' : 'Confirming price...') : 'No price detected');
                 renderOverlays();
-                // Alternate layouts even after a partial match: small cents can otherwise
-                // trap recognition on a fragment while the larger whole amount is missed.
-                const nextLayout = layout === '11' ? '6' : '11';
+                // Keep the productive layout, but periodically probe for missed larger tags.
+                passes++;
+                const nextLayout = !current.length ? (layout === '11' ? '6' : '11') :
+                    passes % 4 === 0 ? (preferredLayout === '11' ? '6' : '11') : preferredLayout;
                 if (nextLayout !== layout && worker) {
                     layout = nextLayout;
                     await worker.setParameters({tessedit_pageseg_mode: layout});

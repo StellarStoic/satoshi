@@ -2,6 +2,10 @@ export const BTC_MAX_AGE = 120_000;
 export const FX_MAX_AGE = 86_400_000;
 export const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
+export function scannerFrameLimit(misses) {
+    return [640, 640, 960, 960, 1280, 1280][misses % 6];
+}
+
 export function hasScannerSettings(storage) {
     try {
         const saved = JSON.parse(storage?.getItem('priceScannerSettings'));

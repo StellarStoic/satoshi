@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parsePrice, detectPrices, fiatToBtc, containedBox, stableDetections, readSharedRates, parseFxResponse, BTC_MAX_AGE, FX_MAX_AGE, cameraCrop, frameDifference, scannerSettings} from '../priceScannerModel.mjs';
 import {ScannerRates} from '../priceScannerRates.mjs';
-import {hasScannerSettings} from '../priceScannerModel.mjs';
+import {hasScannerSettings, scannerFrameLimit} from '../priceScannerModel.mjs';
+
+test('OCR starts small and retries larger frames without permanently slowing every scan', () => {
+    assert.deepEqual(Array.from({length: 8}, (_, i) => scannerFrameLimit(i)), [640, 640, 960, 960, 1280, 1280, 640, 640]);
+    assert.equal(scannerFrameLimit(0), 640);
+});
 
 test('currency conversion uses fiat per USD and USD per BTC, never the inverse', () => {
     assert.equal(fiatToBtc(20, 100000, 0.8), 0.00025);
