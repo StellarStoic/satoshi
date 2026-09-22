@@ -2,7 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parsePrice, detectPrices, fiatToBtc, containedBox, stableDetections, readSharedRates, parseFxResponse, BTC_MAX_AGE, FX_MAX_AGE, cameraCrop, frameDifference, scannerSettings} from '../priceScannerModel.mjs';
 import {ScannerRates} from '../priceScannerRates.mjs';
-import {hasScannerSettings, scannerFrameLimit} from '../priceScannerModel.mjs';
+import {hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox} from '../priceScannerModel.mjs';
+
+test('center scan area is bounded and maps OCR boxes back into the camera frame', () => {
+    for (const [width, height] of [[390, 844], [844, 390], [1440, 900], [296, 641], [592, 1282]]) {
+        const region = scannerRegion(width, height);
+        assert.ok(Math.abs(region.x + region.width / 2 - width / 2) <= 0.5);
+        assert.ok(Math.abs(region.y + region.height / 2 - height / 2) <= 0.5);
+        assert.ok(region.width * region.height < width * height * 0.25);
+        assert.deepEqual(regionBox({x0: 0, y0: 0, x1: region.width, y1: region.height}, region),
+            {x0: region.x, y0: region.y, x1: region.x + region.width, y1: region.y + region.height});
+    }
+});
 
 test('OCR starts small and retries larger frames without permanently slowing every scan', () => {
     assert.deepEqual(Array.from({length: 8}, (_, i) => scannerFrameLimit(i)), [640, 640, 960, 960, 1280, 1280, 640, 640]);

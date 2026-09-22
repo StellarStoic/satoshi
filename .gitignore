@@ -1,6 +1,8 @@
 /tools/*
 !/tools/bip39/
 !/tools/history/
+!/tools/price-scanner/
+/tools/price-scanner/node_modules/
 __pycache__/
 .vscode
 converter copy.html

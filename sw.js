@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v31';
+const CACHE = 'satoshi-static-v34';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
@@ -11,6 +11,7 @@ const CORE = [
     '/historical_data/generated/living-EU-observed.json',
     '/img/living/fuel.jpg', '/img/living/electricity.jpg',
     '/priceScanner.html', '/priceScanner.css', '/priceScanner.mjs',
+    '/priceScannerOcr.mjs', '/priceScannerOcrWorker.mjs',
     '/priceScannerModel.mjs', '/priceScannerRates.mjs', '/priceScannerPhoto.mjs', '/priceScannerTracking.mjs', '/vendor/jsfeat/jsfeat-min.js', '/currencies.json',
     '/vendor/lucide/lucide.min.js'
 ];
@@ -30,12 +31,17 @@ self.addEventListener('fetch', event => {
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
     // Cache public static resources only; live data and user inputs are excluded.
     const navigation = request.mode === 'navigate';
-    const asset = ['style', 'script', 'image', 'font'].includes(request.destination);
+    const asset = ['style', 'script', 'worker', 'image', 'font'].includes(request.destination);
     const livingData = url.pathname === '/historical_data/generated/living-EU-observed.json';
-    const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/ocr/');
+    const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
     if ((!navigation && !asset && !livingData && !scannerAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
+        // Versioned, self-hosted OCR assets are large and immutable within a release.
+        if (url.pathname.startsWith('/vendor/paddle/')) {
+            const cached = await cache.match(request);
+            if (cached) return cached;
+        }
         try {
             const response = await fetch(request);
             if (response.ok && response.type === 'basic') {

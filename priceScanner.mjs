@@ -1,8 +1,9 @@
-import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings, scannerFrameLimit} from './priceScannerModel.mjs';
+import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox} from './priceScannerModel.mjs';
 import {ScannerRates} from './priceScannerRates.mjs';
 import {drawScannerPhoto} from './priceScannerPhoto.mjs';
 import './vendor/jsfeat/jsfeat-min.js';
 import {PriceTracker} from './priceScannerTracking.mjs';
+import {createScannerOcr} from './priceScannerOcr.mjs';
 
 const $ = id => document.getElementById(id);
 const video = $('scanner-video'), stage = $('scanner-stage'), overlays = $('scanner-overlays');
@@ -34,7 +35,7 @@ const settings = scannerSettings(storage);
 let configured = hasScannerSettings(storage);
 let unit = settings.unit, names = {}, worker, stream, running = false, run = 0, revision = 0;
 let torch = false, detections = [], previous = [];
-let detectedAt = 0, animation, lastMotionAt = 0, ocrScript;
+let detectedAt = 0, animation, lastMotionAt = 0;
 let enginePromise, engineGeneration = 0, activeOcrJob, preloadTimer;
 let lastVideoTime = -1;
 let zoom = settings.zoom, pinch, overlayLifetime = 4000, takingPhoto = false, photoUrl, photoFile, logoReady = false;
@@ -151,17 +152,6 @@ function watchMotion(now) {
     animation = requestAnimationFrame(watchMotion);
 }
 
-async function loadOcr() {
-    if (!ocrScript) ocrScript = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'vendor/ocr/tesseract.min.js';
-        script.onload = resolve;
-        script.onerror = () => { script.remove(); ocrScript = null; reject(new Error('OCR download failed')); };
-        document.head.append(script);
-    });
-    await ocrScript;
-}
-
 function disposeOcr() {
     engineGeneration++;
     enginePromise = null;
@@ -174,23 +164,11 @@ function prepareOcr() {
     if (enginePromise) return enginePromise;
     const generation = engineGeneration;
     enginePromise = (async () => {
-        await loadOcr();
-        if (generation !== engineGeneration) throw new DOMException('Recognition cancelled', 'AbortError');
-        const engine = await Tesseract.createWorker('eng', 1, {
-            workerPath: new URL('vendor/ocr/worker.min.js', location.href).href,
-            corePath: new URL('vendor/ocr/', location.href).href,
-            langPath: new URL('vendor/ocr/', location.href).href,
-            workerBlobURL: false,
-            logger: message => { if (running && generation === engineGeneration && message.status !== 'recognizing text') status(`Loading recognition... ${Math.round((message.progress || 0) * 100)}%`); },
-            errorHandler: () => {
-                if (generation !== engineGeneration) return;
-                disposeOcr();
-                if (running) { stopCamera(); showError('Recognition could not load. Check your connection and retry.'); }
-            },
-        });
+        const engine = createScannerOcr();
+        worker = engine;
+        await engine.ready;
         if (generation !== engineGeneration) { await engine.terminate(); throw new DOMException('Recognition cancelled', 'AbortError'); }
         worker = engine;
-        await engine.setParameters({tessedit_pageseg_mode: '6'});
         return engine;
     })().catch(error => { if (generation === engineGeneration) disposeOcr(); throw error; });
     return enginePromise;
@@ -249,32 +227,28 @@ function normalizedPriceCrop(box) {
 }
 
 async function recognize(session) {
-    let layout = '6', preferredLayout = '6', passes = 0;
     let misses = 0, previousWidth = 0, previousHeight = 0;
     while (running && run === session && worker) {
         if (!video.videoWidth || video.readyState < 2) { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
         const aspect = stage.clientWidth / stage.clientHeight;
         const longest = scannerFrameLimit(misses);
         const width = Math.round(Math.min(longest, longest * aspect)), height = Math.round(width / aspect);
-        canvas.width = width; canvas.height = height;
-        drawCamera(context, width, height);
+        const region = scannerRegion(width, height);
+        const crop = cameraCrop(video.videoWidth, video.videoHeight, {width: stage.clientWidth, height: stage.clientHeight}, zoom);
+        canvas.width = region.width; canvas.height = region.height;
+        context.drawImage(video, crop.x + crop.width * region.x / width, crop.y + crop.height * region.y / height,
+            crop.width * region.width / width, crop.height * region.height / height, 0, 0, region.width, region.height);
         updateTracking();
         const trackingSnapshot = tracker.snapshot();
-        if (layout === '6') {
-            const image = context.getImageData(0, 0, width, height);
-            for (let i = 0; i < image.data.length; i += 4) {
-                const value = image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114 < 140 ? 0 : 255;
-                image.data[i] = image.data[i + 1] = image.data[i + 2] = value;
-            }
-            context.putImageData(image, 0, 0);
-        }
         const started = performance.now(), version = revision, selected = currency;
         try {
-            activeOcrJob = worker.recognize(canvas, {}, {blocks: true, text: true});
+            activeOcrJob = worker.recognize(canvas);
             const {data} = await activeOcrJob;
             if (!running || session !== run) return;
             if (revision === version && currency === selected) {
-                let current = detectPrices(data.blocks, currency);
+                const insideTarget = box => box && box.x0 > 1 && box.y0 > 1 &&
+                    box.x1 < region.width - 1 && box.y1 < region.height - 1;
+                let current = detectPrices(data.blocks, currency).filter(price => insideTarget(price.bbox));
                 const comparable = previousWidth ? previous.map(price => ({...price, bbox: {
                     x0: price.bbox.x0 * width / previousWidth, x1: price.bbox.x1 * width / previousWidth,
                     y0: price.bbox.y0 * height / previousHeight, y1: price.bbox.y1 * height / previousHeight,
@@ -282,25 +256,22 @@ async function recognize(session) {
                 const publish = prices => {
                     const confirmed = stableDetections(prices, comparable, width, height, true);
                     if (!confirmed.length) return false;
-                    detections = confirmed.map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, detection.bbox, {width, height})}));
+                    detections = confirmed.map(detection => ({...detection, anchor: tracker.anchor(trackingSnapshot, regionBox(detection.bbox, region), {width, height})}));
                     detectedAt = performance.now();
                     overlayLifetime = Math.min(10000, Math.max(4000, (detectedAt - started) * 2 + 500));
                     renderOverlays();
                     return true;
                 };
                 const published = publish(current);
-                if (published) preferredLayout = layout;
                 const words = (data.blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
                     (paragraph.lines || []).flatMap(line => line.words || [])));
-                const uncertain = words.filter(word => word.bbox && /\d/.test(word.text) && word.confidence < 80)
+                const uncertain = words.filter(word => insideTarget(word.bbox) && /\d/.test(word.text) && word.confidence < 80)
                     .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0))[0];
                 const normalized = !published && uncertain && normalizedPriceCrop(uncertain.bbox);
                 if (normalized) {
-                    await worker.setParameters({tessedit_pageseg_mode: '7'});
-                    activeOcrJob = worker.recognize(normalized, {}, {blocks: true, text: true});
+                    activeOcrJob = worker.recognize(normalized);
                     const retry = await activeOcrJob;
                     if (!running || session !== run) return;
-                    await worker.setParameters({tessedit_pageseg_mode: layout});
                     if (revision !== version || currency !== selected) continue;
                     const recovered = detectPrices(retry.data.blocks, currency);
                     if (recovered.length === 1) {
@@ -317,14 +288,6 @@ async function recognize(session) {
                 const quote = rates.snapshot(current[0]?.currency || currency);
                 status(current.length ? (!quote.ready ? 'Price detected; waiting for exchange rates' : detections.length ? 'Scanning' : 'Confirming price...') : 'No price detected');
                 renderOverlays();
-                // Keep the productive layout, but periodically probe for missed larger tags.
-                passes++;
-                const nextLayout = !current.length ? (layout === '11' ? '6' : '11') :
-                    passes % 4 === 0 ? (preferredLayout === '11' ? '6' : '11') : preferredLayout;
-                if (nextLayout !== layout && worker) {
-                    layout = nextLayout;
-                    await worker.setParameters({tessedit_pageseg_mode: layout});
-                }
             } else clearDetections();
         } catch {
             if (running && run === session) { stopCamera(); disposeOcr(); showError('Text recognition stopped. Start the camera to retry.'); }
@@ -388,8 +351,6 @@ async function startCamera() {
         status('Loading recognition...');
         await engineReady;
         await activeOcrJob?.catch(() => {});
-        if (!running || run !== session) return;
-        await worker.setParameters({tessedit_pageseg_mode: '6'});
         if (!running || run !== session) return;
         status('Scanning');
         recognize(session);
@@ -468,7 +429,11 @@ stage.addEventListener('keydown', event => {
     if (!running || !['+', '-', '=', '0'].includes(event.key)) return;
     event.preventDefault(); setZoom(event.key === '0' ? 1 : zoom + (event.key === '-' ? -0.25 : 0.25));
 });
-new ResizeObserver(() => { revision++; clearDetections(); }).observe(stage);
+new ResizeObserver(() => {
+    revision++; clearDetections();
+    const region = scannerRegion(stage.clientWidth, stage.clientHeight);
+    Object.assign($('scanner-target').style, {left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, height: `${region.height}px`});
+}).observe(stage);
 window.addEventListener('pagehide', () => { clearTimeout(preloadTimer); stopCamera(); disposeOcr(); rates.stop(); });
 window.addEventListener('pageshow', () => { if (!document.hidden) { rates.start(); warmRecognition(); } });
 document.addEventListener('visibilitychange', () => {

@@ -6,6 +6,16 @@ export function scannerFrameLimit(misses) {
     return [640, 640, 960, 960, 1280, 1280][misses % 6];
 }
 
+export function scannerRegion(width, height) {
+    const w = Math.max(1, Math.round(Math.min(width * 0.84, height * 0.9)));
+    const h = Math.max(1, Math.round(Math.min(height * 0.28, w * 0.5)));
+    return {x: Math.round((width - w) / 2), y: Math.round((height - h) / 2), width: w, height: h};
+}
+
+export function regionBox(box, region) {
+    return {x0: box.x0 + region.x, x1: box.x1 + region.x, y0: box.y0 + region.y, y1: box.y1 + region.y};
+}
+
 export function hasScannerSettings(storage) {
     try {
         const saved = JSON.parse(storage?.getItem('priceScannerSettings'));

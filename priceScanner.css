@@ -23,6 +23,8 @@
 .scanner-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #53585d; }
 .scanner-idle svg { width: 80px; height: 80px; stroke-width: 1; }
 #scanner-overlays { position: absolute; inset: 0; pointer-events: none; }
+#scanner-target { position: absolute; box-sizing: border-box; border: 1px solid #f2a90080; border-radius: 4px; pointer-events: none; }
+.scanner-stage:not(.is-running) #scanner-target { display: none; }
 .scanner-price { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px; background: #101112; border: 1px solid #f2a900; border-radius: 4px; color: #f2a900; overflow: hidden; }
 .scanner-price strong { font-size: 16px; line-height: 1.25; white-space: nowrap; }
 .scanner-price small { color: #d0d3d5; font-size: 11px; white-space: nowrap; }
