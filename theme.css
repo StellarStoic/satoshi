@@ -80,6 +80,26 @@ p, h1, h2, h3, h4, a, code { overflow-wrap: anywhere; }
     border-radius: 8px;
 }
 #contactModal { z-index: 4000; }
+body.modal-open { overflow: hidden; }
+#cookieConsentModal {
+    width: min(440px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    overflow: hidden;
+}
+#cookieConsentModal .modal-content { max-height: none; overflow: visible; }
+#cookieConsentModal h4 { margin: 0 0 8px; font-size: 18px; }
+#cookieConsentModal p { margin: 0; font-size: 14px; line-height: 1.45; }
+#cookieConsentModal .consent-question { margin-top: 12px; color: var(--text); font-weight: 600; }
+#cookieConsentModal .consent-button-container { margin-top: 12px; }
+@media (max-height: 420px) {
+    #cookieConsentModal { padding: 12px; }
+    #cookieConsentModal h4 { font-size: 16px; margin-bottom: 4px; }
+    #cookieConsentModal p { font-size: 12px; line-height: 1.3; }
+    #cookieConsentModal .consent-question,
+    #cookieConsentModal .consent-button-container { margin-top: 6px; }
+    #cookieConsentModal .consent-icon-button { font-size: 1.6rem; }
+}
 .contact-modal-content { border-radius: 8px; margin: 24px auto; }
 .contact-icon { flex: 0 0 40px; margin-right: 16px; }
 .contact-info { min-width: 0; overflow-wrap: anywhere; }

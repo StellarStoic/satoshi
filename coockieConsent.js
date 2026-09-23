@@ -19,6 +19,37 @@ document.addEventListener('DOMContentLoaded', function () {
         document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";  // Set path to root
     }
 
+    function prepareCookieNotice() {
+        const content = document.querySelector('#cookieConsentModal .modal-content');
+        if (!content) return;
+
+        const title = document.createElement('h4');
+        title.textContent = 'Privacy settings';
+        const summary = document.createElement('p');
+        summary.textContent = 'satoshi.si does not track you or sell your data. It only stores optional preferences, such as your selected currency, on this device.';
+        const question = document.createElement('p');
+        question.className = 'consent-question';
+        question.textContent = 'Allow local preferences?';
+        const actions = document.createElement('div');
+        actions.className = 'consent-button-container';
+        const accept = document.createElement('button');
+        accept.type = 'button';
+        accept.className = 'consent-icon-button green-check';
+        accept.title = 'Allow local preferences';
+        accept.setAttribute('aria-label', 'Allow local preferences');
+        accept.textContent = '\u2714';
+        accept.addEventListener('click', acceptCookies);
+        const decline = document.createElement('button');
+        decline.type = 'button';
+        decline.className = 'consent-icon-button red-cross';
+        decline.title = 'Continue without saving preferences';
+        decline.setAttribute('aria-label', 'Continue without saving preferences');
+        decline.textContent = '\u2718';
+        decline.addEventListener('click', declineCookies);
+        actions.append(accept, decline);
+        content.replaceChildren(title, summary, question, actions);
+    }
+
     // Function to check for cookie consent
     function checkCookieConsent() {
         const consent = getCookie("cookieConsent");
@@ -71,6 +102,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.classList.remove('modal-open');
         }
     }
+
+    prepareCookieNotice();
 
     // Check consent on page load
     checkCookieConsent();

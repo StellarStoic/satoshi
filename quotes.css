@@ -28,30 +28,47 @@
 }
 
 #next-quote {
-    display: none;
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top));
+    right: 16px;
+    z-index: 900;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    opacity: .45;
+    font-size: 21px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#next-quote:disabled {
+    opacity: .18;
+    cursor: wait;
+}
+
+#next-quote i {
+    display: block;
+    line-height: 1;
 }
 
 @media (min-width: 1024px) {
     #next-quote {
-        display: grid;
-        place-items: center;
-        position: fixed;
         top: 40px;
         right: 24px;
         width: 40px;
         height: 40px;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: var(--text-muted);
         opacity: .35;
         font-size: 20px;
-        cursor: pointer;
     }
+}
 
-    #next-quote:hover,
-    #next-quote:focus-visible {
-        opacity: 1;
-        color: #f2a900;
-    }
+#next-quote:hover,
+#next-quote:focus-visible {
+    opacity: 1;
+    color: #f2a900;
 }
