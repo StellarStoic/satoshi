@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parsePrice, detectPrices, fiatToBtc, containedBox, stableDetections, readSharedRates, parseFxResponse, BTC_MAX_AGE, FX_MAX_AGE, cameraCrop, frameDifference, scannerSettings} from '../priceScannerModel.mjs';
 import {ScannerRates} from '../priceScannerRates.mjs';
-import {hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox} from '../priceScannerModel.mjs';
+import {hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox, inferSmallCents, needsPriceDetail} from '../priceScannerModel.mjs';
 
 test('center scan area is bounded and maps OCR boxes back into the camera frame', () => {
     for (const [width, height] of [[390, 844], [844, 390], [1440, 900], [296, 641], [592, 1282]]) {
@@ -37,6 +37,38 @@ test('prices handle decimal commas, thousands, currency symbols and whole prices
     for (const text of ['1234567890123', '20%', '2026-09-20', '20/09/2026', '12.09.2026', '1.5 kg', '-12.99', '1.234', '1,2,3', '0.00', '$12.99', 'USD 12.99']) {
         assert.equal(parsePrice(text, 'EUR'), null, text);
     }
+});
+
+test('smaller final glyphs restore an omitted cents separator without changing normal whole prices', () => {
+    const frame = (lightInk = false) => {
+        const width = 60, height = 40;
+        const background = lightInk ? 20 : 245, ink = lightInk ? 245 : 20;
+        const data = new Uint8ClampedArray(width * height * 4);
+        for (let i = 0; i < data.length; i += 4) data[i] = data[i + 1] = data[i + 2] = background;
+        const glyph = (x0, y0, x1, y1) => {
+            for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+                const i = (y * width + x) * 4; data[i] = data[i + 1] = data[i + 2] = ink; data[i + 3] = 255;
+            }
+        };
+        glyph(2, 2, 11, 37); glyph(20, 3, 29, 20); glyph(38, 4, 48, 21);
+        return {data, width, height};
+    };
+    const box = {x0: 0, y0: 0, x1: 52, y1: 40};
+    assert.equal(inferSmallCents('178', box, frame()), '1.78');
+    assert.equal(inferSmallCents('178', box, frame(true)), '1.78');
+    assert.equal(inferSmallCents('4589', box, frame()), '45.89');
+    assert.equal(inferSmallCents('78', box, frame()), '78');
+    const equal = frame();
+    for (let y = 20; y < 37; y++) for (const [x0, x1] of [[20, 29], [38, 48]]) {
+        for (let x = x0; x < x1; x++) { const i = (y * equal.width + x) * 4; equal.data[i] = equal.data[i + 1] = equal.data[i + 2] = 20; }
+    }
+    assert.equal(inferSmallCents('178', box, equal), '178');
+    const tiny = {text: '178', bbox: {x0: 0, y0: 0, x1: 18, y1: 11}};
+    assert.equal(needsPriceDetail(tiny, 640), true);
+    assert.equal(needsPriceDetail(tiny, 960), true);
+    assert.equal(needsPriceDetail(tiny, 1280), false);
+    assert.equal(needsPriceDetail({...tiny, text: '1.78'}, 640), false);
+    assert.equal(needsPriceDetail({...tiny, bbox: {...tiny.bbox, y1: 30}}, 640), false);
 });
 
 test('confident prices appear immediately; uncertain OCR needs repeat agreement', () => {

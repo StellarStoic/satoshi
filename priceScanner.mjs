@@ -1,4 +1,4 @@
-import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox} from './priceScannerModel.mjs';
+import {fiatToBtc, detectPrices, stableDetections, containedBox, positive, cameraCrop, scannerSettings, hasScannerSettings, scannerFrameLimit, scannerRegion, regionBox, inferSmallCents, needsPriceDetail} from './priceScannerModel.mjs';
 import {ScannerRates} from './priceScannerRates.mjs';
 import {drawScannerPhoto} from './priceScannerPhoto.mjs';
 import './vendor/jsfeat/jsfeat-min.js';
@@ -248,7 +248,19 @@ async function recognize(session) {
             if (revision === version && currency === selected) {
                 const insideTarget = box => box && box.x0 > 1 && box.y0 > 1 &&
                     box.x1 < region.width - 1 && box.y1 < region.height - 1;
-                let current = detectPrices(data.blocks, currency).filter(price => insideTarget(price.bbox));
+                const words = (data.blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
+                    (paragraph.lines || []).flatMap(line => line.words || [])));
+                const compactNumbers = words.filter(word => /^\d{3,6}$/.test(word.text) && insideTarget(word.bbox));
+                const largestCompact = Math.max(0, ...compactNumbers.map(word => word.bbox.y1 - word.bbox.y0));
+                const centsCandidates = compactNumbers.filter(word => word.bbox.y1 - word.bbox.y0 >= largestCompact * 0.65);
+                if (centsCandidates.length) {
+                    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+                    for (const word of centsCandidates) word.text = inferSmallCents(word.text, word.bbox, frame);
+                }
+                const needsDetail = centsCandidates.filter(word => needsPriceDetail(word, longest));
+                let current = detectPrices(data.blocks, currency).filter(price => insideTarget(price.bbox) &&
+                    !needsDetail.some(word => word.bbox.x0 >= price.bbox.x0 && word.bbox.x1 <= price.bbox.x1 &&
+                        word.bbox.y0 >= price.bbox.y0 && word.bbox.y1 <= price.bbox.y1));
                 const comparable = previousWidth ? previous.map(price => ({...price, bbox: {
                     x0: price.bbox.x0 * width / previousWidth, x1: price.bbox.x1 * width / previousWidth,
                     y0: price.bbox.y0 * height / previousHeight, y1: price.bbox.y1 * height / previousHeight,
@@ -263,8 +275,6 @@ async function recognize(session) {
                     return true;
                 };
                 const published = publish(current);
-                const words = (data.blocks || []).flatMap(block => (block.paragraphs || []).flatMap(paragraph =>
-                    (paragraph.lines || []).flatMap(line => line.words || [])));
                 const uncertain = words.filter(word => insideTarget(word.bbox) && /\d/.test(word.text) && word.confidence < 80)
                     .sort((a, b) => (b.bbox.y1 - b.bbox.y0) - (a.bbox.y1 - a.bbox.y0))[0];
                 const normalized = !published && uncertain && normalizedPriceCrop(uncertain.bbox);
@@ -282,7 +292,7 @@ async function recognize(session) {
                         publish(current);
                     }
                 }
-                misses = current.length ? 0 : misses + 1;
+                misses = needsDetail.length ? Math.max(2, misses + 2) : current.length ? 0 : misses + 1;
                 previous = current;
                 previousWidth = width; previousHeight = height;
                 const quote = rates.snapshot(current[0]?.currency || currency);

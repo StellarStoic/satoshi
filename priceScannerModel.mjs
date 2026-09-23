@@ -16,6 +16,80 @@ export function regionBox(box, region) {
     return {x0: box.x0 + region.x, x1: box.x1 + region.x, y0: box.y0 + region.y, y1: box.y1 + region.y};
 }
 
+export function inferSmallCents(text, box, frame) {
+    if (!/^\d{3,6}$/.test(text) || !box || !frame?.data || !positive(frame.width) || !positive(frame.height)) return text;
+    const left = Math.max(0, Math.floor(box.x0)), top = Math.max(0, Math.floor(box.y0));
+    const right = Math.min(frame.width, Math.ceil(box.x1)), bottom = Math.min(frame.height, Math.ceil(box.y1));
+    const width = right - left, height = bottom - top;
+    if (width < text.length * 2 || height < 6) return text;
+
+    const gray = new Uint8Array(width * height), histogram = new Uint32Array(256);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const source = ((top + y) * frame.width + left + x) * 4;
+        const value = Math.round(frame.data[source] * 0.299 + frame.data[source + 1] * 0.587 + frame.data[source + 2] * 0.114);
+        gray[y * width + x] = value; histogram[value]++;
+    }
+    const percentile = fraction => {
+        const target = width * height * fraction;
+        let total = 0;
+        for (let value = 0; value < histogram.length; value++) {
+            total += histogram[value];
+            if (total >= target) return value;
+        }
+        return 255;
+    };
+    const low = percentile(0.01), high = percentile(0.95);
+    if (high - low < 45) return text;
+
+    const glyphRuns = (lightInk, threshold) => {
+        const columns = [];
+        const minimumInk = Math.max(1, Math.floor(height * 0.025));
+        for (let x = 0; x < width; x++) {
+            let ink = 0, y0 = height, y1 = -1;
+            for (let y = 0; y < height; y++) {
+                const value = gray[y * width + x];
+                if (lightInk ? value >= threshold : value <= threshold) { ink++; y0 = Math.min(y0, y); y1 = y; }
+            }
+            columns.push(ink >= minimumInk ? {y0, y1} : null);
+        }
+        const runs = [];
+        let run;
+        for (let x = 0; x < width; x++) {
+            const column = columns[x];
+            if (column) {
+                if (!run) { run = {x0: x, x1: x, y0: column.y0, y1: column.y1}; runs.push(run); }
+                run.x1 = x; run.y0 = Math.min(run.y0, column.y0); run.y1 = Math.max(run.y1, column.y1);
+            } else run = null;
+        }
+        return runs.filter(run => run.x1 - run.x0 + 1 >= Math.max(1, width * 0.025) && run.y1 - run.y0 + 1 >= height * 0.2);
+    };
+    const range = high - low;
+    const masks = [0.12, 0.18, 0.28, 0.38].flatMap(level => [
+        glyphRuns(false, low + range * level), glyphRuns(true, high - range * level),
+    ]);
+    for (const runs of masks) {
+        const complete = runs.length === text.length;
+        const oneMissingInteger = text.length >= 4 && runs.length === text.length - 1;
+        if (!complete && !oneMissingInteger) continue;
+        const integer = runs.slice(0, -2), cents = runs.slice(-2);
+        const heights = runs.map(run => run.y1 - run.y0 + 1);
+        const integerHeights = heights.slice(0, -2), centHeights = heights.slice(-2);
+        const mainMin = Math.min(...integerHeights), mainMax = Math.max(...integerHeights);
+        const centMin = Math.min(...centHeights), centMax = Math.max(...centHeights);
+        if (mainMin < mainMax * 0.72 || centMin < centMax * 0.65 || centMax > mainMin * 0.78) continue;
+        const mainTop = Math.min(...integer.map(run => run.y0)), mainBottom = Math.max(...integer.map(run => run.y1));
+        const centTop = Math.min(...cents.map(run => run.y0)), centBottom = Math.max(...cents.map(run => run.y1));
+        const topAligned = Math.abs(centTop - mainTop) <= mainMax * 0.3 && mainBottom - centBottom >= mainMax * 0.15;
+        const bottomAligned = Math.abs(centBottom - mainBottom) <= mainMax * 0.3 && centTop - mainTop >= mainMax * 0.15;
+        if (topAligned || bottomAligned) return `${text.slice(0, -2)}.${text.slice(-2)}`;
+    }
+    return text;
+}
+
+export function needsPriceDetail(word, frameLimit) {
+    return frameLimit < 1280 && /^\d{3,6}$/.test(word?.text || '') && word?.bbox && word.bbox.y1 - word.bbox.y0 < 24;
+}
+
 export function hasScannerSettings(storage) {
     try {
         const saved = JSON.parse(storage?.getItem('priceScannerSettings'));
