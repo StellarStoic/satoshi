@@ -1,271 +1,187 @@
-import { wordlist as bip39Words } from './vendor/bip39.mjs';
-import { explainTerms } from './bip39Glossary.mjs';
-
-// From Jameson Lopp's repeated words findings at https://blog.lopp.net/how-many-bitcoin-seed-phrases-are-only-one-repeated-word/
-const repeatedWords12x = new Set([
-  "action", "agent", "aim", "all", "ankle", "announce", "audit", "awesome", "beef", "believe", "blue", "border", "brand",
-  "breeze", "bus", "business", "cannon", "canyon", "carry", "cave", "century", "cereal", "chronic", "coast", "convince",
-  "cute", "dawn", "dilemma", "divorce", "dry", "elevator", "else", "embrace", "enroll", "escape", "evolve", "exclude",
-  "excuse", "exercise", "expire", "fetch", "fever", "forward", "fury", "garment", "gauge", "gym", "half", "harsh", "hole",
-  "hybrid", "illegal", "include", "index", "into", "invest", "involve", "jeans", "kick", "kite", "later", "layer", "legend",
-  "life", "lyrics", "margin", "melody", "mom", "more", "morning", "nation", "neck", "neglect", "never", "noble", "novel",
-  "obvious", "ocean", "oil", "orphan", "oxygen", "pause", "peasant", "permit", "piano", "proof", "pumpkin", "question",
-  "real", "report", "rough", "rude", "salad", "scale", "screen", "sea", "seat", "sell", "seminar", "seven", "sheriff",
-  "siege", "silver", "soldier", "spell", "split", "spray", "stadium", "sugar", "sunny", "sure", "tobacco", "tongue",
-  "track", "tree", "trouble", "twelve", "twice", "type", "uniform", "useless", "valid", "very", "vibrant", "virtual",
-  "vocal", "warrior", "word", "world", "yellow"
-]);
-
-const repeatedWords24x = new Set([
-  "bacon", "flag", "gas", "great", "slice", "solution", "summer", "they", "trade", "trap", "zebra"
-]);
-
+import {wordlist as bip39Words} from './vendor/bip39.mjs';
 
 const input = document.getElementById('bip39Input');
-const suggestionsBox = document.getElementById('suggestions');
-const warningBox = document.getElementById('repetitionWarning');
+const suggestions = document.getElementById('suggestions');
+const validity = document.getElementById('wordValidityInfo');
+const wordSet = new Set(bip39Words);
 
-let currentMatches = [];
-let inputRevision = 0;
+const wideSlots = [
+  [50, 30], [50, 70], [22, 38], [78, 38], [20, 62], [80, 62], [9, 50], [91, 50],
+  [13, 11], [32, 13], [69, 11], [87, 14], [20, 23], [39, 21], [63, 22], [82, 24],
+  [14, 78], [34, 80], [66, 79], [86, 78], [9, 89], [27, 91], [48, 88], [70, 91],
+  [90, 89], [8, 34], [92, 34], [8, 66],
+];
 
-input.addEventListener('input', () => {
-  const value = input.value.trim().toLowerCase();
-  const revision = ++inputRevision;
-  const validityInfo = document.getElementById('wordValidityInfo');
-  validityInfo.textContent = '';
-  validityInfo.classList.remove('visible');
-  document.getElementById('lab-use-checked-word').hidden = true;
-  warningBox.textContent = '';
-  warningBox.classList.remove('visible');
-  currentMatches = [];
+const narrowSlots = [
+  [50, 28], [50, 72], [24, 35], [76, 35], [22, 66], [78, 66],
+  [17, 10], [50, 11], [82, 13], [20, 20], [79, 22],
+  [18, 81], [50, 82], [82, 79], [14, 91], [40, 91], [68, 91], [88, 89],
+];
 
-  if (value === "") {
-    input.classList.remove('valid', 'invalid');
-    suggestionsBox.textContent = "";
-    suggestionsBox.classList.remove('active');
-    return;
-  }
+const featured = [
+  'abandon', 'ability', 'acoustic', 'alien', 'ancient', 'balance', 'bamboo', 'beach',
+  'bitcoin', 'block', 'brave', 'cactus', 'coin', 'digital', 'dream', 'energy', 'future',
+  'galaxy', 'honest', 'liberty', 'light', 'matrix', 'network', 'orange', 'proof', 'quantum',
+  'signal', 'trust',
+].filter(word => wordSet.has(word));
 
-  // Reset UI
-  suggestionsBox.innerHTML = '';
-  suggestionsBox.classList.remove('active');
-  warningBox.classList.remove('visible');
-  warningBox.textContent = '';
-
-  if (bip39Words.includes(value)) {
-    input.classList.add('valid');
-    input.classList.remove('invalid');
-  
-  } else {
-    input.classList.add('invalid');
-    input.classList.remove('valid');
-  }
-
-  const isValid = bip39Words.includes(value);
-  document.getElementById('lab-use-checked-word').hidden = !isValid;
-  const validity = document.createElement('strong');
-  validity.className = isValid ? 'word-valid' : 'word-invalid';
-  validity.textContent = isValid ? 'valid' : 'NOT';
-  validityInfo.append(
-    `${value} is ${isValid ? 'a ' : ''}`,
-    validity,
-    isValid ? ' BIP39 word.' : ' valid BIP39 word.'
-  );
-  validityInfo.classList.add('visible');
-  explainTerms(validityInfo);
-
-  // If invalid BIP39 word, fetch similar real words
-  if (!bip39Words.includes(value) && /^[a-z]{3,}$/.test(value)) {
-    fetchSimilarEnglishWords(value).then(similarWords => {
-      if (revision !== inputRevision) return;
-      let html = '';
-  
-      // 1. Datamuse Suggestions
-      const datamuseSuggestions = similarWords.filter(word => !usedWords.has(word));
-      if (datamuseSuggestions.length) {
-        const wordElements = datamuseSuggestions.map(word => {
-          const isBip = bip39Words.includes(word);
-          usedWords.add(word);
-          const color = isBip ? 'limegreen' : '#999';
-          const fontWeight = isBip ? '600' : 'normal';
-          return `<span style="color:${color}; font-weight:${fontWeight};">${word}</span>`;
-        });
-      
-        html += `<div><span style="color:#999;">Other similar English words: ${wordElements.join(', ')}</span></div>`;
-      }
-  
-      // 2. Levenshtein fallback only if Datamuse gave nothing
-      if (similarWords.length === 0) {
-        const typoFixes = getClosestWordsByDistance(
-          value,
-          bip39Words.filter(w => !usedWords.has(w)), // avoid duplicates
-          value.length <= 4 ? 1 : 2
-        );
-        
-        if (typoFixes.length) {
-          html += `<div><span style="color:#ccc;">Did you mean: <span style="color:limegreen;">${typoFixes.join(', ')}</span>?</span></div>`;
-        }
-      }
-  
-      if (bip39SuggestionHTML || html) {
-        suggestionsBox.innerHTML = [bip39SuggestionHTML, html].filter(Boolean).join('<br>');
-        suggestionsBox.classList.add('active');
-      }
-    });
-  }
-  
-  const usedWords = new Set(); // keeps track of already suggested words
-
-// --- First: BIP39 "startsWith" suggestions ---
-currentMatches = bip39Words.filter(word => word.startsWith(value)).slice(0, 5);
-let bip39SuggestionHTML = '';
-if (currentMatches.length) {
-  const matchElements = currentMatches.map(word => {
-    usedWords.add(word);
-    return `<span class="suggestion">${word}</span>`;
-  }).join(', ');
-  bip39SuggestionHTML = `Suggestions: ${matchElements}`;
-}
-if (!isValid && bip39SuggestionHTML) {
-  suggestionsBox.innerHTML = bip39SuggestionHTML;
-  suggestionsBox.classList.add('active');
-}
-
-// Repeated seed phrase warning
-let warns12 = repeatedWords12x.has(value);
-let warns24 = repeatedWords24x.has(value);
-
-if (warns12 || warns24) {
-  let repeatNote = `"${value}" is one of the rare words that can form a valid seed phrase when repeated `;
-
-  if (warns12 && warns24) {
-    repeatNote += `12 or 24 times.`;
-  } else if (warns12) {
-    repeatNote += `12 times.`;
-  } else {
-    repeatNote += `24 times.`;
-  }
-
-  repeatNote += ` Never use such phrases – they're insecure and publicly known.`;
-
-  warningBox.textContent = repeatNote;
-  warningBox.classList.add('visible');
-  explainTerms(warningBox);
-} else {
-  warningBox.textContent = '';
-  warningBox.classList.remove('visible');
-}
-});
-
-// Autocomplete on click
-suggestionsBox.addEventListener('click', (e) => {
-  if (e.target.classList.contains('suggestion')) {
-    input.value = e.target.textContent;
-    input.dispatchEvent(new Event('input'));
-  }
-});
-
-// Autocomplete on TAB if one match
-input.addEventListener('keydown', (e) => {
-  if (e.key === 'Tab' && !e.shiftKey && currentMatches.length === 1 && currentMatches[0] !== input.value.trim().toLowerCase()) {
-    e.preventDefault();
-    input.value = currentMatches[0];
-    input.dispatchEvent(new Event('input'));
-  }
-});
-
-// Levenshtein typo correction for mistyped words
-function getClosestWordsByDistance(input, wordList, maxDistance = 2, maxResults = 5) {
-  function levenshtein(a, b) {
-    const matrix = Array.from({ length: a.length + 1 }, () => []);
-    for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-    for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-
-    for (let i = 1; i <= a.length; i++) {
-      for (let j = 1; j <= b.length; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + cost
-        );
-      }
+function levenshtein(a, b) {
+  const previous = Array.from({length: b.length + 1}, (_, index) => index);
+  for (let row = 1; row <= a.length; row++) {
+    let diagonal = previous[0];
+    previous[0] = row;
+    for (let column = 1; column <= b.length; column++) {
+      const above = previous[column];
+      previous[column] = Math.min(previous[column] + 1, previous[column - 1] + 1,
+        diagonal + (a[row - 1] === b[column - 1] ? 0 : 1));
+      diagonal = above;
     }
-    return matrix[a.length][b.length];
   }
-
-  return wordList
-    .map(word => ({word, distance: levenshtein(input.toLowerCase(), word.toLowerCase())}))
-    .filter(entry => entry.distance > 0 && entry.distance <= maxDistance)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, maxResults)
-    .map(entry => entry.word);
+  return previous[b.length];
 }
 
-function fetchSimilarEnglishWords(inputWord) {
-  const url = `https://api.datamuse.com/words?sp=${inputWord}&sl=${inputWord}&md=f&max=10`;
-
-  return fetch(url)
-    .then(res => res.json())
-    .then(data => {
-      return data
-        .filter(entry => {
-          const freqTag = entry.tags?.find(tag => tag.startsWith("f:"));
-          if (!freqTag) return false;
-          const frequency = parseFloat(freqTag.slice(2));
-          return frequency >= 1; // only show common words
-        })
-        .map(entry => entry.word)
-        .filter(word => word.length >= 3 && word !== inputWord);
-    })
-    .catch(() => []);
+function sharedPrefix(a, b) {
+  let length = 0;
+  while (length < a.length && length < b.length && a[length] === b[length]) length++;
+  return length;
 }
+
+function phonetic(word) {
+  const groups = {b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2,
+    d: 3, t: 3, l: 4, m: 5, n: 5, r: 6};
+  let code = word[0] || '', previous = groups[code] || 0;
+  for (const letter of word.slice(1)) {
+    const value = groups[letter] || 0;
+    if (value && value !== previous) code += value;
+    previous = value;
+  }
+  return (code + '000').slice(0, 4);
+}
+
+function score(word, query) {
+  const prefix = sharedPrefix(word, query);
+  let value = levenshtein(word, query) * 12 + Math.abs(word.length - query.length) * 2 - prefix * 10;
+  if (word.startsWith(query)) value -= 90 + query.length * 7;
+  else if (word.includes(query)) value -= 28;
+  if (word[0] === query[0]) value -= 8;
+  if (query.length >= 3 && phonetic(word) === phonetic(query)) value -= 20;
+  return value;
+}
+
+function rankedWords(query, count) {
+  if (!query) {
+    const chosen = [...featured];
+    for (let index = 17; chosen.length < count; index += 73) {
+      const word = bip39Words[index % bip39Words.length];
+      if (!chosen.includes(word)) chosen.push(word);
+    }
+    return chosen.slice(0, count);
+  }
+  return bip39Words
+    .filter(word => word !== query)
+    .map(word => ({word, score: score(word, query)}))
+    .sort((a, b) => a.score - b.score || a.word.localeCompare(b.word))
+    .slice(0, count)
+    .map(match => match.word);
+}
+
+function setValidity(value) {
+  input.classList.remove('valid', 'invalid');
+  validity.replaceChildren();
+  if (!value) return;
+  const valid = wordSet.has(value);
+  input.classList.add(valid ? 'valid' : 'invalid');
+  const state = document.createElement('strong');
+  state.className = valid ? 'word-valid' : 'word-invalid';
+  state.textContent = valid ? 'valid' : 'not';
+  validity.append(`"${value}" is `, state, ' a BIP39 word');
+}
+
+function render() {
+  const value = input.value.trim().toLowerCase().replace(/[^a-z]/g, '');
+  if (input.value !== value) input.value = value;
+  setValidity(value);
+  const slots = matchMedia('(max-width: 650px)').matches ? narrowSlots : wideSlots;
+  const words = rankedWords(value, slots.length);
+  const nodes = words.map((word, index) => {
+    const button = document.createElement('button');
+    const [x, y] = slots[index];
+    const prominence = index === 0 ? 22 : index < 3 ? 18 : index < 10 ? 15 : 13;
+    button.type = 'button';
+    button.className = 'word-suggestion';
+    button.dataset.rank = String(index);
+    button.textContent = word;
+    button.setAttribute('aria-label', `Use BIP39 word ${word}`);
+    button.style.setProperty('--word-x', `${x}%`);
+    button.style.setProperty('--word-y', `${y}%`);
+    button.style.setProperty('--word-size', `${prominence}px`);
+    button.style.setProperty('--word-opacity', String(index < 4 ? .95 : Math.max(.3, .78 - index * .017)));
+    button.style.setProperty('--word-enter-delay', `${Math.min(index * 16, 240)}ms`);
+    button.style.setProperty('--word-delay', `${-((index * 1.37) % 7)}s`);
+    button.style.setProperty('--word-speed', `${6 + index % 5}s`);
+    button.style.setProperty('--word-drift-x', `${index % 2 ? -3 : 3}px`);
+    button.style.setProperty('--word-drift-y', `${index % 3 ? 2 : -3}px`);
+    button.addEventListener('click', () => {
+      input.value = word;
+      render();
+      input.focus();
+    });
+    return button;
+  });
+  suggestions.replaceChildren(...nodes);
+}
+
+input.addEventListener('input', render);
+input.addEventListener('keydown', event => {
+  const words = [...suggestions.querySelectorAll('button')];
+  if (event.key === 'ArrowDown' && words.length) {
+    event.preventDefault();
+    words[0].focus();
+  } else if (event.key === 'Tab' && !event.shiftKey && words.length === 1) {
+    event.preventDefault();
+    words[0].click();
+  }
+});
+
+suggestions.addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) return;
+  event.preventDefault();
+  if (event.key === 'Escape') { input.focus(); return; }
+  const words = [...suggestions.querySelectorAll('button')];
+  const current = words.indexOf(document.activeElement);
+  const step = ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1;
+  words[(current + step + words.length) % words.length]?.focus();
+});
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 120);
+});
 
 function closeAllModals() {
-  document.querySelectorAll('.description-modal.active').forEach(modal => {
-    modal.classList.remove('active');
-  });
+  document.querySelectorAll('.description-modal.active').forEach(modal => modal.classList.remove('active'));
   document.body.classList.remove('modal-open');
 }
 
-
-// Open the modal
 function openBipModal(event) {
-    if (event) event.stopPropagation();
-    closeAllModals(); // if you use this globally
-    const modal = document.getElementById("bip39Modal");
-    modal.classList.add("active");
-    document.body.classList.add("modal-open");
-  }
-  
-  // Close the modal
-  function closeBipModal() {
-    const modal = document.getElementById("bip39Modal");
-    modal.classList.remove("active");
-    document.body.classList.remove("modal-open");
-  }
-  
-  // Global registration
-  window.openBipModal = openBipModal;
-  window.closeBipModal = closeBipModal;
-  
-  document.addEventListener('DOMContentLoaded', () => {
-    const openBtn = document.getElementById("openBipInfoModal");
-    const closeBtn = document.getElementById("closeBipModal");
-    const modal = document.getElementById("bip39Modal");
+  event?.stopPropagation();
+  closeAllModals();
+  document.getElementById('bip39Modal').classList.add('active');
+  document.body.classList.add('modal-open');
+}
 
-    if (openBtn) {
-      openBtn.addEventListener("click", openBipModal);
-    }
-  
-    if (closeBtn) {
-      closeBtn.addEventListener("click", closeBipModal);
-    }
-  
-    // Close when clicking outside modal-content
-    window.addEventListener("click", (event) => {
-      if (event.target === modal) {
-        closeBipModal();
-      }
-    });
-  });
+function closeBipModal() {
+  document.getElementById('bip39Modal').classList.remove('active');
+  document.body.classList.remove('modal-open');
+}
+
+document.getElementById('openBipInfoModal')?.addEventListener('click', openBipModal);
+document.getElementById('closeBipModal')?.addEventListener('click', closeBipModal);
+document.getElementById('bip39Modal')?.addEventListener('click', event => {
+  if (event.target === event.currentTarget) closeBipModal();
+});
+
+window.openBipModal = openBipModal;
+window.closeBipModal = closeBipModal;
+render();

@@ -12,7 +12,7 @@
 | --- | --- |
 | [Words of Satoshi](https://satoshi.si/quotes.html) | Shuffled quotes, click-to-copy, two-minute rotation, and a subtle desktop control for the next quote. |
 | [Bitcoin whitepaper](https://satoshi.si/whitepaper.html) | A collection of translations, with contributions welcome to make Bitcoin knowledge accessible in more languages. |
-| [BIP39 checker and playground](https://satoshi.si/isBip39.html) | Check English BIP39 words, construct example phrases, explore entropy and checksums, and compare seeds with an optional passphrase. Click technical terms for simple explanations. |
+| [BIP39 word checker](https://satoshi.si/isBip39.html) | Type one word and explore a full-screen field of similar English BIP39 words. Validation and suggestions run locally and work offline. |
 | [History chart](https://satoshi.si/chart.html) | Explore currencies and other assets priced in sats, with time ranges, linear/logarithmic scales, historical events, snapshots, and CSV/JSON exports. |
 | [Moscow Time](https://satoshi.si/MoscowTime.html) | A sats-per-dollar view of Bitcoin's price. |
 | [Converter](https://satoshi.si/converter.html) | Bitcoin, satoshi, and fiat conversions. |

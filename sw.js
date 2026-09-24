@@ -1,11 +1,10 @@
-const CACHE = 'satoshi-static-v35';
+const CACHE = 'satoshi-static-v36';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js',
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
-    '/isBip39.html', '/isBip39.css', '/isBip39.js', '/bip39Lab.css',
-    '/bip39Lab.mjs', '/bip39LabModel.mjs', '/bip39Glossary.mjs', '/vendor/bip39.mjs',
+    '/isBip39.html', '/isBip39.css', '/isBip39.js', '/vendor/bip39.mjs',
     '/img/grain.png', '/siteEffects.js', '/siteEffects.css',
     '/living.html', '/living.css', '/living.mjs', '/livingModel.mjs',
     '/historical_data/generated/living-EU-observed.json',

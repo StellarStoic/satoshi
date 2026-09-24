@@ -26,14 +26,13 @@
     <meta name="theme-color" content="#101112">
 
     
-    <title>BIP39 Playground | Satoshi.si</title>
+    <title>Is It a BIP39 Word? | Satoshi.si</title>
     <link rel="stylesheet" href="theme.css">
-    <link rel="stylesheet" href="bip39Lab.css">
     <script src="pwa.js" defer></script>
     <link rel="stylesheet" href="siteEffects.css">
     <script src="siteEffects.js" defer></script>
 </head>
-<body>
+<body class="bip39-word-page">
   
   <!-- Copy text notification -->
   <div id="copyNotification"  class="copy-notification">Text copied to clipboard!</div>
@@ -117,121 +116,21 @@
     </div>
 
     <!-- Question mark icon for basic info -->
-    <div class="info-modal-trigger" id="openBipInfoModal">
+    <button type="button" class="info-modal-trigger" id="openBipInfoModal" aria-label="About BIP39 words" title="About BIP39 words">
       <i class="lni lni-question-mark-circle"></i>
-    </div>
+    </button>
 
-    <main id="bip39-page">
-    <header class="lab-heading">
-      <img src="android-chrome-192x192.png" width="48" height="48" alt="Satoshi.si">
-      <div><h1>BIP39 playground</h1><p>From a few words to the seed behind a Bitcoin wallet.</p></div>
-    </header>
-    <p class="lab-notice">Learning examples only. Never use these phrases for funds or enter a real recovery phrase.</p>
-
-    <section class="centered-input-container" aria-label="Single word checker">
-      <div class="input-wrapper">
-        <label for="bip39Input">Check one word</label>
-        <input type="text" id="bip39Input" placeholder="Try alien" autocomplete="off" autocapitalize="none" spellcheck="false">
-
-        <div class="bip39-helper-zone">
-          <div id="suggestions" class="suggestions-box"></div>
-          <div id="repetitionWarning" class="repetition-warning"></div>
-          <div id="wordValidityInfo" class="word-validity-info" role="status" aria-live="polite"></div>
-          <button type="button" id="lab-use-checked-word" class="lab-secondary" hidden>Use as word 1</button>
+    <main id="bip39-page" class="word-field-page">
+      <section class="word-field" aria-labelledby="word-field-title">
+        <div id="suggestions" class="word-field-suggestions" aria-label="Similar BIP39 words"></div>
+        <div class="word-field-core">
+          <h1 id="word-field-title">Is it a BIP39 word?</h1>
+          <label class="visually-hidden" for="bip39Input">Enter one word</label>
+          <input type="text" id="bip39Input" placeholder="alien" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+          <p id="wordValidityInfo" class="word-validity-info" role="status" aria-live="polite"></p>
         </div>
-      </div>
-    </section>
-
-    <div id="bip39-lab" aria-busy="true">
-      <p id="lab-loading" role="status">Loading the playground...</p>
-      <noscript><p>The interactive examples need JavaScript enabled.</p></noscript>
-      <div id="lab-content" hidden>
-        <section class="lab-section" aria-labelledby="phrase-title">
-          <div class="lab-section-heading">
-            <div><span class="lab-step">01 / THE WORDS</span><h2 id="phrase-title">Build a practice phrase</h2></div>
-            <div class="lab-controls">
-              <label for="lab-length">Words <select id="lab-length"><option>12</option><option>15</option><option>18</option><option>21</option><option>24</option></select></label>
-              <button type="button" id="lab-random">New example</button>
-              <button type="button" id="lab-reset" class="lab-secondary">Reset</button>
-            </div>
-          </div>
-          <p>Each word stands for 11 bits: eleven zeros and ones. The order matters, and a phrase needs a matching checksum as well as valid words.</p>
-          <div id="lab-words" class="lab-word-grid" aria-label="Practice phrase words"></div>
-          <div class="lab-word-editor">
-            <form id="lab-word-form">
-              <label for="lab-word-choice" id="lab-word-label">Word 1</label>
-              <div class="lab-edit-row"><input id="lab-word-choice" list="lab-wordlist" autocomplete="off" autocapitalize="none" spellcheck="false" required><button type="submit">Apply word</button></div>
-              <datalist id="lab-wordlist"></datalist>
-              <p id="lab-word-error" role="status"></p>
-            </form>
-            <div class="lab-word-facts">
-              <div><span>List position</span><strong id="lab-position"></strong></div>
-              <div><span>Index (starts at 0)</span><strong id="lab-index"></strong></div>
-              <div><span>11-bit value</span><code id="lab-selected-bits"></code></div>
-            </div>
-          </div>
-          <p class="lab-small">The highlighted first four letters identify each English BIP39 word uniquely. Shorter words use their full spelling.</p>
-        </section>
-
-        <section class="lab-section" aria-labelledby="bits-title">
-          <span class="lab-step">02 / UNDER THE HOOD</span><h2 id="bits-title">Bits first. Words second.</h2>
-          <p>A wallet starts with random bits, called <strong>entropy</strong>. It adds a short checksum, then splits the result into 11-bit pieces and looks up a word for each piece.</p>
-          <div class="lab-equation" aria-label="Phrase bit structure">
-            <div><strong id="lab-entropy-count"></strong><span>entropy bits</span></div><b>+</b>
-            <div class="lab-checksum-color"><strong id="lab-checksum-count"></strong><span>checksum bits</span></div><b>=</b>
-            <div><strong id="lab-total-count"></strong><span id="lab-piece-count"></span></div>
-          </div>
-          <details class="lab-details">
-            <summary>Explore the entropy bits</summary>
-            <p>A bit can be 0 or 1. Flipping one changes the example; its checksum is recalculated too. A real wallet generates these bits randomly, instead of choosing memorable words.</p>
-            <div class="lab-controls"><label for="lab-preset">Example pattern <select id="lab-preset"><option value="counting">Counting bytes</option><option value="zero">All zeros</option><option value="random">Random bits</option></select></label></div>
-            <div id="lab-entropy" class="lab-bit-grid" aria-label="Entropy bits"></div>
-            <div class="lab-hex-line"><span>Entropy in hexadecimal</span><code id="lab-entropy-hex"></code></div>
-          </details>
-          <div class="lab-checksum">
-            <h3>The last word is part data, part check</h3>
-            <p id="lab-last-explainer"></p>
-            <div id="lab-last-bits" class="lab-last-bits" aria-label="Last word bits"></div>
-            <div class="lab-check-values"><span>Stored check <code id="lab-stored-check"></code></span><span>Expected check <code id="lab-expected-check"></code></span></div>
-            <p id="lab-check-status" role="status"></p>
-            <div class="lab-controls"><button type="button" id="lab-break" class="lab-secondary">Break one checksum bit</button><button type="button" id="lab-repair">Recalculate checksum</button></div>
-            <label class="lab-last-choice" for="lab-last-choice">Other valid last words <select id="lab-last-choice"></select></label>
-            <p id="lab-last-count" class="lab-small"></p>
-            <p class="lab-small">A checksum is a small error check made from SHA-256. Passing it does not mean a phrase is secret or safe. Recalculating it here changes the example; it does not recover a lost wallet.</p>
-          </div>
-        </section>
-
-        <section class="lab-section" aria-labelledby="seed-title">
-          <span class="lab-step">03 / THE OPTIONAL EXTRA</span><h2 id="seed-title">Same words. Different seed.</h2>
-          <p>The words and an optional passphrase are combined to produce a 64-byte seed. Wallet software uses that seed to derive keys and addresses.</p>
-          <label class="lab-toggle"><input type="checkbox" id="lab-use-passphrase"> Use an optional passphrase</label>
-          <div id="lab-passphrase-fields" hidden>
-            <label for="lab-passphrase">Practice passphrase</label>
-            <div class="lab-passphrase-row"><input type="password" id="lab-passphrase" value="satoshi" autocomplete="off" spellcheck="false" autocapitalize="none" disabled><label class="lab-toggle"><input type="checkbox" id="lab-show-passphrase"> Show</label></div>
-          </div>
-          <p class="lab-small">Sometimes called the "13th" or "25th word", a passphrase can be a whole sentence. It is separate from the word list. Leaving it empty is valid.</p>
-          <div class="lab-seed-output">
-            <p class="lab-small">Each pair below is one byte, written in hexadecimal.</p>
-            <h3>Without a passphrase</h3><code id="lab-base-seed" class="lab-seed" aria-label="Seed without a passphrase"></code>
-            <div id="lab-extra-seed" hidden><h3>With your practice passphrase</h3><code id="lab-passphrase-seed" class="lab-seed" aria-label="Seed with a passphrase"></code></div>
-            <p id="lab-seed-status" role="status"></p>
-          </div>
-          <p>Case and spaces matter. A different passphrase leads to a different wallet, with no "wrong passphrase" error. You need the exact phrase and passphrase to return to the same wallet.</p>
-          <details class="lab-details"><summary>The technical recipe</summary><p>BIP39 uses PBKDF2-HMAC-SHA512 with 2,048 iterations. The mnemonic is the password, and "mnemonic" plus the passphrase is the salt. Both use Unicode NFKD normalization. The output is always 512 bits (64 bytes), not a Bitcoin address.</p></details>
-        </section>
-        <p class="lab-source">Based on <a href="https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki" target="_blank" rel="noopener">BIP39</a>. Playground calculations stay in this browser and are not saved.</p>
-      </div>
-    </div>
-    <dialog id="lab-glossary" aria-labelledby="lab-glossary-title" aria-describedby="lab-glossary-simple">
-      <form method="dialog" class="lab-glossary-header">
-        <span>IN PLAIN ENGLISH</span><button id="lab-glossary-close" type="submit" class="lab-secondary" autofocus>Close</button>
-      </form>
-      <h2 id="lab-glossary-title"></h2>
-      <p id="lab-glossary-simple"></p>
-      <h3>In this playground</h3>
-      <p id="lab-glossary-context"></p>
-      <nav id="lab-glossary-related" aria-label="Related explanations"></nav>
-    </dialog>
+        <noscript><p class="word-field-noscript">JavaScript is required to check the BIP39 list.</p></noscript>
+      </section>
     </main>
 
 
@@ -239,22 +138,9 @@
 <div id="bip39Modal" class="description-modal">
   <div class="modal-content">
     <span class="close-icon" id="closeBipModal">&times;</span>
-    <h4 style="text-align:center;">What is this tool?</h4>
-    <p>
-      This tool helps you check if a word is part of the official <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank" rel="noopener"><strong>BIP39 English word list</strong></a> used in Bitcoin wallets for generating seed phrases (mnemonics).
-    </p>
-
-    <p>
-      We currently only support the <strong>English</strong> version of the BIP39 word list, which contains exactly 2048 unique words standardized for secure phrase generation.
-    </p>
-
-    <p>
-      As you type, the input will validate whether the word is part of the list, and show suggestions that match what you're typing.
-    </p>
-
-    <p>
-      If the word isn't valid, we suggest similar English words using the <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener">Datamuse API</a> — an open API for finding related words based on spelling and pronunciation.
-    </p>
+    <h4 style="text-align:center;">BIP39 words</h4>
+    <p>This checks the official <a href="https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt" target="_blank" rel="noopener"><strong>English BIP39 list</strong></a> used by many Bitcoin wallets.</p>
+    <p>The surrounding words are valid BIP39 alternatives ranked by spelling, prefix and pronunciation similarity. Everything runs locally in this browser.</p>
 
   </div>
 </div>
@@ -443,12 +329,6 @@
 <script src="contact.js"></script>
 <script src="burgerMenu.js"></script>
 <script type="module" src="isBip39.js"></script>
-<script type="module">
-  import('./bip39Lab.mjs').catch(() => {
-    document.getElementById('lab-loading').textContent = 'The playground could not load. Reconnect and refresh to try again.';
-    document.getElementById('bip39-lab').setAttribute('aria-busy', 'false');
-  });
-</script>
 
 
 </body>
