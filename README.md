@@ -12,7 +12,7 @@
 | --- | --- |
 | [Words of Satoshi](https://satoshi.si/quotes.html) | Shuffled quotes, click-to-copy, two-minute rotation, and a subtle desktop control for the next quote. |
 | [Bitcoin whitepaper](https://satoshi.si/whitepaper.html) | A collection of translations, with contributions welcome to make Bitcoin knowledge accessible in more languages. |
-| [BIP39 word checker](https://satoshi.si/isBip39.html) | Type one word and explore a full-screen field of similar English BIP39 words. Validation and suggestions run locally and work offline. |
+| [BIP39 word checker](https://satoshi.si/isBip39.html) | Type one word and explore similar words from any of the ten official BIP39 language lists. Validation and suggestions run locally and work offline. |
 | [History chart](https://satoshi.si/chart.html) | Explore currencies and other assets priced in sats, with time ranges, linear/logarithmic scales, historical events, snapshots, and CSV/JSON exports. |
 | [Moscow Time](https://satoshi.si/MoscowTime.html) | A sats-per-dollar view of Bitcoin's price. |
 | [Converter](https://satoshi.si/converter.html) | Bitcoin, satoshi, and fiat conversions. |
@@ -29,11 +29,11 @@ The shared interface uses a near-black theme with orange accents, gently animate
 
 Open [satoshi.si](https://satoshi.si) in a supported browser and use its install or **Add to Home Screen** option. Installation availability and wording vary by browser. The manifest provides a standalone app window, icons, and theme colors.
 
-The service worker precaches the home shell, an offline fallback, and the BIP39 playground. Visited pages and eligible same-origin static assets are cached with a network-first strategy.
+The service worker precaches the home shell, an offline fallback, and the BIP39 word checker. Visited pages and eligible same-origin static assets are cached with a network-first strategy.
 
 **Offline support is selective, not a promise that every tool works without a connection.**
 
-- The educational BIP39 playground can work offline once its assets have been cached.
+- The BIP39 word checker can work offline once its assets have been cached.
 - Cached pages remain available, but their live data and external services may not be.
 - API responses, JSON datasets, query-string requests, and third-party resources are not cached by the worker. Quotes and historical chart data therefore still require connectivity under the current cache policy.
 - External fonts, icons, embeds, and multiplayer services may be unavailable offline.
@@ -42,13 +42,11 @@ Updates activate after existing tabs controlled by the old service worker close.
 
 ## BIP39 Safety and Privacy
 
-**Use example phrases only. Do not enter a real wallet recovery phrase or use this playground to create a wallet.** Predictable examples are deliberately included for learning.
+The public checker accepts one word and compares it locally with the selected official BIP39 list. It does not send the word to an API. The first four letters are emphasized because those prefixes are unique within each BIP39 wordlist.
 
-Phrase construction, checksum validation, and seed derivation run locally using a bundled BIP39 library. The playground does not save or transmit the phrase or passphrase, or put them in a URL. The separate single-word checker may query Datamuse for similar words; multiword input is excluded from those requests.
+The previous phrase, entropy, checksum, and passphrase playground is retained as source in [`archive/bip39-playground`](archive/bip39-playground), but is not published as a second live page. **Never enter a real wallet recovery phrase into an educational tool.**
 
-The optional BIP39 passphrase is **not literally a 13th word**: it is separate text, and changing it produces a different seed. The playground produces a 64-byte seed, not wallet addresses or private keys. GhostQR is also experimental and should not be treated as an audited wallet-backup solution.
-
-See [BIP39 implementation notes](docs/bip39-playground.md) for the library, normalization behavior, tests, and references.
+See [BIP39 implementation notes](docs/bip39-playground.md) for details about the archived playground.
 
 ## Data Sources and Dependencies
 
@@ -58,7 +56,6 @@ See [BIP39 implementation notes](docs/bip39-playground.md) for the library, norm
 - **mempool.space:** block and fee information.
 - **CoinGecko and CoinPaprika:** Bitcoin Mood market data, with Binance as a daily fallback. Some volatility values are estimates rather than measured historical ranges.
 - **Open Exchange Rates:** fiat rates used by the converter.
-- **Datamuse:** similar-word suggestions for the single-word checker, not word-frequency reporting.
 - **Third-party services:** ChangeNOW and the lottery embed power their respective widgets; multiplayer Game39 uses Firebase. Several pages also load libraries, fonts, or icons from external hosts.
 
 The history chart displays BTC per unit. A Yahoo Finance collector now generates sourced stock, futures, index, and ETF datasets, with a daily GitHub Actions workflow ready to enable. Original CSVs remain as a labelled fallback; fiat history is not refreshed by this workflow. See [history sources, methodology, and setup](docs/history-data.md) for the recovered pipeline, adjustment choices, units, failure handling, and deployment steps.

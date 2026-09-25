@@ -1,6 +1,6 @@
-# BIP39 Playground
+# Archived BIP39 Playground
 
-The existing `isBip39.html` page includes a single-word checker and an educational phrase playground. All phrase construction, checksum checks, and seed derivation run locally. No phrase or passphrase is saved, sent to an API, or placed in a URL. The existing single-word checker may still request similar English words from Datamuse; multiword input is excluded from those requests.
+The advanced phrase playground is preserved in `archive/bip39-playground` and is not currently published. Its phrase construction, checksum checks, and seed derivation run locally. No phrase or passphrase is saved, sent to an API, or placed in a URL. The public `isBip39.html` page is now a simpler, fully local word checker with all ten official language lists.
 
 Examples are for education, not wallet creation. The default counting-byte pattern and all-zero pattern are intentionally predictable. Random examples use the browser's cryptographic RNG, but the entire playground remains labeled for learning only.
 
@@ -10,7 +10,7 @@ Examples are for education, not wallet creation. The default counting-byte patte
 - `bip39Lab.mjs`: word selection, entropy buttons, last-word alternatives, passphrase comparison, and stale-result protection.
 - `bip39Lab.css`: page-scoped responsive styles loaded after the shared theme.
 - `bip39Glossary.mjs`: inline technical-term explanations in a native modal dialog. Prose is enhanced after updates; editable fields, phrase words, existing controls, and code remain untouched. Escape, backdrop click, and Close dismiss the dialog and restore focus.
-- `vendor/bip39.mjs`: locally bundled library and English word list, with licenses alongside it.
+- `vendor/bip39.mjs`: locally bundled library and all official BIP39 wordlists, with licenses alongside it.
 
 The passphrase is not an additional mnemonic word. Empty text is valid; case and spaces are preserved; the library applies BIP39's NFKD normalization. The output is a 64-byte seed, not a private key or address. The playground deliberately stops before wallet/address derivation.
 
@@ -24,7 +24,7 @@ npm run build --prefix tools/bip39
 node --test tests/bip39Lab.test.mjs
 ```
 
-Package versions and dependency integrity hashes are locked in `tools/bip39/package-lock.json`. After modifying precached files, bump the service worker cache version. The PWA precaches the playground and library, so the educational controls work offline after installation.
+Package versions and dependency integrity hashes are locked in `tools/bip39/package-lock.json`. After modifying precached files, bump the service worker cache version. The PWA precaches the public word checker and library so they work offline after installation.
 
 ## References
 

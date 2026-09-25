@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v36';
+const CACHE = 'satoshi-static-v37';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',

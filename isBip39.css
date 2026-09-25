@@ -102,6 +102,16 @@
     transition: color .18s ease, opacity .18s ease;
 }
 
+.word-suggestion strong,
+.word-mark strong {
+    font-weight: 500;
+}
+
+.word-suggestion span,
+.word-mark span {
+    font-weight: 300;
+}
+
 .word-suggestion[data-rank="0"] { color: #f2a900; font-weight: 500; }
 .word-suggestion[data-rank="1"],
 .word-suggestion[data-rank="2"] { color: #c9c1ad; }
@@ -113,7 +123,7 @@
     position: fixed;
     z-index: 900;
     top: calc(24px + env(safe-area-inset-top));
-    right: 24px;
+    right: 76px;
     display: grid;
     place-items: center;
     width: 44px;
@@ -128,6 +138,104 @@
 
 .info-modal-trigger:hover,
 .info-modal-trigger:focus-visible { color: #f2a900; outline: none; }
+
+.wordlist-settings-trigger {
+    position: fixed;
+    z-index: 900;
+    top: calc(24px + env(safe-area-inset-top));
+    right: 24px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #777d82;
+    cursor: pointer;
+}
+
+.wordlist-settings-trigger svg,
+.wordlist-settings-close svg {
+    width: 21px;
+    height: 21px;
+}
+
+.wordlist-settings-trigger:hover,
+.wordlist-settings-trigger:focus-visible,
+.wordlist-settings-close:hover,
+.wordlist-settings-close:focus-visible {
+    color: #f2a900;
+    outline: none;
+}
+
+.wordlist-settings {
+    width: min(360px, calc(100vw - 32px));
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: #151719;
+    color: var(--text);
+    box-shadow: 0 22px 70px rgba(0, 0, 0, .58);
+    font-family: "Roboto Mono", monospace;
+}
+
+.wordlist-settings::backdrop {
+    background: rgba(4, 5, 6, .72);
+    backdrop-filter: blur(3px);
+}
+
+.wordlist-settings form { padding: 20px; }
+
+.wordlist-settings-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.wordlist-settings h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+}
+
+.wordlist-settings-close {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #92989c;
+    cursor: pointer;
+}
+
+.wordlist-settings label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.wordlist-settings select {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 38px 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: #0f1112;
+    color: var(--text);
+    font: 500 15px/1 "Roboto Mono", monospace;
+    letter-spacing: 0;
+}
+
+.wordlist-settings select:focus-visible {
+    border-color: #f2a900;
+    outline: 3px solid rgba(242, 169, 0, .16);
+}
 
 .visually-hidden {
     position: absolute;
@@ -164,7 +272,8 @@
     #bip39Input { height: 54px; font-size: 20px; }
     .word-suggestion { min-height: 36px; padding: 6px; }
     .word-suggestion:nth-child(n + 19) { display: none; }
-    .info-modal-trigger { top: calc(18px + env(safe-area-inset-top)); right: 14px; }
+    .info-modal-trigger { top: calc(18px + env(safe-area-inset-top)); right: 58px; }
+    .wordlist-settings-trigger { top: calc(18px + env(safe-area-inset-top)); right: 8px; }
 }
 
 @media (max-height: 560px) {
