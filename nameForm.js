@@ -1,4 +1,5 @@
-document.getElementById('name-form').addEventListener('submit', function(event) {
+const nameForm = document.getElementById('name-form');
+nameForm?.addEventListener('submit', function(event) {
     // Prevent the form from being submitted
     event.preventDefault();
 
@@ -6,6 +7,8 @@ document.getElementById('name-form').addEventListener('submit', function(event) 
     var name = document.getElementById('name').value;
 
     // Display the name in the name-display div
-    document.getElementById('name-display-1').innerHTML =  name;
-    document.getElementById('name-display-2').innerHTML =  name;
+    const firstDisplay = document.getElementById('name-display-1');
+    const secondDisplay = document.getElementById('name-display-2');
+    if (firstDisplay) firstDisplay.textContent = name;
+    if (secondDisplay) secondDisplay.textContent = name;
     });

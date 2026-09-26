@@ -140,13 +140,20 @@
 <dialog id="wordlistSettings" class="wordlist-settings" aria-labelledby="wordlist-settings-title">
   <form method="dialog">
     <div class="wordlist-settings-heading">
-      <h2 id="wordlist-settings-title">Wordlist language</h2>
+      <h2 id="wordlist-settings-title">Word settings</h2>
       <button type="submit" class="wordlist-settings-close" aria-label="Close settings" title="Close">
         <i data-lucide="x" aria-hidden="true"></i>
       </button>
     </div>
     <label for="wordlistLanguage">BIP39 wordlist</label>
     <select id="wordlistLanguage" name="wordlistLanguage"></select>
+    <div class="suggestion-density-setting">
+      <div class="suggestion-density-label">
+        <label for="suggestionDensity">Suggested words</label>
+        <output id="suggestionDensityValue" for="suggestionDensity">100%</output>
+      </div>
+      <input type="range" id="suggestionDensity" name="suggestionDensity" min="25" max="100" step="5" value="100">
+    </div>
   </form>
 </dialog>
 
@@ -157,7 +164,7 @@
     <span class="close-icon" id="closeBipModal">&times;</span>
     <h4 style="text-align:center;">BIP39 words</h4>
     <p>This checks the official <a href="https://github.com/bitcoin/bips/tree/master/bip-0039" target="_blank" rel="noopener"><strong>BIP39 wordlists</strong></a> used by many Bitcoin wallets.</p>
-    <p>The surrounding words are valid BIP39 alternatives ranked by spelling and prefix similarity. Everything runs locally in this browser.</p>
+    <p>The surrounding words are valid BIP39 alternatives ranked by spelling and sound, including words with different first letters. Everything runs locally in this browser.</p>
 
   </div>
 </div>

@@ -12,6 +12,7 @@ import {
 } from './vendor/bip39.mjs';
 
 const LANGUAGE_STORAGE_KEY = 'bip39WordlistLanguage';
+const DENSITY_STORAGE_KEY = 'bip39SuggestionDensity';
 const languages = {
   english: {label: 'English', locale: 'en', words: englishWordlist, phonetic: true},
   spanish: {label: 'Español', statusLabel: 'Spanish', locale: 'es', words: spanishWordlist},
@@ -30,7 +31,10 @@ const suggestions = document.getElementById('suggestions');
 const validity = document.getElementById('wordValidityInfo');
 const settingsDialog = document.getElementById('wordlistSettings');
 const languageSelect = document.getElementById('wordlistLanguage');
+const densityInput = document.getElementById('suggestionDensity');
+const densityValue = document.getElementById('suggestionDensityValue');
 let languageKey = getSavedLanguage();
+let suggestionDensity = getSavedDensity();
 let language;
 let entries;
 let wordIndex;
@@ -77,6 +81,23 @@ function saveLanguage() {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, languageKey);
   } catch {
     // The selection still works for this visit when storage is unavailable.
+  }
+}
+
+function getSavedDensity() {
+  try {
+    const saved = Number(localStorage.getItem(DENSITY_STORAGE_KEY));
+    return Number.isFinite(saved) && saved >= 25 && saved <= 100 ? saved : 100;
+  } catch {
+    return 100;
+  }
+}
+
+function saveDensity() {
+  try {
+    localStorage.setItem(DENSITY_STORAGE_KEY, String(suggestionDensity));
+  } catch {
+    // The density still works for this visit when storage is unavailable.
   }
 }
 
@@ -153,6 +174,10 @@ function phonetic(word) {
   return (code + '000').slice(0, 4);
 }
 
+function phoneticEnding(word) {
+  return phonetic(Array.from(word).slice(1).join(''));
+}
+
 function score(entry, query) {
   const word = entry.normalized;
   const prefix = sharedPrefix(word, query);
@@ -178,12 +203,34 @@ function rankedWords(query, count) {
     }
     return chosen.slice(0, count);
   }
-  return entries
+  const matches = entries
     .filter(entry => entry.normalized !== query)
-    .map(entry => ({entry, score: score(entry, query)}))
+    .map(entry => ({
+      entry,
+      score: score(entry, query),
+      distance: levenshtein(entry.normalized, query),
+    }))
     .sort((a, b) => a.score - b.score || a.entry.index - b.entry.index)
-    .slice(0, count)
-    .map(match => match.entry);
+  if (!language.phonetic || query.length < 3) return matches.slice(0, count).map(match => match.entry);
+
+  const queryInitial = Array.from(query)[0];
+  const queryEnding = phoneticEnding(query);
+  const maximumDistance = Math.max(1, Math.ceil(Array.from(query).length / 3));
+  const alternatives = matches.filter(match => {
+    const word = match.entry.normalized;
+    return Array.from(word)[0] !== queryInitial
+      && (match.distance <= maximumDistance || phoneticEnding(word) === queryEnding);
+  });
+  const alternativeEntries = new Set(alternatives.map(match => match.entry));
+  const primary = matches.filter(match => !alternativeEntries.has(match.entry));
+  const mixed = [];
+  while (mixed.length < count && (primary.length || alternatives.length)) {
+    // Put a different-initial sound-alike near the center, then keep a calm
+    // two-to-one rhythm so strong prefix matches still lead the results.
+    const useAlternative = mixed.length % 3 === 1 && alternatives.length;
+    mixed.push((useAlternative ? alternatives : primary).shift() || alternatives.shift());
+  }
+  return mixed.map(match => match.entry);
 }
 
 function ordinal(number) {
@@ -211,7 +258,12 @@ function setValidity(value) {
 function render() {
   const value = normalizeWord(input.value);
   setValidity(value);
-  const slots = matchMedia('(max-width: 650px)').matches ? narrowSlots : wideSlots;
+  const availableSlots = matchMedia('(max-width: 650px)').matches ? narrowSlots : wideSlots;
+  const screenCapacity = matchMedia('(max-height: 560px)').matches
+    ? Math.min(14, availableSlots.length)
+    : availableSlots.length;
+  const suggestionCount = Math.max(1, Math.round(screenCapacity * suggestionDensity / 100));
+  const slots = availableSlots.slice(0, suggestionCount);
   const words = rankedWords(value, slots.length);
   const nodes = words.map((entry, index) => {
     const button = document.createElement('button');
@@ -268,6 +320,14 @@ suggestions.addEventListener('keydown', event => {
 });
 
 languageSelect.addEventListener('change', () => selectLanguage(languageSelect.value));
+densityInput.value = String(suggestionDensity);
+densityValue.value = `${suggestionDensity}%`;
+densityInput.addEventListener('input', () => {
+  suggestionDensity = Number(densityInput.value);
+  densityValue.value = `${suggestionDensity}%`;
+  saveDensity();
+  render();
+});
 document.getElementById('openWordlistSettings')?.addEventListener('click', () => settingsDialog.showModal());
 settingsDialog.addEventListener('click', event => {
   if (event.target === settingsDialog) settingsDialog.close();

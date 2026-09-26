@@ -1,6 +1,8 @@
-const CACHE = 'satoshi-static-v37';
+const CACHE = 'satoshi-static-v44';
 const CORE = [
-    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js',
+    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/satoshiChat.css', '/satoshiChat.mjs',
+    '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
+    '/settings.html', '/settings.css', '/settings.js',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js',
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',

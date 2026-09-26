@@ -237,6 +237,38 @@
     outline: 3px solid rgba(242, 169, 0, .16);
 }
 
+.suggestion-density-setting {
+    margin-top: 20px;
+}
+
+.suggestion-density-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.suggestion-density-label label {
+    margin-bottom: 0;
+}
+
+.suggestion-density-label output {
+    color: #f2a900;
+    font-size: 12px;
+}
+
+.wordlist-settings input[type="range"] {
+    width: 100%;
+    margin: 4px 0 0;
+    accent-color: #f2a900;
+    cursor: pointer;
+}
+
+.wordlist-settings input[type="range"]:focus-visible {
+    outline: 3px solid rgba(242, 169, 0, .16);
+    outline-offset: 4px;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -271,7 +303,6 @@
     .word-field-core h1 { margin-bottom: 14px; font-size: 18px; }
     #bip39Input { height: 54px; font-size: 20px; }
     .word-suggestion { min-height: 36px; padding: 6px; }
-    .word-suggestion:nth-child(n + 19) { display: none; }
     .info-modal-trigger { top: calc(18px + env(safe-area-inset-top)); right: 58px; }
     .wordlist-settings-trigger { top: calc(18px + env(safe-area-inset-top)); right: 8px; }
 }
@@ -281,7 +312,6 @@
     .word-field-core h1 { margin-bottom: 10px; font-size: 17px; }
     #bip39Input { height: 48px; }
     .word-validity-info { margin-top: 8px; }
-    .word-suggestion:nth-child(n + 15) { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

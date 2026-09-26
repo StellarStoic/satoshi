@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <title>Settings | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/settings.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="settings-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation">
+    <ul>
+      <li><a href="/index.html">Home</a></li>
+      <li class="has-submenu"><a href="#">Knowlage</a><ul class="submenu">
+        <li><a href="/whitepaper.html">Bitcoin whitepaper</a></li><li><a href="/quotes.html">Words of Satoshi</a></li><li><a href="/isBip39.html">Is BIP39 word?</a></li>
+      </ul></li>
+      <li class="has-submenu"><a href="#">Lottery</a><ul class="submenu">
+        <li><a href="/lottery.html">Play</a></li><li><a href="/lotteryStats.html">Results &amp; Stats</a></li><li><a href="/ticketVerifier.html">Ticket Verifier</a></li>
+      </ul></li>
+      <li class="has-submenu"><a href="#">Price Related</a><ul class="submenu">
+        <li><a href="/converter.html">Converter</a></li><li><a href="/MoscowTime.html">Moscow time</a></li><li><a href="/memedBitcoinMood.html">Memed Bitcoin Mood</a></li><li><a href="/chart.html">History chart</a></li><li><a href="/priceScanner.html">Price Scanner</a></li>
+      </ul></li>
+      <li class="has-submenu"><a href="#">Exchange</a><ul class="submenu"><li><a href="/exchangeShitcoins.html">Exchange Shitcoins</a></li></ul></li>
+      <li class="has-submenu"><a href="#">Nostr</a><ul class="submenu"><li><a href="/nip05.html">NIP-05</a></li></ul></li>
+      <li class="has-submenu"><a href="#">Game</a><ul class="submenu"><li><a href="/game39.html">Game39 Multi Player</a></li><li><a href="/game39single.html">Game39 Single Player</a></li></ul></li>
+      <li class="has-submenu"><a href="#">Tools</a><ul class="submenu"><li><a href="/ghostQR.html">GhostQR</a></li><li><a href="/isBip39.html">Is BIP39 word?</a></li></ul></li>
+    </ul>
+  </nav>
+
+  <main class="site-settings">
+    <h1>Settings</h1>
+    <section class="setting-row">
+      <img src="/apple-touch-icon.png" alt="" width="48" height="48">
+      <label for="syntheticSatoshiEnabled">
+        <strong>Synthetic Satoshi</strong>
+        <span>AI floating button</span>
+      </label>
+      <input type="checkbox" id="syntheticSatoshiEnabled" role="switch">
+    </section>
+  </main>
+
+  <script src="/burgerMenu.js"></script>
+  <script src="/settings.js"></script>
+</body>
+</html>

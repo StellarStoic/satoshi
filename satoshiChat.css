@@ -1,0 +1,232 @@
+.satoshi-chat-launcher {
+    position: fixed;
+    z-index: 3200;
+    right: 18px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.satoshi-chat-launcher img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+}
+
+.satoshi-chat-panel {
+    position: fixed;
+    z-index: 4100;
+    right: 18px;
+    bottom: calc(136px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(390px, calc(100vw - 32px));
+    height: min(620px, calc(100dvh - 170px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid #414448;
+    border-radius: 8px;
+    background: #151719;
+    color: #e6e6e6;
+    box-shadow: 0 24px 72px rgba(0, 0, 0, .65);
+    font: 14px/1.5 "Roboto Mono", monospace;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px) scale(.985);
+    transform-origin: bottom right;
+    transition: opacity .16s ease, transform .16s ease;
+}
+
+.satoshi-chat-panel.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+
+.satoshi-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 58px;
+    padding: 9px 10px 9px 16px;
+    border-bottom: 1px solid #34373a;
+    background: #191b1d;
+}
+
+.satoshi-chat-identity { display: grid; min-width: 0; }
+.satoshi-chat-identity strong { color: #f2a900; font-size: 14px; }
+.satoshi-chat-identity span { color: #8d9296; font-size: 10px; }
+.satoshi-chat-header-actions { display: flex; flex: 0 0 auto; }
+
+.satoshi-chat-icon-button,
+.satoshi-chat-send {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #aeb2b5;
+    cursor: pointer;
+    font: 20px/1 Arial, sans-serif;
+}
+
+.satoshi-chat-icon-button:hover,
+.satoshi-chat-icon-button:focus-visible { color: #f2a900; }
+.satoshi-chat-close { font-size: 27px; font-weight: 300; }
+
+.satoshi-chat-transcript {
+    min-height: 0;
+    padding: 18px 14px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.satoshi-chat-welcome { margin: auto; max-width: 290px; padding: 24px 10px; text-align: center; }
+.satoshi-chat-welcome strong { color: #f2a900; font-size: 16px; }
+.satoshi-chat-welcome p { margin: 10px 0 0; color: #aeb2b5; font-size: 12px; }
+
+.satoshi-chat-message { max-width: 88%; margin: 0 0 16px; }
+.satoshi-chat-message.user { margin-left: auto; }
+.satoshi-chat-message > span { display: block; margin-bottom: 4px; color: #858a8e; font-size: 9px; text-transform: uppercase; }
+.satoshi-chat-message.user > span { text-align: right; }
+.satoshi-chat-message-body { margin: 0; padding: 10px 12px; border: 1px solid #35383b; border-radius: 7px; background: #202326; color: #e6e6e6; white-space: normal; overflow-wrap: anywhere; }
+.satoshi-chat-message.user .satoshi-chat-message-body { border-color: rgba(242, 169, 0, .35); background: #26241e; white-space: pre-wrap; }
+.satoshi-chat-message.pending .satoshi-chat-message-body { color: #9ca1a4; }
+.satoshi-chat-message.error .satoshi-chat-message-body { border-color: #8f3438; color: #ff9b9f; }
+.satoshi-chat-message-body > :first-child { margin-top: 0; }
+.satoshi-chat-message-body > :last-child { margin-bottom: 0; }
+.satoshi-chat-message-body p { margin: 0 0 9px; }
+.satoshi-chat-message-body h3,
+.satoshi-chat-message-body h4,
+.satoshi-chat-message-body h5,
+.satoshi-chat-message-body h6 { margin: 12px 0 6px; color: #f2a900; font-size: 14px; letter-spacing: 0; }
+.satoshi-chat-message-body ul,
+.satoshi-chat-message-body ol { margin: 7px 0 9px; padding-left: 22px; }
+.satoshi-chat-message-body ul { list-style: disc outside; }
+.satoshi-chat-message-body ol { list-style: decimal outside; }
+.satoshi-chat-message-body li { margin: 3px 0; }
+.satoshi-chat-message-body a { color: #f2a900; text-decoration: underline; text-underline-offset: 2px; }
+.satoshi-chat-message-body code { padding: 1px 4px; border-radius: 3px; background: #101214; color: #f0c866; font: 12px/1.45 "Roboto Mono", monospace; }
+.satoshi-chat-message-body pre { margin: 8px 0; padding: 10px; overflow-x: auto; border: 1px solid #34373a; border-radius: 5px; background: #101214; }
+.satoshi-chat-message-body pre code { padding: 0; background: transparent; white-space: pre; }
+.satoshi-chat-message-body blockquote { margin: 8px 0; padding-left: 10px; border-left: 2px solid #f2a900; color: #bfc2c4; }
+.satoshi-chat-message-body hr { margin: 12px 0; border: 0; border-top: 1px solid #414448; }
+
+.satoshi-chat-setup {
+    grid-row: 2 / 4;
+    min-height: 0;
+    padding: 20px;
+    overflow-y: auto;
+}
+.satoshi-chat-setup[hidden],
+.satoshi-chat-transcript[hidden],
+.satoshi-chat-composer[hidden] { display: none; }
+.satoshi-chat-setup p { margin: 0 0 18px; color: #b5b5b5; font-size: 12px; }
+.satoshi-chat-setup label { display: block; margin: 14px 0 6px; color: #b5b5b5; font-size: 11px; }
+.satoshi-chat-setup input,
+.satoshi-chat-setup select {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 11px;
+    border: 1px solid #414448;
+    border-radius: 5px;
+    background: #0f1112;
+    color: #e6e6e6;
+    font: 14px/1.2 "Roboto Mono", monospace;
+}
+.satoshi-chat-setup input:focus,
+.satoshi-chat-setup select:focus { border-color: #f2a900; outline: none; }
+.satoshi-chat-setup small { display: block; margin-top: 6px; color: #858a8e; font-size: 9px; line-height: 1.4; }
+.satoshi-chat-connect {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 14px;
+    border: 1px solid #f2a900;
+    border-radius: 5px;
+    background: #f2a900;
+    color: #101112;
+    cursor: pointer;
+    font: 600 13px/1.2 "Roboto Mono", monospace;
+}
+.satoshi-chat-connect:disabled { opacity: .6; cursor: wait; }
+.satoshi-chat-connect-note { margin-bottom: 18px; text-align: center; }
+.satoshi-chat-connect-note.error { color: #ff9b9f; }
+.satoshi-chat-manual { margin-top: 18px; border-top: 1px solid #34373a; padding-top: 14px; }
+.satoshi-chat-manual summary { color: #9fa4a7; cursor: pointer; font-size: 10px; }
+.satoshi-chat-setup-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.satoshi-chat-forget {
+    margin-right: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #aeb2b5;
+    cursor: pointer;
+    font: 10px/1.2 "Roboto Mono", monospace;
+}
+.satoshi-chat-forget:hover,
+.satoshi-chat-forget:focus-visible { color: #f2a900; }
+.satoshi-chat-primary {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #f2a900;
+    border-radius: 5px;
+    background: #f2a900;
+    color: #101112;
+    cursor: pointer;
+    font: 600 11px/1.2 "Roboto Mono", monospace;
+}
+
+.satoshi-chat-composer {
+    display: flex;
+    align-items: end;
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid #34373a;
+    background: #191b1d;
+}
+.satoshi-chat-composer textarea {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 42px;
+    max-height: 120px;
+    resize: none;
+    padding: 10px 11px;
+    border: 1px solid #414448;
+    border-radius: 6px;
+    background: #0f1112;
+    color: #e6e6e6;
+    font: 14px/1.45 "Roboto Mono", monospace;
+}
+.satoshi-chat-composer textarea:focus { border-color: #f2a900; outline: none; }
+.satoshi-chat-send { flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; background: #f2a900; color: #101112; font-size: 22px; }
+.satoshi-chat-send:disabled { opacity: .45; cursor: wait; }
+
+@media (max-width: 600px) {
+    body.satoshi-chat-open { overflow: hidden; }
+    .satoshi-chat-launcher { right: 12px; bottom: calc(68px + env(safe-area-inset-bottom)); }
+    .satoshi-chat-panel {
+        inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        border-width: 0;
+        border-radius: 0;
+        transform: translateY(14px);
+    }
+    .satoshi-chat-panel.open { transform: none; }
+    .satoshi-chat-setup-actions { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .satoshi-chat-panel { transition: none; }
+}
