@@ -160,6 +160,8 @@ window['Slip'] = (function(){
         this.options.keepSwipingPercent = options.keepSwipingPercent || 0;
         this.options.minimumSwipeVelocity = options.minimumSwipeVelocity || 1;
         this.options.minimumSwipeTime = options.minimumSwipeTime || 110;
+        this.options.reorderDelay = options.reorderDelay === undefined ? 300 : options.reorderDelay;
+        this.options.autoScrollSpeed = options.autoScrollSpeed === undefined ? 40 : options.autoScrollSpeed;
 
         // Functions used for as event handlers need usable `this` and must not change to be removable
         this.cancel = this.setState.bind(this, this.states.idle);
@@ -258,7 +260,7 @@ window['Slip'] = (function(){
                                 this.setState(this.states.reorder);
                             }
                         }
-                    }.bind(this), 300);
+                    }.bind(this), this.options.reorderDelay);
                 }
 
                 return {
@@ -380,6 +382,7 @@ window['Slip'] = (function(){
                 var mouseOutsideTimer;
                 var zero = this.target.node.offsetTop + this.target.height/2;
                 var otherNodes = [];
+                var autoScrollFrame;
                 for(var i=0; i < nodes.length; i++) {
                     if (nodes[i].nodeType != 1 || nodes[i] === this.target.node) continue;
                     var t = nodes[i].offsetTop;
@@ -428,9 +431,15 @@ window['Slip'] = (function(){
                 }
 
                 onMove.call(this);
+                var keepAutoScrolling = function() {
+                    onMove.call(this);
+                    autoScrollFrame = requestAnimationFrame(keepAutoScrolling);
+                }.bind(this);
+                autoScrollFrame = requestAnimationFrame(keepAutoScrolling);
 
                 return {
                     leaveState: function() {
+                        cancelAnimationFrame(autoScrollFrame);
                         if (mouseOutsideTimer) clearTimeout(mouseOutsideTimer);
 
                         if (compositorDoesNotOrderLayers) {
@@ -682,6 +691,9 @@ window['Slip'] = (function(){
               scrollContainer = scrollContainer.parentNode;
             }
             scrollContainer = scrollContainer || document.body;
+            if (scrollContainer === document.body) {
+              scrollContainer = document.scrollingElement || document.documentElement;
+            }
 
             this.target = {
                 originalTarget: e.target,
@@ -774,20 +786,22 @@ window['Slip'] = (function(){
 
         updateScrolling: function() {
             var triggerOffset = 40,
+                maxScrollStep = this.options.autoScrollSpeed,
                 offset = 0;
 
             var scrollable = this.target.scrollContainer,
-                containerRect = scrollable.getBoundingClientRect(),
+                isDocumentScroll = scrollable === document.scrollingElement || scrollable === document.documentElement,
+                containerRect = isDocumentScroll ? {top:0, bottom:window.innerHeight} : scrollable.getBoundingClientRect(),
                 targetRect = this.target.node.getBoundingClientRect(),
                 bottomOffset = Math.min(containerRect.bottom, window.innerHeight) - targetRect.bottom,
                 topOffset = targetRect.top - Math.max(containerRect.top, 0),
-                maxScrollTop = this.target.origScrollHeight - Math.min(scrollable.clientHeight, window.innerHeight);
+                maxScrollTop = this.target.origScrollHeight - (isDocumentScroll ? window.innerHeight : Math.min(scrollable.clientHeight, window.innerHeight));
 
             if (bottomOffset < triggerOffset) {
-              offset = Math.min(triggerOffset, triggerOffset - bottomOffset);
+              offset = Math.min(maxScrollStep, triggerOffset - bottomOffset);
             }
             else if (topOffset < triggerOffset) {
-              offset = Math.max(-triggerOffset, topOffset - triggerOffset);
+              offset = Math.max(-maxScrollStep, topOffset - triggerOffset);
             }
 
             scrollable.scrollTop = Math.max(0, Math.min(maxScrollTop, scrollable.scrollTop + offset));
@@ -871,4 +885,3 @@ window['Slip'] = (function(){
     }
     return Slip;
 })();
-

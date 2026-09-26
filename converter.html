@@ -126,6 +126,10 @@
   </div>
 </div>
 
+<div id="currencyDeleteDrop" class="currency-delete-drop" aria-hidden="true">
+  <span aria-hidden="true">&times;</span>
+</div>
+
 <div id="converter">
 
   <div class="currency-container">
@@ -152,7 +156,11 @@
     <div class="modal-content">
         <span class="close-icon" onclick="closeCurrencyModal()">&times;</span>
         <h4>Select a Currency</h4>
+        <label class="visually-hidden" for="currencySearch">Search currencies</label>
+        <input type="search" id="currencySearch" placeholder="Search code or currency" autocomplete="off" autocapitalize="characters" spellcheck="false">
         <div id="currencyList"></div> <!-- Container for currency list -->
+        <p id="currencyNoResults" class="currency-no-results" hidden>No currency found.</p>
+        <p class="currency-protected-note">BTC and SAT are always included and intentionally cannot be removed.</p>
     </div>
 </div>
 

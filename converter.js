@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const container = document.getElementById('converter');
     const currencyModal = document.getElementById('currencyModal');
     const currencyList = document.getElementById('currencyList');
+    const currencySearch = document.getElementById('currencySearch');
+    const currencyNoResults = document.getElementById('currencyNoResults');
+    const deleteDrop = document.getElementById('currencyDeleteDrop');
     const apiKey = '6d0add5ffd6f427f97a0df5d04816c45';
     let selectedCurrency = null; // To store the selected currency
     let supportedCurrencies = {}; // To store currencies from currencies.json
@@ -13,26 +16,60 @@ document.addEventListener('DOMContentLoaded', function () {
     const USER_SETTINGS_KEY = 'userCurrencySettings'; // Key to store user settings
     const MAX_BTC_SUPPLY = 21000000; // Maximum supply of BTC
     const MAX_SAT_SUPPLY = MAX_BTC_SUPPLY * 100000000; // Maximum supply of SAT (21 million BTC in Satoshis)
+    let settingsLoaded = false;
+    let demoScheduled = false;
+    let demoTimer;
+    let demoObserver;
+    let fadeFrame = null;
+    let fadeSettleFrame = null;
+    let draggedRow = null;
+    let dragCanDelete = false;
 
-    // Slip.js is used for drag-and-drop and swipe-to-remove functionality. Removing this slipInstance constant will result in broken dragging.
-    const slipInstance = new Slip(container); // Do not remove this constant!!!
+    // Register these before Slip so editing a value never begins a drag.
+    function protectInputFromDrag(event) {
+        if (event.target.closest('.currency-input')) event.stopImmediatePropagation();
+    }
+    container.addEventListener('mousedown', protectInputFromDrag);
+    container.addEventListener('touchstart', protectInputFromDrag, {passive: true});
 
-    // Prevent drag start when clicking on an input field
-    container.addEventListener('mousedown', function (e) {
-        if (e.target.tagName.toLowerCase() === 'input') {
-            e.stopPropagation(); // Prevent drag when input is clicked
+    // A shorter hold keeps touch scrolling available while making a deliberate drag feel responsive.
+    const slipInstance = new Slip(container, {reorderDelay: 180, autoScrollSpeed: 8});
+
+    // Mouse users can drag immediately. Touch gets a short decision window for horizontal deletion swipes.
+    container.addEventListener('slip:beforewait', function (event) {
+        if (matchMedia('(pointer: fine)').matches) event.preventDefault();
+    });
+
+    function hideDeleteDrop() {
+        deleteDrop.classList.remove('active', 'drop-ready');
+        document.body.classList.remove('currency-delete-mode');
+        draggedRow = null;
+        dragCanDelete = false;
+    }
+
+    container.addEventListener('slip:beforereorder', function (event) {
+        draggedRow = event.target.closest('.currency-container');
+        const symbol = draggedRow?.querySelector('.currency-symbol')?.textContent;
+        dragCanDelete = matchMedia('(pointer: fine)').matches && symbol !== 'BTC' && symbol !== 'SAT';
+        if (dragCanDelete) {
+            deleteDrop.classList.add('active');
+            document.body.classList.add('currency-delete-mode');
         }
     });
 
-    container.addEventListener('touchstart', function (e) {
-        if (e.target.tagName.toLowerCase() === 'input') {
-            e.stopPropagation(); // Prevent drag when input is touched
-        }
-    });
+    window.addEventListener('pointermove', function (event) {
+        if (!dragCanDelete) return;
+        const bounds = deleteDrop.getBoundingClientRect();
+        const overTarget = event.clientX >= bounds.left && event.clientX <= bounds.right
+            && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+        deleteDrop.classList.toggle('drop-ready', overTarget);
+    }, {passive: true});
+
+    window.addEventListener('pointerup', () => setTimeout(hideDeleteDrop, 0), {passive: true});
 
     // Prevent swipe gestures on certain conditions
     container.addEventListener('slip:beforeswipe', function (e) {
-        const currencySymbolElement = e.target.querySelector('.currency-symbol');
+        const currencySymbolElement = e.target.closest('.currency-container')?.querySelector('.currency-symbol');
         if (!currencySymbolElement) return; // If no currency-symbol found, exit
 
         const currencySymbol = currencySymbolElement.textContent;
@@ -43,32 +80,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Handle swipe-to-remove functionality
     container.addEventListener('slip:swipe', function (e) {
-        const currencySymbolElement = e.target.querySelector('.currency-symbol');
-        if (!currencySymbolElement) return; // If no currency-symbol found, exit
-
-        const currencySymbol = currencySymbolElement.textContent;
-        if (currencySymbol !== 'BTC' && currencySymbol !== 'SAT') {
-            e.target.parentNode.removeChild(e.target); // Remove the swiped container
-            if (getCookie("cookieConsent") === "true") {
-                saveUserSettings(); // Save settings after removing a currency
-            }
-            updateAllCurrencies(); // Update currencies after removing one
-        }
-    });
-
-    // Prevent reordering of BTC and SAT
-    container.addEventListener('slip:beforereorder', function (e) {
-        const currencySymbolElement = e.target.querySelector('.currency-symbol');
+        const currencySymbolElement = e.target.closest('.currency-container')?.querySelector('.currency-symbol');
         if (!currencySymbolElement) return; // If no currency-symbol found, exit
 
         const currencySymbol = currencySymbolElement.textContent;
         if (currencySymbol === 'BTC' || currencySymbol === 'SAT') {
-            e.preventDefault(); // Prevent reordering for BTC and SAT
+            e.preventDefault();
+            return;
         }
+        e.target.remove();
+        syncCurrencyCheckboxes();
+        if (getCookie("cookieConsent") === "true") {
+            saveUserSettings(); // Save settings after removing a currency
+        }
+        updateAllCurrencies(); // Update currencies after removing one
+        ensureFirstCurrencyVisible();
     });
 
     container.addEventListener('slip:reorder', function (e) {
+        if (dragCanDelete && draggedRow === e.target && deleteDrop.classList.contains('drop-ready')) {
+            e.target.remove();
+            hideDeleteDrop();
+            syncCurrencyCheckboxes();
+            if (getCookie("cookieConsent") === "true") saveUserSettings();
+            updateAllCurrencies();
+            ensureFirstCurrencyVisible();
+            return false;
+        }
         e.target.parentNode.insertBefore(e.target, e.detail.insertBefore);
+        trackScrollFadeWhileSettling();
+        ensureFirstCurrencyVisible();
 
         // Add vibration feedback on mobile devices when reordering
         if (navigator.vibrate) {
@@ -79,6 +120,7 @@ document.addEventListener('DOMContentLoaded', function () {
             saveUserSettings(); // Save settings after reordering
         }
         updateAllCurrencies(); // Recalculate all currencies after reorder
+        hideDeleteDrop();
         return false;
     });
 
@@ -133,6 +175,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     function updateAllCurrencies() {
+        syncCurrencyInputStates();
+        scheduleScrollFade();
         if (updateTimeout) clearTimeout(updateTimeout); // Clear any existing timeout to avoid unnecessary updates
     
         // Debounce logic to avoid excessive calculations and updates
@@ -165,12 +209,9 @@ document.addEventListener('DOMContentLoaded', function () {
     
                 // Make the base currency input editable and skip further processing
                 if (index === 0) {
-                    inputField.readOnly = false;
+                    fitCurrencyInput(inputField);
                     return;
                 }
-    
-                // Make all other inputs read-only
-                inputField.readOnly = true;
     
                 // Conversion factors for smaller BTC-derived units (e.g., SAT, mBTC)
                 const conversions = {
@@ -246,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const newValue = baseValue * conversionRate; // Calculate the new value
                     inputField.value = formatCurrency(newValue, 4); // Display up to 4 decimals for fiat conversions
                 }
+                fitCurrencyInput(inputField);
             });
         }, 300); // Debounce timeout to delay excessive calculations
     }
@@ -367,7 +409,21 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function fitCurrencyInput(input) {
+        const characterCount = Math.max(Array.from(input.value || '0').length, 1);
+        input.style.setProperty('--currency-value-width', `calc(${characterCount}ch + 10px)`);
+    }
+
+    function syncCurrencyInputStates() {
+        container.querySelectorAll('.currency-input').forEach((input, index) => {
+            input.readOnly = index !== 0;
+            fitCurrencyInput(input);
+        });
+    }
+
     function restrictInput(input) {
+        if (input.dataset.validationReady === 'true') return;
+        input.dataset.validationReady = 'true';
         input.addEventListener('input', function () {
             // Allow only numbers and periods (dot) in the input
             this.value = this.value.replace(/[^0-9.]/g, '');
@@ -385,6 +441,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
             // If the input is empty or a single dot, do nothing and wait for valid input
             if (this.value === '' || this.value === '.') {
+                fitCurrencyInput(this);
                 updateAllCurrencies();
                 return;
             }
@@ -437,6 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
              // adjustFontSize(this);
 
 
+                fitCurrencyInput(this);
                 // Trigger update on input change for valid numbers
                 updateAllCurrencies();
             } else {
@@ -445,6 +503,7 @@ document.addEventListener('DOMContentLoaded', function () {
              // adjustFontSize(this);
 
 
+                fitCurrencyInput(this);
                 // If input is invalid (like just a dot or incorrect format), clear the input or handle accordingly
                 updateAllCurrencies(); // Ensure currencies are updated if the input is cleared or invalid
             }
@@ -494,11 +553,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function initializeInputValidation() {
     const inputs = document.querySelectorAll('.currency-input');
-    inputs.forEach(input => restrictInput(input));
+    inputs.forEach(input => {
+        restrictInput(input);
+        fitCurrencyInput(input);
+    });
 }
 
 function populateCurrencyList(currencies) {
     currencyList.innerHTML = ''; // Clear existing list
+
+    function appendCurrency(code, name, isProtected = false) {
+        const currencyItem = document.createElement('label');
+        currencyItem.className = 'currency-item';
+        currencyItem.dataset.code = code;
+        currencyItem.dataset.search = `${code} ${name}`.toLocaleLowerCase();
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'currency-checkbox';
+        checkbox.disabled = isProtected;
+        checkbox.setAttribute('aria-label', `${name} (${code})`);
+        const text = document.createElement('span');
+        text.textContent = `${name} (${code})`;
+        currencyItem.append(checkbox, text);
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                selectedCurrency = code;
+                addCurrencyContainer();
+            } else {
+                removeCurrencyContainer(code);
+            }
+        });
+        currencyList.appendChild(currencyItem);
+    }
+
+    appendCurrency('BTC', 'Bitcoin', true);
+    appendCurrency('SAT', 'Satoshi', true);
 
     // First, add Bitcoin-derived units manually
     const btcDerivedUnits = {
@@ -511,39 +600,96 @@ function populateCurrencyList(currencies) {
     };
 
     for (const [code, name] of Object.entries(btcDerivedUnits)) {
-        const currencyItem = document.createElement('div');
-        currencyItem.className = 'currency-item';
-        currencyItem.textContent = `${name} (${code})`;
-        currencyItem.onclick = function () {
-            selectCurrency(code);
-        };
-        currencyList.appendChild(currencyItem);
+        appendCurrency(code, name);
     }
 
     // Then, add the rest of the currencies from the fetched data
     for (const [code, name] of Object.entries(currencies)) {
         // Optional: If you want to skip adding BTC itself, uncomment the next line
-        if (code === 'BTC') continue;
+        if (code === 'BTC' || code === 'SAT') continue;
 
-        const currencyItem = document.createElement('div');
-        currencyItem.className = 'currency-item';
-        currencyItem.textContent = `${name} (${code})`;
-        currencyItem.onclick = function () {
-            selectCurrency(code);
-        };
-        currencyList.appendChild(currencyItem);
+        appendCurrency(code, name);
     }
+    syncCurrencyCheckboxes();
+    filterCurrencyList();
 }
 
+    function getSelectedCurrencyCodes() {
+        return new Set([...container.querySelectorAll('.currency-symbol')].map(symbol => symbol.textContent));
+    }
+
+    function syncCurrencyCheckboxes() {
+        const selected = getSelectedCurrencyCodes();
+        currencyList.querySelectorAll('.currency-item').forEach(item => {
+            const checkbox = item.querySelector('.currency-checkbox');
+            checkbox.checked = checkbox.disabled || selected.has(item.dataset.code);
+        });
+    }
+
+    function removeCurrencyContainer(currency) {
+        if (currency === 'BTC' || currency === 'SAT') return;
+        container.querySelectorAll('.currency-container').forEach(row => {
+            if (row.querySelector('.currency-symbol')?.textContent === currency) row.remove();
+        });
+        syncCurrencyCheckboxes();
+        if (getCookie("cookieConsent") === "true") saveUserSettings();
+        updateAllCurrencies();
+        ensureFirstCurrencyVisible();
+    }
+
+    function filterCurrencyList() {
+        const query = currencySearch.value.trim().toLocaleLowerCase();
+        let visibleCount = 0;
+        currencyList.querySelectorAll('.currency-item').forEach(item => {
+            const matches = !query || item.dataset.search.includes(query);
+            item.hidden = !matches;
+            if (matches) visibleCount++;
+        });
+        currencyNoResults.hidden = visibleCount !== 0;
+        currencyList.scrollTop = 0;
+    }
+
+    currencySearch.addEventListener('input', filterCurrencyList);
+    currencySearch.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            closeCurrencyModal();
+            return;
+        }
+        if (event.key !== 'Enter') return;
+        const query = currencySearch.value.trim().toLocaleLowerCase();
+        const visibleItems = [...currencyList.querySelectorAll('.currency-item:not([hidden])')];
+        const match = visibleItems.find(item => item.dataset.code.toLocaleLowerCase() === query) || visibleItems[0];
+        if (match) {
+            event.preventDefault();
+            const checkbox = match.querySelector('.currency-checkbox');
+            if (!checkbox.checked) {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            closeCurrencyModal();
+        }
+    });
+
     window.openCurrencyModal = function () {
+        syncCurrencyCheckboxes();
         currencyModal.style.display = 'block';
+        requestAnimationFrame(() => {
+            currencySearch.focus();
+            currencySearch.select();
+        });
     };
 
     window.closeCurrencyModal = function () {
         currencyModal.style.display = 'none';
+        currencySearch.value = '';
+        filterCurrencyList();
     };
 
     window.selectCurrency = function (currency) {
+        if (getSelectedCurrencyCodes().has(currency)) {
+            closeCurrencyModal();
+            return;
+        }
         selectedCurrency = currency;  // Store selected currency
         // consol.log(`Selected currency: ${selectedCurrency}`);
         closeCurrencyModal();
@@ -558,6 +704,11 @@ function populateCurrencyList(currencies) {
             console.error('No currency selected. Cannot add container.');
             return;
         }
+        if (getSelectedCurrencyCodes().has(selectedCurrency)) {
+            selectedCurrency = null;
+            syncCurrencyCheckboxes();
+            return;
+        }
         const newContainer = document.createElement('div');
         newContainer.className = 'currency-container';
         newContainer.innerHTML = `
@@ -570,6 +721,7 @@ function populateCurrencyList(currencies) {
             saveUserSettings(); // Save user settings after adding a new currency
         }
         selectedCurrency = null;  // Reset after use
+        syncCurrencyCheckboxes();
         updateAllCurrencies(); // Update all currencies after adding a new one
     };
 
@@ -583,6 +735,8 @@ function populateCurrencyList(currencies) {
     }
 
     function loadUserSettings() {
+        if (settingsLoaded) return;
+        settingsLoaded = true;
         const savedSettings = localStorage.getItem(USER_SETTINGS_KEY);
         if (savedSettings) {
             const currencies = JSON.parse(savedSettings);
@@ -600,11 +754,115 @@ function populateCurrencyList(currencies) {
                     addCurrencyContainer();
                 }
             });
+            ['BTC', 'SAT'].forEach(currency => {
+                if (getSelectedCurrencyCodes().has(currency)) return;
+                selectedCurrency = currency;
+                addCurrencyContainer();
+            });
+        }
+        scheduleReorderDemo();
+    }
+
+    function stopReorderDemo() {
+        clearTimeout(demoTimer);
+        demoObserver?.disconnect();
+        demoObserver = null;
+        container.classList.remove('converter-demo');
+        container.querySelectorAll('.converter-demo-card').forEach(card => {
+            card.classList.remove('converter-demo-card');
+            card.style.removeProperty('--demo-y');
+        });
+    }
+
+    function scheduleReorderDemo() {
+        if (demoScheduled || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        demoScheduled = true;
+        const startDemo = () => {
+            const cards = [...container.querySelectorAll('.currency-container')];
+            if (cards.length < 2) return;
+            const first = cards[0];
+            const second = cards[Math.min(2, cards.length - 1)];
+            const distance = second.offsetTop - first.offsetTop;
+            first.style.setProperty('--demo-y', `${distance}px`);
+            second.style.setProperty('--demo-y', `${-distance}px`);
+            first.classList.add('converter-demo-card');
+            second.classList.add('converter-demo-card');
+            container.classList.add('converter-demo');
+            first.addEventListener('animationend', stopReorderDemo, {once: true});
+        };
+        const queueDemo = () => { demoTimer = setTimeout(startDemo, 550); };
+        const consentModal = document.getElementById('cookieConsentModal');
+        if (consentModal?.classList.contains('active')) {
+            demoObserver = new MutationObserver(() => {
+                if (consentModal.classList.contains('active')) return;
+                demoObserver.disconnect();
+                demoObserver = null;
+                queueDemo();
+            });
+            demoObserver.observe(consentModal, {attributes: true, attributeFilter: ['class']});
+        } else {
+            queueDemo();
         }
     }
 
+    container.addEventListener('pointerdown', stopReorderDemo, {capture: true});
+
+    function updateScrollFade() {
+        fadeFrame = null;
+        const {controlBottom, fadeDistance} = getFadeBoundary();
+        container.querySelectorAll('.currency-container').forEach(card => {
+            const opacity = Math.max(0, Math.min(1, (card.getBoundingClientRect().top - controlBottom) / fadeDistance));
+            card.style.setProperty('--scroll-fade', opacity.toFixed(3));
+            card.style.pointerEvents = opacity < .08 ? 'none' : '';
+        });
+    }
+
+    function getFadeBoundary() {
+        const controls = ['#toggle', '#toggle-button', '.add-currency-icon']
+            .map(selector => document.querySelector(selector))
+            .filter(Boolean);
+        const controlBottom = Math.max(...controls.map(control => control.getBoundingClientRect().bottom)) + 4;
+        const fadeDistance = 28;
+        return {controlBottom, fadeDistance};
+    }
+
+    function scheduleScrollFade() {
+        if (fadeFrame === null) fadeFrame = requestAnimationFrame(updateScrollFade);
+    }
+
+    function trackScrollFadeWhileSettling() {
+        cancelAnimationFrame(fadeSettleFrame);
+        const startedAt = performance.now();
+        const refresh = now => {
+            updateScrollFade();
+            if (now - startedAt < 280) fadeSettleFrame = requestAnimationFrame(refresh);
+        };
+        fadeSettleFrame = requestAnimationFrame(refresh);
+    }
+
+    function ensureFirstCurrencyVisible() {
+        setTimeout(() => {
+            const first = container.querySelector('.currency-container');
+            if (!first) return;
+            const {controlBottom, fadeDistance} = getFadeBoundary();
+            const targetTop = controlBottom + fadeDistance + 4;
+            const bounds = first.getBoundingClientRect();
+            if (bounds.top >= targetTop && bounds.bottom <= innerHeight) return;
+            window.scrollBy({
+                top: bounds.top - targetTop,
+                behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
+        }, 240);
+    }
+
+    window.addEventListener('scroll', scheduleScrollFade, {passive: true});
+    window.addEventListener('resize', scheduleScrollFade);
+
     initializeInputValidation();
+    syncCurrencyInputStates();
+    loadUserSettings();
     fetchSupportedCurrencies(); // Fetch the supported currencies and exchange rates
+    updateScrollFade();
 
 
 
