@@ -9,3 +9,18 @@
     location.reload();
   });
 })();
+
+(() => {
+  const analyticsToggle = document.getElementById('analyticsEnabled');
+  const sync = () => {
+    analyticsToggle.disabled = !window.satoshiAnalytics;
+    analyticsToggle.checked = window.satoshiAnalytics?.getConsent() === 'granted';
+  };
+  sync();
+  window.addEventListener('satoshi-analytics-ready', sync);
+  window.addEventListener('satoshi-analytics-consent', sync);
+  analyticsToggle.addEventListener('change', () => {
+    window.satoshiAnalytics?.setConsent(analyticsToggle.checked);
+    if (!analyticsToggle.checked) location.reload();
+  });
+})();

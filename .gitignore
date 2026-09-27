@@ -1,6 +1,7 @@
 /tools/*
 !/tools/bip39/
 !/tools/history/
+!/tools/news/
 !/tools/price-scanner/
 /tools/price-scanner/node_modules/
 __pycache__/

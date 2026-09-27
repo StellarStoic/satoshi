@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,follow">
     <title>Lucky Sats Lottery</title>
     <style>
         body {
@@ -196,12 +197,15 @@
     </style>
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#101112">
+    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="theme.css">
     <script src="pwa.js" defer></script>
     <link rel="stylesheet" href="siteEffects.css">
     <script src="siteEffects.js" defer></script>
 </head>
 <body>
+    <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+    <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
     <div class="container">
         <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -324,6 +328,7 @@
         </div>
     </div>
 
+    <script src="burgerMenu.js"></script>
     <script>
         // Wait for iframe to load
         document.getElementById('lotteryIframe').onload = function() {

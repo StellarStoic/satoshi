@@ -3,7 +3,9 @@
 .site-settings h1 { margin: 0 0 28px; color: #f2a900; font-size: 24px; letter-spacing: 0; }
 .setting-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 16px 0; border-block: 1px solid #34373a; }
 .setting-row img { width: 48px; height: 48px; object-fit: contain; }
+.setting-row .setting-icon { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid #555a5e; border-radius: 6px; color: #f2a900; font-size: 12px; font-weight: 700; }
 .setting-row label { display: grid; gap: 3px; cursor: pointer; }
 .setting-row strong { color: #e6e6e6; font-size: 14px; }
 .setting-row span { color: #92979a; font-size: 11px; }
 .setting-row input { width: 42px; height: 22px; accent-color: #f2a900; cursor: pointer; }
+.setting-row input:disabled { opacity: .45; cursor: wait; }

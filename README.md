@@ -16,6 +16,7 @@
 | [History chart](https://satoshi.si/chart.html) | Explore currencies and other assets priced in sats, with time ranges, linear/logarithmic scales, historical events, snapshots, and CSV/JSON exports. |
 | [Moscow Time](https://satoshi.si/MoscowTime.html) | A sats-per-dollar view of Bitcoin's price. |
 | [Converter](https://satoshi.si/converter.html) | Bitcoin, satoshi, and fiat conversions. |
+| [Bitcoin and Nostr News](https://satoshi.si/news.html) | Bitcoin and Nostr engineering, release, media, research, and community feeds, with locally stored source and keyword filters plus custom RSS and Nostr profiles. |
 | [Memed Bitcoin Mood](https://satoshi.si/memedBitcoinMood.html) | Market moods and memes across daily, weekly, monthly, and yearly timeframes, with fallback data providers. |
 | [Game39](https://satoshi.si/game39single.html) | BIP39 word games, with a separate [multiplayer mode](https://satoshi.si/game39.html). |
 | [GhostQR](https://satoshi.si/ghostQR.html) | An experimental tool for creating printable, layered QR codes. |
@@ -54,6 +55,7 @@ See [BIP39 implementation notes](docs/bip39-playground.md) for details about the
 - **Frankfurter:** historical fiat conversion rates in the data-generation script, plus exchange rates used by the chart.
 - **Sintra:** live Bitcoin prices used by price-related tools.
 - **mempool.space:** block and fee information.
+- **Bitcoin and Nostr news:** Bitcoin Optech, Bitcoin Core releases, project blogs, independent publications, Nostr newsletters, community feeds, and Reddit sources. A daily GitHub Action creates the static feed snapshot.
 - **CoinGecko and CoinPaprika:** Bitcoin Mood market data, with Binance as a daily fallback. Some volatility values are estimates rather than measured historical ranges.
 - **Open Exchange Rates:** fiat rates used by the converter.
 - **Third-party services:** ChangeNOW and the lottery embed power their respective widgets; multiplayer Game39 uses Firebase. Several pages also load libraries, fonts, or icons from external hosts.
@@ -86,7 +88,7 @@ Run automated checks with Node.js:
 node --test tests/*.test.mjs
 ```
 
-Tests cover BIP39 behavior, glossary matching, and Bitcoin Mood fallback handling. They do not replace browser checks for layouts, installation, external integrations, or offline behavior.
+Tests cover BIP39 behavior, news filtering and feed parsing, scanner recognition, historical data, and Bitcoin Mood fallback handling. They do not replace browser checks for layouts, installation, external integrations, or offline behavior.
 
 The BIP39 library bundle is committed, so visitors and normal static previews do not need npm. To rebuild it:
 

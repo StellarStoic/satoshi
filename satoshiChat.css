@@ -103,6 +103,8 @@
 .satoshi-chat-message.user .satoshi-chat-message-body { border-color: rgba(242, 169, 0, .35); background: #26241e; white-space: pre-wrap; }
 .satoshi-chat-message.pending .satoshi-chat-message-body { color: #9ca1a4; }
 .satoshi-chat-message.error .satoshi-chat-message-body { border-color: #8f3438; color: #ff9b9f; }
+.satoshi-chat-copy { display: block; margin: 5px 2px 0 auto; padding: 2px 0; border: 0; background: transparent; color: #777d82; cursor: pointer; font: 9px/1.2 "Roboto Mono", monospace; }
+.satoshi-chat-copy:hover, .satoshi-chat-copy:focus-visible { color: #f2a900; }
 .satoshi-chat-message-body > :first-child { margin-top: 0; }
 .satoshi-chat-message-body > :last-child { margin-bottom: 0; }
 .satoshi-chat-message-body p { margin: 0 0 9px; }

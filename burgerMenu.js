@@ -43,11 +43,11 @@ theToggle.onclick = function() {
 
 // NEW CODE: Submenu functionality
 document.addEventListener('DOMContentLoaded', function() {
-    const priceLink = document.querySelector('#menu a[href="chart.html"]') ||
+    const priceLink = document.querySelector('#menu a[href$="chart.html"]') ||
         Array.from(document.querySelectorAll('#menu .submenu a')).find(function(link) {
             return link.textContent.trim() === 'History chart';
         });
-    if (priceLink && !document.querySelector('#menu a[href="priceScanner.html"]')) {
+    if (priceLink && !document.querySelector('#menu a[href$="priceScanner.html"]')) {
         const item = document.createElement('li');
         const link = document.createElement('a');
         link.href = 'priceScanner.html';

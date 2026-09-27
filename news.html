@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Bitcoin and Nostr news, engineering updates, podcasts, Reddit discussions, and community feeds.">
+  <title>Bitcoin and Nostr News | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/news.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+  <script src="/vendor/lucide/lucide.min.js" defer></script>
+</head>
+<body class="news-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul><li><a href="/index.html">Home</a></li><li><a href="/isBip39.html">BIP39</a></li><li><a href="/converter.html">Converter</a></li><li><a href="/priceScanner.html">Price Scanner</a></li></ul></nav>
+
+  <main class="news-shell">
+    <header class="news-header">
+      <div><h1>Bitcoin and Nostr News</h1><p id="newsUpdated">Loading sources…</p></div>
+      <button type="button" id="openNewsSettings" class="news-icon-button" aria-label="News settings" title="News settings"><i data-lucide="settings" aria-hidden="true"></i></button>
+    </header>
+    <div id="newsStatus" class="news-status" role="status" aria-live="polite"></div>
+    <section id="newsFeed" class="news-feed" aria-label="Bitcoin and Nostr news"></section>
+    <button type="button" id="showMoreNews" class="news-more" hidden>Show more</button>
+  </main>
+
+  <dialog id="newsSettings" class="news-settings" aria-labelledby="newsSettingsTitle">
+    <form method="dialog" class="news-settings-inner">
+      <header><h2 id="newsSettingsTitle">News settings</h2><button value="close" class="news-icon-button" aria-label="Close settings" title="Close"><i data-lucide="x" aria-hidden="true"></i></button></header>
+      <fieldset><legend>Sources</legend><div id="defaultNewsSources" class="news-source-options"></div><small>Unavailable means the publisher moved, blocked, or temporarily failed to serve its feed during the latest refresh.</small></fieldset>
+      <fieldset>
+        <legend>Filters</legend>
+        <label for="requiredKeywords">Only show posts containing</label><input id="requiredKeywords" type="text" placeholder="lightning, mining">
+        <label for="blockedKeywords">Hide posts containing</label><input id="blockedKeywords" type="text" placeholder="price, ETF">
+        <small>Separate keywords with commas. Filters apply only in this browser.</small>
+      </fieldset>
+      <fieldset>
+        <legend>Your feeds</legend>
+        <div class="custom-feed-form"><input id="customFeedInput" type="text" placeholder="RSS URL, npub, or NIP-05"><button id="addCustomFeed" type="button" aria-label="Add feed" title="Add feed">+</button></div>
+        <div id="customNewsSources" class="custom-news-sources"></div>
+        <small>Custom RSS and Nostr sources, source choices, and keyword filters are stored only in this browser. They are never uploaded to satoshi.si. Loading a custom RSS feed contacts its publisher and may use rss2json when direct browser access is blocked.</small>
+      </fieldset>
+    </form>
+  </dialog>
+
+  <script src="/burgerMenu.js"></script>
+  <script type="module" src="/news.mjs"></script>
+</body>
+</html>
