@@ -18,6 +18,8 @@ import('/analytics.mjs').catch(error => console.warn('Analytics consent could no
 import('/seo.mjs').catch(error => console.warn('SEO metadata could not be loaded:', error));
 
 const menuList = document.querySelector('#menu > ul');
+const menu = document.getElementById('menu');
+const menuToggle = document.getElementById('toggle');
 const MENU_ITEMS = [
     {label: 'Home', href: '/index.html'},
     {label: 'Knowledge', children: [
@@ -67,6 +69,9 @@ function createMenuLink(item) {
 }
 
 if (menuList) {
+    menu?.setAttribute('role', 'navigation');
+    menu?.setAttribute('aria-label', 'Main navigation');
+    menuToggle?.setAttribute('aria-label', 'Navigation');
     menuList.replaceChildren(...MENU_ITEMS.map(item => {
         const listItem = document.createElement('li');
         if (!item.children) {
@@ -86,6 +91,10 @@ if (menuList) {
         listItem.append(trigger, submenu);
         return listItem;
     }));
+}
+
+if (document.querySelector('[data-live-footer]')) {
+    import('/siteFooter.mjs').catch(error => console.warn('Live footer data could not be loaded:', error));
 }
 
 let chatEnabled = true;

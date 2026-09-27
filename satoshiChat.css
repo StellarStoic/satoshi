@@ -2,7 +2,7 @@
     position: fixed;
     z-index: 3200;
     right: 18px;
-    bottom: calc(74px + env(safe-area-inset-bottom));
+    bottom: calc(15px + env(safe-area-inset-bottom));
     display: grid;
     place-items: center;
     width: 44px;
@@ -215,7 +215,7 @@
 
 @media (max-width: 600px) {
     body.satoshi-chat-open { overflow: hidden; }
-    .satoshi-chat-launcher { right: 12px; bottom: calc(68px + env(safe-area-inset-bottom)); }
+    .satoshi-chat-launcher { right: 12px; bottom: calc(15px + env(safe-area-inset-bottom)); }
     .satoshi-chat-panel {
         inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
         width: 100%;
