@@ -16,6 +16,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "offers-data.json"
+PREVIOUS_OUTPUT = Path("/tmp/previous-offers-data.json")
 SESSION = requests.Session()
 SESSION.headers.update({"Accept": "application/json", "User-Agent": "satoshi.si public P2P order-book mirror"})
 SOURCE_LINKS = {
@@ -315,22 +316,46 @@ def collect_bisq():
     return result
 
 
+def load_previous_offers():
+    try:
+        payload = json.loads(PREVIOUS_OUTPUT.read_text(encoding="utf-8"))
+        return payload.get("offers", []) if payload.get("schema") == 2 else []
+    except (OSError, ValueError):
+        return []
+
+
 def main():
     collectors = [("hodlhodl", collect_hodlhodl), ("peach", collect_peach),
                   ("nostr", collect_nip69), ("robosats", collect_robosats), ("bisq", collect_bisq)]
+    previous = load_previous_offers()
+    fallback_sources = {
+        "hodlhodl": {"hodlhodl"}, "peach": {"peach"},
+        "nostr": {"mostro", "lnp2pbot"}, "robosats": {"robosats"}, "bisq": {"bisq"},
+    }
     offers, statuses, seen = [], {}, set()
+
+    def append_unique(rows):
+        added = 0
+        for offer in rows:
+            key = (offer["source"], offer["id"], offer["currency"])
+            if key not in seen:
+                offers.append(offer)
+                seen.add(key)
+                added += 1
+        return added
+
     for name, collector in collectors:
         started = time.time()
         try:
             collected = collector()
-            for offer in collected:
-                key = (offer["source"], offer["id"], offer["currency"])
-                if key not in seen:
-                    offers.append(offer)
-                    seen.add(key)
+            if not collected:
+                raise RuntimeError(f"{name} returned no public offers")
+            append_unique(collected)
             statuses[name] = {"ok": True, "count": len(collected), "milliseconds": round((time.time() - started) * 1000)}
         except Exception as error:
-            statuses[name] = {"ok": False, "count": 0, "error": str(error)[:180]}
+            sources = fallback_sources[name]
+            retained = append_unique(offer for offer in previous if offer.get("source") in sources)
+            statuses[name] = {"ok": False, "count": retained, "stale": retained > 0, "error": str(error)[:180]}
             print(f"{name} failed: {error}")
     if not offers:
         raise RuntimeError("All P2P sources failed; keeping the previous snapshot")

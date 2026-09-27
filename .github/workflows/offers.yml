@@ -32,6 +32,8 @@ jobs:
           sudo apt-get install --yes tor
           sudo systemctl start tor
           python -m pip install --requirement tools/offers/requirements.txt
+      - name: Keep the last successful market data available
+        run: curl --fail --silent --show-error --location --max-time 30 "https://raw.githubusercontent.com/${{ github.repository }}/p2p-data/offers-data.json" --output /tmp/previous-offers-data.json || true
       - run: python tools/offers/collect.py
       - name: Publish data branch
         run: |
