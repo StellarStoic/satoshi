@@ -21,7 +21,7 @@ SESSION.headers.update({"Accept": "application/json", "User-Agent": "satoshi.si 
 SOURCE_LINKS = {
     "hodlhodl": "https://hodlhodl.com/join/L4HT",
     "peach": "https://peachbitcoin.com/referral?code=PRC876",
-    "robosats": "https://robosats.com/",
+    "robosats": "https://robosats.com/offers",
     "mostro": "https://mostro.network/",
     "lnp2pbot": "https://t.me/lnp2pbot",
     "bisq": "https://bisq.network/",
@@ -196,16 +196,21 @@ def collect_nip69():
         methods = tags.get("pm") or []
         if len(methods) == 1:
             methods = [item.strip() for item in methods[0].split(",")]
+        fixed_sats = sats[0] if sats and sats[0] and sats[0] > 0 else None
+        fixed_fiat = fiat[0] if len(fiat) == 1 and fiat[0] and fiat[0] > 0 else None
         offer = normalized_offer(
             id=(tags.get("d") or [event["id"]])[0], source=source,
             side=(tags.get("k") or [None])[0], currency=(tags.get("f") or [None])[0],
+            price=fixed_fiat * 100_000_000 / fixed_sats if fixed_fiat and fixed_sats else None,
             fiat_min=fiat[0] if fiat else None, fiat_max=fiat[-1] if fiat else None,
             sats_min=sats[0] if sats else None, sats_max=sats[-1] if sats else None,
             premium=(tags.get("premium") or [None])[0], payment_methods=methods,
             trader=(tags.get("name") or [None])[0], layer=(tags.get("layer") or ["lightning"])[0],
             created_at=datetime.fromtimestamp(event["created_at"], timezone.utc).isoformat(),
             expires_at=datetime.fromtimestamp(expires, timezone.utc).isoformat() if expires else None,
-            url=(tags.get("source") or [SOURCE_LINKS[source]])[0])
+            # Public RoboSats offers live in the book; /order routes require a
+            # private robot/session and render empty for an untouched offer.
+            url=SOURCE_LINKS[source] if source == "robosats" else (tags.get("source") or [SOURCE_LINKS[source]])[0])
         if offer:
             result.append(offer)
     return result
@@ -247,7 +252,7 @@ def collect_robosats():
                     sats_max=raw.get("max_satoshis") or raw.get("satoshis"), premium=raw.get("premium"),
                     payment_methods=[raw.get("payment_method")], trader=raw.get("maker_nick") or coordinator,
                     layer="lightning", created_at=raw.get("created_at") or raw.get("created"),
-                    url=f"https://robosats.com/order/{coordinator}/{raw.get('id')}")
+                    url=SOURCE_LINKS["robosats"])
                 if offer:
                     collected.append(offer)
         except Exception as error:
