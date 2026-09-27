@@ -2,6 +2,15 @@ import {deduplicateNews, filterNews, parseKeywords} from './newsModel.mjs';
 
 const SETTINGS_KEY = 'bitcoinNewsSettings';
 const PAGE_SIZE = 24;
+const SOURCE_CATALOG_VERSION = 1;
+const BUILTIN_NOSTR_SOURCES = [{
+  id: 'nostr-nostrrecap',
+  type: 'nostr',
+  value: 'npub1etjm06353tl0cnqs9wmmzfwyj283z3ee5facwlrte7l957fgqwzqsznr68',
+  label: 'nostrrecap',
+  status: 'client',
+  clientNostr: true,
+}];
 const feed = document.getElementById('newsFeed');
 const status = document.getElementById('newsStatus');
 const updated = document.getElementById('newsUpdated');
@@ -12,22 +21,30 @@ const requiredInput = document.getElementById('requiredKeywords');
 const blockedInput = document.getElementById('blockedKeywords');
 const customInput = document.getElementById('customFeedInput');
 const moreButton = document.getElementById('showMoreNews');
+const searchInput = document.getElementById('newsSearch');
+const clearSearchButton = document.getElementById('clearNewsSearch');
 let dataset = {sources: [], items: [], generatedAt: null};
 let customItems = [];
 let visibleCount = PAGE_SIZE;
+let searchQuery = '';
 let settings = loadSettings();
 
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    const enabledSources = Array.isArray(saved?.enabledSources) ? [...saved.enabledSources] : null;
+    if (enabledSources && Number(saved?.sourceCatalogVersion || 0) < SOURCE_CATALOG_VERSION) {
+      for (const source of BUILTIN_NOSTR_SOURCES) if (!enabledSources.includes(source.id)) enabledSources.push(source.id);
+    }
     return {
-      enabledSources: Array.isArray(saved?.enabledSources) ? saved.enabledSources : null,
+      enabledSources,
       required: String(saved?.required || ''),
       blocked: String(saved?.blocked || ''),
       customSources: Array.isArray(saved?.customSources) ? saved.customSources : [],
+      sourceCatalogVersion: SOURCE_CATALOG_VERSION,
     };
   } catch {
-    return {enabledSources: null, required: '', blocked: '', customSources: []};
+    return {enabledSources: null, required: '', blocked: '', customSources: [], sourceCatalogVersion: SOURCE_CATALOG_VERSION};
   }
 }
 
@@ -65,6 +82,7 @@ function renderSources() {
       visibleCount = PAGE_SIZE;
       saveSettings();
       renderNews();
+      if (checkbox.checked && source.clientNostr) loadClientSources();
     });
     label.append(checkbox, document.createTextNode(`${source.label}${checkbox.disabled ? ' (unavailable)' : ''}`));
     return label;
@@ -74,7 +92,7 @@ function renderSources() {
 function renderCustomSources() {
   customSourcesNode.replaceChildren(...settings.customSources.map(source => {
     const row = node('div', undefined, 'custom-source');
-    row.append(node('span', source.value));
+    row.append(node('span', source.type === 'nostr' ? nostrSettingsLabel(source) : source.value));
     const remove = node('button', '×');
     remove.type = 'button';
     remove.setAttribute('aria-label', `Remove ${source.value}`);
@@ -97,6 +115,7 @@ function currentFilteredNews() {
     enabledSources: enabled,
     blocked: parseKeywords(settings.blocked),
     required: parseKeywords(settings.required),
+    query: searchQuery,
   });
 }
 
@@ -126,7 +145,7 @@ function renderNews() {
     article.append(meta, content);
     return article;
   }));
-  status.textContent = filtered.length ? `${filtered.length} posts from ${enabled.length} enabled sources` : 'No posts match the current sources and keyword filters.';
+  status.textContent = filtered.length ? `${filtered.length} posts from ${enabled.length} enabled sources` : 'No posts match your search and filters.';
   moreButton.hidden = shown.length >= filtered.length;
   focusNewsHash(filtered);
 }
@@ -242,7 +261,7 @@ function bech32NpubToHex(npub) {
 }
 
 async function resolveNostrIdentity(value) {
-  if (value.toLowerCase().startsWith('npub1')) return bech32NpubToHex(value);
+  if (value.toLowerCase().startsWith('npub1')) return {pubkey: bech32NpubToHex(value), npub: value.toLowerCase()};
   const match = value.match(/^([^@\s]+)@([^@\s]+)$/);
   if (!match) throw new Error('Enter an RSS URL, npub, or NIP-05 address');
   const response = await fetch(`https://${match[2]}/.well-known/nostr.json?name=${encodeURIComponent(match[1])}`);
@@ -250,7 +269,61 @@ async function resolveNostrIdentity(value) {
   const payload = await response.json();
   const pubkey = payload.names?.[match[1]] || payload.names?.[match[1].toLowerCase()];
   if (!/^[0-9a-f]{64}$/i.test(pubkey || '')) throw new Error('NIP-05 response has no public key');
-  return pubkey;
+  return {pubkey, nip05: value};
+}
+
+function shortenNpub(value) {
+  return value && value.length > 14 ? `${value.slice(0, 7)}...${value.slice(-3)}` : value;
+}
+
+function nostrSourceName(source) {
+  return source.profileName || source.nip05 || shortenNpub(source.npub || source.value) || 'Nostr';
+}
+
+function nostrSettingsLabel(source) {
+  const identifier = source.npub ? shortenNpub(source.npub) : (source.nip05 || source.value);
+  const name = nostrSourceName(source);
+  return identifier && name !== identifier ? `${name} (${identifier})` : name;
+}
+
+function readNostrProfile(url, pubkey) {
+  return new Promise(resolve => {
+    const socket = new WebSocket(url);
+    const subscription = `satoshi-profile-${crypto.randomUUID()}`;
+    let newest = null;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      try { socket.close(); } catch {}
+      resolve(newest);
+    };
+    const timer = setTimeout(finish, 3500);
+    socket.onopen = () => socket.send(JSON.stringify(['REQ', subscription, {authors: [pubkey], kinds: [0], limit: 5}]));
+    socket.onmessage = event => {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message[0] === 'EOSE') { clearTimeout(timer); finish(); return; }
+      if (message[0] !== 'EVENT') return;
+      if (!newest || message[2].created_at > newest.created_at) newest = message[2];
+    };
+    socket.onerror = finish;
+  });
+}
+
+async function enrichNostrSource(source) {
+  const identity = await resolveNostrIdentity(source.value);
+  const events = await Promise.all([
+    readNostrProfile('wss://relay.damus.io', identity.pubkey),
+    readNostrProfile('wss://nos.lol', identity.pubkey),
+    readNostrProfile('wss://relay.primal.net', identity.pubkey),
+  ]);
+  const event = events.filter(Boolean).sort((a, b) => b.created_at - a.created_at)[0];
+  let profile = {};
+  try { profile = JSON.parse(event?.content || '{}'); } catch {}
+  const profileName = String(profile.display_name || profile.displayName || profile.name || '').trim();
+  const nip05 = String(profile.nip05 || identity.nip05 || '').trim();
+  return {...source, pubkey: identity.pubkey, npub: identity.npub || source.npub, nip05, profileName, profileResolvedAt: Date.now(), label: profileName || nip05 || shortenNpub(identity.npub || source.value)};
 }
 
 function readRelay(url, pubkey, source) {
@@ -292,22 +365,45 @@ function readRelay(url, pubkey, source) {
 }
 
 async function fetchNostr(source) {
-  const pubkey = await resolveNostrIdentity(source.value);
+  const resolved = source.pubkey ? source : await enrichNostrSource(source);
+  const pubkey = resolved.pubkey;
   const results = await Promise.all([
-    readRelay('wss://relay.damus.io', pubkey, source),
-    readRelay('wss://nos.lol', pubkey, source),
-    readRelay('wss://relay.primal.net', pubkey, source),
+    readRelay('wss://relay.damus.io', pubkey, resolved),
+    readRelay('wss://nos.lol', pubkey, resolved),
+    readRelay('wss://relay.primal.net', pubkey, resolved),
   ]);
   return deduplicateNews(results.flat());
 }
 
-async function loadCustomSources() {
-  if (!settings.customSources.length) return;
-  status.textContent = 'Loading your local feeds…';
-  const settled = await Promise.allSettled(settings.customSources.map(async source => source.type === 'rss' ? fetchCustomRss(source) : fetchNostr(source)));
+async function loadClientSources() {
+  const builtInSources = dataset.sources.filter(source => source.clientNostr && settings.enabledSources?.includes(source.id));
+  const sources = [...builtInSources, ...settings.customSources];
+  if (!sources.length) { customItems = []; renderNews(); return; }
+  status.textContent = 'Loading Nostr and local feeds…';
+  const enriched = await Promise.allSettled(settings.customSources.map(source => source.type === 'nostr' && !source.profileResolvedAt ? enrichNostrSource(source) : source));
+  let changed = false;
+  settings.customSources = settings.customSources.map((source, index) => {
+    const result = enriched[index];
+    if (result.status !== 'fulfilled' || source.type !== 'nostr') return source;
+    changed ||= JSON.stringify(source) !== JSON.stringify(result.value);
+    return result.value;
+  });
+  if (changed) { saveSettings(); renderCustomSources(); }
+  const resolvedBuiltIns = await Promise.allSettled(builtInSources.map(source => enrichNostrSource(source)));
+  resolvedBuiltIns.forEach((result, index) => {
+    if (result.status !== 'fulfilled') return;
+    const datasetIndex = dataset.sources.findIndex(source => source.id === builtInSources[index].id);
+    if (datasetIndex >= 0) dataset.sources[datasetIndex] = {...result.value, status: 'client', clientNostr: true};
+  });
+  if (resolvedBuiltIns.some(result => result.status === 'fulfilled')) renderSources();
+  const resolvedSources = [
+    ...resolvedBuiltIns.map((result, index) => result.status === 'fulfilled' ? result.value : builtInSources[index]),
+    ...settings.customSources,
+  ];
+  const settled = await Promise.allSettled(resolvedSources.map(async source => source.type === 'rss' ? fetchCustomRss(source) : fetchNostr(source)));
   customItems = settled.flatMap(result => result.status === 'fulfilled' ? result.value : []);
   const failures = settled.filter(result => result.status === 'rejected').length;
-  if (failures) status.textContent = `${failures} custom source${failures === 1 ? '' : 's'} could not be reached.`;
+  if (failures) status.textContent = `${failures} source${failures === 1 ? '' : 's'} could not be reached.`;
   renderNews();
 }
 
@@ -322,6 +418,17 @@ for (const input of [requiredInput, blockedInput]) input.addEventListener('input
   saveSettings();
   renderNews();
 });
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value.trim();
+  clearSearchButton.hidden = !searchQuery;
+  visibleCount = PAGE_SIZE;
+  renderNews();
+});
+clearSearchButton.addEventListener('click', () => {
+  searchInput.value = '';
+  searchInput.dispatchEvent(new Event('input'));
+  searchInput.focus();
+});
 document.getElementById('addCustomFeed').addEventListener('click', async () => {
   const value = customInput.value.trim();
   if (!value) return;
@@ -332,12 +439,19 @@ document.getElementById('addCustomFeed').addEventListener('click', async () => {
     return;
   }
   customInput.setCustomValidity('');
-  const source = {id: `custom-${crypto.randomUUID()}`, type: isRss ? 'rss' : 'nostr', value, label: isRss ? new URL(value).hostname : `Nostr ${value.slice(0, 12)}…`};
+  let source = {id: `custom-${crypto.randomUUID()}`, type: isRss ? 'rss' : 'nostr', value, label: isRss ? new URL(value).hostname : shortenNpub(value)};
+  if (!isRss) {
+    try { source = await enrichNostrSource(source); } catch (error) {
+      customInput.setCustomValidity(error.message || 'Nostr profile could not be resolved.');
+      customInput.reportValidity();
+      return;
+    }
+  }
   settings.customSources.push(source);
   saveSettings();
   customInput.value = '';
   renderCustomSources();
-  await loadCustomSources();
+  await loadClientSources();
 });
 customInput.addEventListener('input', () => customInput.setCustomValidity(''));
 moreButton.addEventListener('click', () => { visibleCount += PAGE_SIZE; renderNews(); });
@@ -346,11 +460,12 @@ try {
   const response = await fetch('/news-data.json', {cache: 'no-store'});
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   dataset = await response.json();
+  dataset.sources.push(...BUILTIN_NOSTR_SOURCES.filter(source => !dataset.sources.some(existing => existing.id === source.id)));
   updated.textContent = dataset.generatedAt ? `Updated ${formatDate(dataset.generatedAt)}` : 'Latest collected posts';
   renderSources();
   renderCustomSources();
   renderNews();
-  await loadCustomSources();
+  await loadClientSources();
 } catch (error) {
   status.textContent = `News could not be loaded: ${error.message}`;
 }

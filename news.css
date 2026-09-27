@@ -6,6 +6,14 @@
 .news-icon-button { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; background: transparent; color: #aeb2b5; cursor: pointer; }
 .news-icon-button:hover, .news-icon-button:focus-visible { color: #f2a900; }
 .news-icon-button svg { width: 21px; height: 21px; }
+.news-search { display: grid; grid-template-columns: 20px minmax(0, 1fr) 34px; align-items: center; gap: 8px; margin-top: 16px; padding: 0 8px 0 12px; border: 1px solid #3d4144; border-radius: 5px; background: #111315; color: #858a8e; }
+.news-search:focus-within { border-color: #f2a900; color: #f2a900; }
+.news-search > svg { width: 17px; height: 17px; }
+.news-search input { min-width: 0; height: 44px; padding: 0; border: 0; outline: 0; background: transparent; color: #e6e6e6; font: 13px "Roboto Mono", monospace; }
+.news-search input::placeholder { color: #73787c; }
+.news-search button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; background: transparent; color: #858a8e; cursor: pointer; }
+.news-search button:hover, .news-search button:focus-visible { color: #f2a900; }
+.news-search button svg { width: 16px; height: 16px; }
 .news-status { min-height: 20px; padding: 12px 0 0; color: #b5b5b5; font-size: 11px; }
 .news-feed { border-top: 1px solid #282b2e; }
 .news-item { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 18px; padding: 18px 0; border-bottom: 1px solid #282b2e; }

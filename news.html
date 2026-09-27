@@ -25,6 +25,11 @@
       <div><h1>Bitcoin and Nostr News</h1><p id="newsUpdated">Loading sources…</p></div>
       <button type="button" id="openNewsSettings" class="news-icon-button" aria-label="News settings" title="News settings"><i data-lucide="settings" aria-hidden="true"></i></button>
     </header>
+    <label class="news-search" for="newsSearch">
+      <i data-lucide="search" aria-hidden="true"></i>
+      <input id="newsSearch" type="search" placeholder="Search news" autocomplete="off">
+      <button id="clearNewsSearch" type="button" aria-label="Clear search" title="Clear search" hidden><i data-lucide="x" aria-hidden="true"></i></button>
+    </label>
     <div id="newsStatus" class="news-status" role="status" aria-live="polite"></div>
     <section id="newsFeed" class="news-feed" aria-label="Bitcoin and Nostr news"></section>
     <button type="button" id="showMoreNews" class="news-more" hidden>Show more</button>

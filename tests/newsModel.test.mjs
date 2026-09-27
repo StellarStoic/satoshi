@@ -13,4 +13,9 @@ test('source and keyword filters combine', () => {
   assert.deepEqual(filterNews(items, {enabledSources: ['optech', 'reddit'], required: ['bitcoin'], blocked: ['etf']}), []);
   assert.equal(filterNews(items, {enabledSources: ['optech'], required: ['lightning']}).length, 1);
 });
+test('search requires every word across title, summary, and source', () => {
+  assert.equal(filterNews(items, {query: 'lightning channel'}).length, 1);
+  assert.equal(filterNews(items, {query: 'optech update'}).length, 1);
+  assert.equal(filterNews(items, {query: 'lightning ETF'}).length, 0);
+});
 test('deduplication keeps the first matching URL', () => assert.equal(deduplicateNews([items[0], {...items[0]}]).length, 1));
