@@ -213,6 +213,10 @@ def collect_nip69():
 
 def collect_robosats():
     registry = SESSION.get("https://raw.githubusercontent.com/RoboSats/robosats/main/frontend/static/federation.json", timeout=35).json()
+    currency_map = SESSION.get(
+        "https://raw.githubusercontent.com/RoboSats/robosats/main/frontend/static/assets/currencies.json",
+        timeout=35,
+    ).json()
     proxies = {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}
     def fetch_coordinator(coordinator, profile):
         network = profile.get("mainnet") or {}
@@ -232,16 +236,18 @@ def collect_robosats():
                     side = raw.get("side") or raw.get("direction")
                 if isinstance(side, int):
                     side = "buy" if side == 0 else "sell"
+                currency = raw.get("currency") or raw.get("currency_code") or raw.get("currency_symbol")
+                currency = currency_map.get(str(currency), currency)
                 offer = normalized_offer(
                     id=f"{coordinator}:{raw.get('id')}", source="robosats", side=str(side).lower(),
-                    currency=raw.get("currency") or raw.get("currency_code") or raw.get("currency_symbol"),
+                    currency=currency,
                     price=raw.get("price"), fiat_min=raw.get("min_amount") or raw.get("fiat_min"),
                     fiat_max=raw.get("max_amount") or raw.get("fiat_max") or raw.get("amount"),
                     sats_min=raw.get("min_satoshis") or raw.get("sats_min"),
                     sats_max=raw.get("max_satoshis") or raw.get("satoshis"), premium=raw.get("premium"),
                     payment_methods=[raw.get("payment_method")], trader=raw.get("maker_nick") or coordinator,
                     layer="lightning", created_at=raw.get("created_at") or raw.get("created"),
-                    url=f"https://robosats.com/?coordinator={coordinator}")
+                    url=f"https://robosats.com/order/{coordinator}/{raw.get('id')}")
                 if offer:
                     collected.append(offer)
         except Exception as error:
