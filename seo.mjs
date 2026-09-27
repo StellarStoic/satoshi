@@ -20,7 +20,7 @@ const pages = {
   '/lotteryStats.html': ['Bitcoin Lottery Results and Statistics | Satoshi.si', 'Review published Bitcoin Lightning lottery results, recent draws and supporting statistics.'],
   '/ticketVerifier.html': ['Bitcoin Lottery Ticket Verifier | Satoshi.si', 'Verify a Bitcoin Lightning lottery ticket against published draw information.'],
   '/lotteryTOS.html': ['Bitcoin Lottery Terms of Service | Satoshi.si', 'Read the terms, risks, eligibility requirements and affiliate disclosures for the Bitcoin Lightning lottery.'],
-  '/exchangeShitcoins.html': ['Exchange Other Assets for Bitcoin | Satoshi.si', 'Access a third-party exchange interface for swapping supported digital assets with Bitcoin.'],
+  '/exchange.html': ['Buy Bitcoin with EUR or Exchange Monero | Satoshi.si', 'Use a third-party ChangeNOW widget to buy Bitcoin with fiat or exchange Monero and other supported digital assets for Bitcoin.'],
   '/offers.html': ['P2P Bitcoin Offers | Satoshi.si', 'Browse tools and information related to finding and comparing peer-to-peer Bitcoin offers.'],
   '/living.html': ['EU Cost of Living in Bitcoin | Satoshi.si', 'Compare selected European living costs in 2010 and recent years using euros, annual Bitcoin prices and EU inflation context.'],
 };

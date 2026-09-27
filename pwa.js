@@ -41,7 +41,7 @@ const MENU_ITEMS = [
         {label: 'Price Scanner', href: '/priceScanner.html'},
     ]},
     {label: 'Exchange', children: [
-        {label: 'Exchange Shitcoins', href: '/exchangeShitcoins.html'},
+        {label: 'Exchange', href: '/exchange.html'},
         {label: 'P2P Bitcoin Offers', href: '/offers.html'},
     ]},
     {label: 'Nostr', children: [{label: 'NIP-05', href: '/nip05.html'}]},

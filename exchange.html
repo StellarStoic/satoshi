@@ -113,6 +113,34 @@
     margin: 1rem auto; /* Center */
 }
 
+.exchange-disclosure {
+    width: min(92%, 620px);
+    margin: 1rem auto 0;
+    color: #92979a;
+    font: 0.72rem/1.55 "Roboto Mono", monospace;
+}
+.exchange-disclosure a { color: #f2a900; text-underline-offset: 2px; }
+.exchange-policy-links a { color: #f2a900; text-underline-offset: 2px; }
+
+.widget-error-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.65rem;
+    margin-top: 0.75rem;
+}
+
+.widget-error-actions button,
+.widget-error-actions a {
+    border: 1px solid #f2a900;
+    border-radius: 4px;
+    padding: 0.55rem 0.8rem;
+    background: transparent;
+    color: #f2a900;
+    font: 0.78rem "Roboto Mono", monospace;
+    text-decoration: none;
+    cursor: pointer;
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -192,7 +220,7 @@
         <li class="has-submenu">
         <a href="#">Exchange</a>
         <ul class="submenu">
-            <li><a href="#">Exchange Shitcoins</a></li>
+            <li><a href="#">Exchange</a></li>
             <!-- <li><a href="offers.html">P2P Bitcoin Offers</a></li> -->
         </ul>
         </li>
@@ -243,14 +271,40 @@
     <!-- Loader -->
     <div id="widget-loader" class="widget-loader"></div>
 
+    <script>
+        // Register the callback before the iframe can finish loading from cache.
+        window.exchangeWidgetLoaded = false;
+        window.markExchangeWidgetLoaded = function () {
+            window.exchangeWidgetLoaded = true;
+            window.clearTimeout(window.exchangeWidgetTimeout);
+
+            const loader = document.getElementById("widget-loader");
+            const error = document.getElementById("widget-error");
+            if (loader) loader.style.display = "none";
+            if (error) error.style.display = "none";
+        };
+    </script>
+
     <iframe id='iframe-widget'
-            src='https://changenow.io/embeds/exchange-widget/v2/widget.html?FAQ=true&amount=378000000&amountFiat&backgroundColor=101112&darkMode=true&from=pepe&horizontal=false&isFiat=false&lang=en-US&link_id=8eac6c66bcf1a5&locales=true&logo=false&primaryColor=f2a900&to=btc&toTheMoon=false'
+            src='https://changenow.io/embeds/exchange-widget/v2/widget.html?FAQ=true&amount=1&amountFiat=150&amountTo=0.0001&backgroundColor=101112&darkMode=true&from=xmr&fromFiat=eur&horizontal=false&isFiat&lang=en-US&link_id=8eac6c66bcf1a5&locales=true&logo=false&primaryColor=f2a900&to=btc&toFiat=btc&toTheMoon=true&topUpAddress&topUpCurrency=btc&topUpExtraId&topUpNetwork=btc'
+            title="ChangeNOW exchange widget"
+            onload="markExchangeWidgetLoaded()"
             style="height: 356px; width: 100%; border: none">
     </iframe>
 
+    <p class="exchange-disclosure">
+        Third-party service by ChangeNOW for crypto swaps and fiat purchases. KYC may be required based on location, payment provider, or transaction screening.
+        Check the <a href="https://changenow.io/terms-of-use/changenow-terms" target="_blank" rel="noopener noreferrer">terms</a>
+        and <a href="https://changenow.io/terms-of-use/aml-kyc" target="_blank" rel="noopener noreferrer">AML/KYC policy</a> before sending funds.
+    </p>
+
         <!-- Error message container -->
     <div id="widget-error" style="display:none; color:#f2a900; margin-top:1rem; font-weight:bold;">
-        ⚠️ Widget failed to load. Please check the Javascript permissions and refresh the page or try again later.
+        ChangeNOW is taking longer than expected.
+        <div class="widget-error-actions">
+            <button type="button" onclick="retryExchangeWidget()">Retry</button>
+            <a href="https://changenow.app.link/referral?link_id=8eac6c66bcf1a5" target="_blank" rel="noopener noreferrer">Open ChangeNOW</a>
+        </div>
     </div>
 
 
@@ -259,7 +313,7 @@
 <div id="exchangeShitcoinsModal" class="description-modal">
     <span class="close-icon" onclick="closeExchangeShitcoinsModal()">&times;</span>
     <div class="modal-content">
-        <h4>Exchange Shitcoins</h4>
+        <h4>Exchange</h4>
         <h5>
             With fair rates powered by 
             <a id="modal-links" href="https://changenow.app.link/referral?link_id=8eac6c66bcf1a5" target="_blank" rel="noopener">
@@ -272,11 +326,13 @@
             You’re in the right place.
         </p>
 
-        <p>
-            This exchange lets you swap nearly <strong>1,000 different coins and tokens</strong>
-            for what actually matters: <strong>Bitcoin</strong>.
-            No accounts, no sign-ups, no KYC nonsense — just trade and move on.
-        </p>
+        <p>This embedded widget is operated by <strong>ChangeNOW</strong>, not satoshi.si. It supports crypto swaps and purchasing crypto with fiat through ChangeNOW and its payment partners. This site may receive an affiliate commission when the referral widget is used.</p>
+
+        <p><strong>KYC is possible and, in some regions, mandatory.</strong> ChangeNOW says all transactions are checked by automated risk controls. Its current terms require KYC for residents of the EU, US, Japan, South Korea, Singapore, Hong Kong, UAE, Australia and Canada. It may request identity documents and information about the source of funds, or pause an exchange during review.</p>
+
+        <p>Before paying or sending funds, confirm that you are eligible to use the service, review the final provider fees and rate, verify the asset and network, check the destination address, and save the exchange ID. Crypto deposit addresses are single-use.</p>
+
+        <p class="exchange-policy-links"><a href="https://changenow.io/terms-of-use/changenow-terms" target="_blank" rel="noopener noreferrer">Terms</a> · <a href="https://changenow.io/terms-of-use/aml-kyc" target="_blank" rel="noopener noreferrer">AML/KYC policy</a> · <a href="https://changenow.io/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a> · <a href="https://support.changenow.io/hc/en-us" target="_blank" rel="noopener noreferrer">Support</a></p>
 
         <p>
             Think of it as a recycling center for your crypto past.
@@ -468,36 +524,46 @@
       </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+(function monitorExchangeWidget() {
     const iframe = document.getElementById("iframe-widget");
     const loader = document.getElementById("widget-loader");
     const errorMsg = document.getElementById("widget-error");
+    const widgetSource = iframe.getAttribute("src");
 
-    let loaded = false;
-
-    // Widget loaded successfully
-    iframe.onload = function () {
-        loaded = true;
-        loader.style.display = "none"; // hide loader
-        console.log("Widget loaded successfully.");
+    window.retryExchangeWidget = function () {
+        window.exchangeWidgetLoaded = false;
+        window.clearTimeout(window.exchangeWidgetTimeout);
+        loader.style.display = "block";
+        errorMsg.style.display = "none";
+        const retryUrl = new URL(widgetSource);
+        retryUrl.searchParams.set("retry", Date.now().toString());
+        iframe.src = retryUrl.toString();
+        startTimeout();
     };
 
-    // Timeout for failure (10 seconds)
-    setTimeout(() => {
-        if (!loaded) {
-            loader.style.display = "none"; // hide loader
-            errorMsg.style.display = "block"; // show error
-            console.warn("Widget failed to load within timeout.");
-        }
-    }, 10000); // 10 seconds
-});
+    function startTimeout() {
+        window.exchangeWidgetTimeout = window.setTimeout(function () {
+            if (!window.exchangeWidgetLoaded) {
+                loader.style.display = "none";
+                errorMsg.style.display = "block";
+                console.warn("ChangeNOW widget is taking longer than expected.");
+            }
+        }, 20000);
+    }
+
+    if (window.exchangeWidgetLoaded) {
+        loader.style.display = "none";
+    } else {
+        startTimeout();
+    }
+})();
 
 
 document.addEventListener("DOMContentLoaded", async function () {
     const animatedTitle = document.getElementById("animated-title");
 
     // Fetch JSON file
-    const response = await fetch('exchangeShitcoins.json');
+    const response = await fetch('exchange.json');
     const data = await response.json();
 
     // Randomly pick one 3-line title set
