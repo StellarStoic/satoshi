@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Bitcoin Self-Custody and Nodes | Satoshi.si</title>
+  <title>Bitcoin Wallets, Self-Custody, Signing Devices and Nodes | Satoshi.si</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="siteEffects.css">
@@ -59,7 +59,65 @@
           <button type="button" data-goal="privacy">Focus on privacy</button>
         </div>
 
-        <h3 class="choice-heading"><i data-lucide="key-round"></i> Protect your signing key</h3>
+        <h3 class="choice-heading"><i data-lucide="wallet-cards"></i> Choose a wallet app</h3>
+        <p class="node-lead">A wallet app shows balances, creates transactions and broadcasts them. A phone or computer connected to the internet is convenient, but treat it as spending money unless an offline signing device protects the key.</p>
+        <div class="choice-grid wallet-grid">
+          <article class="choice-card wallet-card" data-goals="easy privacy">
+            <div class="choice-icon"><i data-lucide="smartphone"></i></div>
+            <p class="choice-type">Everyday on-chain · Bitcoin-only</p>
+            <h4>BlueWallet</h4>
+            <div class="platforms"><span>iOS</span><span>Android</span><span>macOS</span></div>
+            <p>A friendly starting point with watch-only wallets, coin control, multisig and PSBT support. It can connect to your own Bitcoin node when you are ready.</p>
+            <a href="https://bluewallet.io/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card wallet-card" data-goals="privacy build">
+            <div class="choice-icon"><i data-lucide="monitor"></i></div>
+            <p class="choice-type">Desktop coordinator · Bitcoin-only</p>
+            <h4>Sparrow Wallet</h4>
+            <div class="platforms"><span>Windows</span><span>macOS</span><span>Linux</span></div>
+            <p>Detailed transaction inspection, excellent coin control, multisig and broad signing-device support. Connect it directly to Bitcoin Core for stronger privacy.</p>
+            <a href="https://www.sparrowwallet.com/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card wallet-card" data-goals="privacy">
+            <div class="choice-icon"><i data-lucide="users-round"></i></div>
+            <p class="choice-type">Multisig and inheritance · Bitcoin-only</p>
+            <h4>Nunchuk</h4>
+            <div class="platforms"><span>iOS</span><span>Android</span><span>Desktop</span></div>
+            <p>A strong path into multi-device and collaborative multisig, with options for inheritance planning and support for common signing devices.</p>
+            <a href="https://nunchuk.io/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card wallet-card" data-goals="easy">
+            <div class="choice-icon"><i data-lucide="shuffle"></i></div>
+            <p class="choice-type">Bitcoin and Monero · multi-coin</p>
+            <h4>Cake Wallet</h4>
+            <div class="platforms"><span>iOS</span><span>Android</span><span>Desktop</span></div>
+            <p>An approachable open-source wallet with Bitcoin and Monero support. Convenient, but not Bitcoin-only and its built-in exchange adds more moving parts.</p>
+            <a href="https://cakewallet.com/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card wallet-card" data-goals="easy">
+            <div class="choice-icon"><i data-lucide="zap"></i></div>
+            <p class="choice-type">Everyday Lightning · self-custodial</p>
+            <h4>Phoenix</h4>
+            <div class="platforms"><span>iOS</span><span>Android</span></div>
+            <p>A streamlined self-custodial Lightning wallet. Channel management is mostly hidden, though Lightning liquidity and service fees still matter.</p>
+            <a href="https://phoenix.acinq.co/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card wallet-card" data-goals="build privacy">
+            <div class="choice-icon"><i data-lucide="radio-tower"></i></div>
+            <p class="choice-type">Advanced Lightning · node control</p>
+            <h4>ZEUS</h4>
+            <div class="platforms"><span>iOS</span><span>Android</span></div>
+            <p>Run an embedded Lightning node on the phone or remotely control your own LND or Core Lightning node. Powerful, with more responsibility.</p>
+            <a href="https://zeusln.com/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+        </div>
+
+        <h3 class="choice-heading signer-heading"><i data-lucide="key-round"></i> Protect your signing key</h3>
         <div class="choice-grid signer-grid">
           <article class="choice-card" data-goals="build privacy">
             <div class="choice-icon"><i data-lucide="scan-qr-code"></i></div>
@@ -68,6 +126,15 @@
             <p>Build it from commonly available parts. A Raspberry Pi Zero 1.3 without Wi-Fi or Bluetooth exchanges transaction data through QR codes. It is intentionally more hands-on and does not persist your seed by default.</p>
             <div class="tradeoff"><strong>Good for</strong><span>People who want transparent parts, QR signing and a project they can assemble themselves.</span></div>
             <a href="https://seedsigner.com/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="easy build">
+            <div class="choice-icon"><i data-lucide="smartphone-off"></i></div>
+            <p class="choice-type">Reuse an old phone · offline QR signer</p>
+            <h4>Cupcake</h4>
+            <p>Turn a wiped Android phone with no network connection into a QR signing companion for Cake Wallet. It is an accessible way to learn offline signing, but a general-purpose phone is not a dedicated security device.</p>
+            <div class="tradeoff"><strong>Good for</strong><span>Learning and modest balances. Use a dedicated signer or carefully designed multisig for serious savings.</span></div>
+            <a href="https://docs.cakewallet.com/cupcake/getting-started" target="_blank" rel="noopener noreferrer">Cupcake guide <i data-lucide="external-link"></i></a>
           </article>
 
           <article class="choice-card" data-goals="easy">
@@ -109,6 +176,13 @@
             <h4>RoninDojo</h4>
             <p>A Bitcoin node stack focused on wallet privacy. RoninOS offers a flashable plug-and-play installation as well as manual paths for users who want more control.</p>
             <a href="https://docs.ronindojo.io/" target="_blank" rel="noopener noreferrer">RoninDojo docs <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="build privacy">
+            <p class="choice-type">Full validation · built-in wallet</p>
+            <h4>Bitcoin Core</h4>
+            <p>The reference implementation validates the complete Bitcoin chain and includes its own wallet. It needs substantial storage, bandwidth and synchronization time; many users run Core as their node and use Sparrow as the interface.</p>
+            <a href="https://bitcoincore.org/en/download/" target="_blank" rel="noopener noreferrer">Bitcoin Core <i data-lucide="external-link"></i></a>
           </article>
         </div>
       </div>

@@ -43,6 +43,7 @@ def normalized_offer(**values):
         "price": number(values.get("price")), "fiat_min": number(values.get("fiat_min")),
         "fiat_max": number(values.get("fiat_max")), "sats_min": number(values.get("sats_min")),
         "sats_max": number(values.get("sats_max")), "premium": number(values.get("premium")),
+        "bond": number(values.get("bond")),
         "payment_methods": [str(item) for item in values.get("payment_methods", []) if item],
         "country": values.get("country"), "trader": values.get("trader"),
         "trades": number(values.get("trades")), "rating": number(values.get("rating")),
@@ -119,7 +120,8 @@ def collect_peach():
                         premium=offer_premium, payment_methods=methods,
                         trader=str(user.get("id") or "")[:10], trades=user.get("trades"),
                         rating=user.get("rating"), online=raw.get("online"),
-                        created_at=raw.get("publishingDate"), url=SOURCE_LINKS["peach"])
+                        created_at=raw.get("publishingDate"),
+                        url=f"https://web.peachbitcoin.com/#/market?type={'buy' if side == 'sell' else 'sell'}")
                     if offer:
                         result.append(offer)
             if not rows or not payload.get("remaining"):
@@ -214,6 +216,7 @@ def collect_nip69():
             fiat_min=fiat[0] if fiat else None, fiat_max=fiat[-1] if fiat else None,
             sats_min=sats[0] if sats else None, sats_max=sats[-1] if sats else None,
             premium=(tags.get("premium") or [None])[0], payment_methods=methods,
+            bond=(tags.get("bond") or [None])[0],
             trader=(tags.get("name") or [None])[0], layer=(tags.get("layer") or ["lightning"])[0],
             created_at=datetime.fromtimestamp(event["created_at"], timezone.utc).isoformat(),
             expires_at=datetime.fromtimestamp(expires, timezone.utc).isoformat() if expires else None,
@@ -267,7 +270,7 @@ def collect_robosats():
                     id=f"{coordinator}:{raw.get('id')}", source="robosats", side=str(side).lower(),
                     currency=currency,
                     price=price, fiat_min=fiat_min, fiat_max=fiat_max,
-                    sats_min=sats_min, sats_max=sats_max, premium=raw.get("premium"),
+                    sats_min=sats_min, sats_max=sats_max, premium=raw.get("premium"), bond=raw.get("bond_size"),
                     payment_methods=[raw.get("payment_method")], trader=raw.get("maker_nick") or coordinator,
                     layer="lightning", created_at=raw.get("created_at") or raw.get("created"),
                     url=SOURCE_LINKS["robosats"])
