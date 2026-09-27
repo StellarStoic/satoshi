@@ -82,11 +82,17 @@ def collect_hodlhodl():
 
 def collect_peach():
     result = []
+    request_options = {}
     for offer_type, side in (("ask", "sell"), ("bid", "buy")):
         for page in range(3):
             response = SESSION.post(
                 f"https://api.peachbitcoin.com/v1/offer/search?page={page}&size=100&sortBy=lowestPremium",
-                json={"type": offer_type}, timeout=35)
+                json={"type": offer_type}, timeout=35, **request_options)
+            if response.status_code == 451 and not request_options:
+                request_options = {"proxies": {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}}
+                response = SESSION.post(
+                    f"https://api.peachbitcoin.com/v1/offer/search?page={page}&size=100&sortBy=lowestPremium",
+                    json={"type": offer_type}, timeout=45, **request_options)
             response.raise_for_status()
             payload = response.json()
             rows = payload.get("offers", [])
@@ -126,30 +132,61 @@ def collect_nip69():
     import websocket
 
     events = {}
-    since = int(time.time()) - 2 * 24 * 60 * 60
-    for relay in ("wss://relay.mostro.network", "wss://relay.damus.io", "wss://nos.lol"):
+    since = int(time.time()) - 108_000
+    author_sources = {
+        "a47457722e10ba3a271fbe7040259a3c4da2cf53bfd1e198138214d235064fc2": "peach",
+        "fcc2a0bd8f5803f6dd8b201a1ddb67a4b6e268371fe7353d41d2b6684af7a61e": "lnp2pbot",
+        "82fa8cb978b43c79b2156585bac2c011176a21d2aead6d9f7c575c005be88390": "mostro",
+    }
+    relays = {"wss://relay.mostro.network", "wss://relay.damus.io", "wss://nos.lol"}
+    try:
+        registry = SESSION.get("https://raw.githubusercontent.com/RoboSats/robosats/main/frontend/static/federation.json", timeout=35).json()
+        for profile in registry.values():
+            clearnet = (profile.get("mainnet") or {}).get("clearnet")
+            if clearnet:
+                relays.add(clearnet.replace("https://", "wss://").replace("http://", "ws://").rstrip("/") + "/relay/")
+    except Exception as error:
+        print(f"RoboSats relay registry failed: {error}")
+
+    def fetch_relay(relay):
+        found = []
         try:
             ws = websocket.create_connection(relay, timeout=8, origin="https://satoshi.si")
             sub = f"satoshi-{int(time.time())}"
-            ws.send(json.dumps(["REQ", sub, {"kinds": [38383], "#s": ["pending"], "#z": ["order"], "since": since, "limit": 1000}]))
+            query = {"kinds": [38383], "since": since, "limit": 2000}
+            if relay.endswith("/relay/"):
+                query["authors"] = list(author_sources)
+            else:
+                query["#s"] = ["pending"]
+                query["#z"] = ["order"]
+            ws.send(json.dumps(["REQ", sub, query]))
             deadline = time.time() + 7
             while time.time() < deadline:
                 message = json.loads(ws.recv())
                 if message[0] == "EOSE":
                     break
                 if message[0] == "EVENT" and valid_nostr_event(message[2]):
-                    events[message[2]["id"]] = message[2]
+                    found.append(message[2])
             ws.close()
         except Exception as error:
             print(f"Nostr relay {relay} failed: {error}")
+        return found
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(fetch_relay, relay) for relay in relays]
+        for future in as_completed(futures):
+            for event in future.result():
+                events[event["id"]] = event
 
     result = []
     now = time.time()
     aliases = {"lnp2pbot": "lnp2pbot", "mostro": "mostro", "robosats": "robosats", "peach": "peach"}
     for event in events.values():
         tags = {tag[0]: tag[1:] for tag in event.get("tags", []) if len(tag) > 1}
-        source = aliases.get((tags.get("y") or [""])[0].lower().replace("@", ""))
+        source = author_sources.get(event.get("pubkey")) or aliases.get((tags.get("y") or [""])[0].lower().replace("@", ""))
         if not source:
+            continue
+        if (tags.get("s") or [None])[0] != "pending":
             continue
         expires = number((tags.get("expires_at") or tags.get("expiration") or [None])[0])
         if expires and expires < now:
