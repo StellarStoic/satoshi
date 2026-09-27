@@ -1,0 +1,42 @@
+name: Refresh P2P offers snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/offers.yml'
+      - 'tools/offers/**'
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p2p-offers-data
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python tools/offers/collect.py
+      - name: Publish data branch
+        run: |
+          mkdir /tmp/p2p-data
+          cp offers-data.json /tmp/p2p-data/offers-data.json
+          cd /tmp/p2p-data
+          git init
+          git checkout -b p2p-data
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offers-data.json
+          git commit -m 'data: refresh P2P offers'
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push --force origin p2p-data

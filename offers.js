@@ -194,6 +194,7 @@ let allOffers = []; // Store all loaded offers
 let currentOffset = 0;
 let isLoadingMore = false;
 let availablePaymentMethods = new Map(); // Use Map to avoid duplicates by ID
+let offersSnapshot = null;
 // Global variable to track if we've loaded initial payment methods
 let initialPaymentMethodsLoaded = false;
 
@@ -264,47 +265,71 @@ elements.amountFilter.addEventListener('input', function() {
 async function initializeApp() {
     try {
         console.log('Starting initialization...');
-        
-        // Clear payment method dropdown initially
-        elements.paymentMethodFilter.innerHTML = '<option value="">All Payment Methods</option>';
-        
-        // Load independent components. allSettled ensures if one fails, the others continue.
-        const results = await Promise.allSettled([
-            loadCurrencies(),
-            loadCountries(),
-            populatePaymentMethodDropdown()
-        ]);
-
-        // Log specific failures for debugging
-        results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-                const names = ['Currencies', 'Countries', 'PaymentMethods'];
-                console.warn(`${names[index]} failed to load:`, result.reason);
-            }
-        });
-        
-        // Try to get current BTC price separately
-        try {
-            await getCurrentBtcPrice();
-        } catch (priceError) {
-            console.warn('BTC price fetch failed, continuing without prices:', priceError.message);
-            elements.currentPrice.innerHTML = `
-                <div style="color: #e74c3c; text-align: center;">
-                    ⚠️ Current BTC price unavailable - offers will show without spread calculation
-                </div>
-            `;
-        }
-        
-        // Load the offers batch. This is the main content.
         await loadOffers(true);
-        
+
+        // Market-price enrichment must never delay the offers themselves.
+        getCurrentBtcPrice()
+            .then(() => displayOffers(allOffers, elements.sideFilter.value, elements.currencyFilter.value))
+            .catch(priceError => console.warn('BTC price fetch failed, continuing without spread data:', priceError.message));
     } catch (error) {
         console.error('Critical error during app initialization:', error);
-        // Only show the hard error if the main offers load fails completely
-        if (allOffers.length === 0) {
-            showError('Failed to load application data. Please refresh to try again.');
+        showError('P2P offers are temporarily unavailable. Please refresh to try again.');
+    }
+}
+
+async function loadOffersSnapshot() {
+    if (offersSnapshot) return offersSnapshot;
+
+    const remoteSnapshot = 'https://raw.githubusercontent.com/StellarStoic/satoshi/p2p-data/offers-data.json';
+    const sources = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+        ? ['offers-data.json', remoteSnapshot]
+        : [remoteSnapshot, 'offers-data.json'];
+    let lastError;
+
+    for (const source of sources) {
+        try {
+            const response = await fetch(source, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const snapshot = await response.json();
+            if (!Array.isArray(snapshot.offers) || snapshot.offers.length === 0) {
+                throw new Error('Snapshot contains no offers');
+            }
+            offersSnapshot = snapshot;
+            populateSnapshotFilters(snapshot);
+            return snapshot;
+        } catch (error) {
+            lastError = error;
+            console.warn(`P2P snapshot failed from ${source}:`, error.message);
         }
     }
+
+    throw lastError || new Error('No P2P snapshot is available');
+}
+
+function populateSnapshotFilters(snapshot) {
+    const selectedCurrency = elements.currencyFilter.value || CONFIG.DEFAULT_CURRENCY;
+    elements.currencyFilter.innerHTML = '<option value="">All Currencies</option>';
+    snapshot.currencies.forEach(code => {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = `${code} - ${getCurrencyName(code)}`;
+        option.selected = code === selectedCurrency;
+        elements.currencyFilter.appendChild(option);
+    });
+
+    const selectedCountry = elements.countryFilter.value;
+    elements.countryFilter.innerHTML = '<option value="">All Countries</option>';
+    snapshot.countries.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country.code;
+        option.textContent = `${country.name} (${country.code})`;
+        option.selected = country.code === selectedCountry;
+        elements.countryFilter.appendChild(option);
+    });
+
+    availablePaymentMethods.clear();
+    snapshot.payment_methods.forEach(method => availablePaymentMethods.set(String(method.id), method));
+    populatePaymentMethodDropdown();
 }
 
 // New function to fetch payment methods from API
@@ -685,70 +710,97 @@ function populatePaymentMethodDropdown() {
     console.log('=== END PAYMENT METHODS DEBUG ===');
 }
 
-// Get current BTC price from a free API
-// Get current BTC price from a free API
-async function getCurrentBtcPrice() {
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        // Split currencies into multiple requests to avoid rate limits
-        const currencyGroups = [
-            'usd,eur,gbp,cad,jpy,brl,rub,thb,aud,inr,zar,try,mxn,ngn,aed',
-            'cop,dop,kes,php,gel,sek,ars,idr,pln,uah,cny,chf,myr,pen,vnd', 
-            'bdt,clp,crc,czk,dkk,huf,ils,krw,kwd,lkr,nzd,pkr,ron,twd,sgd'
-        ];
-        
-        currentBtcPrice = {};
-        
-        console.log('🔄 Fetching BTC prices from CoinGecko...');
-        
-        // Fetch groups sequentially with delay and proper error handling
-        for (let i = 0; i < currencyGroups.length; i++) {
-            try {
-                console.log(`📡 Fetching currency group ${i + 1}/${currencyGroups.length}: ${currencyGroups[i]}`);
-                
-                const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencyGroups[i]}`);
-                
-                if (!response.ok) {
-                    console.warn(`❌ Group ${i + 1} failed: HTTP ${response.status}`);
-                    continue; // Skip this group but continue with others
-                }
-                
-                const data = await response.json();
-                if (data.bitcoin) {
-                    Object.keys(data.bitcoin).forEach(key => {
-                        currentBtcPrice[key.toUpperCase()] = data.bitcoin[key];
-                    });
-                    console.log(`✅ Group ${i + 1} successful: ${Object.keys(data.bitcoin).length} currencies`);
-                }
-                
-                // Add delay between requests (1 second)
-                if (i < currencyGroups.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-                
-            } catch (groupError) {
-                console.warn(`❌ Group ${i + 1} error:`, groupError.message);
-                // Continue with next group even if this one fails
-            }
-        }
-        
-        // Check if we got any data at all
-        const currenciesLoaded = Object.keys(currentBtcPrice).length;
-        console.log(`📊 BTC prices loaded for ${currenciesLoaded} currencies`);
-        
-        if (currenciesLoaded === 0) {
-            throw new Error('No BTC price data could be loaded from any currency group');
-        }
-        
-        updateCurrentPriceDisplay();
-        return currentBtcPrice;
-        
-    } catch (error) {
-        console.error('❌ Failed to fetch BTC prices:', error);
-        // Don't set fallback prices - just return empty object
-        currentBtcPrice = {};
-        updateCurrentPriceDisplay();
-        throw error; // Re-throw to handle in initializeApp
+        const response = await fetch(url, {
+            signal: controller.signal,
+            cache: 'no-store',
+            credentials: 'omit'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
     }
+}
+
+function readCachedMarketRates() {
+    try {
+        const rates = JSON.parse(localStorage.getItem('exchangeRatesCache'));
+        const btcTimestamp = Number(localStorage.getItem('btcCacheTimestamp'));
+        const btcUsd = rates?.BTC > 0 && Date.now() - btcTimestamp < 24 * 60 * 60 * 1000
+            ? 1 / rates.BTC
+            : null;
+        return {btcUsd, rates: rates || {}};
+    } catch {
+        return {btcUsd: null, rates: {}};
+    }
+}
+
+function getSintraBtcUsd(timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const socket = new WebSocket('wss://api.sintra.fi/ws');
+        const finish = (error, price) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            socket.close();
+            if (error) reject(error);
+            else resolve(price);
+        };
+        const timeout = setTimeout(() => finish(new Error('Sintra timed out')), timeoutMs);
+        socket.onmessage = event => {
+            try {
+                const message = JSON.parse(event.data);
+                const price = Number(message.data?.prices?.usd);
+                if (message.event === 'data' && price > 0) finish(null, price);
+            } catch {}
+        };
+        socket.onerror = () => finish(new Error('Sintra connection failed'));
+    });
+}
+
+// Build BTC prices from Sintra BTC/USD and Frankfurter fiat rates.
+async function getCurrentBtcPrice() {
+    const cached = readCachedMarketRates();
+    const [btcResult, fxResult] = await Promise.allSettled([
+        getSintraBtcUsd(),
+        fetchJsonWithTimeout('https://api.frankfurter.dev/v2/rates?base=USD')
+    ]);
+
+    let btcUsd = btcResult.status === 'fulfilled' ? Number(btcResult.value) : null;
+    if (!(btcUsd > 0)) btcUsd = cached.btcUsd;
+
+    if (!(btcUsd > 0)) {
+        try {
+            const fallback = await fetchJsonWithTimeout('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+            btcUsd = Number(fallback?.bitcoin?.usd);
+        } catch {}
+    }
+
+    if (!(btcUsd > 0)) throw new Error('BTC/USD price is temporarily unavailable');
+
+    const fiatRates = {USD: 1, ...cached.rates};
+    if (fxResult.status === 'fulfilled' && Array.isArray(fxResult.value)) {
+        fxResult.value.forEach(row => {
+            if (row.base === 'USD' && /^[A-Z]{3}$/.test(row.quote) && Number(row.rate) > 0) {
+                fiatRates[row.quote] = Number(row.rate);
+            }
+        });
+    }
+
+    currentBtcPrice = {USD: btcUsd};
+    Object.entries(fiatRates).forEach(([code, rate]) => {
+        if (/^[A-Z]{3}$/.test(code) && code !== 'BTC' && Number(rate) > 0) {
+            currentBtcPrice[code] = btcUsd * Number(rate);
+        }
+    });
+
+    updateCurrentPriceDisplay();
+    return currentBtcPrice;
 }
 
 function updateCurrentPriceDisplay() {
@@ -776,119 +828,49 @@ function updateCurrentPriceDisplay() {
         `;
     }
 }
-// Load offers from HodlHodl API with Proxy Fallback and all original filters
+// Load the GitHub-refreshed snapshot from same-origin data.
 async function loadOffers(isFirstLoad = false) {
-    // PRESERVE: Original UI State Management
-    if (isFirstLoad) {
-        showLoading();
-        hideError();
-        allOffers = [];
-        currentOffset = 0;
-        availablePaymentMethods.clear(); 
-    } else {
-        isLoadingMore = true;
-        const btn = document.getElementById('loadMoreBtn');
-        if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
-    }
+    showLoading();
+    hideError();
 
     try {
-        // PRESERVE: Original Filter Extractions
+        // Manual and timed refreshes request the newest published snapshot.
+        if (!isFirstLoad) offersSnapshot = null;
+        const snapshot = await loadOffersSnapshot();
         const side = elements.sideFilter.value;
         const currency = elements.currencyFilter.value;
         const country = elements.countryFilter.value;
         const paymentMethod = elements.paymentMethodFilter.value;
-        const amount = elements.amountFilter.value;
-        
+        const amount = parseFloat(elements.amountFilter.value);
+
         updateCurrentPriceDisplay();
+        allOffers = snapshot.offers.filter(offer => {
+            if (offer.side !== side) return false;
+            if (currency && offer.currency_code !== currency) return false;
+            if (country && offer.country_code !== country) return false;
 
-        // PRESERVE: Your exact API URL construction
-        let apiUrl = `https://hodlhodl.com/api/v1/offers?filters[asset_code]=BTC&filters[side]=${side}&pagination[limit]=${CONFIG.OFFERS_LIMIT}&pagination[offset]=${currentOffset}`;
-        
-        if (currency) apiUrl += `&filters[currency_code]=${currency}`;
-        
-        if (country) {
-            apiUrl += `&filters[country]=${encodeURIComponent(country)}`;
-        } else {
-            apiUrl += '&filters[include_global]=true';
-        }
-        
-        if (paymentMethod) apiUrl += `&filters[payment_method_id]=${paymentMethod}`;
+            const methods = offer.payment_method_instructions || offer.payment_methods || [];
+            if (paymentMethod && !methods.some(method =>
+                String(method.payment_method_id || method.id) === paymentMethod
+            )) return false;
 
-        if (amount && !isNaN(amount) && parseFloat(amount) > 0) {
-            apiUrl += `&filters[amount]=${encodeURIComponent(amount)}`;
-        }
-
-        // NEW: Proxy Rotation Loop
-        let success = false;
-        let lastError = null;
-
-        for (let i = 0; i < CONFIG.PROXIES.length; i++) {
-            try {
-                const proxyUrl = getProxiedUrl(apiUrl);
-                console.log(`Attempt ${i + 1}: Fetching via ${proxyUrl}`);
-
-                // ADD THIS: 5-second timeout for each proxy attempt
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-
-                const response = await fetch(proxyUrl, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!response.ok) throw new Error(`Status ${response.status}`);
-                
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    // PRESERVE: All data processing logic
-                    allOffers = allOffers.concat(data.offers);
-                    currentOffset += data.offers.length;
-                    
-                    extractPaymentMethodsFromOffers(allOffers);
-                    
-                    if (isFirstLoad || data.offers.length > 0) {
-                        populatePaymentMethodDropdown();
-                    }
-                    
-                    displayOffers(allOffers, side, currency);
-                    toggleLoadMoreButton(data.offers.length);
-                    
-                    success = true;
-                    break; // SUCCESS: Exit the proxy loop
-                } else {
-                    throw new Error('API returned error status');
-                }
-            } catch (error) {
-                console.warn(`Proxy ${i} failed:`, error.message);
-                lastError = error;
-                switchToNextProxy(); // Move pointer to next proxy for future calls
+            if (!Number.isNaN(amount) && amount > 0) {
+                const minimum = parseFloat(offer.min_amount);
+                const maximum = parseFloat(offer.max_amount);
+                if ((!Number.isNaN(minimum) && amount < minimum) ||
+                    (!Number.isNaN(maximum) && amount > maximum)) return false;
             }
-        }
+            return true;
+        });
 
-        if (!success) throw lastError || new Error('All proxies failed');
-
+        displayOffers(allOffers, side, currency);
+        toggleLoadMoreButton(0);
     } catch (error) {
-        // PRESERVE: Original Error Handling
         console.error('Error loading offers:', error);
-        if (isFirstLoad) {
-            showError('Failed to load offers. Error: ' + error.message);
-        }
+        showError('P2P offers are temporarily unavailable. Please refresh to try again.');
     } finally {
-        // PRESERVE: Original Cleanup
-        if (isFirstLoad) {
-            hideLoading();
-        } else {
-            isLoadingMore = false;
-            const btn = document.getElementById('loadMoreBtn');
-            if (btn) {
-                btn.textContent = 'Load More Offers';
-                btn.disabled = false;
-            }
-        }
+        hideLoading();
+        isLoadingMore = false;
     }
 }
 
@@ -932,7 +914,6 @@ function displayOffers(offers, side, currency) {
             } else {
                 // No market price available for this currency
                 spreadMessage = `No rates for ${offerCurrency}`;
-                console.warn(`❌ No market price available for ${offerCurrency}`);
             }
             
             return {

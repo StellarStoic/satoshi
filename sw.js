@@ -1,9 +1,10 @@
-const CACHE = 'satoshi-static-v54';
+const CACHE = 'satoshi-static-v55';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/seo.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
     '/settings.html', '/settings.css', '/settings.js',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
+    '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js',
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
@@ -36,8 +37,9 @@ self.addEventListener('fetch', event => {
     const asset = ['style', 'script', 'worker', 'image', 'font'].includes(request.destination);
     const livingData = url.pathname === '/historical_data/generated/living-EU-observed.json';
     const newsData = url.pathname === '/news-data.json';
+    const offersData = url.pathname === '/offers-data.json';
     const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
-    if ((!navigation && !asset && !livingData && !newsData && !scannerAsset) || url.search) return;
+    if ((!navigation && !asset && !livingData && !newsData && !offersData && !scannerAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         // Versioned, self-hosted OCR assets are large and immutable within a release.
