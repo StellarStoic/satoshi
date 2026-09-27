@@ -36,7 +36,7 @@ body::before {
     50% { transform: translate(79px, -37px); }
     75% { transform: translate(-91px, -73px); }
 }
-body:has(.footer) { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+body:has(.footer) { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 img, video { max-width: 100%; height: auto; }
 /* Match these widgets' default color scheme so their canvases stay transparent. */
 iframe[src^="https://playtdt.com/widget/"],
@@ -56,11 +56,11 @@ p, h1, h2, h3, h4, a, code { overflow-wrap: anywhere; }
     grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
     align-items: center;
     gap: 4px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    padding: 4px 10px calc(4px + env(safe-area-inset-bottom));
 }
 .footer > a { grid-column: 2; grid-row: 1; margin: 0; }
 .footer > i.lni.lni-bolt-2 { grid-column: 3; grid-row: 1; margin: 0; }
-.footer > .site-footer-bolt { grid-column: 3; grid-row: 1; justify-self: center; margin: 0; color: #f2a900; font-size: 23px; line-height: 1; text-decoration: none; }
+.footer > .site-footer-bolt { grid-column: 3; grid-row: 1; justify-self: center; margin: 0; color: #f2a900; font-size: 18px; line-height: 1; text-decoration: none; }
 .footer #fee-rate, .footer #block-height {
     position: static;
     grid-row: 1;
