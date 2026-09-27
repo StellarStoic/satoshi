@@ -3,10 +3,12 @@ import {deduplicateNews, filterNews, parseKeywords} from './newsModel.mjs';
 const SETTINGS_KEY = 'bitcoinNewsSettings';
 const PAGE_SIZE = 24;
 const SOURCE_CATALOG_VERSION = 1;
+const NOSTRRECAP_NPUB = 'npub1etjm06353tl0cnqs9wmmzfwyj283z3ee5facwlrte7l957fgqwzqsznr68';
+const KNOWN_NOSTR_NAMES = new Map([[NOSTRRECAP_NPUB, 'nostrrecap']]);
 const BUILTIN_NOSTR_SOURCES = [{
   id: 'nostr-nostrrecap',
   type: 'nostr',
-  value: 'npub1etjm06353tl0cnqs9wmmzfwyj283z3ee5facwlrte7l957fgqwzqsznr68',
+  value: NOSTRRECAP_NPUB,
   label: 'nostrrecap',
   status: 'client',
   clientNostr: true,
@@ -40,7 +42,7 @@ function loadSettings() {
       enabledSources,
       required: String(saved?.required || ''),
       blocked: String(saved?.blocked || ''),
-      customSources: Array.isArray(saved?.customSources) ? saved.customSources : [],
+      customSources: Array.isArray(saved?.customSources) ? saved.customSources.map(normalizeNostrSource) : [],
       sourceCatalogVersion: SOURCE_CATALOG_VERSION,
     };
   } catch {
@@ -273,15 +275,30 @@ async function resolveNostrIdentity(value) {
 }
 
 function shortenNpub(value) {
-  return value && value.length > 14 ? `${value.slice(0, 7)}...${value.slice(-3)}` : value;
+  return value && value.length > 15 ? `${value.slice(0, 7)}...${value.slice(-4)}` : value;
+}
+
+function sourceNpub(source) {
+  if (source.npub?.toLowerCase().startsWith('npub1')) return source.npub.toLowerCase();
+  if (source.value?.toLowerCase().startsWith('npub1')) return source.value.toLowerCase();
+  return '';
+}
+
+function normalizeNostrSource(source) {
+  if (source?.type !== 'nostr') return source;
+  const npub = sourceNpub(source);
+  const knownName = KNOWN_NOSTR_NAMES.get(npub);
+  return {...source, ...(npub ? {npub} : {}), ...(knownName ? {profileName: knownName, label: knownName} : {})};
 }
 
 function nostrSourceName(source) {
-  return source.profileName || source.nip05 || shortenNpub(source.npub || source.value) || 'Nostr';
+  const npub = sourceNpub(source);
+  return source.profileName || KNOWN_NOSTR_NAMES.get(npub) || source.nip05 || shortenNpub(npub) || 'Nostr';
 }
 
 function nostrSettingsLabel(source) {
-  const identifier = source.npub ? shortenNpub(source.npub) : (source.nip05 || source.value);
+  const npub = sourceNpub(source);
+  const identifier = npub ? shortenNpub(npub) : (source.nip05 || source.value);
   const name = nostrSourceName(source);
   return identifier && name !== identifier ? `${name} (${identifier})` : name;
 }
@@ -321,7 +338,7 @@ async function enrichNostrSource(source) {
   const event = events.filter(Boolean).sort((a, b) => b.created_at - a.created_at)[0];
   let profile = {};
   try { profile = JSON.parse(event?.content || '{}'); } catch {}
-  const profileName = String(profile.display_name || profile.displayName || profile.name || '').trim();
+  const profileName = String(profile.display_name || profile.displayName || profile.name || KNOWN_NOSTR_NAMES.get(identity.npub) || '').trim();
   const nip05 = String(profile.nip05 || identity.nip05 || '').trim();
   return {...source, pubkey: identity.pubkey, npub: identity.npub || source.npub, nip05, profileName, profileResolvedAt: Date.now(), label: profileName || nip05 || shortenNpub(identity.npub || source.value)};
 }
