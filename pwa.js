@@ -22,6 +22,7 @@ const MENU_ITEMS = [
     {label: 'Home', href: '/index.html'},
     {label: 'Knowledge', children: [
         {label: 'Bitcoin whitepaper', href: '/whitepaper.html'},
+        {label: 'Self-custody', href: '/selfCustody.html'},
         {label: 'Words of Satoshi', href: '/quotes.html'},
         {label: 'Is BIP39 word?', href: '/isBip39.html'},
     ]},

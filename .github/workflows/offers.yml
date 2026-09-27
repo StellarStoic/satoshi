@@ -20,12 +20,18 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install Tor and collector dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes tor
+          sudo systemctl start tor
+          python -m pip install --requirement tools/offers/requirements.txt
       - run: python tools/offers/collect.py
       - name: Publish data branch
         run: |

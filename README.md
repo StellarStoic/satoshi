@@ -12,6 +12,7 @@
 | --- | --- |
 | [Words of Satoshi](https://satoshi.si/quotes.html) | Shuffled quotes, click-to-copy, two-minute rotation, and a subtle desktop control for the next quote. |
 | [Bitcoin whitepaper](https://satoshi.si/whitepaper.html) | A collection of translations, with contributions welcome to make Bitcoin knowledge accessible in more languages. |
+| [Self-custody](https://satoshi.si/selfCustody.html) | A newcomer-friendly explanation of signing devices and full nodes, with SeedSigner, BitBox, Start9 and open-source DIY node paths. |
 | [BIP39 word checker](https://satoshi.si/isBip39.html) | Type one word and explore similar words from any of the ten official BIP39 language lists. Validation and suggestions run locally and work offline. |
 | [History chart](https://satoshi.si/chart.html) | Explore currencies and other assets priced in sats, with time ranges, linear/logarithmic scales, historical events, snapshots, and CSV/JSON exports. |
 | [Moscow Time](https://satoshi.si/MoscowTime.html) | A sats-per-dollar view of Bitcoin's price. |

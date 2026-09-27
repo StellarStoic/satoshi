@@ -26,7 +26,8 @@
     <meta name="theme-color" content="#101112">
 
     
-    <title>Buy Bitcoin P2P</title>
+    <meta name="description" content="Compare public Bitcoin P2P buy and sell offers from Hodl Hodl, Peach, RoboSats, Mostro, LNP2PBot, and Bisq.">
+    <title>Bitcoin P2P Order Book | satoshi.si</title>
     <link rel="stylesheet" href="theme.css">
     <script src="pwa.js" defer></script>
     <link rel="stylesheet" href="siteEffects.css">
@@ -116,98 +117,48 @@
     </div>
 <!-- -----------------------------BITCOIN OFFERS STUFF----------------------------------------- -->
 
-    <div class="container">
-        <header>
-            <h1>P2P Bitcoin Market Mirror</h1>
-            <h5>View the Latest Bitcoin Buy & Sell Offers From Ordinary People Around The World</h5>
+    <main class="orderbook-shell">
+        <header class="orderbook-header">
+            <div>
+                <p class="eyebrow">Open Bitcoin markets</p>
+                <h1>P2P order book</h1>
+                <p>Compare public offers across independent markets. Trades happen on the original platform.</p>
+            </div>
+            <div class="snapshot-meta">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span id="snapshotTime">Loading market snapshot</span>
+                <button id="refreshBtn" class="icon-button" type="button" title="Refresh offers" aria-label="Refresh offers">
+                    <i class="lni lni-refresh-circle-1-clockwise" aria-hidden="true"></i>
+                </button>
+            </div>
         </header>
 
-        <div class="current-price" id="currentPrice">
-            <!-- Current BTC price will be displayed here -->
-        </div>
+        <section class="market-stats" aria-label="Order book summary">
+            <div><span id="offerTotal">--</span><small>offers</small></div>
+            <div><span id="marketTotal">--</span><small>markets</small></div>
+            <div><span id="currencyTotal">--</span><small>currencies</small></div>
+            <div id="currentPrice"><span>--</span><small>BTC / USD</small></div>
+        </section>
 
-        <div class="controls">
-            <div class="filter-group">
-                <label for="sideFilter">I want to:</label>
-                <select id="sideFilter">
-                    <option value="sell">BUY Bitcoin</option>
-                    <option value="buy">SELL Bitcoin</option>
-                </select>
+        <section class="orderbook-controls" aria-label="Filter offers">
+            <div class="side-switch" role="group" aria-label="Trade direction">
+                <button type="button" data-side="sell" class="active">Buy BTC</button>
+                <button type="button" data-side="buy">Sell BTC</button>
             </div>
-            <div class="filter-group">
-                <label for="currencyFilter">Currency:</label>
-                <select id="currencyFilter">
-                    <option value="">Loading currencies...</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="countryFilter">Country:</label>
-                <select id="countryFilter">
-                    <option value="">All Countries</option>
-                    <!-- Countries will be populated from API -->
-                </select>
-            </div>
-            <div class="filter-group" title="Payment methods listed in the menu are all methods available across all current offers">
-                <label for="paymentMethodFilter">Payment Method:</label>
-                <select id="paymentMethodFilter">
-                    <option value="">All Methods</option>
-                    <!-- Will be populated from offersPaymentMethods.json -->
-                </select>
-            </div>
-            <div class="filter-group">
-                <label for="amountFilter">Amount:</label>
-                <input type="number" id="amountFilter" placeholder="Filter by  amount" min="0" step="10">
-            </div>
-            <div class="filter-group">
-                <label for="refreshCountdown">
-                    Auto Refresh: 
-                    <span id="refreshCountdown" class="refresh-countdown">5:30</span>
-                </label>
-                <button id="refreshBtn">Refresh Offers</button>
-            </div>
-        </div>
+            <label><span>Currency</span><select id="currencyFilter"><option value="">All currencies</option></select></label>
+            <label><span>Market</span><select id="sourceFilter"><option value="">All markets</option></select></label>
+            <label><span>Payment</span><select id="paymentMethodFilter"><option value="">All methods</option></select></label>
+            <label><span>Fiat amount</span><input type="number" id="amountFilter" min="0" inputmode="decimal" placeholder="Any amount"></label>
+            <label><span>Sort</span><select id="sortFilter"><option value="price">Best price</option><option value="premium">Lowest premium</option><option value="recent">Newest</option></select></label>
+        </section>
 
-        <div class="loading" id="loading">
-            Loading offers...
-        </div>
-
-        <div class="error" id="error" style="display: none;">
-            Error loading offers. Please try again.
-        </div>
-
-        <div class="offers-container" id="offersContainer">
-            <!-- Offers will be populated by JavaScript -->
-        </div>
-
-        <button id="loadMoreBtn" class="load-more-btn" style="display: none;">
-            Load More Offers
-        </button>
-
-    </div>
-
-    <!-- HodlHodl Signup Modal -->
-    <div id="signupModal" class="hodlhodl-modal" style="display: none;">
-        <div class="hodlhodl-modal-content">
-            <div class="modal-header">
-                <h2>Start Trading P2P on HodlHodl</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <p>To start trading person-to-person (P2P) Bitcoin, you need to sign up or log in to HodlHodl website.</p>
-                <p>HodlHodl is a non-custodial P2P exchange where you trade directly with other people.</p>
-                <div class="modal-features">
-                    <div class="feature">✓ Non-custodial (you control your funds)</div>
-                    <div class="feature">✓ No KYC required</div>
-                    <div class="feature">✓ Global community</div>
-                    <div class="feature">✓ Multiple payment methods</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="visitHodlHodlBtn" class="visit-btn">Visit HodlHodl & Sign Up</button>
-                <button id="skipBtn" class="skip-btn">Skip for now</button>
-            </div>
-        </div>
-    </div>
+        <div class="source-health" id="sourceHealth" aria-label="Market data status"></div>
+        <div class="loading" id="loading">Gathering public offers...</div>
+        <div class="error" id="error" hidden></div>
+        <section class="offers-container" id="offersContainer" aria-live="polite"></section>
+        <button id="loadMoreBtn" class="load-more-btn" type="button" hidden>Show more offers</button>
+        <p class="affiliate-note">Hodl Hodl and Peach links are affiliate links. Other market links are not sponsored.</p>
+    </main>
 
 <!-- Contact modal -->
 <div id="contactModal" class="contact-modal-wrapper">

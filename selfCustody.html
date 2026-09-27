@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Bitcoin Self-Custody and Nodes | Satoshi.si</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="siteEffects.css">
+  <link rel="stylesheet" href="selfCustody.css">
+  <link rel="icon" href="favicon.ico">
+  <script src="pwa.js" defer></script>
+  <script src="siteEffects.js" defer></script>
+  <script src="/vendor/lucide/lucide.min.js" defer></script>
+  <script src="selfCustody.js" defer></script>
+</head>
+<body>
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main>
+    <section class="custody-intro" aria-labelledby="page-title">
+      <div class="intro-copy">
+        <p class="eyebrow">Bitcoin self-custody</p>
+        <h1 id="page-title">Hold the keys.<br><span>Verify the rules.</span></h1>
+        <p class="lead">A signing device protects the key that authorizes a payment. A node checks that the payment follows Bitcoin's rules. They solve different problems, and they work well together.</p>
+      </div>
+      <div class="key-flow" aria-label="How a Bitcoin payment is signed and verified">
+        <div><i data-lucide="wallet-cards"></i><strong>Wallet app</strong><span>Builds a payment</span></div>
+        <i class="flow-arrow" data-lucide="arrow-right"></i>
+        <div class="flow-focus"><i data-lucide="key-round"></i><strong>Signing device</strong><span>Approves with your key</span></div>
+        <i class="flow-arrow" data-lucide="arrow-right"></i>
+        <div><i data-lucide="server"></i><strong>Your node</strong><span>Checks Bitcoin's rules</span></div>
+      </div>
+    </section>
+
+    <section class="plain-explainer" aria-labelledby="wallet-explainer">
+      <div class="section-inner split-copy">
+        <div>
+          <p class="section-number">01</p>
+          <h2 id="wallet-explainer">The wallet does not contain bitcoin</h2>
+        </div>
+        <div class="explanation">
+          <p>Your bitcoin is recorded on Bitcoin's public ledger. A hardware wallet or signing device holds a <strong>private signing key</strong>. That key creates the proof needed to move your bitcoin to another address.</p>
+          <p>Think of the device as a pen that can produce a signature nobody else can copy. The wallet app prepares the form; the device lets you inspect and sign it.</p>
+          <p>If the device breaks, your bitcoin is not trapped inside it. A correct recovery backup can rebuild the same keys on a compatible device. Anyone who finds that backup can do the same, so keep it offline and private.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="choices" aria-labelledby="choose-path">
+      <div class="section-inner">
+        <p class="section-number">02</p>
+        <h2 id="choose-path">Choose how hands-on you want to be</h2>
+        <div class="goal-picker" role="group" aria-label="Highlight choices by goal">
+          <button type="button" class="active" data-goal="all">Show all</button>
+          <button type="button" data-goal="easy">Keep it simple</button>
+          <button type="button" data-goal="build">Build it myself</button>
+          <button type="button" data-goal="privacy">Focus on privacy</button>
+        </div>
+
+        <h3 class="choice-heading"><i data-lucide="key-round"></i> Protect your signing key</h3>
+        <div class="choice-grid signer-grid">
+          <article class="choice-card" data-goals="build privacy">
+            <div class="choice-icon"><i data-lucide="scan-qr-code"></i></div>
+            <p class="choice-type">DIY · air-gapped · stateless</p>
+            <h4>SeedSigner</h4>
+            <p>Build it from commonly available parts. A Raspberry Pi Zero 1.3 without Wi-Fi or Bluetooth exchanges transaction data through QR codes. It is intentionally more hands-on and does not persist your seed by default.</p>
+            <div class="tradeoff"><strong>Good for</strong><span>People who want transparent parts, QR signing and a project they can assemble themselves.</span></div>
+            <a href="https://seedsigner.com/" target="_blank" rel="noopener noreferrer">Official project <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="easy">
+            <div class="choice-icon"><i data-lucide="usb"></i></div>
+            <p class="choice-type">Ready-made · Bitcoin-only option</p>
+            <h4>BitBox</h4>
+            <p>The Bitcoin-only BitBox is designed for a smoother first setup. Its open-source firmware uses reproducible builds, while a separate secure chip hardens access to the signing key.</p>
+            <div class="tradeoff"><strong>Good for</strong><span>People who prefer a compact finished product with guided software and straightforward backups.</span></div>
+            <a href="https://bitbox.swiss/bitbox02/" target="_blank" rel="noopener noreferrer">Official product <i data-lucide="external-link"></i></a>
+          </article>
+        </div>
+
+        <h3 class="choice-heading node-heading"><i data-lucide="network"></i> Verify Bitcoin with your own node</h3>
+        <p class="node-lead">A node downloads and checks Bitcoin's history and new transactions. Connecting your wallet to it means you ask your own computer about balances and payments instead of trusting somebody else's server.</p>
+        <div class="choice-grid node-grid">
+          <article class="choice-card" data-goals="easy privacy">
+            <p class="choice-type">Plug-and-play or DIY · personal server</p>
+            <h4>Start9</h4>
+            <p>StartOS provides a graphical personal server for Bitcoin Core, Lightning and other self-hosted services. Buy supported hardware or install the open-source system yourself.</p>
+            <a href="https://docs.start9.com/" target="_blank" rel="noopener noreferrer">Start9 docs <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="build">
+            <p class="choice-type">Guided DIY · Bitcoin and Lightning</p>
+            <h4>RaspiBlitz</h4>
+            <p>An MIT-licensed project with ready-to-flash images for Raspberry Pi hardware. It combines a full Bitcoin node, optional Lightning and a dashboard without hiding the machinery.</p>
+            <a href="https://docs.raspiblitz.org/" target="_blank" rel="noopener noreferrer">RaspiBlitz docs <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="build">
+            <p class="choice-type">Manual DIY · maximum learning</p>
+            <h4>RaspiBolt</h4>
+            <p>A detailed build-it-yourself guide rather than an appliance. You install and configure the node layer by layer, which takes longer but teaches you what each component does.</p>
+            <a href="https://raspibolt.org/" target="_blank" rel="noopener noreferrer">RaspiBolt guide <i data-lucide="external-link"></i></a>
+          </article>
+
+          <article class="choice-card" data-goals="privacy build">
+            <p class="choice-type">Privacy-focused · plug-and-play path</p>
+            <h4>RoninDojo</h4>
+            <p>A Bitcoin node stack focused on wallet privacy. RoninOS offers a flashable plug-and-play installation as well as manual paths for users who want more control.</p>
+            <a href="https://docs.ronindojo.io/" target="_blank" rel="noopener noreferrer">RoninDojo docs <i data-lucide="external-link"></i></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="safety" aria-labelledby="before-start">
+      <div class="section-inner safety-layout">
+        <div><p class="section-number">03</p><h2 id="before-start">Before moving meaningful bitcoin</h2></div>
+        <ol>
+          <li><strong>Use official sources.</strong> Verify downloads and never buy a device that arrives already initialized.</li>
+          <li><strong>Keep recovery words offline.</strong> Never type them into this website, a chat, cloud storage or a general-purpose computer.</li>
+          <li><strong>Verify on the device.</strong> Check the destination address and amount on the signer's own screen.</li>
+          <li><strong>Practice recovery.</strong> Learn with a small amount and test the backup before depending on it.</li>
+          <li><strong>Remember the boundary.</strong> A node verifies rules; it does not replace secure key storage.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <script src="burgerMenu.js"></script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://satoshi.si/</loc></url>
   <url><loc>https://satoshi.si/whitepaper.html</loc></url>
+  <url><loc>https://satoshi.si/selfCustody.html</loc></url>
   <url><loc>https://satoshi.si/quotes.html</loc></url>
   <url><loc>https://satoshi.si/isBip39.html</loc></url>
   <url><loc>https://satoshi.si/converter.html</loc></url>
