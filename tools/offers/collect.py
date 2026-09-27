@@ -21,7 +21,7 @@ SESSION.headers.update({"Accept": "application/json", "User-Agent": "satoshi.si 
 SOURCE_LINKS = {
     "hodlhodl": "https://hodlhodl.com/join/L4HT",
     "peach": "https://peachbitcoin.com/referral?code=PRC876",
-    "robosats": "https://robosats.com/offers",
+    "robosats": "http://robosatsy56bwqn56qyadmcxkx767hnabg4mihxlmgyt6if5gnuxvzad.onion/offers",
     "mostro": "https://mostro.network/",
     "lnp2pbot": "https://t.me/lnp2pbot",
     "bisq": "https://bisq.network/",
@@ -83,6 +83,12 @@ def collect_hodlhodl():
 def collect_peach():
     result = []
     request_options = {}
+    market_response = SESSION.get("https://api.peachbitcoin.com/v1/market/prices", timeout=35)
+    if market_response.status_code == 451:
+        request_options = {"proxies": {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"}}
+        market_response = SESSION.get("https://api.peachbitcoin.com/v1/market/prices", timeout=45, **request_options)
+    market_response.raise_for_status()
+    market_prices = market_response.json()
     for offer_type, side in (("ask", "sell"), ("bid", "buy")):
         for page in range(3):
             response = SESSION.post(
@@ -103,11 +109,14 @@ def collect_peach():
                 prices = raw.get("prices") or {}
                 for currency, methods in (raw.get("meansOfPayment") or {}).items():
                     fiat = number(prices.get(currency))
-                    price = fiat * 100_000_000 / number(sats_min) if fiat and number(sats_min) else None
+                    price = fiat * 100_000_000 / number(sats_min) if fiat and number(sats_min) else number(market_prices.get(currency))
+                    fiat_min = fiat if fiat is not None else price * number(sats_min) / 100_000_000 if price and number(sats_min) else None
+                    fiat_max = fiat if fiat is not None else price * number(sats_max) / 100_000_000 if price and number(sats_max) else None
+                    offer_premium = raw.get("premium") if raw.get("premium") is not None else raw.get("maxPremium")
                     offer = normalized_offer(
                         id=f"{raw.get('id')}:{currency}", source="peach", side=side, currency=currency,
-                        price=price, fiat_min=fiat, fiat_max=fiat, sats_min=sats_min, sats_max=sats_max,
-                        premium=raw.get("premium") or raw.get("maxPremium"), payment_methods=methods,
+                        price=price, fiat_min=fiat_min, fiat_max=fiat_max, sats_min=sats_min, sats_max=sats_max,
+                        premium=offer_premium, payment_methods=methods,
                         trader=str(user.get("id") or "")[:10], trades=user.get("trades"),
                         rating=user.get("rating"), online=raw.get("online"),
                         created_at=raw.get("publishingDate"), url=SOURCE_LINKS["peach"])
@@ -212,6 +221,8 @@ def collect_nip69():
             # private robot/session and render empty for an untouched offer.
             url=SOURCE_LINKS[source] if source == "robosats" else (tags.get("source") or [SOURCE_LINKS[source]])[0])
         if offer:
+            if offer["source"] == "robosats" and offer["currency"] == "BTC":
+                continue
             result.append(offer)
     return result
 
@@ -243,13 +254,20 @@ def collect_robosats():
                     side = "buy" if side == 0 else "sell"
                 currency = raw.get("currency") or raw.get("currency_code") or raw.get("currency_symbol")
                 currency = currency_map.get(str(currency), currency)
+                if currency == "BTC":
+                    continue
+                has_range = bool(raw.get("has_range"))
+                fiat_min = raw.get("min_amount") if has_range else raw.get("amount")
+                fiat_max = raw.get("max_amount") if has_range else raw.get("amount")
+                price = number(raw.get("price"))
+                fixed_sats = raw.get("satoshis_now") or raw.get("satoshis")
+                sats_min = number(fiat_min) * 100_000_000 / price if has_range and number(fiat_min) and price else fixed_sats
+                sats_max = number(fiat_max) * 100_000_000 / price if has_range and number(fiat_max) and price else fixed_sats
                 offer = normalized_offer(
                     id=f"{coordinator}:{raw.get('id')}", source="robosats", side=str(side).lower(),
                     currency=currency,
-                    price=raw.get("price"), fiat_min=raw.get("min_amount") or raw.get("fiat_min"),
-                    fiat_max=raw.get("max_amount") or raw.get("fiat_max") or raw.get("amount"),
-                    sats_min=raw.get("min_satoshis") or raw.get("sats_min"),
-                    sats_max=raw.get("max_satoshis") or raw.get("satoshis"), premium=raw.get("premium"),
+                    price=price, fiat_min=fiat_min, fiat_max=fiat_max,
+                    sats_min=sats_min, sats_max=sats_max, premium=raw.get("premium"),
                     payment_methods=[raw.get("payment_method")], trader=raw.get("maker_nick") or coordinator,
                     layer="lightning", created_at=raw.get("created_at") or raw.get("created"),
                     url=SOURCE_LINKS["robosats"])
