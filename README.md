@@ -21,6 +21,7 @@
 | [Memed Bitcoin Mood](https://satoshi.si/memedBitcoinMood.html) | Market moods and memes across daily, weekly, monthly, and yearly timeframes, with fallback data providers. |
 | [Game39](https://satoshi.si/game39single.html) | BIP39 word games, with a separate [multiplayer mode](https://satoshi.si/game39.html). |
 | [GhostQR](https://satoshi.si/ghostQR.html) | An experimental tool for creating printable, layered QR codes. |
+| [Entropy Lab](https://satoshi.si/entropy.html) | Compare secure randomness with coin flips, dice, typed patterns, images, pointer movement and sound; captured media stays on-device and is discarded after fingerprinting. |
 | [Lightning lottery](https://satoshi.si/lottery.html) | An embedded lottery, alongside [statistics](https://satoshi.si/lotteryStats.html), a [ticket verifier](https://satoshi.si/ticketVerifier.html), and [terms](https://satoshi.si/lotteryTOS.html). |
 | [Exchange](https://satoshi.si/exchange.html) | A third-party ChangeNOW widget for crypto swaps and fiat purchases, defaulting to XMR/BTC and EUR/BTC. |
 | [Nostr identifiers](https://satoshi.si/nip05.html) | Information about NIP-05 identifiers on the satoshi.si domain. |

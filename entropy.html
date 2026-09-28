@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Learn Bitcoin wallet entropy through secure randomness, coin flips, dice, typed patterns, images, movement, sound, and interactive visualizations.">
+  <title>Bitcoin Entropy Lab | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/entropy.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+  <script src="/vendor/lucide/lucide.min.js" defer></script>
+</head>
+<body class="entropy-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main>
+    <section class="entropy-hero" aria-labelledby="entropy-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Bitcoin Entropy Lab</p>
+        <h1 id="entropy-title">Make uncertainty visible.</h1>
+        <p>Entropy is uncertainty that an attacker must guess. A wallet needs enough unpredictable entropy to create private keys no one else can reproduce.</p>
+      </div>
+      <div class="hero-number" aria-label="Two to the power of 128 possible values">
+        <span>2</span><sup>128</sup>
+        <small>possible starting values</small>
+      </div>
+    </section>
+
+    <section class="entropy-basics" aria-label="Entropy basics">
+      <article><span>01</span><h2>What it looks like</h2><p>Random entropy is simply bits: unpredictable zeroes and ones. Sixteen random bytes give 128 bits, enough for a 12-word BIP39 phrase after adding a checksum.</p></article>
+      <article><span>02</span><h2>What can go wrong</h2><p>Dates, quotations, repeated patterns, biased coins, and human-chosen words occupy tiny, guessable corners of the possible range. More characters do not automatically mean more entropy.</p></article>
+      <article><span>03</span><h2>How wallets do it</h2><p>Good wallets use a cryptographically secure random-number generator, ideally with hardware randomness and health checks. Generate keys in a trusted wallet or signing device, never on this page.</p></article>
+    </section>
+
+    <section class="lab" aria-labelledby="lab-title">
+      <header class="lab-header">
+        <div><p class="eyebrow">Interactive microscope</p><h2 id="lab-title">Build and inspect uncertainty</h2></div>
+        <p class="lab-warning"><i data-lucide="triangle-alert" aria-hidden="true"></i> Learning only. Never use entropy shown by a website to protect real bitcoin.</p>
+      </header>
+
+      <div class="source-tabs" role="tablist" aria-label="Entropy source">
+        <button type="button" role="tab" aria-selected="true" data-mode="secure"><i data-lucide="shield-check"></i><span>Secure device</span></button>
+        <button type="button" role="tab" aria-selected="false" data-mode="coin"><i data-lucide="circle-dollar-sign"></i><span>Coin flips</span></button>
+        <button type="button" role="tab" aria-selected="false" data-mode="dice"><i data-lucide="dice-5"></i><span>Dice rolls</span></button>
+        <button type="button" role="tab" aria-selected="false" data-mode="text"><i data-lucide="keyboard"></i><span>Typed text</span></button>
+        <button type="button" role="tab" aria-selected="false" data-mode="environment"><i data-lucide="scan-eye"></i><span>Environment</span></button>
+      </div>
+
+      <div class="lab-workspace">
+        <div class="lab-controls">
+          <section class="mode-panel active" data-panel="secure">
+            <h3>Ask the operating system</h3>
+            <p>The browser requests cryptographically secure bytes from your device. Regenerating should change roughly half the squares.</p>
+            <div class="bit-length" role="group" aria-label="Entropy length">
+              <button type="button" class="active" data-bits="128">128 bits <small>12 words</small></button>
+              <button type="button" data-bits="256">256 bits <small>24 words</small></button>
+            </div>
+            <button type="button" class="primary-action" id="generateEntropy"><i data-lucide="sparkles"></i>Generate fresh entropy</button>
+          </section>
+
+          <section class="mode-panel" data-panel="coin" hidden>
+            <h3>Flip a fair coin</h3>
+            <p>Record the result before flipping again. One independent fair flip can contribute one bit. Keyboard: <kbd>H</kbd> or <kbd>T</kbd>.</p>
+            <div class="coin-actions"><button type="button" data-flip="0"><span>H</span>Heads</button><button type="button" data-flip="1"><span>T</span>Tails</button></div>
+            <button type="button" class="quiet-action" data-reset="coin"><i data-lucide="rotate-ccw"></i>Reset flips</button>
+          </section>
+
+          <section class="mode-panel" data-panel="dice" hidden>
+            <h3>Roll a fair six-sided die</h3>
+            <p>Each independent roll carries about 2.58 bits. A real conversion must remove modulo bias; the raw three-bit display below is only a visual trace.</p>
+            <div class="dice-actions" aria-label="Record die result"><button type="button" data-roll="1">1</button><button type="button" data-roll="2">2</button><button type="button" data-roll="3">3</button><button type="button" data-roll="4">4</button><button type="button" data-roll="5">5</button><button type="button" data-roll="6">6</button></div>
+            <button type="button" class="quiet-action" data-reset="dice"><i data-lucide="rotate-ccw"></i>Reset rolls</button>
+          </section>
+
+          <section class="mode-panel" data-panel="text" hidden>
+            <h3>Watch humans make patterns</h3>
+            <p>Type anything. The estimate measures variety inside this sample, not how difficult your idea is to guess from dictionaries or personal information.</p>
+            <label for="entropyText">Experimental text</label>
+            <textarea id="entropyText" rows="4" maxlength="160" autocomplete="off" spellcheck="false" placeholder="Try a date, a sentence, then random key mashing"></textarea>
+          </section>
+
+          <section class="mode-panel environment-panel" data-panel="environment" hidden>
+            <h3>Capture a changing environment</h3>
+            <p>Images, movement, and sound contain variation, but their true unpredictability is unknown. Capture a sample, inspect its fingerprint, then mix it with secure device randomness.</p>
+            <div class="sensor-tabs" role="group" aria-label="Environmental source">
+              <button type="button" class="active" data-sensor="image"><i data-lucide="camera"></i>Image</button>
+              <button type="button" data-sensor="movement"><i data-lucide="mouse-pointer-2"></i>Movement</button>
+              <button type="button" data-sensor="sound"><i data-lucide="mic"></i>Sound</button>
+            </div>
+
+            <div class="sensor-panel active" data-sensor-panel="image">
+              <div class="sensor-actions"><label class="sensor-file"><i data-lucide="image-up"></i>Upload image<input id="entropyImageInput" type="file" accept="image/*"></label><button type="button" id="startEntropyCamera"><i data-lucide="video"></i>Use webcam</button></div>
+              <video id="entropyCamera" autoplay muted playsinline hidden></video>
+              <button type="button" id="captureEntropyFrame" class="sensor-capture" hidden><i data-lucide="aperture"></i>Capture frame</button>
+              <img id="entropyImagePreview" alt="Environmental image used for the local entropy demonstration" hidden>
+              <canvas id="entropyImageCanvas" hidden></canvas>
+            </div>
+
+            <div class="sensor-panel" data-sensor-panel="movement" hidden>
+              <canvas id="movementCanvas" class="movement-canvas" width="520" height="210" aria-label="Move a pointer here to collect movement samples"></canvas>
+              <div class="sensor-progress"><span id="movementStatus">Move your pointer inside the field</span><button type="button" id="finishMovement" disabled>Use movement</button></div>
+            </div>
+
+            <div class="sensor-panel" data-sensor-panel="sound" hidden>
+              <canvas id="soundCanvas" class="sound-canvas" width="520" height="150" aria-label="Live microphone waveform"></canvas>
+              <button type="button" id="captureSound" class="sensor-capture"><i data-lucide="mic"></i>Capture 3 seconds</button>
+              <p id="soundStatus" class="sensor-status">Microphone audio stays in this browser and is discarded after its fingerprint is made.</p>
+            </div>
+
+            <p id="environmentStatus" class="environment-status" role="status" aria-live="polite">Choose an environmental source.</p>
+            <button type="button" id="mixEnvironment" class="primary-action" disabled><i data-lucide="shuffle"></i>Mix with secure randomness</button>
+          </section>
+        </div>
+
+        <div class="entropy-visual" aria-live="polite">
+          <div class="visual-heading"><div><span id="visualMode">Secure device</span><strong id="bitCount">128 / 128 bits</strong></div><span id="qualityLabel" class="quality strong">Cryptographic source</span></div>
+          <div id="bitGrid" class="bit-grid" aria-label="Entropy bits"></div>
+          <div class="meter"><span id="entropyMeter"></span></div>
+          <dl class="entropy-stats">
+            <div><dt>Recorded</dt><dd id="recordedStat">128 bits</dd></div>
+            <div><dt>Balance</dt><dd id="balanceStat">Checking…</dd></div>
+            <div><dt>Longest run</dt><dd id="runStat">Checking…</dd></div>
+            <div><dt>Average guess</dt><dd id="guessStat">Checking…</dd></div>
+          </dl>
+          <div class="entropy-output" id="entropyOutput"><span id="outputLabel">Hexadecimal view</span><code id="hexOutput"></code></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="anatomy" aria-labelledby="anatomy-title">
+      <div><p class="eyebrow">Under the hood</p><h2 id="anatomy-title">Entropy becomes word indexes</h2><p>BIP39 does not pick twelve words independently. It starts with entropy, appends checksum bits derived from SHA-256, then cuts the result into 11-bit indexes for a 2,048-word list.</p></div>
+      <div class="anatomy-flow" aria-label="BIP39 structure">
+        <div><strong id="shapeEntropy">128</strong><span>entropy bits</span></div><i data-lucide="plus"></i><div><strong id="shapeChecksum">4</strong><span>checksum bits</span></div><i data-lucide="arrow-right"></i><div class="final"><strong id="shapeWords">12</strong><span>BIP39 words</span></div>
+      </div>
+    </section>
+
+    <section class="guess-lab" aria-labelledby="guess-title">
+      <div><p class="eyebrow">Attacker's view</p><h2 id="guess-title">Small bit counts collapse quickly</h2><p>Move the control to change the search space. This assumes an unrealistically favorable attacker trying one trillion guesses every second.</p></div>
+      <div class="guess-control">
+        <label for="guessBits"><span>Entropy</span><output id="guessBitsOutput">32 bits</output></label>
+        <input id="guessBits" type="range" min="8" max="256" step="8" value="32">
+        <div class="guess-result"><span>Possible values</span><strong id="possibilityCount">2^32</strong><span>Average guessing time</span><strong id="guessTime">less than a second</strong></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
+    <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+    <a class="site-footer-bolt" href="lightning:one@satoshi.si" aria-label="Support satoshi.si with Lightning" title="Support satoshi.si with Lightning"><span aria-hidden="true">↯</span></a>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+  <script type="module" src="/entropy.mjs"></script>
+</body>
+</html>

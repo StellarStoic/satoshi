@@ -52,7 +52,10 @@ const MENU_ITEMS = [
         {label: 'Game39 Multi Player', href: '/game39.html'},
         {label: 'Game39 Single Player', href: '/game39single.html'},
     ]},
-    {label: 'Tools', children: [{label: 'GhostQR', href: '/ghostQR.html'}]},
+    {label: 'Tools', children: [
+        {label: 'Entropy Lab', href: '/entropy.html'},
+        {label: 'GhostQR', href: '/ghostQR.html'},
+    ]},
     {label: 'News', href: '/news.html'},
     {label: 'Settings', href: '/settings.html'},
 ];
