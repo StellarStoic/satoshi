@@ -35,6 +35,54 @@ const STORE_KEY = 'blockLofiSettings';
 const SETTINGS_VERSION = 2;
 const ADJECTIVES = ['Dusty', 'Patient', 'Quiet', 'Amber', 'Late', 'Soft', 'Hidden', 'Slow'];
 const NOUNS = ['Nonce', 'Window', 'Ledger', 'Signal', 'Coffee', 'Halving', 'Mempool', 'Lantern'];
+const LEAN_KEYS = [
+  {name: 'dusty Rhodes', oscillator: 'triangle8', attack: .045, decay: .72, sustain: .045, release: .65},
+  {name: 'muted tape piano', oscillator: 'sine4', attack: .025, decay: .58, sustain: .035, release: .55},
+  {name: 'felt keys', oscillator: 'triangle4', attack: .075, decay: .82, sustain: .025, release: .72},
+  {name: 'cassette Wurlitzer', oscillator: 'sine6', attack: .035, decay: .68, sustain: .04, release: .62},
+  {name: 'soft jazz keys', oscillator: 'triangle2', attack: .065, decay: .76, sustain: .05, release: .7},
+  {name: 'worn electric piano', oscillator: 'sine3', attack: .05, decay: .9, sustain: .03, release: .8},
+];
+const LEAN_BASSES = [
+  {name: 'round sub bass', oscillator: 'sine2', attack: .025, decay: .3, sustain: .48, release: .58},
+  {name: 'muted electric bass', oscillator: 'triangle2', attack: .018, decay: .24, sustain: .35, release: .42},
+  {name: 'dub bass', oscillator: 'sine3', attack: .045, decay: .42, sustain: .55, release: .78},
+  {name: 'tape pluck bass', oscillator: 'triangle4', attack: .008, decay: .32, sustain: .2, release: .34},
+  {name: 'soft upright bass', oscillator: 'sine2', attack: .035, decay: .36, sustain: .28, release: .52},
+  {name: 'rubber bass', oscillator: 'triangle2', attack: .02, decay: .4, sustain: .4, release: .66},
+];
+const LEAN_LEADS = [
+  {name: 'tape flute accent', oscillator: 'sine', attack: .14, decay: .42, release: .9},
+  {name: 'soft vibraphone accent', oscillator: 'sine3', attack: .035, decay: .6, release: .75},
+  {name: 'muted guitar accent', oscillator: 'triangle2', attack: .02, decay: .38, release: .48},
+  {name: 'hollow reed accent', oscillator: 'sine2', attack: .1, decay: .48, release: .82},
+  {name: 'felt mallet accent', oscillator: 'triangle4', attack: .018, decay: .52, release: .58},
+  {name: 'cassette whistle accent', oscillator: 'sine', attack: .18, decay: .5, release: 1},
+  {name: 'soft bell accent', oscillator: 'sine4', attack: .025, decay: .7, release: .86},
+  {name: 'night-key accent', oscillator: 'triangle2', attack: .07, decay: .55, release: .8},
+];
+const LEAN_DRUMS = ['dust-pocket kit', 'brush-room kit', 'cassette-break kit', 'soft boom-bap kit', 'late-night kit'];
+const LEAN_KICKS = [
+  {pitchDecay: .06, octaves: 2.7, envelope: {attack: .003, decay: .34, sustain: 0, release: .3}, volume: -4},
+  {pitchDecay: .045, octaves: 2.2, envelope: {attack: .005, decay: .4, sustain: 0, release: .34}, volume: -5},
+  {pitchDecay: .035, octaves: 3.1, envelope: {attack: .002, decay: .28, sustain: 0, release: .25}, volume: -6},
+  {pitchDecay: .07, octaves: 2.5, envelope: {attack: .004, decay: .36, sustain: 0, release: .32}, volume: -4},
+  {pitchDecay: .025, octaves: 2, envelope: {attack: .006, decay: .46, sustain: 0, release: .38}, volume: -5},
+];
+const LEAN_SNARES = [
+  {noise: {type: 'pink'}, envelope: {attack: .008, decay: .16, sustain: 0}, volume: -13},
+  {noise: {type: 'brown'}, envelope: {attack: .012, decay: .22, sustain: 0}, volume: -12},
+  {noise: {type: 'pink'}, envelope: {attack: .004, decay: .12, sustain: 0}, volume: -14},
+  {noise: {type: 'brown'}, envelope: {attack: .007, decay: .18, sustain: 0}, volume: -13},
+  {noise: {type: 'pink'}, envelope: {attack: .015, decay: .25, sustain: 0}, volume: -12},
+];
+const LEAN_HATS = [
+  {noise: {type: 'brown'}, envelope: {attack: .004, decay: .035, sustain: 0}, volume: -24},
+  {noise: {type: 'pink'}, envelope: {attack: .003, decay: .055, sustain: 0}, volume: -27},
+  {noise: {type: 'brown'}, envelope: {attack: .002, decay: .026, sustain: 0}, volume: -23},
+  {noise: {type: 'pink'}, envelope: {attack: .005, decay: .04, sustain: 0}, volume: -26},
+  {noise: {type: 'brown'}, envelope: {attack: .007, decay: .07, sustain: 0}, volume: -25},
+];
 const deviceMemory = Number(globalThis.navigator?.deviceMemory || 8);
 const processorCount = Number(globalThis.navigator?.hardwareConcurrency || 8);
 const lowPower = globalThis.matchMedia?.('(max-width: 700px)').matches || deviceMemory <= 4 || processorCount <= 4;
@@ -118,10 +166,10 @@ function showComposition(composition) {
   ui.key.textContent = `${composition.session} · ${composition.texture} · ${composition.key}`;
   ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : 'offline';
   ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
-  if (ui.harmony) ui.harmony.textContent = economyAudio ? 'dusty electric keys' : composition.sound.chordName;
-  if (ui.lead) ui.lead.textContent = economyAudio ? 'occasional soft accent' : composition.sound.leadName;
-  if (ui.bass) ui.bass.textContent = economyAudio ? 'round bass' : composition.sound.bassName;
-  if (ui.drums) ui.drums.textContent = economyAudio ? 'soft boom-bap kit' : composition.sound.drumName;
+  if (ui.harmony) ui.harmony.textContent = economyAudio ? LEAN_KEYS[composition.sound.chordVoice].name : composition.sound.chordName;
+  if (ui.lead) ui.lead.textContent = economyAudio ? LEAN_LEADS[composition.sound.leadVoice].name : composition.sound.leadName;
+  if (ui.bass) ui.bass.textContent = economyAudio ? LEAN_BASSES[composition.sound.bassVoice].name : composition.sound.bassName;
+  if (ui.drums) ui.drums.textContent = economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName;
   if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.space} + ${composition.sound.motion}`;
   applyNetworkSound();
 }
@@ -251,7 +299,7 @@ function ingestTransactions(txids, sequence = 0, summary = null) {
       txid,
       vsize: 180,
       feeRate: Math.max(1, state.chain.fee),
-      type: 'Mixed',
+      type: 'Live',
       rbf: false,
       hasData: false,
     })));
@@ -432,10 +480,11 @@ function createEngine() {
 
   const makeChordVoice = index => {
     if (economyAudio) {
+      const profile = LEAN_KEYS[index];
       return new ToneApi.PolySynth(ToneApi.Synth, {
         maxPolyphony: 4,
-        oscillator: {type: 'triangle8'},
-        envelope: {attack: .045, decay: .72, sustain: .045, release: .65},
+        oscillator: {type: profile.oscillator},
+        envelope: {attack: profile.attack, decay: profile.decay, sustain: profile.sustain, release: profile.release},
         volume: -22,
       }).connect(chorus);
     }
@@ -451,9 +500,10 @@ function createEngine() {
   };
   const makeBassVoice = index => {
     if (economyAudio) {
+      const profile = LEAN_BASSES[index];
       return new ToneApi.Synth({
-        oscillator: {type: 'sine2'},
-        envelope: {attack: .025, decay: .3, sustain: .48, release: .58},
+        oscillator: {type: profile.oscillator},
+        envelope: {attack: profile.attack, decay: profile.decay, sustain: profile.sustain, release: profile.release},
         portamento: .025,
         volume: -9,
       }).connect(bassGain);
@@ -470,9 +520,10 @@ function createEngine() {
   };
   const makeLeadVoice = index => {
     if (economyAudio) {
+      const profile = LEAN_LEADS[index];
       return new ToneApi.Synth({
-        oscillator: {type: 'sine'},
-        envelope: {attack: .14, decay: .42, sustain: .05, release: .9},
+        oscillator: {type: profile.oscillator},
+        envelope: {attack: profile.attack, decay: profile.decay, sustain: .04, release: profile.release},
         portamento: .035,
         volume: -31,
       }).connect(delay);
@@ -552,17 +603,17 @@ function createEngine() {
     leadVoice(index) { return this.leadVoices[index] ||= makeLeadVoice(index); },
     kickVoice(index) {
       return this.kickVoices[index] ||= new ToneApi.MembraneSynth(economyAudio
-        ? {pitchDecay: .055, octaves: 2.5, envelope: {attack: .004, decay: .3, sustain: 0, release: .27}, volume: -4}
+        ? LEAN_KICKS[index]
         : makeKickVoice(index)).connect(drumsGain);
     },
     snareVoice(index) {
       return this.snareVoices[index] ||= new ToneApi.NoiseSynth(economyAudio
-        ? {noise: {type: 'pink'}, envelope: {attack: .008, decay: .16, sustain: 0}, volume: -13}
+        ? LEAN_SNARES[index]
         : makeSnareVoice(index)).connect(drumsGain);
     },
     hatVoice(index) {
       return this.hatVoices[index] ||= economyAudio
-        ? new ToneApi.NoiseSynth({noise: {type: 'brown'}, envelope: {attack: .004, decay: .035, sustain: 0}, volume: -24}).connect(drumsGain)
+        ? new ToneApi.NoiseSynth(LEAN_HATS[index]).connect(drumsGain)
         : new ToneApi.MetalSynth(makeHatVoice(index)).connect(drumsGain);
     },
     releaseUnusedVoices(composition, flow) {
@@ -858,6 +909,13 @@ const TRANSACTION_COLORS = {
   Data: '#e45fb2',
   Mixed: '#f3d36a',
 };
+const LIVE_TRANSACTION_COLORS = ['#00c2ff', '#2dd4bf', '#84cc16', '#ffd166', '#ff7a59', '#ff5fa2', '#a78bfa', '#5b8cff'];
+
+function transactionColor(transaction) {
+  if (transaction.type !== 'Live') return TRANSACTION_COLORS[transaction.type] || TRANSACTION_COLORS.Mixed;
+  const seed = Number.parseInt(transaction.txid.slice(0, 8), 16) || 0;
+  return LIVE_TRANSACTION_COLORS[seed % LIVE_TRANSACTION_COLORS.length];
+}
 
 function drawTransactions(context, width, height, cx, cy, radius, now) {
   state.transactionVisuals = state.transactionVisuals.filter(transaction => {
@@ -888,7 +946,7 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * targetY;
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
-    const color = TRANSACTION_COLORS[transaction.type] || TRANSACTION_COLORS.Mixed;
+    const color = transactionColor(transaction);
     context.save();
     context.globalAlpha = Math.max(.12, arrival * .88);
     context.shadowColor = color;
