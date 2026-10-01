@@ -29,6 +29,10 @@
 
 The shared interface uses a near-black theme with orange accents, gently animated grain, and retro TV navigation effects. Reduced-motion preferences disable the animations. Responsive layouts, menus, and dialogs support smaller screens; the footer places block height on the left and fee rate on the right.
 
+### How Block Lo-Fi Works
+
+Block Lo-Fi is not a playlist. A Bitcoin block hash acts like a repeatable musical seed: it chooses the key, tempo, groove and instrument ensemble. Live transactions from the mempool appear as bubbles and gently influence the rhythm and sound. Most bubbles flow into the circular visualizer, while some cross its center; a center crossing displays that transaction's available size, fee and structure. Any visible bubble can also be inspected with a mouse or tap. When a new block is found, the completed block's music fades fully out, its instruments are released, and the new block's session fades in. Everything is generated locally in the browser from public Bitcoin data.
+
 ## Install and Use Offline
 
 Open [satoshi.si](https://satoshi.si) in a supported browser and use its install or **Add to Home Screen** option. Installation availability and wording vary by browser. The manifest provides a standalone app window, icons, and theme colors.

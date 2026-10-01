@@ -323,6 +323,7 @@ function addTransactionVisuals(items) {
       bend: ((seed >>> 18) % 200 - 100) / 100,
       entryAngle: ((seed ^ (seed >>> 11)) % 6283) / 1000,
       orbit: ((seed >>> 5) & 1) ? 1 : -1,
+      crossesCenter: seed % 4 === 0,
     });
   });
   state.transactionVisuals = state.transactionVisuals.slice(-visualProfile.maxParticles);
@@ -1121,19 +1122,21 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const edgeDistance = Math.hypot(width, height) * .72 + 40;
     const startX = cx + Math.cos(entryAngle) * edgeDistance;
     const startY = cy + Math.sin(entryAngle) * edgeDistance;
-    const targetX = cx;
-    const targetY = cy;
+    const targetAngle = transaction.lane * Math.PI * 2;
+    const targetX = transaction.crossesCenter ? cx - Math.cos(entryAngle) * edgeDistance : cx + Math.cos(targetAngle) * radius * .78;
+    const targetY = transaction.crossesCenter ? cy - Math.sin(entryAngle) * edgeDistance : cy + Math.sin(targetAngle) * radius * .78;
     const curveDistance = Math.min(width, height) * (.18 + Math.abs(transaction.bend) * .13);
     const controlAngle = entryAngle + (transaction.orbit || 1) * (Math.PI * .48 + transaction.bend * .34);
-    const controlX = cx + Math.cos(controlAngle) * (radius + curveDistance);
-    const controlY = cy + Math.sin(controlAngle) * (radius + curveDistance);
+    const controlX = transaction.crossesCenter ? cx : cx + Math.cos(controlAngle) * (radius + curveDistance);
+    const controlY = transaction.crossesCenter ? cy : cy + Math.sin(controlAngle) * (radius + curveDistance);
     const inverse = 1 - eased;
     const x = inverse * inverse * startX + 2 * inverse * eased * controlX + eased * eased * targetX;
     const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * targetY;
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
     state.transactionHitAreas.push({transaction, x, y, radius: Math.max(10, particleRadius + 4)});
-    if (progress >= .96 && !transaction.announced) {
+    const touchesCenter = transaction.crossesCenter && Math.hypot(x - cx, y - cy) <= Math.max(8, particleRadius);
+    if (touchesCenter && !transaction.announced) {
       transaction.announced = true;
       if (!state.inspectedTransaction || now > state.inspectedUntil) showTransaction(transaction);
     }
@@ -1309,18 +1312,6 @@ ui.canvas.addEventListener('pointerdown', event => {
   if (event.pointerType === 'touch') inspectTransaction(event, true);
 });
 
-document.getElementById('copyExplainer')?.addEventListener('click', async event => {
-  const button = event.currentTarget;
-  const text = document.getElementById('shareExplainerText')?.textContent.trim();
-  if (!text) return;
-  try {
-    await navigator.clipboard.writeText(`${text}\n\nhttps://satoshi.si/lofi.html`);
-    button.querySelector('span').textContent = 'Copied';
-  } catch {
-    button.querySelector('span').textContent = 'Copy failed';
-  }
-  setTimeout(() => { button.querySelector('span').textContent = 'Copy explainer'; }, 1800);
-});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.playing) ui.transport.textContent = 'Playing in background';
   else if (!document.hidden) refreshBlockTip().catch(() => {});
