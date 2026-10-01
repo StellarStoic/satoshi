@@ -37,6 +37,20 @@ class NewsCollectorTests(unittest.TestCase):
         item = collect.parse_hackernews(payload, SOURCE)[0]
         self.assertEqual(item["url"], "https://news.ycombinator.com/item?id=42")
 
+    def test_detects_links_outside_the_source(self):
+        source = {"homepage": "https://news.ycombinator.com/"}
+        self.assertTrue(collect.is_external_item({"url": "https://example.com/story"}, source))
+        self.assertFalse(collect.is_external_item({"url": "https://news.ycombinator.com/item?id=42"}, source))
+
+    def test_reads_newest_snapshot_from_timemap(self):
+        payload = '''<https://example.com>; rel="original",
+<https://archive.ph/OLD12>; rel="first memento"; datetime="Mon, 01 Jan 2024 00:00:00 GMT",
+<https://archive.is/NEW34>; rel="last memento"; datetime="Tue, 02 Jan 2024 00:00:00 GMT"'''
+        self.assertEqual(collect.parse_archive_timemap(payload), "https://archive.is/NEW34")
+
+    def test_rejects_non_archive_timemap_links(self):
+        self.assertIsNone(collect.parse_archive_timemap('<https://example.com/copy>; rel="memento"'))
+
 
 if __name__ == "__main__":
     unittest.main()

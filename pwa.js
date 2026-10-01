@@ -54,6 +54,7 @@ const MENU_ITEMS = [
     ]},
     {label: 'Tools', children: [
         {label: 'Entropy Lab', href: '/entropy.html'},
+        {label: 'Block Lo-Fi', href: '/lofi.html'},
         {label: 'GhostQR', href: '/ghostQR.html'},
     ]},
     {label: 'News', href: '/news.html'},
@@ -96,7 +97,7 @@ if (menuList) {
     }));
 }
 
-if (document.querySelector('[data-live-footer]')) {
+if (document.querySelector('.footer')) {
     import('/siteFooter.mjs').catch(error => console.warn('Live footer data could not be loaded:', error));
 }
 

@@ -17,6 +17,7 @@ const pages = {
   '/game39single.html': ['Single-Player BIP39 Word Game | Satoshi.si', 'Practice and recognize official BIP39 words in a focused single-player Bitcoin word game.'],
   '/ghostQR.html': ['GhostQR Layered QR Code Maker | Satoshi.si', 'Create experimental printable layered QR codes for splitting and reconstructing visual information.'],
   '/entropy.html': ['Bitcoin Entropy Lab | Satoshi.si', 'Learn wallet entropy by comparing secure randomness, coin flips, dice, typed patterns, images, movement and sound in an interactive Bitcoin tool.'],
+  '/lofi.html': ['Bitcoin Block Lo-Fi Music Generator | Satoshi.si', 'Listen to endless browser-generated Lo-Fi music whose harmony, rhythm and visuals are shaped by Bitcoin blocks and live mempool activity.'],
   '/nip05.html': ['NIP-05 Nostr Identifier | Satoshi.si', 'Learn about NIP-05 human-readable Nostr identifiers and identifiers available on the satoshi.si domain.'],
   '/lottery.html': ['Bitcoin Lightning Lottery | Satoshi.si', 'Play a Bitcoin Lightning lottery with transparent results, ticket verification and supporting statistics.'],
   '/lotteryStats.html': ['Bitcoin Lottery Results and Statistics | Satoshi.si', 'Review published Bitcoin Lightning lottery results, recent draws and supporting statistics.'],

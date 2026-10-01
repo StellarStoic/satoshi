@@ -18,6 +18,12 @@ let audioStream = null;
 let audioContext = null;
 let audioFrame = 0;
 let movementSamples = [];
+let demonstratedBits = '';
+let demonstratedStrength = 128;
+let derivationVersion = 0;
+let raceFrame = 0;
+let raceStarted = 0;
+let accumulatedRaceSeconds = 0;
 
 function secureEntropy() {
   const bytes = new Uint8Array(state.target / 8);
@@ -25,11 +31,131 @@ function secureEntropy() {
   state.bits = bytesToBits(bytes);
   state.hex = bytesToHex(bytes);
   render(true);
+  updateKeyspace(state.bits, state.target);
 }
 
 async function sha256(bytes) {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return {bits: bytesToBits(digest), hex: bytesToHex(digest), bytes: digest};
+}
+
+function bitsToBytes(bits) {
+  const bytes = new Uint8Array(Math.ceil(bits.length / 8));
+  for (let index = 0; index < bits.length; index += 1) if (bits[index] === '1') bytes[Math.floor(index / 8)] |= 1 << (7 - index % 8);
+  return bytes;
+}
+
+async function teachingFingerprint(label, bits) {
+  const labelBytes = new TextEncoder().encode(`satoshi.si entropy demo:${label}:`);
+  const entropyBytes = bitsToBytes(bits);
+  const input = new Uint8Array(labelBytes.length + entropyBytes.length);
+  input.set(labelBytes);
+  input.set(entropyBytes, labelBytes.length);
+  return sha256(input);
+}
+
+function shortFingerprint(hex) {
+  return `${hex.slice(0, 8)}…${hex.slice(-8)}`;
+}
+
+async function updateKeyspace(bits, strength) {
+  if (!bits) return;
+  const version = ++derivationVersion;
+  demonstratedBits = bits.slice(0, strength);
+  demonstratedStrength = strength;
+  stopRace();
+  updateBip39Visual(demonstratedBits, strength, version);
+  const [root, branch0, branch1, branch2] = await Promise.all([
+    teachingFingerprint('root', demonstratedBits),
+    teachingFingerprint('branch-0', demonstratedBits),
+    teachingFingerprint('branch-1', demonstratedBits),
+    teachingFingerprint('branch-2', demonstratedBits),
+  ]);
+  if (version !== derivationVersion) return;
+  document.getElementById('rootFingerprint').textContent = shortFingerprint(root.hex);
+  document.getElementById('branchFingerprint0').textContent = shortFingerprint(branch0.hex);
+  document.getElementById('branchFingerprint1').textContent = shortFingerprint(branch1.hex);
+  document.getElementById('branchFingerprint2').textContent = shortFingerprint(branch2.hex);
+  const x = 5 + Number.parseInt(root.hex.slice(0, 8), 16) / 0xffffffff * 90;
+  const y = 8 + Number.parseInt(root.hex.slice(8, 16), 16) / 0xffffffff * 75;
+  const marker = document.getElementById('secretMarker');
+  marker.style.setProperty('--secret-x', `${x}%`);
+  marker.style.setProperty('--secret-y', `${y}%`);
+  document.getElementById('keyspaceSize').textContent = `2^${strength} possible secrets`;
+  document.getElementById('raceTitle').textContent = `Guessing a ${strength}-bit wallet`;
+  document.getElementById('raceTime').textContent = guessTime(strength);
+  await showAvalanche(Math.floor(Math.random() * demonstratedBits.length));
+  resetRaceDisplay();
+}
+
+async function updateBip39Visual(bits, strength, version) {
+  const shape = bip39Shape(strength);
+  if (!shape) return;
+  document.getElementById('shapeEntropy').textContent = shape.entropy;
+  document.getElementById('shapeChecksum').textContent = shape.checksum;
+  document.getElementById('shapeWords').textContent = shape.words;
+  const digest = await sha256(bitsToBytes(bits));
+  if (version !== derivationVersion) return;
+  const checksum = digest.bits.slice(0, shape.checksum);
+  const combined = bits.slice(0, strength) + checksum;
+  const tape = document.getElementById('bip39BitTape');
+  const bitNodes = [...combined].map((bit, index) => {
+    const node = document.createElement('span');
+    node.className = `bip39-bit ${bit === '1' ? 'one' : 'zero'}${index >= strength ? ' checksum' : ''}`;
+    node.dataset.group = String(Math.floor(index / 11));
+    node.title = `${index >= strength ? 'Checksum' : 'Entropy'} bit ${index + 1}: ${bit}`;
+    node.setAttribute('aria-hidden', 'true');
+    return node;
+  });
+  tape.replaceChildren(...bitNodes);
+  const groups = combined.match(/.{11}/g) || [];
+  const grid = document.getElementById('wordIndexGrid');
+  const setHighlight = (group, active) => tape.querySelectorAll(`[data-group="${group}"]`).forEach(node => node.classList.toggle('group-active', active));
+  grid.replaceChildren(...groups.map((group, index) => {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'word-index';
+    node.innerHTML = `<span>${group}</span><strong>Index ${Number.parseInt(group, 2).toLocaleString()}</strong><em>group ${index + 1}</em>`;
+    node.addEventListener('mouseenter', () => setHighlight(index, true));
+    node.addEventListener('mouseleave', () => setHighlight(index, false));
+    node.addEventListener('focus', () => setHighlight(index, true));
+    node.addEventListener('blur', () => setHighlight(index, false));
+    return node;
+  }));
+}
+
+async function showAvalanche(bitIndex) {
+  if (!demonstratedBits) return;
+  const flipped = [...demonstratedBits];
+  flipped[bitIndex] = flipped[bitIndex] === '1' ? '0' : '1';
+  const [original, changed] = await Promise.all([teachingFingerprint('root', demonstratedBits), teachingFingerprint('root', flipped.join(''))]);
+  const difference = original.bits.split('').reduce((total, bit, index) => total + (bit !== changed.bits[index] ? 1 : 0), 0);
+  document.getElementById('changedBits').textContent = difference;
+  document.getElementById('differenceRing').style.setProperty('--difference', `${difference / 256 * 100}%`);
+}
+
+function resetRaceDisplay() {
+  accumulatedRaceSeconds = 0;
+  document.getElementById('raceGuesses').textContent = '0';
+  document.getElementById('raceChance').textContent = '0%';
+  document.getElementById('raceProgress').style.width = '0';
+}
+
+function stopRace() {
+  cancelAnimationFrame(raceFrame);
+  raceFrame = 0;
+  document.querySelector('.race-track')?.classList.remove('searching');
+  const label = document.querySelector('#toggleRace span');
+  if (label) label.textContent = 'Start guessing';
+}
+
+function renderRace(now) {
+  const seconds = accumulatedRaceSeconds + (now - raceStarted) / 1000;
+  const guesses = seconds * 1e12;
+  const logPercent = Math.log10(Math.max(guesses, 1)) - demonstratedStrength * Math.log10(2) + 2;
+  document.getElementById('raceGuesses').textContent = guesses < 1e15 ? Math.floor(guesses).toLocaleString() : guesses.toExponential(3);
+  document.getElementById('raceChance').textContent = logPercent < -4 ? `≈ 10^${Math.floor(logPercent)}%` : `${Math.min(100, 10 ** logPercent).toFixed(6)}%`;
+  raceFrame = requestAnimationFrame(renderRace);
 }
 
 async function setEnvironmentalSample(bytes, description, samples) {
@@ -100,6 +226,8 @@ function setMode(mode) {
     panel.classList.toggle('active', active);
   });
   render();
+  if (mode === 'secure') updateKeyspace(state.bits, state.target);
+  if (mode === 'environment' && state.environment.mixed) updateKeyspace(state.environment.bits, 256);
 }
 
 function stopCamera() {
@@ -268,6 +396,7 @@ document.getElementById('mixEnvironment').addEventListener('click', async () => 
   state.environment = {...state.environment, ...digest, mixed: true, description: `${state.environment.description} + secure device randomness`};
   document.getElementById('environmentStatus').textContent = 'The sample fingerprint was mixed with 256 secure device bits, then hashed. Security comes from the device randomness even if the sample was predictable.';
   render(true);
+  updateKeyspace(state.environment.bits, 256);
 });
 
 function updateShape() {
@@ -313,6 +442,24 @@ document.addEventListener('keydown', event => {
     state.rolls = state.rolls.slice(0, 100);
     render(true);
   }
+});
+
+document.getElementById('flipEntropyBit').addEventListener('click', () => {
+  if (demonstratedBits) showAvalanche(Math.floor(Math.random() * demonstratedBits.length));
+});
+
+document.getElementById('toggleRace').addEventListener('click', () => {
+  const label = document.querySelector('#toggleRace span');
+  const track = document.querySelector('.race-track');
+  if (raceFrame) {
+    accumulatedRaceSeconds += (performance.now() - raceStarted) / 1000;
+    stopRace();
+    return;
+  }
+  raceStarted = performance.now();
+  label.textContent = 'Pause guessing';
+  track.classList.add('searching');
+  raceFrame = requestAnimationFrame(renderRace);
 });
 
 const guessSlider = document.getElementById('guessBits');

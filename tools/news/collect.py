@@ -16,12 +16,14 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "news-data.json"
 USER_AGENT = "satoshi.si news collector (+https://satoshi.si)"
 MAX_PER_SOURCE = 35
+ARCHIVE_DOMAINS = ("https://archive.ph", "https://archive.today", "https://archive.is")
+ARCHIVE_LINK = re.compile(r'<(https?://[^>]+)>;\s*rel="[^"]*memento[^"]*"', re.IGNORECASE)
 
 SOURCES = (
     {"id": "optech", "label": "Bitcoin Optech", "homepage": "https://bitcoinops.org/", "url": "https://bitcoinops.org/feed.xml", "kind": "engineering"},
@@ -63,6 +65,75 @@ def fetch(url: str) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/atom+xml, application/rss+xml, application/json;q=0.9, */*;q=0.8"})
     with urllib.request.urlopen(request, timeout=25) as response:
         return response.read()
+
+
+def normalized_host(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    return host
+
+
+def is_external_item(item: dict, source: dict) -> bool:
+    item_host = normalized_host(item.get("url", ""))
+    source_host = normalized_host(source.get("homepage", ""))
+    if not item_host or not source_host:
+        return False
+    return not (item_host == source_host or item_host.endswith(f".{source_host}") or source_host.endswith(f".{item_host}"))
+
+
+def parse_archive_timemap(payload: str) -> str | None:
+    matches = ARCHIVE_LINK.findall(payload or "")
+    if not matches:
+        return None
+    candidate = matches[-1]
+    host = normalized_host(candidate)
+    if not host.startswith("archive."):
+        return None
+    return candidate
+
+
+def find_archive(url: str) -> str | None:
+    for domain in ARCHIVE_DOMAINS:
+        request = urllib.request.Request(
+            f"{domain}/timemap/{url}",
+            headers={"User-Agent": USER_AGENT, "Accept": "application/link-format, text/plain;q=0.9"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                archive_url = parse_archive_timemap(response.read(2_000_000).decode("utf-8", errors="replace"))
+                if archive_url:
+                    return archive_url
+                return None
+        except Exception:
+            continue
+    return None
+
+
+def existing_archive_urls() -> dict[str, str]:
+    try:
+        data = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {
+        item["url"]: item["archiveUrl"]
+        for item in data.get("items", [])
+        if item.get("url") and item.get("archiveUrl")
+    }
+
+
+def attach_archive_urls(items: list[dict]) -> None:
+    source_by_id = {source["id"]: source for source in SOURCES}
+    cached = existing_archive_urls()
+    candidates = []
+    for item in items:
+        if item["url"] in cached:
+            item["archiveUrl"] = cached[item["url"]]
+        elif is_external_item(item, source_by_id.get(item["sourceId"], {})):
+            candidates.append(item)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        archive_urls = executor.map(find_archive, (item["url"] for item in candidates))
+        for item, archive_url in zip(candidates, archive_urls):
+            if archive_url:
+                item["archiveUrl"] = archive_url
 
 
 class FeedLinkParser(HTMLParser):
@@ -212,6 +283,7 @@ def collect() -> dict:
     items = sorted(unique.values(), key=lambda item: item["published"], reverse=True)
     if not items:
         raise RuntimeError("Every news source failed; previous snapshot retained")
+    attach_archive_urls(items)
     return {"generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "sources": source_status, "items": items}
 
 
@@ -231,4 +303,5 @@ if __name__ == "__main__":
     result = collect()
     write_atomic(result)
     healthy = sum(source["status"] == "ok" for source in result["sources"])
-    print(f"Collected {len(result['items'])} posts from {healthy}/{len(result['sources'])} sources")
+    archived = sum(bool(item.get("archiveUrl")) for item in result["items"])
+    print(f"Collected {len(result['items'])} posts from {healthy}/{len(result['sources'])} sources; {archived} external links use Archive.today snapshots")

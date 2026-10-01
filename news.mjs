@@ -135,15 +135,19 @@ function renderNews() {
     const heading = node('h2');
     const link = node('a', item.title || 'Untitled');
     try {
-      const url = new URL(item.url, location.origin);
+      const url = new URL(item.archiveUrl || item.url, location.origin);
       link.href = /^https?:$/.test(url.protocol) ? url.href : '#';
     } catch { link.href = '#'; }
+    if (item.archiveUrl) {
+      link.title = 'Open verified Archive.today snapshot';
+      link.dataset.originalUrl = item.url;
+    }
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     heading.append(link);
     content.append(heading);
     if (item.summary) content.append(node('p', item.summary));
-    content.append(node('span', item.kind || 'article', 'news-item-kind'));
+    content.append(node('span', `${item.kind || 'article'}${item.archiveUrl ? ' · archived copy' : ''}`, 'news-item-kind'));
     article.append(meta, content);
     return article;
   }));

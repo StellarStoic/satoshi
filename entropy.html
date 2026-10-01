@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101112">
   <meta name="description" content="Learn Bitcoin wallet entropy through secure randomness, coin flips, dice, typed patterns, images, movement, sound, and interactive visualizations.">
-  <title>Bitcoin Entropy Lab | Satoshi.si</title>
+  <title>Information about Entropy | Satoshi.si</title>
   <link rel="icon" href="/favicon-32x32.png">
   <link rel="manifest" href="/site.webmanifest">
+  <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/siteEffects.css">
@@ -24,7 +25,7 @@
     <section class="entropy-hero" aria-labelledby="entropy-title">
       <div class="hero-copy">
         <p class="eyebrow">Bitcoin Entropy Lab</p>
-        <h1 id="entropy-title">Make uncertainty visible.</h1>
+        <h1 id="entropy-title">Information about entropy</h1>
         <p>Entropy is uncertainty that an attacker must guess. A wallet needs enough unpredictable entropy to create private keys no one else can reproduce.</p>
       </div>
       <div class="hero-number" aria-label="Two to the power of 128 possible values">
@@ -134,10 +135,55 @@
       </div>
     </section>
 
+    <section class="keyspace" aria-labelledby="keyspace-title">
+      <header class="keyspace-heading">
+        <div><p class="eyebrow">What entropy protects</p><h2 id="keyspace-title">One secret in an unthinkably large space</h2></div>
+        <p>A wallet deterministically derives many private keys from one starting secret. These fingerprints demonstrate that branching behavior without creating recovery words, real private keys, or Bitcoin addresses.</p>
+      </header>
+
+      <div class="keyspace-map" aria-label="Symbolic map of the wallet keyspace">
+        <div id="keyspaceStars" aria-hidden="true"></div>
+        <span id="secretMarker" aria-hidden="true"></span>
+        <div class="map-caption"><span>Symbolic map, not to scale</span><strong id="keyspaceSize">2^128 possible secrets</strong></div>
+      </div>
+
+      <div class="derivation-demo">
+        <div class="demo-root"><span>Starting secret fingerprint</span><code id="rootFingerprint">Calculating…</code></div>
+        <div class="branch-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="demo-branches">
+          <div><span>Demo branch 0</span><code id="branchFingerprint0">—</code></div>
+          <div><span>Demo branch 1</span><code id="branchFingerprint1">—</code></div>
+          <div><span>Demo branch 2</span><code id="branchFingerprint2">—</code></div>
+        </div>
+        <p>These are domain-separated SHA-256 teaching fingerprints. They illustrate deterministic derivation but are deliberately not usable wallet credentials.</p>
+      </div>
+
+      <div class="avalanche-demo">
+        <div><p class="eyebrow">Change one bit</p><h3>The descendants become unrelated</h3><p>Flip one bit in the starting entropy and compare its demonstration fingerprint. A good cryptographic function changes roughly half its output bits.</p></div>
+        <div class="avalanche-result"><div class="difference-ring" id="differenceRing"><strong id="changedBits">—</strong><span>of 256 bits changed</span></div><button type="button" id="flipEntropyBit"><i data-lucide="git-compare-arrows"></i>Flip another bit</button></div>
+      </div>
+
+      <div class="guess-race">
+        <div><p class="eyebrow">Brute-force race</p><h3 id="raceTitle">Guessing a 128-bit wallet</h3><p>Watch an imaginary attacker test one trillion candidates every second. The counter moves quickly; its share of the full keyspace effectively does not.</p></div>
+        <div class="race-console">
+          <dl><div><dt>Guesses simulated</dt><dd id="raceGuesses">0</dd></div><div><dt>Keyspace searched</dt><dd id="raceChance">0%</dd></div><div><dt>Average time</dt><dd id="raceTime">—</dd></div></dl>
+          <div class="race-track"><span id="raceProgress"></span><i id="raceTarget" title="Your wallet secret"></i></div>
+          <button type="button" id="toggleRace"><i data-lucide="play"></i><span>Start guessing</span></button>
+        </div>
+      </div>
+    </section>
+
     <section class="anatomy" aria-labelledby="anatomy-title">
       <div><p class="eyebrow">Under the hood</p><h2 id="anatomy-title">Entropy becomes word indexes</h2><p>BIP39 does not pick twelve words independently. It starts with entropy, appends checksum bits derived from SHA-256, then cuts the result into 11-bit indexes for a 2,048-word list.</p></div>
       <div class="anatomy-flow" aria-label="BIP39 structure">
         <div><strong id="shapeEntropy">128</strong><span>entropy bits</span></div><i data-lucide="plus"></i><div><strong id="shapeChecksum">4</strong><span>checksum bits</span></div><i data-lucide="arrow-right"></i><div class="final"><strong id="shapeWords">12</strong><span>BIP39 words</span></div>
+      </div>
+      <div class="bip39-visual" aria-label="Visual BIP39 entropy and checksum demonstration">
+        <div class="bip39-stage-heading"><span>1 · Append the checksum</span><div><i></i>Entropy bits <i class="checksum-key"></i>SHA-256 checksum</div></div>
+        <div id="bip39BitTape" class="bip39-bit-tape"></div>
+        <div class="bip39-split"><span></span><strong>Split every 11 bits</strong><span></span></div>
+        <div id="wordIndexGrid" class="word-index-grid"></div>
+        <p>Each 11-bit group is a number from 0 to 2,047: an index into the selected BIP39 wordlist. Hover or focus an index to see exactly which bits created it. The words themselves are intentionally not shown.</p>
       </div>
     </section>
 
@@ -155,7 +201,7 @@
     <a href="mailto:one@satoshi.si">one@satoshi.si</a>
     <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
     <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
-    <a class="site-footer-bolt" href="lightning:one@satoshi.si" aria-label="Support satoshi.si with Lightning" title="Support satoshi.si with Lightning"><span aria-hidden="true">↯</span></a>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Open support QR codes" title="Support me with a sat or two!"></i>
   </footer>
 
   <script src="/burgerMenu.js"></script>

@@ -21,7 +21,8 @@
 | [Memed Bitcoin Mood](https://satoshi.si/memedBitcoinMood.html) | Market moods and memes across daily, weekly, monthly, and yearly timeframes, with fallback data providers. |
 | [Game39](https://satoshi.si/game39single.html) | BIP39 word games, with a separate [multiplayer mode](https://satoshi.si/game39.html). |
 | [GhostQR](https://satoshi.si/ghostQR.html) | An experimental tool for creating printable, layered QR codes. |
-| [Entropy Lab](https://satoshi.si/entropy.html) | Compare secure randomness with coin flips, dice, typed patterns, images, pointer movement and sound; captured media stays on-device and is discarded after fingerprinting. |
+| [Entropy Lab](https://satoshi.si/entropy.html) | Compare secure randomness with coin flips, dice, typed patterns and local sensor capture, then visualize deterministic descendants, avalanche behavior and the near-impossible scale of wallet guessing. |
+| [Block Lo-Fi](https://satoshi.si/lofi.html) | Endless browser-generated Lo-Fi music: each block hash creates a musical world, then fresh mempool transaction IDs continuously write new phrases, voicings and instrument changes inside it. |
 | [Lightning lottery](https://satoshi.si/lottery.html) | An embedded lottery, alongside [statistics](https://satoshi.si/lotteryStats.html), a [ticket verifier](https://satoshi.si/ticketVerifier.html), and [terms](https://satoshi.si/lotteryTOS.html). |
 | [Exchange](https://satoshi.si/exchange.html) | A third-party ChangeNOW widget for crypto swaps and fiat purchases, defaulting to XMR/BTC and EUR/BTC. |
 | [Nostr identifiers](https://satoshi.si/nip05.html) | Information about NIP-05 identifiers on the satoshi.si domain. |
@@ -57,6 +58,7 @@ See [BIP39 implementation notes](docs/bip39-playground.md) for details about the
 - **Frankfurter:** historical fiat conversion rates in the data-generation script, plus exchange rates used by the chart.
 - **Sintra:** live Bitcoin prices used by price-related tools.
 - **mempool.space:** block and fee information.
+- **Tone.js:** the bundled MIT-licensed Web Audio framework used for Block Lo-Fi scheduling, synthesis and effects. The music uses generated instruments rather than downloaded samples.
 - **Bitcoin and Nostr news:** Bitcoin Optech, Bitcoin Core releases, project blogs, independent publications, Nostr newsletters, community feeds, and Reddit sources. A daily GitHub Action creates the static feed snapshot.
 - **CoinGecko and CoinPaprika:** Bitcoin Mood market data, with Binance as a daily fallback. Some volatility values are estimates rather than measured historical ranges.
 - **Open Exchange Rates:** fiat rates used by the converter.
@@ -116,4 +118,4 @@ Reach out through [the website](https://satoshi.si) or [Telegram](https://t.me/s
 
 ## License
 
-This project has been described as MIT-licensed; a top-level license file still needs to be added. Bundled BIP39 dependency notices are in [`vendor/bip39.LICENSE.txt`](vendor/bip39.LICENSE.txt). Third-party content and services may have separate terms.
+This project has been described as MIT-licensed; a top-level license file still needs to be added. Bundled dependency notices are in [`vendor/bip39.LICENSE.txt`](vendor/bip39.LICENSE.txt) and [`vendor/tone/LICENSE.md`](vendor/tone/LICENSE.md). Third-party content and services may have separate terms.
