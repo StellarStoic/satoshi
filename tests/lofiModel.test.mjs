@@ -22,6 +22,11 @@ test('block composition is deterministic and musically bounded', () => {
   assert.ok(first.sound.leadVoice >= 0 && first.sound.leadVoice < 8);
   assert.ok(first.sound.bassVoice >= 0 && first.sound.bassVoice < 6);
   assert.ok(first.sound.drumKit >= 0 && first.sound.drumKit < 5);
+  assert.ok(first.sound.padVoice >= 0 && first.sound.padVoice < 5);
+  assert.ok(first.sound.arpVoice >= 0 && first.sound.arpVoice < 6);
+  assert.ok(first.sound.malletVoice >= 0 && first.sound.malletVoice < 5);
+  assert.ok(first.sound.percussionVoice >= 0 && first.sound.percussionVoice < 8);
+  assert.ok(first.sound.textureVoice >= 0 && first.sound.textureVoice < 4);
   assert.ok(first.sound.reverbWet >= .04 && first.sound.reverbWet <= .21);
 });
 
@@ -40,6 +45,8 @@ test('a run of blocks explores the session, harmony and instrument palette', () 
   assert.ok(new Set(blocks.map(block => block.voicing)).size >= 4);
   assert.ok(new Set(blocks.map(block => block.sound.leadVoice)).size >= 7);
   assert.ok(new Set(blocks.map(block => block.sound.drumKit)).size >= 3);
+  assert.ok(new Set(blocks.map(block => block.sound.padVoice)).size >= 4);
+  assert.ok(new Set(blocks.map(block => block.sound.arpVoice)).size >= 5);
 });
 
 test('live block parser accepts singular updates and block snapshots', () => {

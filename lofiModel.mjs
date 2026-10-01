@@ -85,6 +85,11 @@ const CHORD_VOICES = ['felt electric piano', 'tape piano', 'soft organ', 'dusty 
 const BASS_VOICES = ['round mono bass', 'sub bass', 'FM bass', 'pulse bass', 'plucked bass', 'rubber bass'];
 const LEAD_VOICES = ['FM bell', 'tape flute', 'soft mallet', 'vinyl pluck', 'dual lead', 'hollow reed', 'glass key', 'night synth'];
 const DRUM_KITS = ['dust kit', 'tight kit', 'soft kit', 'brush kit', 'machine kit'];
+const PAD_VOICES = ['tape strings', 'airy choir', 'warm organ', 'bowed glass', 'night drone'];
+const ARP_VOICES = ['nylon pluck', 'soft harp', 'kalimba', 'music box', 'wooden mallet', 'glass drop'];
+const MALLET_VOICES = ['vibraphone', 'marimba', 'celesta', 'low bell', 'chime cluster'];
+const PERCUSSION_VOICES = ['pink shaker', 'rimshot', 'soft clap', 'dust ride', 'open hat', 'low tom', 'bongo', 'woodblock'];
+const ROOM_TEXTURES = ['vinyl room', 'tape hiss', 'rain room', 'quiet air'];
 const SPACES = ['small room', 'warm plate', 'long hall', 'spring haze'];
 const MOTIONS = ['slow chorus', 'soft phaser', 'tape tremolo', 'still air'];
 
@@ -173,6 +178,17 @@ export function compositionFromBlock(hash, height = 0) {
       bassName: BASS_VOICES[bytes[23] % BASS_VOICES.length],
       drumKit: bytes[28] % DRUM_KITS.length,
       drumName: DRUM_KITS[bytes[28] % DRUM_KITS.length],
+      padVoice: bytes[5] % PAD_VOICES.length,
+      padName: PAD_VOICES[bytes[5] % PAD_VOICES.length],
+      arpVoice: bytes[6] % ARP_VOICES.length,
+      arpName: ARP_VOICES[bytes[6] % ARP_VOICES.length],
+      arpPattern: bytes[7] % 3,
+      malletVoice: bytes[8] % MALLET_VOICES.length,
+      malletName: MALLET_VOICES[bytes[8] % MALLET_VOICES.length],
+      percussionVoice: bytes[9] % PERCUSSION_VOICES.length,
+      percussionName: PERCUSSION_VOICES[bytes[9] % PERCUSSION_VOICES.length],
+      textureVoice: bytes[10] % ROOM_TEXTURES.length,
+      textureName: ROOM_TEXTURES[bytes[10] % ROOM_TEXTURES.length],
       kickNote: ['C1', 'D1', 'E1'][bytes[24] % 3],
       chordVelocity: 0.3 + (bytes[25] % 24) / 100,
       melodyVelocity: 0.2 + (bytes[26] % 20) / 100,

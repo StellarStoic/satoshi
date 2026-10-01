@@ -24,6 +24,11 @@ const ui = {
   lead: document.getElementById('leadVoice'),
   bass: document.getElementById('bassVoice'),
   drums: document.getElementById('drumVoice'),
+  pad: document.getElementById('padVoice'),
+  arp: document.getElementById('arpVoice'),
+  mallet: document.getElementById('malletVoice'),
+  percussion: document.getElementById('percussionVoice'),
+  texture: document.getElementById('textureVoice'),
   effects: document.getElementById('effectVoice'),
   transition: document.getElementById('blockTransition'),
   canvas: document.getElementById('lofiCanvas'),
@@ -82,6 +87,37 @@ const LEAN_HATS = [
   {noise: {type: 'brown'}, envelope: {attack: .002, decay: .026, sustain: 0}, volume: -23},
   {noise: {type: 'pink'}, envelope: {attack: .005, decay: .04, sustain: 0}, volume: -26},
   {noise: {type: 'brown'}, envelope: {attack: .007, decay: .07, sustain: 0}, volume: -25},
+];
+const PAD_PROFILES = [
+  {oscillator: 'triangle4', attack: .8, decay: 1.2, sustain: .45, release: 1.8},
+  {oscillator: 'sine4', attack: 1.1, decay: 1.4, sustain: .42, release: 2.1},
+  {oscillator: 'sine6', attack: .3, decay: .7, sustain: .62, release: 1.1},
+  {oscillator: 'triangle8', attack: .65, decay: 1.5, sustain: .38, release: 2.2},
+  {oscillator: 'triangle2', attack: 1.25, decay: 1.6, sustain: .5, release: 2.5},
+];
+const ARP_PROFILES = [
+  {oscillator: 'triangle4', attack: .008, decay: .24, release: .3},
+  {oscillator: 'sine4', attack: .015, decay: .34, release: .42},
+  {oscillator: 'sine6', attack: .004, decay: .22, release: .28},
+  {oscillator: 'triangle8', attack: .003, decay: .3, release: .5},
+  {oscillator: 'triangle2', attack: .01, decay: .18, release: .24},
+  {oscillator: 'sine8', attack: .018, decay: .38, release: .55},
+];
+const MALLET_PROFILES = [
+  {oscillator: 'sine4', attack: .004, decay: .55, release: .7},
+  {oscillator: 'triangle4', attack: .003, decay: .38, release: .48},
+  {oscillator: 'sine6', attack: .006, decay: .68, release: .82},
+  {oscillator: 'sine2', attack: .012, decay: .8, release: 1},
+  {oscillator: 'triangle8', attack: .005, decay: .5, release: .65},
+];
+const ARP_PATTERNS = [
+  [0, null, null, 1, null, null, 2, null, 1, null, null, 2, null, null, 3, null],
+  [0, null, 2, null, 1, null, 3, null, 0, null, 2, null, 1, null, 3, null],
+  [0, null, null, null, 2, null, null, null, 1, null, null, null, 3, null, null, null],
+];
+const PERCUSSION_PATTERNS = [
+  [2, 6, 10, 14], [4, 12], [4, 12], [6, 14],
+  [14], [11, 15], [3, 11], [5, 13],
 ];
 const deviceMemory = Number(globalThis.navigator?.deviceMemory || 8);
 const processorCount = Number(globalThis.navigator?.hardwareConcurrency || 8);
@@ -170,7 +206,13 @@ function showComposition(composition) {
   if (ui.lead) ui.lead.textContent = economyAudio ? LEAN_LEADS[composition.sound.leadVoice].name : composition.sound.leadName;
   if (ui.bass) ui.bass.textContent = economyAudio ? LEAN_BASSES[composition.sound.bassVoice].name : composition.sound.bassName;
   if (ui.drums) ui.drums.textContent = economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName;
+  if (ui.pad) ui.pad.textContent = composition.sound.padName;
+  if (ui.arp) ui.arp.textContent = composition.sound.arpName;
+  if (ui.mallet) ui.mallet.textContent = composition.sound.malletName;
+  if (ui.percussion) ui.percussion.textContent = composition.sound.percussionName;
+  if (ui.texture) ui.texture.textContent = composition.sound.textureName;
   if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.space} + ${composition.sound.motion}`;
+  state.engine?.setTexture(composition.sound.textureVoice);
   applyNetworkSound();
 }
 
@@ -208,6 +250,10 @@ function prepareVoices(composition, flow) {
   state.engine.kickVoice(composition.sound.drumKit);
   state.engine.snareVoice(composition.sound.drumKit);
   state.engine.hatVoice(composition.sound.drumKit);
+  state.engine.padVoice(composition.sound.padVoice);
+  state.engine.arpVoice(composition.sound.arpVoice);
+  state.engine.malletVoice(composition.sound.malletVoice);
+  state.engine.percussionVoice(composition.sound.percussionVoice);
 }
 
 function beginBlockTransition(nextComposition) {
@@ -472,7 +518,13 @@ function createEngine() {
   const bassGain = new ToneApi.Gain(economyAudio ? 1.35 : 1).connect(musicBus);
   const melodyGain = new ToneApi.Gain(economyAudio ? .18 : 1).connect(musicBus);
   const drumsGain = new ToneApi.Gain(economyAudio ? 1.55 : 1).connect(musicBus);
+  const padGain = new ToneApi.Gain(economyAudio ? .16 : .22).connect(musicBus);
+  const arpGain = new ToneApi.Gain(economyAudio ? .22 : .3).connect(musicBus);
+  const malletGain = new ToneApi.Gain(economyAudio ? .14 : .22).connect(musicBus);
+  const percussionGain = new ToneApi.Gain(economyAudio ? .42 : .55).connect(musicBus);
   const dustGain = new ToneApi.Gain(ToneApi.dbToGain(economyAudio ? -52 : -39)).connect(musicBus);
+  const textureGain = new ToneApi.Gain(ToneApi.dbToGain(-55)).connect(musicBus);
+  const textureFilter = new ToneApi.Filter(2400, 'lowpass').connect(textureGain);
   const delay = new ToneApi.FeedbackDelay('8n.', economyAudio ? .1 : .23).connect(melodyGain);
   delay.wet.value = economyAudio ? .035 : .12;
   const chorus = economyAudio ? bypass(harmonyGain) : new ToneApi.Chorus(1.2, 2.6, 0.18).connect(harmonyGain).start();
@@ -540,6 +592,52 @@ function createEngine() {
     ];
     return factories[index]().connect(delay);
   };
+  const makePadVoice = index => {
+    const profile = PAD_PROFILES[index];
+    return new ToneApi.PolySynth(ToneApi.Synth, {
+      maxPolyphony: 3,
+      oscillator: {type: profile.oscillator},
+      envelope: {attack: profile.attack, decay: profile.decay, sustain: profile.sustain, release: profile.release},
+      volume: economyAudio ? -28 : -25,
+    }).connect(padGain);
+  };
+  const makeArpVoice = index => {
+    const profile = ARP_PROFILES[index];
+    return new ToneApi.Synth({
+      oscillator: {type: profile.oscillator},
+      envelope: {attack: profile.attack, decay: profile.decay, sustain: 0, release: profile.release},
+      volume: economyAudio ? -24 : -21,
+    }).connect(arpGain);
+  };
+  const makeMalletVoice = index => {
+    const profile = MALLET_PROFILES[index];
+    return new ToneApi.Synth({
+      oscillator: {type: profile.oscillator},
+      envelope: {attack: profile.attack, decay: profile.decay, sustain: 0, release: profile.release},
+      volume: economyAudio ? -29 : -25,
+    }).connect(malletGain);
+  };
+  const makePercussionVoice = index => {
+    if ([1, 5, 6].includes(index)) {
+      return {
+        pitched: true,
+        node: new ToneApi.MembraneSynth({
+          pitchDecay: .025,
+          octaves: index === 5 ? 1.5 : 1.1,
+          envelope: {attack: .003, decay: index === 5 ? .2 : .08, sustain: 0, release: .08},
+          volume: -20,
+        }).connect(percussionGain),
+      };
+    }
+    return {
+      pitched: false,
+      node: new ToneApi.NoiseSynth({
+        noise: {type: index % 2 ? 'brown' : 'pink'},
+        envelope: {attack: .003, decay: index === 2 ? .14 : .065, sustain: 0},
+        volume: index === 2 ? -22 : -26,
+      }).connect(percussionGain),
+    };
+  };
   const makeKickVoice = index => [
     {pitchDecay: .06, octaves: 5, envelope: {attack: .002, decay: .34, sustain: 0, release: .32}, volume: -11},
     {pitchDecay: .025, octaves: 3, envelope: {attack: .001, decay: .13, sustain: 0, release: .16}, volume: -9},
@@ -561,8 +659,12 @@ function createEngine() {
     {frequency: 110, envelope: {attack: .006, decay: .12, release: .04}, harmonicity: 2.1, modulationIndex: 7, resonance: 1500, octaves: .6, volume: -31},
     {frequency: 310, envelope: {attack: .001, decay: .022, release: .01}, harmonicity: 6.2, modulationIndex: 28, resonance: 4600, octaves: 1.8, volume: -34},
   ][index];
+  const textureTypes = ['brown', 'pink', 'white', 'pink'];
+  const textureFrequencies = [1800, 4000, 1200, 2600];
+  const textureLevels = [-56, -52, -58, -61];
   const dustFilter = economyAudio ? null : new ToneApi.Filter(1250, 'lowpass').connect(dustGain);
   const dust = economyAudio ? new ToneApi.Noise('pink').connect(dustGain).start() : new ToneApi.Noise('pink').connect(dustFilter).start();
+  const roomTexture = new ToneApi.Noise(textureTypes[state.composition.sound.textureVoice]).connect(textureFilter).start();
   const lastTriggerTime = new WeakMap();
   const safeTriggerTime = (voice, requestedTime) => {
     const previous = lastTriggerTime.get(voice) ?? -Infinity;
@@ -583,8 +685,12 @@ function createEngine() {
     kickVoices: Array(5),
     snareVoices: Array(5),
     hatVoices: Array(5),
-    chorus, dust, dustFilter,
-    dustGain,
+    padVoices: Array(5),
+    arpVoices: Array(6),
+    malletVoices: Array(5),
+    percussionVoices: Array(8),
+    chorus, dust, dustFilter, roomTexture, textureFilter,
+    dustGain, textureGain,
     layerGains: {harmony: harmonyGain, bass: bassGain, melody: melodyGain, drums: drumsGain, dust: dustGain},
     step: 0,
     percussionChance: 0.1,
@@ -598,9 +704,19 @@ function createEngine() {
       this.analyser.dispose();
       this.analyser = null;
     },
+    setTexture(index) {
+      const nextType = textureTypes[index] || 'pink';
+      if (this.roomTexture.type !== nextType) this.roomTexture.type = nextType;
+      this.textureFilter.frequency.rampTo(textureFrequencies[index] || 2400, 2);
+      this.textureGain.gain.rampTo(ToneApi.dbToGain(textureLevels[index] || -58), 2);
+    },
     chordVoice(index) { return this.chordVoices[index] ||= makeChordVoice(index); },
     bassVoice(index) { return this.bassVoices[index] ||= makeBassVoice(index); },
     leadVoice(index) { return this.leadVoices[index] ||= makeLeadVoice(index); },
+    padVoice(index) { return this.padVoices[index] ||= makePadVoice(index); },
+    arpVoice(index) { return this.arpVoices[index] ||= makeArpVoice(index); },
+    malletVoice(index) { return this.malletVoices[index] ||= makeMalletVoice(index); },
+    percussionVoice(index) { return this.percussionVoices[index] ||= makePercussionVoice(index); },
     kickVoice(index) {
       return this.kickVoices[index] ||= new ToneApi.MembraneSynth(economyAudio
         ? LEAN_KICKS[index]
@@ -622,6 +738,10 @@ function createEngine() {
         bass: economyAudio ? composition.sound.bassVoice : flow?.bassVoice ?? composition.sound.bassVoice,
         lead: economyAudio ? composition.sound.leadVoice : flow?.leadVoice ?? composition.sound.leadVoice,
         drums: composition.sound.drumKit,
+        pad: composition.sound.padVoice,
+        arp: composition.sound.arpVoice,
+        mallet: composition.sound.malletVoice,
+        percussion: composition.sound.percussionVoice,
       };
       const release = (bank, activeIndex) => bank.forEach((voice, index) => {
         if (voice && index !== activeIndex) {
@@ -635,12 +755,22 @@ function createEngine() {
       release(this.kickVoices, keep.drums);
       release(this.snareVoices, keep.drums);
       release(this.hatVoices, keep.drums);
+      release(this.padVoices, keep.pad);
+      release(this.arpVoices, keep.arp);
+      release(this.malletVoices, keep.mallet);
+      this.percussionVoices.forEach((voice, index) => {
+        if (voice && index !== keep.percussion) {
+          voice.node.dispose();
+          this.percussionVoices[index] = undefined;
+        }
+      });
     },
     dispose() {
       this.loop?.dispose();
-      [...this.chordVoices, ...this.bassVoices, ...this.leadVoices, ...this.kickVoices, ...this.snareVoices, ...this.hatVoices]
+      [...this.chordVoices, ...this.bassVoices, ...this.leadVoices, ...this.kickVoices, ...this.snareVoices, ...this.hatVoices, ...this.padVoices, ...this.arpVoices, ...this.malletVoices]
         .filter(Boolean).forEach(voice => voice.dispose());
-      [this.dust, this.dustFilter, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.musicBus, bassGain]
+      this.percussionVoices.filter(Boolean).forEach(voice => voice.node.dispose());
+      [this.dust, this.dustFilter, this.roomTexture, this.textureFilter, this.textureGain, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.musicBus, bassGain, padGain, arpGain, malletGain, percussionGain]
         .filter(Boolean).forEach(node => { try { node.dispose(); } catch {} });
     },
   };
@@ -667,6 +797,10 @@ function createEngine() {
     const kick = engine.kickVoice(drumKit);
     const snare = engine.snareVoice(drumKit);
     const hat = engine.hatVoice(drumKit);
+    const pad = engine.padVoice(composition.sound.padVoice);
+    const arp = engine.arpVoice(composition.sound.arpVoice);
+    const mallet = engine.malletVoice(composition.sound.malletVoice);
+    const percussion = engine.percussionVoice(composition.sound.percussionVoice);
     if (arrangement.harmony && rhythm.chord[step]) {
       const chord = economyAudio
         ? composition.chords[bar].slice(0, 3).map((note, index) => transposeNote(note, index === 0 ? -12 : 0))
@@ -674,6 +808,16 @@ function createEngine() {
       const chordVoice = engine.chordVoice(economyAudio ? composition.sound.chordVoice : flow.chordVoice ?? composition.sound.chordVoice);
       const chordVelocity = Math.min(.72, composition.sound.chordVelocity * (flow.chordWeight || 1));
       chordVoice.triggerAttackRelease(chord, economyAudio ? '4n' : rhythm.chordDuration, safeTriggerTime(chordVoice, time), economyAudio ? chordVelocity * .82 : chordVelocity);
+    }
+    if (arrangement.harmony && sixteenth === 0) {
+      const padChord = composition.chords[bar].slice(0, 3).map(note => transposeNote(note, -12));
+      pad.triggerAttackRelease(padChord, '1m', safeTriggerTime(pad, time), economyAudio ? .16 : .22);
+    }
+    const arpTone = ARP_PATTERNS[composition.sound.arpPattern][sixteenth];
+    if (arrangement.harmony && bar % 2 === 0 && arpTone !== null) {
+      const chord = composition.chords[bar];
+      const note = chord[arpTone % chord.length];
+      arp.triggerAttackRelease(note, '16n', safeTriggerTime(arp, time), economyAudio ? .16 : .22);
     }
     if (arrangement.bass && (rhythm.bass[step] || (sixteenth === 14 && flow.bassPickup))) {
       const bassBar = sixteenth === 14 ? (bar + 1) % 4 : bar;
@@ -707,6 +851,20 @@ function createEngine() {
         leadVoice.triggerAttackRelease(note, economyAudio ? '8n' : flow.noteLength || (sixteenth % 4 ? '16n' : '8n'), safeTriggerTime(leadVoice, time), velocity);
       }
     }
+    if (bar % 2 === 1 && (sixteenth === 6 || sixteenth === 14)) {
+      const chord = composition.chords[bar];
+      const note = chord[(sixteenth === 6 ? 1 : 2) % chord.length];
+      mallet.triggerAttackRelease(note, '8n', safeTriggerTime(mallet, time), economyAudio ? .11 : .16);
+    }
+    if (PERCUSSION_PATTERNS[composition.sound.percussionVoice].includes(sixteenth)) {
+      const percTime = safeTriggerTime(percussion.node, time);
+      if (percussion.pitched) {
+        const notes = ['C3', 'D3', 'E2', 'G2', 'A2', 'C2', 'E3', 'G3'];
+        percussion.node.triggerAttackRelease(notes[composition.sound.percussionVoice], '32n', percTime, .2);
+      } else {
+        percussion.node.triggerAttackRelease('32n', percTime, .14);
+      }
+    }
     ToneApi.Draw.schedule(() => {
       state.visualStep = step;
     }, time);
@@ -725,6 +883,10 @@ async function warmEngine(engine) {
     () => engine.kickVoice(state.composition.sound.drumKit),
     () => engine.snareVoice(state.composition.sound.drumKit),
     () => engine.hatVoice(state.composition.sound.drumKit),
+    () => engine.padVoice(state.composition.sound.padVoice),
+    () => engine.arpVoice(state.composition.sound.arpVoice),
+    () => engine.malletVoice(state.composition.sound.malletVoice),
+    () => engine.percussionVoice(state.composition.sound.percussionVoice),
   ];
   for (const construct of constructors) {
     construct();
