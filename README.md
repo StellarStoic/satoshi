@@ -31,7 +31,7 @@ The shared interface uses a near-black theme with orange accents, gently animate
 
 ### How Block Lo-Fi Works
 
-Block Lo-Fi is not a playlist. A Bitcoin block hash acts like a repeatable musical seed: it chooses the key, tempo, groove and one of eight coherent production scenes. Each scene combines a compatible set of sampled keys, guitar, organ, bass, flute or mallet sounds with lightweight synthesized pads and drums. Consecutive blocks cannot repeat the same scene. Live transactions from the mempool appear as bubbles in two-second batches and gently influence the rhythm and sound. The visualizer's gravity catches every bubble on its ring. Some transactions fly near the center and make a barely audible whistle; higher-fee transactions arrive more quickly and overshoot slightly farther before curving back into orbit. When a new block is found, the completed block's music fades fully out, its instruments are released, and the new block's session fades in. Everything is arranged locally in the browser from public Bitcoin data.
+Block Lo-Fi is not a playlist. A Bitcoin block hash acts like a repeatable musical seed: it chooses the key, tempo, groove and one of twelve coherent production scenes. Each scene combines a compatible set of sampled piano, guitar, organ, harmonium, bass, cello, flute, saxophone, harp or mallet sounds with lightweight synthesized pads and drums. Consecutive blocks cannot repeat the same scene. Live transactions from the mempool appear as bubbles in two-second batches and gently influence the rhythm and sound. The visualizer's gravity catches every bubble on its ring. Some transactions fly near the center and make a barely audible whistle; higher-fee transactions arrive more quickly and overshoot slightly farther before curving back into orbit. The block height sits at the visualizer's center, while its complete hash runs clockwise around the outer ring. When a new block is found, the completed block's music fades fully out, its instruments are released, and the new block's session fades in. Everything is arranged locally in the browser from public Bitcoin data.
 
 ## Install and Use Offline
 
@@ -63,7 +63,7 @@ See [BIP39 implementation notes](docs/bip39-playground.md) for details about the
 - **Sintra:** live Bitcoin prices used by price-related tools.
 - **mempool.space:** block and fee information.
 - **Tone.js:** the bundled MIT-licensed Web Audio framework used for Block Lo-Fi scheduling, sampling, synthesis and effects.
-- **tonejs-instruments:** sparse piano, organ, guitar, bass, flute and xylophone samples used by Block Lo-Fi under CC BY 3.0. Only the active scene's instruments are loaded; the original contributors and sample authors are credited in [`audio/lofi/README.md`](audio/lofi/README.md).
+- **tonejs-instruments:** sparse piano, organ, harmonium, acoustic and nylon guitar, bass, cello, flute, saxophone, harp and xylophone samples used by Block Lo-Fi under CC BY 3.0. Only the active scene's instruments are loaded; the original contributors and sample authors are credited in [`audio/lofi/README.md`](audio/lofi/README.md).
 - **Bitcoin and Nostr news:** Bitcoin Optech, Bitcoin Core releases, project blogs, independent publications, Nostr newsletters, community feeds, and Reddit sources. A daily GitHub Action creates the static feed snapshot.
 - **CoinGecko and CoinPaprika:** Bitcoin Mood market data, with Binance as a daily fallback. Some volatility values are estimates rather than measured historical ranges.
 - **Open Exchange Rates:** fiat rates used by the converter.

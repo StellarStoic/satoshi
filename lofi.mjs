@@ -46,10 +46,15 @@ const SAMPLE_BANKS = {
   bass: {baseUrl: '/audio/lofi/bass/', urls: {E1: 'E1.mp3', E2: 'E2.mp3', E3: 'E3.mp3', E4: 'E4.mp3'}},
   flute: {baseUrl: '/audio/lofi/flute/', urls: {C4: 'C4.mp3', C5: 'C5.mp3', C6: 'C6.mp3'}},
   xylophone: {baseUrl: '/audio/lofi/xylophone/', urls: {G4: 'G4.mp3', C5: 'C5.mp3', G5: 'G5.mp3', C6: 'C6.mp3'}},
+  harmonium: {baseUrl: '/audio/lofi/harmonium/', urls: {C2: 'C2.mp3', C3: 'C3.mp3', C4: 'C4.mp3', C5: 'C5.mp3'}},
+  nylon: {baseUrl: '/audio/lofi/nylon/', urls: {A2: 'A2.mp3', A3: 'A3.mp3', A4: 'A4.mp3', A5: 'A5.mp3'}},
+  cello: {baseUrl: '/audio/lofi/cello/', urls: {C2: 'C2.mp3', C3: 'C3.mp3', C4: 'C4.mp3', C5: 'C5.mp3'}},
+  saxophone: {baseUrl: '/audio/lofi/saxophone/', urls: {D3: 'D3.mp3', D4: 'D4.mp3', D5: 'D5.mp3'}},
+  harp: {baseUrl: '/audio/lofi/harp/', urls: {A2: 'A2.mp3', A4: 'A4.mp3', A6: 'A6.mp3'}},
 };
-const CHORD_SAMPLE_BANKS = ['piano', 'guitar', 'organ', 'piano', 'organ', 'guitar'];
-const LEAD_SAMPLE_BANKS = ['flute', 'xylophone', 'guitar', 'flute', 'xylophone', 'flute', 'xylophone', 'guitar'];
-const ARP_SAMPLE_BANKS = ['guitar', 'guitar', 'xylophone', 'xylophone', 'guitar', 'xylophone'];
+const CHORD_SAMPLE_BANKS = ['piano', 'guitar', 'organ', 'piano', 'organ', 'guitar', 'harmonium', 'nylon'];
+const LEAD_SAMPLE_BANKS = ['flute', 'xylophone', 'guitar', 'flute', 'xylophone', 'flute', 'xylophone', 'guitar', 'saxophone', 'cello', 'harp'];
+const ARP_SAMPLE_BANKS = ['guitar', 'guitar', 'xylophone', 'xylophone', 'guitar', 'xylophone', 'harp', 'nylon'];
 const LEAN_KEYS = [
   {name: 'dusty Rhodes', oscillator: 'triangle8', attack: .045, decay: .72, sustain: .045, release: .65},
   {name: 'muted tape piano', oscillator: 'sine4', attack: .025, decay: .58, sustain: .035, release: .55},
@@ -57,6 +62,8 @@ const LEAN_KEYS = [
   {name: 'cassette Wurlitzer', oscillator: 'sine6', attack: .035, decay: .68, sustain: .04, release: .62},
   {name: 'soft jazz keys', oscillator: 'triangle2', attack: .065, decay: .76, sustain: .05, release: .7},
   {name: 'worn electric piano', oscillator: 'sine3', attack: .05, decay: .9, sustain: .03, release: .8},
+  {name: 'reed harmonium', oscillator: 'sine6', attack: .12, decay: .7, sustain: .2, release: 1},
+  {name: 'nylon guitar', oscillator: 'triangle2', attack: .01, decay: .45, sustain: .02, release: .45},
 ];
 const LEAN_BASSES = [
   {name: 'round sub bass', oscillator: 'sine2', attack: .025, decay: .3, sustain: .48, release: .58},
@@ -65,6 +72,7 @@ const LEAN_BASSES = [
   {name: 'tape pluck bass', oscillator: 'triangle4', attack: .008, decay: .32, sustain: .2, release: .34},
   {name: 'soft upright bass', oscillator: 'sine2', attack: .035, decay: .36, sustain: .28, release: .52},
   {name: 'rubber bass', oscillator: 'triangle2', attack: .02, decay: .4, sustain: .4, release: .66},
+  {name: 'low cello bass', oscillator: 'triangle4', attack: .08, decay: .45, sustain: .38, release: .8},
 ];
 const LEAN_LEADS = [
   {name: 'tape flute accent', oscillator: 'sine', attack: .14, decay: .42, release: .9},
@@ -75,6 +83,9 @@ const LEAN_LEADS = [
   {name: 'cassette whistle accent', oscillator: 'sine', attack: .18, decay: .5, release: 1},
   {name: 'soft bell accent', oscillator: 'sine4', attack: .025, decay: .7, release: .86},
   {name: 'night-key accent', oscillator: 'triangle2', attack: .07, decay: .55, release: .8},
+  {name: 'velvet sax accent', oscillator: 'sine4', attack: .09, decay: .5, release: .9},
+  {name: 'cello phrase', oscillator: 'triangle4', attack: .14, decay: .55, release: 1.1},
+  {name: 'harp answer', oscillator: 'triangle2', attack: .006, decay: .52, release: .7},
 ];
 const LEAN_DRUMS = ['dust-pocket kit', 'brush-room kit', 'cassette-break kit', 'soft boom-bap kit', 'late-night kit'];
 const LEAN_KICKS = [
@@ -112,6 +123,8 @@ const ARP_PROFILES = [
   {oscillator: 'triangle8', attack: .003, decay: .3, release: .5},
   {oscillator: 'triangle2', attack: .01, decay: .18, release: .24},
   {oscillator: 'sine8', attack: .018, decay: .38, release: .55},
+  {oscillator: 'triangle4', attack: .006, decay: .42, release: .62},
+  {oscillator: 'triangle2', attack: .004, decay: .3, release: .4},
 ];
 const MALLET_PROFILES = [
   {oscillator: 'sine4', attack: .004, decay: .55, release: .7},
@@ -603,15 +616,22 @@ function createEngine() {
       [ToneApi.Synth, {oscillator: {type: 'square8'}, envelope: {attack: .01, decay: .2, sustain: .12, release: 1.1}, volume: -27}],
       [ToneApi.FMSynth, {harmonicity: .75, modulationIndex: .65, oscillator: {type: 'sine'}, envelope: {attack: .45, decay: 1.1, sustain: .38, release: 3.2}, modulation: {type: 'sine'}, modulationEnvelope: {attack: .7, decay: .8, sustain: .2, release: 2.4}, volume: -23}],
       [ToneApi.Synth, {oscillator: {type: 'fatsine', count: 3, spread: 18}, envelope: {attack: .32, decay: .9, sustain: .28, release: 2.8}, volume: -24}],
+      [ToneApi.AMSynth, {harmonicity: 1.25, oscillator: {type: 'sine'}, envelope: {attack: .16, decay: .7, sustain: .35, release: 1.9}, modulation: {type: 'triangle'}, modulationEnvelope: {attack: .2, decay: .6, sustain: .18, release: 1.3}, volume: -21}],
+      [ToneApi.Synth, {oscillator: {type: 'triangle4'}, envelope: {attack: .008, decay: .42, sustain: .04, release: .65}, volume: -22}],
     ];
     return new ToneApi.PolySynth(...profiles[index]).connect(chorus);
   };
-  const makeChordVoice = index => makeSampledVoice(CHORD_SAMPLE_BANKS[index], chorus, () => makeChordFallback(index), {
-    attack: index === 2 || index === 4 ? .035 : .008,
-    release: index === 1 || index === 5 ? .48 : 1.05,
-    volume: index === 1 || index === 5 ? -17 : -19,
-    filter: index === 2 || index === 4 ? 2700 : 2350,
-  });
+  const makeChordVoice = index => {
+    const bank = CHORD_SAMPLE_BANKS[index];
+    const plucked = bank === 'guitar' || bank === 'nylon';
+    const sustained = bank === 'organ' || bank === 'harmonium';
+    return makeSampledVoice(bank, chorus, () => makeChordFallback(index), {
+      attack: sustained ? .045 : .008,
+      release: plucked ? .48 : sustained ? 1.25 : 1.05,
+      volume: plucked ? -17 : -19,
+      filter: sustained ? 2700 : 2350,
+    });
+  };
 
   const makeBassFallback = index => {
     if (economyAudio) {
@@ -630,15 +650,16 @@ function createEngine() {
       () => new ToneApi.Synth({oscillator: {type: 'pulse'}, envelope: {attack: .015, decay: .22, sustain: .3, release: .55}, volume: -18}),
       () => new ToneApi.PluckSynth({attackNoise: .45, dampening: 1100, resonance: .72, volume: -14}),
       () => new ToneApi.MonoSynth({oscillator: {type: 'fatsquare', count: 2, spread: 8}, filter: {Q: 2, type: 'lowpass'}, envelope: {attack: .02, decay: .3, sustain: .38, release: .75}, filterEnvelope: {attack: .03, decay: .28, sustain: .18, release: .7, baseFrequency: 65, octaves: 2.8}, volume: -18}),
+      () => new ToneApi.MonoSynth({oscillator: {type: 'triangle4'}, filter: {Q: 1.2, type: 'lowpass'}, envelope: {attack: .1, decay: .4, sustain: .38, release: .9}, filterEnvelope: {attack: .08, decay: .35, sustain: .2, release: .8, baseFrequency: 80, octaves: 1.8}, volume: -15}),
     ];
     return factories[index]().connect(bassGain);
   };
-  const makeBassVoice = index => [0, 2, 3, 4].includes(index)
-    ? makeSampledVoice('bass', bassGain, () => makeBassFallback(index), {
+  const makeBassVoice = index => [0, 2, 3, 4, 6].includes(index)
+    ? makeSampledVoice(index === 6 ? 'cello' : 'bass', bassGain, () => makeBassFallback(index), {
         attack: index === 3 ? .002 : .012,
-        release: index === 2 ? .8 : .48,
-        volume: -8,
-        filter: [850, 700, 620, 1050, 900, 800][index],
+        release: index === 2 || index === 6 ? .8 : .48,
+        volume: index === 6 ? -12 : -8,
+        filter: [850, 700, 620, 1050, 900, 800, 950][index],
       })
     : makeBassFallback(index);
 
@@ -661,15 +682,21 @@ function createEngine() {
       () => new ToneApi.Synth({oscillator: {type: 'sine4'}, envelope: {attack: .18, decay: .5, sustain: .08, release: 1.8}, portamento: .04, volume: -20}),
       () => new ToneApi.FMSynth({harmonicity: 3.01, modulationIndex: 7, oscillator: {type: 'sine'}, envelope: {attack: .002, decay: .75, sustain: .02, release: 1.4}, modulation: {type: 'sine'}, modulationEnvelope: {attack: .002, decay: .32, sustain: 0, release: .7}, volume: -25}),
       () => new ToneApi.Synth({oscillator: {type: 'fattriangle', count: 2, spread: 12}, envelope: {attack: .09, decay: .34, sustain: .16, release: 1.35}, volume: -23}),
+      () => new ToneApi.Synth({oscillator: {type: 'sine4'}, envelope: {attack: .1, decay: .45, sustain: .18, release: 1.2}, portamento: .03, volume: -21}),
+      () => new ToneApi.Synth({oscillator: {type: 'triangle4'}, envelope: {attack: .16, decay: .55, sustain: .22, release: 1.5}, portamento: .02, volume: -23}),
+      () => new ToneApi.PluckSynth({attackNoise: .4, dampening: 1900, resonance: .86, volume: -21}),
     ];
     return factories[index]().connect(delay);
   };
-  const makeLeadVoice = index => makeSampledVoice(LEAD_SAMPLE_BANKS[index], delay, () => makeLeadFallback(index), {
-    attack: LEAD_SAMPLE_BANKS[index] === 'flute' ? .08 : .004,
-    release: LEAD_SAMPLE_BANKS[index] === 'guitar' ? .38 : .72,
-    volume: LEAD_SAMPLE_BANKS[index] === 'flute' ? -22 : -19,
-    filter: LEAD_SAMPLE_BANKS[index] === 'xylophone' ? 2500 : 2100,
-  });
+  const makeLeadVoice = index => {
+    const bank = LEAD_SAMPLE_BANKS[index];
+    return makeSampledVoice(bank, delay, () => makeLeadFallback(index), {
+      attack: ['flute', 'saxophone'].includes(bank) ? .08 : bank === 'cello' ? .14 : .004,
+      release: ['guitar', 'harp'].includes(bank) ? .42 : bank === 'cello' ? 1.15 : .72,
+      volume: ['flute', 'saxophone', 'cello'].includes(bank) ? -22 : -19,
+      filter: bank === 'xylophone' ? 2500 : bank === 'cello' ? 1800 : 2100,
+    });
+  };
   const makePadVoice = index => {
     const profile = PAD_PROFILES[index];
     return new ToneApi.PolySynth(ToneApi.Synth, {
@@ -758,14 +785,14 @@ function createEngine() {
 
   const engine = {
     master, filter, musicBus, analyser, delay, compressor, widener, reverb, phaser, tremolo, distortion,
-    chordVoices: Array(6),
-    bassVoices: Array(6),
-    leadVoices: Array(8),
+    chordVoices: Array(8),
+    bassVoices: Array(7),
+    leadVoices: Array(11),
     kickVoices: Array(5),
     snareVoices: Array(5),
     hatVoices: Array(5),
     padVoices: Array(5),
-    arpVoices: Array(6),
+    arpVoices: Array(8),
     malletVoices: Array(5),
     percussionVoices: Array(8),
     chorus, dust, dustFilter, roomTexture, textureFilter, whistle, whistleFilter,
@@ -1245,6 +1272,36 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
   });
 }
 
+function drawBlockIdentity(context, cx, cy, radius) {
+  const hash = String(state.chain.hash || state.composition?.hash || '').replace(/[^0-9a-f]/gi, '').padEnd(64, '0').slice(0, 64).toLowerCase();
+  const hashRadius = radius * 1.09;
+  const hashSize = Math.max(7, Math.min(11, radius * .055));
+  context.save();
+  context.fillStyle = 'rgba(205,208,204,.62)';
+  context.font = `500 ${hashSize}px "Roboto Mono", monospace`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  [...hash].forEach((character, index) => {
+    const angle = -Math.PI / 2 + index / hash.length * Math.PI * 2;
+    context.save();
+    context.translate(cx + Math.cos(angle) * hashRadius, cy + Math.sin(angle) * hashRadius);
+    context.rotate(angle + Math.PI / 2);
+    context.fillText(character, 0, 0);
+    context.restore();
+  });
+
+  const blockHeight = state.chain.height ? Number(state.chain.height).toLocaleString() : 'OFFLINE';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = 'rgba(174,178,176,.72)';
+  context.font = `600 ${Math.max(7, Math.min(10, radius * .06))}px "Roboto Mono", monospace`;
+  context.fillText('BLOCK', cx, cy - Math.max(10, radius * .075));
+  context.fillStyle = '#f2a900';
+  context.font = `600 ${Math.max(15, Math.min(25, radius * .14))}px "Roboto Mono", monospace`;
+  context.fillText(blockHeight, cx, cy + Math.max(7, radius * .055));
+  context.restore();
+}
+
 function draw() {
   state.animationFrame = 0;
   if (!state.animationEnabled) return;
@@ -1303,11 +1360,8 @@ function draw() {
     context.lineTo(Math.cos(angle) * radius * (.7 + value / 850), Math.sin(angle) * radius * (.7 + value / 850));
     context.stroke();
   });
-  context.fillStyle = '#f2a900';
-  context.beginPath();
-  context.arc(0, 0, Math.max(5, radius * .035), 0, Math.PI * 2);
-  context.fill();
   context.restore();
+  drawBlockIdentity(context, cx, cy, radius);
 
   const waveform = state.engine?.analyser?.getValue();
   if (waveform) {

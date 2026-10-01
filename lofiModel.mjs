@@ -135,12 +135,12 @@ const TEXTURES = [
   {name: 'late-night radio', noiseBias: 1, filterBias: -480},
   {name: 'clean tape', noiseBias: -8, filterBias: 320},
 ];
-const CHORD_VOICES = ['felt upright piano', 'room acoustic guitar', 'warm drawbar organ', 'worn upright piano', 'tape organ', 'muted acoustic guitar'];
-const BASS_VOICES = ['fingered electric bass', 'round sub bass', 'dub electric bass', 'short electric bass', 'soft finger bass', 'rubber synth bass'];
-const LEAD_VOICES = ['breathy flute', 'soft xylophone', 'muted guitar', 'hollow flute', 'felt mallet', 'low flute', 'wooden bell', 'night guitar'];
+const CHORD_VOICES = ['felt upright piano', 'room acoustic guitar', 'warm drawbar organ', 'worn upright piano', 'tape organ', 'muted acoustic guitar', 'reed harmonium', 'nylon guitar'];
+const BASS_VOICES = ['fingered electric bass', 'round sub bass', 'dub electric bass', 'short electric bass', 'soft finger bass', 'rubber synth bass', 'low cello'];
+const LEAD_VOICES = ['breathy flute', 'soft xylophone', 'muted guitar', 'hollow flute', 'felt mallet', 'low flute', 'wooden bell', 'night guitar', 'velvet saxophone', 'bowed cello', 'soft harp'];
 const DRUM_KITS = ['dust kit', 'tight kit', 'soft kit', 'brush kit', 'machine kit'];
 const PAD_VOICES = ['tape strings', 'airy choir', 'warm organ', 'bowed glass', 'night drone'];
-const ARP_VOICES = ['nylon pluck', 'soft harp', 'kalimba', 'music box', 'wooden mallet', 'glass drop'];
+const ARP_VOICES = ['nylon pluck', 'soft harp', 'kalimba', 'music box', 'wooden mallet', 'glass drop', 'concert harp', 'nylon pattern'];
 const MALLET_VOICES = ['vibraphone', 'marimba', 'celesta', 'low bell', 'chime cluster'];
 const PERCUSSION_VOICES = ['muted tick', 'rimshot', 'soft knock', 'low clave', 'tape click', 'low tom', 'bongo', 'woodblock'];
 const ROOM_TEXTURES = ['vinyl room', 'tape hiss', 'rain room', 'quiet air'];
@@ -155,6 +155,10 @@ const PRODUCTION_SCENES = [
   {name: 'Tape Organ Dub', sessions: [9, 5], voices: [4, 2, 5, 4, 2, 4, 3, 5, 1]},
   {name: 'Wooden Jazzhop', sessions: [3, 5], voices: [1, 3, 6, 0, 5, 2, 1, 7, 0]},
   {name: 'Sunday Piano Haze', sessions: [6, 7], voices: [0, 0, 4, 2, 0, 1, 4, 4, 3]},
+  {name: 'Harmonium Hearth', sessions: [7, 9], voices: [6, 6, 8, 3, 2, 6, 3, 6, 1]},
+  {name: 'Nylon Moonlight', sessions: [4, 6], voices: [7, 4, 9, 2, 4, 7, 0, 2, 2]},
+  {name: 'Velvet Sax Lounge', sessions: [3, 1], voices: [3, 0, 8, 3, 1, 6, 1, 1, 0]},
+  {name: 'Harp and Cello Drift', sessions: [6, 2], voices: [6, 6, 10, 2, 0, 6, 4, 4, 3]},
 ];
 
 function chordForDegree(mood, root, degree, voicing) {
