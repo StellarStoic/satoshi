@@ -11,6 +11,28 @@
 })();
 
 (() => {
+  const output = document.getElementById('pwaVersion');
+  const cachePrefix = 'satoshi-static-v';
+  const numericVersion = name => Number.parseInt(name.slice(cachePrefix.length), 10);
+
+  async function showInstalledVersion() {
+    try {
+      const versions = (await caches.keys())
+        .filter(name => name.startsWith(cachePrefix))
+        .map(numericVersion)
+        .filter(Number.isFinite)
+        .sort((a, b) => b - a);
+      output.textContent = versions.length ? `v${versions[0]}` : 'not installed';
+    } catch {
+      output.textContent = 'not available';
+    }
+  }
+
+  showInstalledVersion();
+  navigator.serviceWorker?.addEventListener('controllerchange', showInstalledVersion);
+})();
+
+(() => {
   const analyticsToggle = document.getElementById('analyticsEnabled');
   const sync = () => {
     analyticsToggle.disabled = !window.satoshiAnalytics;
