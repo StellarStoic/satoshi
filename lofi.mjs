@@ -18,9 +18,6 @@ const ui = {
   weight: document.getElementById('weightReading'),
   transactions: document.getElementById('transactionReading'),
   depth: document.getElementById('depthReading'),
-  latestType: document.getElementById('latestTxType'),
-  latestDetail: document.getElementById('latestTxDetail'),
-  txReadoutLabel: document.getElementById('txReadoutLabel'),
   harmony: document.getElementById('harmonyVoice'),
   lead: document.getElementById('leadVoice'),
   bass: document.getElementById('bassVoice'),
@@ -146,6 +143,9 @@ const state = {
   flowPulse: 0,
   transactionSummary: summarizeTransactions(),
   transactionVisuals: [],
+  transactionVisualBuffer: [],
+  visualRefreshTimer: 0,
+  lastVisualRefresh: 0,
   variation: 0,
   playing: false,
   engine: null,
@@ -165,9 +165,6 @@ const state = {
   soundSignature: '',
   animationEnabled: true,
   animationFrame: 0,
-  transactionHitAreas: [],
-  inspectedTransaction: null,
-  inspectedUntil: 0,
 };
 
 function loadSettings() {
@@ -311,7 +308,7 @@ function renderChain() {
   ui.connection.querySelector('span').textContent = state.chain.connected ? 'Live from mempool.space' : 'Offline composition';
 }
 
-function addTransactionVisuals(items) {
+function renderTransactionVisuals(items) {
   if (!state.animationEnabled) return;
   const stride = Math.max(1, Math.ceil(items.length / visualProfile.batchParticles));
   items.filter((_, index) => index % stride === 0).slice(0, visualProfile.batchParticles).forEach((item, index) => {
@@ -327,6 +324,20 @@ function addTransactionVisuals(items) {
     });
   });
   state.transactionVisuals = state.transactionVisuals.slice(-visualProfile.maxParticles);
+}
+
+function addTransactionVisuals(items) {
+  if (!state.animationEnabled || !items?.length) return;
+  state.transactionVisualBuffer.push(...items);
+  state.transactionVisualBuffer = [...new Map(state.transactionVisualBuffer.map(item => [item.txid, item])).values()].slice(-visualProfile.batchParticles * 2);
+  const flush = () => {
+    state.visualRefreshTimer = 0;
+    state.lastVisualRefresh = performance.now();
+    const buffered = state.transactionVisualBuffer.splice(0);
+    renderTransactionVisuals(buffered);
+  };
+  const wait = Math.max(0, 2000 - (performance.now() - state.lastVisualRefresh));
+  if (!state.visualRefreshTimer) state.visualRefreshTimer = setTimeout(flush, wait);
 }
 
 function ingestTransactions(txids, sequence = 0, summary = null) {
@@ -419,24 +430,6 @@ function invertChord(chord, inversion) {
 function transposeNote(note, semitones) {
   if (!note || !semitones) return note;
   return ToneApi.Frequency(ToneApi.Frequency(note).toMidi() + semitones, 'midi').toNote();
-}
-
-function formatBitcoinValue(sats) {
-  if (!sats) return '0 sats';
-  if (sats < 100000) return `${Math.round(sats).toLocaleString()} sats`;
-  return `${(sats / 100000000).toFixed(sats >= 10000000 ? 2 : 4)} BTC`;
-}
-
-function showTransaction(transaction, label = 'TRANSACTION AT THE CENTER') {
-  if (!transaction) return;
-  const fee = Number(transaction.feeRate || state.chain.fee || 1);
-  const size = Math.round(transaction.vsize || 180);
-  const structure = Number.isFinite(transaction.inputs)
-    ? `${transaction.inputs} in -> ${transaction.outputs} out`
-    : 'structure sampling';
-  ui.txReadoutLabel.textContent = label;
-  ui.latestType.textContent = `${transaction.type === 'Live' ? 'Live transaction' : transaction.type}${transaction.rbf ? ' · RBF' : ''}`;
-  ui.latestDetail.textContent = `${size.toLocaleString()} vB · ${fee.toFixed(fee >= 10 ? 0 : 1)} sat/vB · ${structure} · ${transaction.txid.slice(0, 6)}...${transaction.txid.slice(-6)}`;
 }
 
 function rampAudioProperty(target, property, value, seconds = 0) {
@@ -536,6 +529,13 @@ function createEngine() {
   const dustGain = new ToneApi.Gain(ToneApi.dbToGain(economyAudio ? -52 : -39)).connect(musicBus);
   const textureGain = new ToneApi.Gain(ToneApi.dbToGain(-55)).connect(musicBus);
   const textureFilter = new ToneApi.Filter(2400, 'lowpass').connect(textureGain);
+  const whistleGain = new ToneApi.Gain(.42).connect(musicBus);
+  const whistleFilter = new ToneApi.Filter(1450, 'lowpass').connect(whistleGain);
+  const whistle = new ToneApi.Synth({
+    oscillator: {type: 'sine'},
+    envelope: {attack: .045, decay: .1, sustain: .035, release: .24},
+    volume: -22,
+  }).connect(whistleFilter);
   const delay = new ToneApi.FeedbackDelay('8n.', economyAudio ? .1 : .23).connect(melodyGain);
   delay.wet.value = economyAudio ? .035 : .12;
   const chorus = economyAudio ? bypass(harmonyGain) : new ToneApi.Chorus(1.2, 2.6, 0.18).connect(harmonyGain).start();
@@ -700,11 +700,12 @@ function createEngine() {
     arpVoices: Array(6),
     malletVoices: Array(5),
     percussionVoices: Array(8),
-    chorus, dust, dustFilter, roomTexture, textureFilter,
+    chorus, dust, dustFilter, roomTexture, textureFilter, whistle, whistleFilter,
     dustGain, textureGain,
     layerGains: {harmony: harmonyGain, bass: bassGain, melody: melodyGain, drums: drumsGain, dust: dustGain},
     step: 0,
     percussionChance: 0.1,
+    lastWhistleAt: 0,
     enableAnalyser() {
       if (this.analyser) return;
       this.analyser = new ToneApi.Analyser('waveform', lowPower ? 64 : 128);
@@ -720,6 +721,19 @@ function createEngine() {
       if (this.roomTexture.type !== nextType) this.roomTexture.type = nextType;
       this.textureFilter.frequency.rampTo(textureFrequencies[index] || 2400, 2);
       this.textureGain.gain.rampTo(ToneApi.dbToGain(textureLevels[index] || -58), 2);
+    },
+    playWhistle(transaction, proximity) {
+      const nowMs = performance.now();
+      if (!state.playing || nowMs - this.lastWhistleAt < 320) return;
+      this.lastWhistleAt = nowMs;
+      const feeMotion = Math.min(1, Math.log2(Math.max(1, transaction.feeRate || state.chain.fee)) / 9);
+      const duration = .14 + (1 - feeMotion) * .42;
+      const startFrequency = 390 + feeMotion * 170;
+      const now = ToneApi.now() + .01;
+      this.whistleFilter.frequency.rampTo(900 + proximity * 650, .08);
+      this.whistle.triggerAttack(startFrequency, now, .018 + proximity * .035);
+      this.whistle.frequency.rampTo(startFrequency * (1.035 + feeMotion * .045), duration);
+      this.whistle.triggerRelease(now + duration);
     },
     chordVoice(index) { return this.chordVoices[index] ||= makeChordVoice(index); },
     bassVoice(index) { return this.bassVoices[index] ||= makeBassVoice(index); },
@@ -795,7 +809,7 @@ function createEngine() {
       [...this.chordVoices, ...this.bassVoices, ...this.leadVoices, ...this.kickVoices, ...this.snareVoices, ...this.hatVoices, ...this.padVoices, ...this.arpVoices, ...this.malletVoices]
         .filter(Boolean).forEach(voice => voice.dispose());
       this.percussionVoices.filter(Boolean).forEach(voice => voice.node.dispose());
-      [this.dust, this.dustFilter, this.roomTexture, this.textureFilter, this.textureGain, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.musicBus, bassGain, padGain, arpGain, malletGain, percussionGain]
+      [this.dust, this.dustFilter, this.roomTexture, this.textureFilter, this.textureGain, this.whistle, this.whistleFilter, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.musicBus, bassGain, padGain, arpGain, malletGain, percussionGain, whistleGain]
         .filter(Boolean).forEach(node => { try { node.dispose(); } catch {} });
     },
   };
@@ -1110,7 +1124,6 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const duration = 5200 - feeMotion * 2400;
     return now - transaction.born < duration + 1100;
   });
-  state.transactionHitAreas = [];
   state.transactionVisuals.forEach(transaction => {
     const feeMotion = Math.min(1, Math.log2(Math.max(1, transaction.feeRate)) / 9);
     const duration = 5200 - feeMotion * 2400;
@@ -1134,11 +1147,11 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * targetY;
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
-    state.transactionHitAreas.push({transaction, x, y, radius: Math.max(10, particleRadius + 4)});
-    const touchesCenter = transaction.crossesCenter && Math.hypot(x - cx, y - cy) <= Math.max(8, particleRadius);
-    if (touchesCenter && !transaction.announced) {
-      transaction.announced = true;
-      if (!state.inspectedTransaction || now > state.inspectedUntil) showTransaction(transaction);
+    const centerDistance = Math.hypot(x - cx, y - cy);
+    const whistleRange = radius * .34;
+    if (transaction.crossesCenter && centerDistance <= whistleRange && !transaction.whistled) {
+      transaction.whistled = true;
+      state.engine?.playWhistle(transaction, Math.max(0, 1 - centerDistance / whistleRange));
     }
     const color = transactionColor(transaction);
     context.save();
@@ -1163,22 +1176,6 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     }
     context.restore();
   });
-}
-
-function transactionAtPointer(event) {
-  const bounds = ui.canvas.getBoundingClientRect();
-  const x = event.clientX - bounds.left;
-  const y = event.clientY - bounds.top;
-  return [...state.transactionHitAreas].reverse().find(hit => Math.hypot(hit.x - x, hit.y - y) <= hit.radius)?.transaction || null;
-}
-
-function inspectTransaction(event, persist = false) {
-  const transaction = transactionAtPointer(event);
-  ui.canvas.style.cursor = transaction ? 'pointer' : 'default';
-  if (!transaction) return;
-  state.inspectedTransaction = transaction;
-  state.inspectedUntil = performance.now() + (persist ? 6000 : 500);
-  showTransaction(transaction, persist ? 'SELECTED TRANSACTION' : 'TRANSACTION UNDER POINTER');
 }
 
 function draw() {
@@ -1302,16 +1299,6 @@ ui.volume.addEventListener('input', () => {
   saveSettings();
 });
 ui.visualToggle.addEventListener('change', () => setAnimationEnabled(ui.visualToggle.checked));
-ui.canvas.addEventListener('pointermove', event => inspectTransaction(event));
-ui.canvas.addEventListener('pointerleave', () => {
-  ui.canvas.style.cursor = 'default';
-  state.inspectedTransaction = null;
-});
-ui.canvas.addEventListener('click', event => inspectTransaction(event, true));
-ui.canvas.addEventListener('pointerdown', event => {
-  if (event.pointerType === 'touch') inspectTransaction(event, true);
-});
-
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.playing) ui.transport.textContent = 'Playing in background';
   else if (!document.hidden) refreshBlockTip().catch(() => {});
@@ -1322,6 +1309,7 @@ globalThis.addEventListener('beforeunload', () => {
   clearTimeout(state.detailTimer);
   clearTimeout(state.transitionTimer);
   clearTimeout(state.soundUpdateTimer);
+  clearTimeout(state.visualRefreshTimer);
   if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
   state.socket?.close();
   state.engine?.dispose();

@@ -35,11 +35,6 @@
     <section class="player" aria-label="Bitcoin Lo-Fi player">
       <div class="visual-stage" id="visualStage">
         <canvas id="lofiCanvas" width="1200" height="720" aria-label="Animated visualization generated from the current Bitcoin block"></canvas>
-        <div class="tx-readout" aria-live="polite">
-          <span id="txReadoutLabel">TRANSACTION AT THE CENTER</span>
-          <strong id="latestTxType">Listening...</strong>
-          <small id="latestTxDetail">Hover or tap a bubble to inspect it</small>
-        </div>
         <div class="record-label" aria-live="polite">
           <span>NOW PLAYING</span>
           <strong id="trackName">Waiting for block data</strong>
@@ -81,7 +76,7 @@
         <div><dt>Average size</dt><dd id="sizeReading">—</dd><small>note length + visual mass</small></div>
         <div><dt>Half-hour fee</dt><dd id="feeReading">—</dd><small>energy + brightness</small></div>
         <div><dt>Mempool weight</dt><dd id="weightReading">—</dd><small>tape texture</small></div>
-        <div><dt>Waiting transactions</dt><dd id="transactionReading">—</dd><small>percussion detail</small></div>
+        <div><dt>Unconfirmed transactions</dt><dd id="transactionReading">—</dd><small>currently waiting in the mempool</small></div>
         <div><dt>Projected blocks</dt><dd id="depthReading">—</dd><small>echo depth</small></div>
       </dl>
       <div class="sonic-recipe" aria-live="polite">

@@ -31,7 +31,7 @@ The shared interface uses a near-black theme with orange accents, gently animate
 
 ### How Block Lo-Fi Works
 
-Block Lo-Fi is not a playlist. A Bitcoin block hash acts like a repeatable musical seed: it chooses the key, tempo, groove and instrument ensemble. Live transactions from the mempool appear as bubbles and gently influence the rhythm and sound. Most bubbles flow into the circular visualizer, while some cross its center; a center crossing displays that transaction's available size, fee and structure. Any visible bubble can also be inspected with a mouse or tap. When a new block is found, the completed block's music fades fully out, its instruments are released, and the new block's session fades in. Everything is generated locally in the browser from public Bitcoin data.
+Block Lo-Fi is not a playlist. A Bitcoin block hash acts like a repeatable musical seed: it chooses the key, tempo, groove and instrument ensemble. Live transactions from the mempool appear as bubbles in two-second batches and gently influence the rhythm and sound. Most bubbles flow into the circular visualizer, while some cross its center and make a barely audible whistle; higher-fee transactions pass and whistle more quickly, while proximity to the center subtly changes the sound. The page also shows how many unconfirmed transactions are currently waiting in the mempool. When a new block is found, the completed block's music fades fully out, its instruments are released, and the new block's session fades in. Everything is generated locally in the browser from public Bitcoin data.
 
 ## Install and Use Offline
 

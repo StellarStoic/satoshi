@@ -32,10 +32,6 @@
 .block-transition.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: #f2a900; content: ""; transform-origin: left; animation: block-handover var(--handover-time, 12s) linear both; }
 @keyframes block-spin { to { transform: rotate(360deg); } }
 @keyframes block-handover { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.tx-readout { position: absolute; top: 22px; left: 22px; width: min(340px, calc(100% - 240px)); padding: 11px 12px; border-left: 2px solid #86a873; background: rgba(10,12,13,.74); pointer-events: none; }
-.tx-readout span { display: block; color: #747a7c; font-size: 9px; text-transform: uppercase; }
-.tx-readout strong { display: block; margin: 5px 0 4px; color: #e7e8e3; font-size: 13px; font-weight: 500; }
-.tx-readout small { display: block; color: #858b8d; font-size: 10px; line-height: 1.45; }
 .tx-legend { position: absolute; right: 22px; bottom: 22px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px 12px; width: min(470px, 61%); color: #979c9e; font-size: 9px; text-transform: uppercase; pointer-events: none; }
 .tx-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .tx-legend span::before { width: 6px; height: 6px; border-radius: 50%; background: #aaa; content: ""; }
@@ -153,8 +149,6 @@
   .studio-heading h1 { font-size: 48px; }
   .visual-stage, #lofiCanvas { min-height: 48svh; }
   .block-stamp { top: 14px; right: 14px; }
-  .tx-readout { top: 14px; left: 14px; width: min(190px, calc(100% - 155px)); }
-  .tx-readout small { white-space: normal; }
   .tx-legend { display: none; }
   .record-label { left: 18px; bottom: 22px; }
   .transport-row { grid-template-columns: 58px minmax(0, 1fr); gap: 10px; }
