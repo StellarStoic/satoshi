@@ -35,6 +35,60 @@ export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
 }
 
+function quadraticPoint(start, control, end, progress) {
+  const inverse = 1 - progress;
+  return inverse * inverse * start + 2 * inverse * progress * control + progress * progress * end;
+}
+
+export function transactionGravityPoint(options = {}) {
+  const cx = Number(options.cx) || 0;
+  const cy = Number(options.cy) || 0;
+  const radius = Math.max(1, Number(options.radius) || 1);
+  const edgeDistance = Math.max(radius, Number(options.edgeDistance) || radius);
+  const entryAngle = Number(options.entryAngle) || 0;
+  const targetAngle = Number(options.targetAngle) || 0;
+  const orbit = Number(options.orbit) < 0 ? -1 : 1;
+  const bend = clamp(options.bend, -1, 1);
+  const feeMotion = clamp(options.feeMotion, 0, 1);
+  const progress = clamp(options.progress, 0, 1);
+  const eased = 1 - Math.pow(1 - progress, 2.4);
+  const startX = cx + Math.cos(entryAngle) * edgeDistance;
+  const startY = cy + Math.sin(entryAngle) * edgeDistance;
+  const targetX = cx + Math.cos(targetAngle) * radius * .78;
+  const targetY = cy + Math.sin(targetAngle) * radius * .78;
+
+  if (!options.crossesCenter) {
+    const curveDistance = radius * (1.12 + Math.abs(bend) * .72);
+    const controlAngle = entryAngle + orbit * (Math.PI * .48 + bend * .34);
+    return {
+      x: quadraticPoint(startX, cx + Math.cos(controlAngle) * curveDistance, targetX, eased),
+      y: quadraticPoint(startY, cy + Math.sin(controlAngle) * curveDistance, targetY, eased),
+    };
+  }
+
+  const captureAt = .68;
+  const overshootDistance = radius * (.1 + feeMotion * .24);
+  const flybyX = cx - Math.cos(entryAngle) * overshootDistance;
+  const flybyY = cy - Math.sin(entryAngle) * overshootDistance;
+  if (eased <= captureAt) {
+    const flybyProgress = eased / captureAt;
+    return {
+      x: quadraticPoint(startX, cx, flybyX, flybyProgress),
+      y: quadraticPoint(startY, cy, flybyY, flybyProgress),
+    };
+  }
+
+  const returnProgress = (eased - captureAt) / (1 - captureAt);
+  const tangentAngle = targetAngle - orbit * Math.PI / 2;
+  const returnControlDistance = radius * (.32 + feeMotion * .12);
+  const returnControlX = cx + Math.cos(tangentAngle) * returnControlDistance;
+  const returnControlY = cy + Math.sin(tangentAngle) * returnControlDistance;
+  return {
+    x: quadraticPoint(flybyX, returnControlX, targetX, returnProgress),
+    y: quadraticPoint(flybyY, returnControlY, targetY, returnProgress),
+  };
+}
+
 export function cleanHash(value) {
   const hash = String(value || '').toLowerCase().replace(/[^0-9a-f]/g, '');
   return (hash + '0000000000000000000000000000000000000000000000000000000000000000').slice(0, 64);

@@ -1,4 +1,4 @@
-import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions} from './lofiModel.mjs';
+import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions, transactionGravityPoint} from './lofiModel.mjs';
 
 const ToneApi = globalThis.Tone;
 const ui = {
@@ -1201,21 +1201,17 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const elapsed = now - transaction.born;
     if (elapsed < 0) return;
     const progress = Math.min(1, elapsed / duration);
-    const eased = 1 - Math.pow(1 - progress, 2.4);
     const entryAngle = transaction.entryAngle ?? transaction.lane * Math.PI * 2;
     const edgeDistance = Math.hypot(width, height) * .72 + 40;
-    const startX = cx + Math.cos(entryAngle) * edgeDistance;
-    const startY = cy + Math.sin(entryAngle) * edgeDistance;
     const targetAngle = transaction.lane * Math.PI * 2;
-    const targetX = transaction.crossesCenter ? cx - Math.cos(entryAngle) * edgeDistance : cx + Math.cos(targetAngle) * radius * .78;
-    const targetY = transaction.crossesCenter ? cy - Math.sin(entryAngle) * edgeDistance : cy + Math.sin(targetAngle) * radius * .78;
-    const curveDistance = Math.min(width, height) * (.18 + Math.abs(transaction.bend) * .13);
-    const controlAngle = entryAngle + (transaction.orbit || 1) * (Math.PI * .48 + transaction.bend * .34);
-    const controlX = transaction.crossesCenter ? cx : cx + Math.cos(controlAngle) * (radius + curveDistance);
-    const controlY = transaction.crossesCenter ? cy : cy + Math.sin(controlAngle) * (radius + curveDistance);
-    const inverse = 1 - eased;
-    const x = inverse * inverse * startX + 2 * inverse * eased * controlX + eased * eased * targetX;
-    const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * targetY;
+    const {x, y} = transactionGravityPoint({
+      cx, cy, radius, edgeDistance, entryAngle, targetAngle,
+      orbit: transaction.orbit,
+      bend: transaction.bend,
+      feeMotion,
+      progress,
+      crossesCenter: transaction.crossesCenter,
+    });
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
     const centerDistance = Math.hypot(x - cx, y - cy);

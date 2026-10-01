@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions} from '../lofiModel.mjs';
+import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -132,4 +132,18 @@ test('fallback state always produces a playable composition', () => {
   const fallback = fallbackChainState();
   assert.equal(cleanHash(fallback.hash).length, 64);
   assert.doesNotThrow(() => compositionFromBlock(fallback.hash, fallback.height));
+});
+
+test('gravity catches regular and fast center-flyby transactions on the ring', () => {
+  const base = {cx: 500, cy: 300, radius: 180, edgeDistance: 760, entryAngle: .25, targetAngle: 2.1, orbit: -1, bend: .6};
+  for (const crossesCenter of [false, true]) {
+    for (const feeMotion of [0, .5, 1]) {
+      const point = transactionGravityPoint({...base, crossesCenter, feeMotion, progress: 1});
+      assert.ok(Math.abs(Math.hypot(point.x - base.cx, point.y - base.cy) - base.radius * .78) < .0001);
+    }
+  }
+  const slowFlyby = transactionGravityPoint({...base, crossesCenter: true, feeMotion: 0, progress: .39});
+  const fastFlyby = transactionGravityPoint({...base, crossesCenter: true, feeMotion: 1, progress: .39});
+  assert.ok(Math.hypot(fastFlyby.x - base.cx, fastFlyby.y - base.cy) > Math.hypot(slowFlyby.x - base.cx, slowFlyby.y - base.cy));
+  assert.ok(Math.hypot(fastFlyby.x - base.cx, fastFlyby.y - base.cy) < base.radius * .35);
 });
