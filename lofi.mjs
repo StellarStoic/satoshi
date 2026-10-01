@@ -20,6 +20,7 @@ const ui = {
   depth: document.getElementById('depthReading'),
   latestType: document.getElementById('latestTxType'),
   latestDetail: document.getElementById('latestTxDetail'),
+  txReadoutLabel: document.getElementById('txReadoutLabel'),
   harmony: document.getElementById('harmonyVoice'),
   lead: document.getElementById('leadVoice'),
   bass: document.getElementById('bassVoice'),
@@ -164,6 +165,9 @@ const state = {
   soundSignature: '',
   animationEnabled: true,
   animationFrame: 0,
+  transactionHitAreas: [],
+  inspectedTransaction: null,
+  inspectedUntil: 0,
 };
 
 function loadSettings() {
@@ -233,7 +237,6 @@ function applyComposition(composition) {
 
 function queueComposition(composition) {
   if (state.playing) {
-    prepareVoices(composition, flowFromTransactions(composition.hash, composition, state.transactionSummary));
     state.pendingComposition = composition;
     ui.transport.textContent = 'New block approaching';
     ui.transition?.classList.add('waiting');
@@ -261,27 +264,28 @@ function beginBlockTransition(nextComposition) {
   state.transitioning = true;
   state.pendingComposition = null;
   const barSeconds = Math.max(2.8, 240 / Math.max(56, ToneApi.getTransport().bpm.value));
-  const fadeOutSeconds = economyAudio ? .7 : barSeconds;
-  const fadeInSeconds = economyAudio ? 1.4 : barSeconds * 2;
-  const transitionFloor = economyAudio ? .58 : .12;
+  const fadeOutSeconds = economyAudio ? 1.4 : Math.min(3.5, barSeconds);
+  const fadeInSeconds = economyAudio ? 2 : Math.min(5, barSeconds * 1.5);
   const bus = state.engine.musicBus.gain;
-  ui.transport.textContent = 'Blending into the new block';
+  ui.transport.textContent = 'Fading out the completed block';
   ui.transition?.classList.remove('waiting');
   ui.transition?.classList.add('active');
   ui.transition?.style.setProperty('--handover-time', `${fadeOutSeconds + fadeInSeconds}s`);
-  bus.rampTo(transitionFloor, fadeOutSeconds);
+  bus.rampTo(0.0001, fadeOutSeconds);
   state.engine.filter.frequency.rampTo(720, fadeOutSeconds * .85);
   clearTimeout(state.transitionTimer);
   state.transitionTimer = setTimeout(() => {
+    state.engine.releaseAllVoices();
     applyComposition(nextComposition);
+    prepareVoices(nextComposition, state.activeFlow);
     state.engine.step = 0;
+    ui.transport.textContent = 'Fading in the new block';
     bus.rampTo(.82, fadeInSeconds);
     applyNetworkSound();
     state.transitionTimer = setTimeout(() => {
       state.transitioning = false;
       ui.transition?.classList.remove('active');
       ui.transport.textContent = state.chain.connected ? 'New block in the groove' : 'Offline groove';
-      if (!economyAudio) state.engine.releaseUnusedVoices(state.composition, state.activeFlow);
     }, fadeInSeconds * 1000);
   }, fadeOutSeconds * 1000);
 }
@@ -337,9 +341,6 @@ function ingestTransactions(txids, sequence = 0, summary = null) {
   if (summary?.count) {
     state.transactionSummary = summary;
     addTransactionVisuals(summary.items);
-    const latest = summary.items[summary.items.length - 1];
-    ui.latestType.textContent = `${latest.type}${latest.rbf ? ' · RBF' : ''}`;
-    ui.latestDetail.textContent = `${Math.round(latest.vsize).toLocaleString()} vB · ${latest.feeRate.toFixed(latest.feeRate >= 10 ? 0 : 1)} sat/vB · ${latest.inputs} in → ${latest.outputs} out · ${formatBitcoinValue(latest.value)}`;
   } else if (state.animationEnabled) {
     addTransactionVisuals(valid.map(txid => ({
       txid,
@@ -355,7 +356,7 @@ function ingestTransactions(txids, sequence = 0, summary = null) {
   state.transactionsSeen += incomingCount;
   state.flowPulse = Math.min(1, state.flowPulse + incomingCount / 24);
   state.flowWindow.push({time: Date.now(), count: incomingCount});
-  if (state.playing) ui.transport.textContent = `${incomingCount.toLocaleString()} new transactions shaping the next bar`;
+  if (state.playing && !state.transitioning) ui.transport.textContent = 'Live Bitcoin session';
   renderChain();
 }
 
@@ -365,9 +366,6 @@ function applyTransactionDetails(transactions) {
   const summary = summarizeTransactions(valid);
   state.transactionSummary = summary;
   addTransactionVisuals(summary.items);
-  const latest = summary.items[summary.items.length - 1];
-  ui.latestType.textContent = `${latest.type}${latest.rbf ? ' · RBF' : ''}`;
-  ui.latestDetail.textContent = `${Math.round(latest.vsize).toLocaleString()} vB · ${latest.feeRate.toFixed(latest.feeRate >= 10 ? 0 : 1)} sat/vB · ${latest.inputs} in → ${latest.outputs} out · ${formatBitcoinValue(latest.value)}`;
   state.pendingFlow = flowFromTransactions(state.flowSeed, state.pendingComposition || state.composition, summary);
   prepareVoices(state.pendingComposition || state.composition, state.pendingFlow);
   renderChain();
@@ -426,6 +424,18 @@ function formatBitcoinValue(sats) {
   if (!sats) return '0 sats';
   if (sats < 100000) return `${Math.round(sats).toLocaleString()} sats`;
   return `${(sats / 100000000).toFixed(sats >= 10000000 ? 2 : 4)} BTC`;
+}
+
+function showTransaction(transaction, label = 'TRANSACTION AT THE CENTER') {
+  if (!transaction) return;
+  const fee = Number(transaction.feeRate || state.chain.fee || 1);
+  const size = Math.round(transaction.vsize || 180);
+  const structure = Number.isFinite(transaction.inputs)
+    ? `${transaction.inputs} in -> ${transaction.outputs} out`
+    : 'structure sampling';
+  ui.txReadoutLabel.textContent = label;
+  ui.latestType.textContent = `${transaction.type === 'Live' ? 'Live transaction' : transaction.type}${transaction.rbf ? ' · RBF' : ''}`;
+  ui.latestDetail.textContent = `${size.toLocaleString()} vB · ${fee.toFixed(fee >= 10 ? 0 : 1)} sat/vB · ${structure} · ${transaction.txid.slice(0, 6)}...${transaction.txid.slice(-6)}`;
 }
 
 function rampAudioProperty(target, property, value, seconds = 0) {
@@ -731,6 +741,20 @@ function createEngine() {
       return this.hatVoices[index] ||= economyAudio
         ? new ToneApi.NoiseSynth(LEAN_HATS[index]).connect(drumsGain)
         : new ToneApi.MetalSynth(makeHatVoice(index)).connect(drumsGain);
+    },
+    releaseAllVoices() {
+      const banks = [this.chordVoices, this.bassVoices, this.leadVoices, this.kickVoices, this.snareVoices, this.hatVoices, this.padVoices, this.arpVoices, this.malletVoices];
+      banks.forEach(bank => bank.forEach((voice, index) => {
+        if (!voice) return;
+        try { voice.releaseAll?.(); } catch {}
+        voice.dispose();
+        bank[index] = undefined;
+      }));
+      this.percussionVoices.forEach((voice, index) => {
+        if (!voice) return;
+        voice.node.dispose();
+        this.percussionVoices[index] = undefined;
+      });
     },
     releaseUnusedVoices(composition, flow) {
       const keep = {
@@ -1085,6 +1109,7 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const duration = 5200 - feeMotion * 2400;
     return now - transaction.born < duration + 1100;
   });
+  state.transactionHitAreas = [];
   state.transactionVisuals.forEach(transaction => {
     const feeMotion = Math.min(1, Math.log2(Math.max(1, transaction.feeRate)) / 9);
     const duration = 5200 - feeMotion * 2400;
@@ -1096,9 +1121,8 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const edgeDistance = Math.hypot(width, height) * .72 + 40;
     const startX = cx + Math.cos(entryAngle) * edgeDistance;
     const startY = cy + Math.sin(entryAngle) * edgeDistance;
-    const targetAngle = transaction.lane * Math.PI * 2;
-    const targetX = cx + Math.cos(targetAngle) * radius * .78;
-    const targetY = cy + Math.sin(targetAngle) * radius * .78;
+    const targetX = cx;
+    const targetY = cy;
     const curveDistance = Math.min(width, height) * (.18 + Math.abs(transaction.bend) * .13);
     const controlAngle = entryAngle + (transaction.orbit || 1) * (Math.PI * .48 + transaction.bend * .34);
     const controlX = cx + Math.cos(controlAngle) * (radius + curveDistance);
@@ -1108,6 +1132,11 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * targetY;
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
+    state.transactionHitAreas.push({transaction, x, y, radius: Math.max(10, particleRadius + 4)});
+    if (progress >= .96 && !transaction.announced) {
+      transaction.announced = true;
+      if (!state.inspectedTransaction || now > state.inspectedUntil) showTransaction(transaction);
+    }
     const color = transactionColor(transaction);
     context.save();
     context.globalAlpha = Math.max(.12, arrival * .88);
@@ -1131,6 +1160,22 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     }
     context.restore();
   });
+}
+
+function transactionAtPointer(event) {
+  const bounds = ui.canvas.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+  return [...state.transactionHitAreas].reverse().find(hit => Math.hypot(hit.x - x, hit.y - y) <= hit.radius)?.transaction || null;
+}
+
+function inspectTransaction(event, persist = false) {
+  const transaction = transactionAtPointer(event);
+  ui.canvas.style.cursor = transaction ? 'pointer' : 'default';
+  if (!transaction) return;
+  state.inspectedTransaction = transaction;
+  state.inspectedUntil = performance.now() + (persist ? 6000 : 500);
+  showTransaction(transaction, persist ? 'SELECTED TRANSACTION' : 'TRANSACTION UNDER POINTER');
 }
 
 function draw() {
@@ -1254,6 +1299,28 @@ ui.volume.addEventListener('input', () => {
   saveSettings();
 });
 ui.visualToggle.addEventListener('change', () => setAnimationEnabled(ui.visualToggle.checked));
+ui.canvas.addEventListener('pointermove', event => inspectTransaction(event));
+ui.canvas.addEventListener('pointerleave', () => {
+  ui.canvas.style.cursor = 'default';
+  state.inspectedTransaction = null;
+});
+ui.canvas.addEventListener('click', event => inspectTransaction(event, true));
+ui.canvas.addEventListener('pointerdown', event => {
+  if (event.pointerType === 'touch') inspectTransaction(event, true);
+});
+
+document.getElementById('copyExplainer')?.addEventListener('click', async event => {
+  const button = event.currentTarget;
+  const text = document.getElementById('shareExplainerText')?.textContent.trim();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(`${text}\n\nhttps://satoshi.si/lofi.html`);
+    button.querySelector('span').textContent = 'Copied';
+  } catch {
+    button.querySelector('span').textContent = 'Copy failed';
+  }
+  setTimeout(() => { button.querySelector('span').textContent = 'Copy explainer'; }, 1800);
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.playing) ui.transport.textContent = 'Playing in background';
   else if (!document.hidden) refreshBlockTip().catch(() => {});

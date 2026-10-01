@@ -36,9 +36,9 @@
       <div class="visual-stage" id="visualStage">
         <canvas id="lofiCanvas" width="1200" height="720" aria-label="Animated visualization generated from the current Bitcoin block"></canvas>
         <div class="tx-readout" aria-live="polite">
-          <span>NEW TRANSACTION</span>
+          <span id="txReadoutLabel">TRANSACTION AT THE CENTER</span>
           <strong id="latestTxType">Listening...</strong>
-          <small id="latestTxDetail">Size, fee and structure will appear here</small>
+          <small id="latestTxDetail">Hover or tap a bubble to inspect it</small>
         </div>
         <div class="record-label" aria-live="polite">
           <span>NOW PLAYING</span>
@@ -112,7 +112,7 @@
         <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique seed. Its bytes choose the key, progression, swing and one instrument for each role: keys, bass, pad, pluck, lead, answering mallet, drums, secondary percussion and room texture. A different block creates a different studio.</p></div><code>hash → musical world</code></li>
         <li><span>02</span><div><h3>The mempool conducts it</h3><p>Waiting transaction count, projected blocks and fee pressure continuously shade tempo, brightness, percussion density, echo and noise. Busy does not simply mean loud; it means more energy and detail.</p></div><code>pressure → energy</code></li>
         <li><span>03</span><div><h3>Transactions write phrases</h3><p>Incoming TXIDs reshape the next phrase. Sampled transaction size controls note length and visual mass; fee rate affects brightness and speed; inputs, outputs, RBF and script family influence rhythm, voicing and color.</p></div><code>transactions → variation</code></li>
-        <li><span>04</span><div><h3>A new block dissolves in</h3><p>The current session first recedes into a filtered wash. The new block changes the ensemble at the quiet point, then rises over two bars. The chain advances without an abrupt track cut.</p></div><code>old block ⇢ new block</code></li>
+        <li><span>04</span><div><h3>Blocks never overlap</h3><p>The completed block fades fully to silence and its instruments are released. Only then does the new block choose its ensemble and fade in, so two block sessions never play over each other.</p></div><code>fade out -> reset -> fade in</code></li>
       </ol>
       <div class="data-legend" aria-label="Live data to music mapping">
         <div><i data-lucide="box"></i><span>Block hash</span><strong>Key · progression · instruments · effects</strong></div>
@@ -120,6 +120,15 @@
         <div><i data-lucide="circle-dot"></i><span>Transaction size</span><strong>Bubble mass · note length</strong></div>
         <div><i data-lucide="git-branch"></i><span>Transaction structure</span><strong>Rhythm · voicing · timbre</strong></div>
       </div>
+    </section>
+
+    <section class="share-explainer" aria-labelledby="share-explainer-title">
+      <div>
+        <p class="lofi-eyebrow">Share the idea</p>
+        <h2 id="share-explainer-title">Bitcoin conducts. Your browser performs.</h2>
+        <p id="shareExplainerText">Each Bitcoin block hash chooses a Lo-Fi key, groove and instrument ensemble. Live mempool transactions become the moving bubbles and gently reshape rhythm, tone and energy. When a new block arrives, the old session fades out and a new one fades in. The music is generated live in your browser, not played from a playlist.</p>
+      </div>
+      <button type="button" id="copyExplainer"><i data-lucide="copy"></i><span>Copy explainer</span></button>
     </section>
 
     <section class="lofi-note">
