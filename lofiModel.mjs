@@ -81,9 +81,9 @@ const TEXTURES = [
   {name: 'late-night radio', noiseBias: 1, filterBias: -480},
   {name: 'clean tape', noiseBias: -8, filterBias: 320},
 ];
-const CHORD_VOICES = ['felt electric piano', 'tape piano', 'soft organ', 'dusty keys', 'glass pad', 'muted strings'];
-const BASS_VOICES = ['round mono bass', 'sub bass', 'FM bass', 'pulse bass', 'plucked bass', 'rubber bass'];
-const LEAD_VOICES = ['FM bell', 'tape flute', 'soft mallet', 'vinyl pluck', 'dual lead', 'hollow reed', 'glass key', 'night synth'];
+const CHORD_VOICES = ['felt upright piano', 'room acoustic guitar', 'warm drawbar organ', 'worn upright piano', 'tape organ', 'muted acoustic guitar'];
+const BASS_VOICES = ['fingered electric bass', 'round sub bass', 'dub electric bass', 'short electric bass', 'soft finger bass', 'rubber synth bass'];
+const LEAD_VOICES = ['breathy flute', 'soft xylophone', 'muted guitar', 'hollow flute', 'felt mallet', 'low flute', 'wooden bell', 'night guitar'];
 const DRUM_KITS = ['dust kit', 'tight kit', 'soft kit', 'brush kit', 'machine kit'];
 const PAD_VOICES = ['tape strings', 'airy choir', 'warm organ', 'bowed glass', 'night drone'];
 const ARP_VOICES = ['nylon pluck', 'soft harp', 'kalimba', 'music box', 'wooden mallet', 'glass drop'];
@@ -92,6 +92,16 @@ const PERCUSSION_VOICES = ['muted tick', 'rimshot', 'soft knock', 'low clave', '
 const ROOM_TEXTURES = ['vinyl room', 'tape hiss', 'rain room', 'quiet air'];
 const SPACES = ['small room', 'warm plate', 'long hall', 'spring haze'];
 const MOTIONS = ['slow chorus', 'soft phaser', 'tape tremolo', 'still air'];
+const PRODUCTION_SCENES = [
+  {name: 'Dusty Piano Pocket', sessions: [0, 3], voices: [0, 0, 1, 0, 0, 0, 0, 1, 0]},
+  {name: 'Rainy Guitar Study', sessions: [1, 6], voices: [1, 4, 0, 3, 4, 1, 3, 2, 2]},
+  {name: 'Cassette Organ Soul', sessions: [7, 9], voices: [2, 2, 2, 4, 2, 2, 1, 5, 1]},
+  {name: 'Late-Night Upright', sessions: [2, 6], voices: [3, 1, 3, 3, 3, 3, 2, 3, 3]},
+  {name: 'Muted Bossa Room', sessions: [4, 1], voices: [5, 4, 7, 3, 1, 0, 0, 6, 2]},
+  {name: 'Tape Organ Dub', sessions: [9, 5], voices: [4, 2, 5, 4, 2, 4, 3, 5, 1]},
+  {name: 'Wooden Jazzhop', sessions: [3, 5], voices: [1, 3, 6, 0, 5, 2, 1, 7, 0]},
+  {name: 'Sunday Piano Haze', sessions: [6, 7], voices: [0, 0, 4, 2, 0, 1, 4, 4, 3]},
+];
 
 function chordForDegree(mood, root, degree, voicing) {
   return voicing.steps.map(step => midiToNote(scaleMidi(mood, root, degree + step, 1)));
@@ -107,12 +117,17 @@ function expandPattern(base, random, addChance = .08) {
   });
 }
 
-export function compositionFromBlock(hash, height = 0) {
+export function compositionFromBlock(hash, height = 0, previousComposition = null) {
   const random = seededRandom(`${cleanHash(hash)}${Number(height).toString(16)}`);
   const bytes = Array.from({length: 32}, () => Math.floor(random() * 256));
   const moodIndex = bytes[0] % MOODS.length;
   const mood = MOODS[moodIndex];
-  const session = SESSIONS[bytes[27] % SESSIONS.length];
+  let sceneIndex = bytes[27] % PRODUCTION_SCENES.length;
+  if (previousComposition && sceneIndex === previousComposition.sceneIndex) {
+    sceneIndex = (sceneIndex + 1 + (bytes[28] % (PRODUCTION_SCENES.length - 1))) % PRODUCTION_SCENES.length;
+  }
+  const scene = PRODUCTION_SCENES[sceneIndex];
+  const session = SESSIONS[scene.sessions[bytes[28] % scene.sessions.length]];
   const voicing = VOICINGS[bytes[19] % VOICINGS.length];
   const texture = TEXTURES[bytes[18] % TEXTURES.length];
   const root = bytes[1] % 12;
@@ -153,6 +168,8 @@ export function compositionFromBlock(hash, height = 0) {
     session: session.name,
     voicing: voicing.name,
     texture: texture.name,
+    scene: scene.name,
+    sceneIndex,
     bpm: session.bpm[0] + (bytes[3] % (session.bpm[1] - session.bpm[0] + 1)),
     swing: 0.5 + (bytes[4] % 19) / 100,
     chords,
@@ -170,25 +187,25 @@ export function compositionFromBlock(hash, height = 0) {
     },
     arrangement,
     sound: {
-      chordVoice: bytes[21] % CHORD_VOICES.length,
-      chordName: CHORD_VOICES[bytes[21] % CHORD_VOICES.length],
-      leadVoice: bytes[22] % LEAD_VOICES.length,
-      leadName: LEAD_VOICES[bytes[22] % LEAD_VOICES.length],
-      bassVoice: bytes[23] % BASS_VOICES.length,
-      bassName: BASS_VOICES[bytes[23] % BASS_VOICES.length],
-      drumKit: bytes[28] % DRUM_KITS.length,
-      drumName: DRUM_KITS[bytes[28] % DRUM_KITS.length],
-      padVoice: bytes[5] % PAD_VOICES.length,
-      padName: PAD_VOICES[bytes[5] % PAD_VOICES.length],
-      arpVoice: bytes[6] % ARP_VOICES.length,
-      arpName: ARP_VOICES[bytes[6] % ARP_VOICES.length],
+      chordVoice: scene.voices[0],
+      chordName: CHORD_VOICES[scene.voices[0]],
+      leadVoice: scene.voices[2],
+      leadName: LEAD_VOICES[scene.voices[2]],
+      bassVoice: scene.voices[1],
+      bassName: BASS_VOICES[scene.voices[1]],
+      drumKit: scene.voices[3],
+      drumName: DRUM_KITS[scene.voices[3]],
+      padVoice: scene.voices[4],
+      padName: PAD_VOICES[scene.voices[4]],
+      arpVoice: scene.voices[5],
+      arpName: ARP_VOICES[scene.voices[5]],
       arpPattern: bytes[7] % 3,
-      malletVoice: bytes[8] % MALLET_VOICES.length,
-      malletName: MALLET_VOICES[bytes[8] % MALLET_VOICES.length],
-      percussionVoice: bytes[9] % PERCUSSION_VOICES.length,
-      percussionName: PERCUSSION_VOICES[bytes[9] % PERCUSSION_VOICES.length],
-      textureVoice: bytes[10] % ROOM_TEXTURES.length,
-      textureName: ROOM_TEXTURES[bytes[10] % ROOM_TEXTURES.length],
+      malletVoice: scene.voices[6],
+      malletName: MALLET_VOICES[scene.voices[6]],
+      percussionVoice: scene.voices[7],
+      percussionName: PERCUSSION_VOICES[scene.voices[7]],
+      textureVoice: scene.voices[8],
+      textureName: ROOM_TEXTURES[scene.voices[8]],
       kickNote: ['C1', 'D1', 'E1'][bytes[24] % 3],
       chordVelocity: 0.3 + (bytes[25] % 24) / 100,
       melodyVelocity: 0.2 + (bytes[26] % 20) / 100,

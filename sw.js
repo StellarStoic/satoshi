@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v100';
+const CACHE = 'satoshi-static-v101';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
@@ -41,12 +41,13 @@ self.addEventListener('fetch', event => {
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
     // Cache public static resources only; live data and user inputs are excluded.
     const navigation = request.mode === 'navigate';
-    const asset = ['style', 'script', 'worker', 'image', 'font'].includes(request.destination);
+    const asset = ['style', 'script', 'worker', 'image', 'font', 'audio'].includes(request.destination);
     const livingData = url.pathname === '/historical_data/generated/living-EU-observed.json';
     const newsData = url.pathname === '/news-data.json';
     const offersData = url.pathname === '/offers-data.json';
+    const lofiAudio = url.pathname.startsWith('/audio/lofi/');
     const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
-    if ((!navigation && !asset && !livingData && !newsData && !offersData && !scannerAsset) || url.search) return;
+    if ((!navigation && !asset && !livingData && !newsData && !offersData && !lofiAudio && !scannerAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         // Versioned, self-hosted OCR assets are large and immutable within a release.

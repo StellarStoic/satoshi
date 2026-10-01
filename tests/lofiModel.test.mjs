@@ -63,6 +63,18 @@ test('different blocks can select different sessions, rhythms and instruments', 
   assert.notEqual(`${first.session}:${first.key}`, `${second.session}:${second.key}`);
 });
 
+test('consecutive blocks never repeat the previous production scene', () => {
+  let previous = compositionFromBlock(HASH, 900000);
+  for (let index = 1; index <= 64; index += 1) {
+    const current = compositionFromBlock(index.toString(16).padStart(64, '0'), 900000 + index, previous);
+    assert.notEqual(current.sceneIndex, previous.sceneIndex);
+    const changedRoles = ['chordVoice', 'bassVoice', 'leadVoice', 'drumKit', 'padVoice', 'arpVoice', 'malletVoice', 'percussionVoice', 'textureVoice']
+      .filter(role => current.sound[role] !== previous.sound[role]);
+    assert.ok(changedRoles.length >= 4);
+    previous = current;
+  }
+});
+
 test('live transaction IDs continually change the musical flow', () => {
   const composition = compositionFromBlock(HASH, 900000);
   const firstSeed = foldTransactionIds(HASH, ['a'.repeat(64)], 1);

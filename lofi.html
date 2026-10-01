@@ -82,6 +82,7 @@
       <div class="sonic-recipe" aria-live="polite">
         <span>Current blockchain ensemble</span>
         <dl>
+          <div><dt>Production scene</dt><dd id="productionScene">—</dd></div>
           <div><dt>Harmony</dt><dd id="harmonyVoice">—</dd></div>
           <div><dt>Lead</dt><dd id="leadVoice">—</dd></div>
           <div><dt>Bass</dt><dd id="bassVoice">—</dd></div>
@@ -104,7 +105,7 @@
         <p>This is not a playlist with blockchain decoration. The browser turns live public Bitcoin data into musical decisions, then keeps those decisions inside Lo-Fi boundaries so the result remains listenable.</p>
       </header>
       <ol class="signal-path">
-        <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique seed. Its bytes choose the key, progression, swing and one instrument for each role: keys, bass, pad, pluck, lead, answering mallet, drums, secondary percussion and room texture. A different block creates a different studio.</p></div><code>hash → musical world</code></li>
+        <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique seed. It chooses one coherent production scene, then sets its key, progression, swing and arrangement. Keys, bass, lead, pluck, drums and room are selected as an ensemble, and consecutive blocks never reuse the same scene.</p></div><code>hash → musical world</code></li>
         <li><span>02</span><div><h3>The mempool conducts it</h3><p>Waiting transaction count, projected blocks and fee pressure continuously shade tempo, brightness, percussion density, echo and noise. Busy does not simply mean loud; it means more energy and detail.</p></div><code>pressure → energy</code></li>
         <li><span>03</span><div><h3>Transactions write phrases</h3><p>Incoming TXIDs reshape the next phrase. Sampled transaction size controls note length and visual mass; fee rate affects brightness and speed; inputs, outputs, RBF and script family influence rhythm, voicing and color.</p></div><code>transactions → variation</code></li>
         <li><span>04</span><div><h3>Blocks never overlap</h3><p>The completed block fades fully to silence and its instruments are released. Only then does the new block choose its ensemble and fade in, so two block sessions never play over each other.</p></div><code>fade out -> reset -> fade in</code></li>
@@ -119,7 +120,7 @@
 
     <section class="lofi-note">
       <i data-lucide="radio-tower"></i>
-      <p>Every incoming TXID shapes the local performance. A rate-limited transaction sample adds size, fee, value, input/output structure and script family without overwhelming the browser; nothing is stored.</p>
+      <p>Every incoming TXID shapes the local performance. A rate-limited transaction sample adds size, fee, value, input/output structure and script family without overwhelming the browser; nothing is stored. Pitched instruments use the <a href="https://github.com/nbrosowsky/tonejs-instruments" target="_blank" rel="noopener noreferrer">tonejs-instruments</a> sample collection under CC BY 3.0.</p>
       <a href="https://mempool.space/docs/api/websocket" target="_blank" rel="noopener noreferrer">Data: mempool.space <i data-lucide="arrow-up-right"></i></a>
     </section>
   </main>

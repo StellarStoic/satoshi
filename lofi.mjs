@@ -28,6 +28,7 @@ const ui = {
   percussion: document.getElementById('percussionVoice'),
   texture: document.getElementById('textureVoice'),
   effects: document.getElementById('effectVoice'),
+  scene: document.getElementById('productionScene'),
   transition: document.getElementById('blockTransition'),
   canvas: document.getElementById('lofiCanvas'),
   visualStage: document.getElementById('visualStage'),
@@ -38,6 +39,17 @@ const STORE_KEY = 'blockLofiSettings';
 const SETTINGS_VERSION = 2;
 const ADJECTIVES = ['Dusty', 'Patient', 'Quiet', 'Amber', 'Late', 'Soft', 'Hidden', 'Slow'];
 const NOUNS = ['Nonce', 'Window', 'Ledger', 'Signal', 'Coffee', 'Halving', 'Mempool', 'Lantern'];
+const SAMPLE_BANKS = {
+  piano: {baseUrl: '/audio/lofi/piano/', urls: {C2: 'C2.mp3', C3: 'C3.mp3', C4: 'C4.mp3', C5: 'C5.mp3'}},
+  organ: {baseUrl: '/audio/lofi/organ/', urls: {C2: 'C2.mp3', C3: 'C3.mp3', C4: 'C4.mp3', C5: 'C5.mp3'}},
+  guitar: {baseUrl: '/audio/lofi/guitar/', urls: {C3: 'C3.mp3', C4: 'C4.mp3', C5: 'C5.mp3'}},
+  bass: {baseUrl: '/audio/lofi/bass/', urls: {E1: 'E1.mp3', E2: 'E2.mp3', E3: 'E3.mp3', E4: 'E4.mp3'}},
+  flute: {baseUrl: '/audio/lofi/flute/', urls: {C4: 'C4.mp3', C5: 'C5.mp3', C6: 'C6.mp3'}},
+  xylophone: {baseUrl: '/audio/lofi/xylophone/', urls: {G4: 'G4.mp3', C5: 'C5.mp3', G5: 'G5.mp3', C6: 'C6.mp3'}},
+};
+const CHORD_SAMPLE_BANKS = ['piano', 'guitar', 'organ', 'piano', 'organ', 'guitar'];
+const LEAD_SAMPLE_BANKS = ['flute', 'xylophone', 'guitar', 'flute', 'xylophone', 'flute', 'xylophone', 'guitar'];
+const ARP_SAMPLE_BANKS = ['guitar', 'guitar', 'xylophone', 'xylophone', 'guitar', 'xylophone'];
 const LEAN_KEYS = [
   {name: 'dusty Rhodes', oscillator: 'triangle8', attack: .045, decay: .72, sustain: .045, release: .65},
   {name: 'muted tape piano', oscillator: 'sine4', attack: .025, decay: .58, sustain: .035, release: .55},
@@ -195,17 +207,17 @@ function titleFor(composition) {
 }
 
 function makeComposition() {
-  return compositionFromBlock(state.chain.hash, state.chain.height);
+  return compositionFromBlock(state.chain.hash, state.chain.height, state.pendingComposition || state.composition);
 }
 
 function showComposition(composition) {
   ui.track.textContent = titleFor(composition);
-  ui.key.textContent = `${composition.session} · ${composition.texture} · ${composition.key}`;
+  ui.key.textContent = `${composition.scene} · ${composition.session} · ${composition.key}`;
   ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : 'offline';
   ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
-  if (ui.harmony) ui.harmony.textContent = economyAudio ? LEAN_KEYS[composition.sound.chordVoice].name : composition.sound.chordName;
-  if (ui.lead) ui.lead.textContent = economyAudio ? LEAN_LEADS[composition.sound.leadVoice].name : composition.sound.leadName;
-  if (ui.bass) ui.bass.textContent = economyAudio ? LEAN_BASSES[composition.sound.bassVoice].name : composition.sound.bassName;
+  if (ui.harmony) ui.harmony.textContent = composition.sound.chordName;
+  if (ui.lead) ui.lead.textContent = composition.sound.leadName;
+  if (ui.bass) ui.bass.textContent = composition.sound.bassName;
   if (ui.drums) ui.drums.textContent = economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName;
   if (ui.pad) ui.pad.textContent = composition.sound.padName;
   if (ui.arp) ui.arp.textContent = composition.sound.arpName;
@@ -213,6 +225,7 @@ function showComposition(composition) {
   if (ui.percussion) ui.percussion.textContent = composition.sound.percussionName;
   if (ui.texture) ui.texture.textContent = composition.sound.textureName;
   if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.space} + ${composition.sound.motion}`;
+  if (ui.scene) ui.scene.textContent = composition.scene;
   state.engine?.setTexture(composition.sound.textureVoice);
   applyNetworkSound();
 }
@@ -541,7 +554,39 @@ function createEngine() {
   const chorus = economyAudio ? bypass(harmonyGain) : new ToneApi.Chorus(1.2, 2.6, 0.18).connect(harmonyGain).start();
   if (economyAudio) chorus.depth = 0;
 
-  const makeChordVoice = index => {
+  const makeSampledVoice = (bankName, destination, fallbackFactory, options = {}) => {
+    const bank = SAMPLE_BANKS[bankName];
+    let failed = false;
+    let fallback = null;
+    const sampleFilter = new ToneApi.Filter(options.filter || 3200, 'lowpass').connect(destination);
+    const sampler = new ToneApi.Sampler({
+      urls: bank.urls,
+      baseUrl: bank.baseUrl,
+      attack: options.attack ?? .012,
+      release: options.release ?? .8,
+      volume: options.volume ?? -15,
+      onerror: () => { failed = true; },
+    }).connect(sampleFilter);
+    const fallbackVoice = () => fallback ||= fallbackFactory();
+    return {
+      get loaded() { return !failed && sampler.loaded; },
+      triggerAttackRelease(...args) {
+        const voice = !failed && sampler.loaded ? sampler : fallbackVoice();
+        voice.triggerAttackRelease(...args);
+      },
+      releaseAll() {
+        try { sampler.releaseAll(); } catch {}
+        try { fallback?.releaseAll?.(); } catch {}
+      },
+      dispose() {
+        try { sampler.dispose(); } catch {}
+        try { sampleFilter.dispose(); } catch {}
+        try { fallback?.dispose(); } catch {}
+      },
+    };
+  };
+
+  const makeChordFallback = index => {
     if (economyAudio) {
       const profile = LEAN_KEYS[index];
       return new ToneApi.PolySynth(ToneApi.Synth, {
@@ -561,7 +606,14 @@ function createEngine() {
     ];
     return new ToneApi.PolySynth(...profiles[index]).connect(chorus);
   };
-  const makeBassVoice = index => {
+  const makeChordVoice = index => makeSampledVoice(CHORD_SAMPLE_BANKS[index], chorus, () => makeChordFallback(index), {
+    attack: index === 2 || index === 4 ? .035 : .008,
+    release: index === 1 || index === 5 ? .48 : 1.05,
+    volume: index === 1 || index === 5 ? -17 : -19,
+    filter: index === 2 || index === 4 ? 2700 : 2350,
+  });
+
+  const makeBassFallback = index => {
     if (economyAudio) {
       const profile = LEAN_BASSES[index];
       return new ToneApi.Synth({
@@ -581,7 +633,16 @@ function createEngine() {
     ];
     return factories[index]().connect(bassGain);
   };
-  const makeLeadVoice = index => {
+  const makeBassVoice = index => [0, 2, 3, 4].includes(index)
+    ? makeSampledVoice('bass', bassGain, () => makeBassFallback(index), {
+        attack: index === 3 ? .002 : .012,
+        release: index === 2 ? .8 : .48,
+        volume: -8,
+        filter: [850, 700, 620, 1050, 900, 800][index],
+      })
+    : makeBassFallback(index);
+
+  const makeLeadFallback = index => {
     if (economyAudio) {
       const profile = LEAN_LEADS[index];
       return new ToneApi.Synth({
@@ -603,6 +664,12 @@ function createEngine() {
     ];
     return factories[index]().connect(delay);
   };
+  const makeLeadVoice = index => makeSampledVoice(LEAD_SAMPLE_BANKS[index], delay, () => makeLeadFallback(index), {
+    attack: LEAD_SAMPLE_BANKS[index] === 'flute' ? .08 : .004,
+    release: LEAD_SAMPLE_BANKS[index] === 'guitar' ? .38 : .72,
+    volume: LEAD_SAMPLE_BANKS[index] === 'flute' ? -22 : -19,
+    filter: LEAD_SAMPLE_BANKS[index] === 'xylophone' ? 2500 : 2100,
+  });
   const makePadVoice = index => {
     const profile = PAD_PROFILES[index];
     return new ToneApi.PolySynth(ToneApi.Synth, {
@@ -612,7 +679,7 @@ function createEngine() {
       volume: economyAudio ? -28 : -25,
     }).connect(padGain);
   };
-  const makeArpVoice = index => {
+  const makeArpFallback = index => {
     const profile = ARP_PROFILES[index];
     return new ToneApi.Synth({
       oscillator: {type: profile.oscillator},
@@ -620,7 +687,13 @@ function createEngine() {
       volume: economyAudio ? -24 : -21,
     }).connect(arpGain);
   };
-  const makeMalletVoice = index => {
+  const makeArpVoice = index => makeSampledVoice(ARP_SAMPLE_BANKS[index], arpGain, () => makeArpFallback(index), {
+    attack: .002,
+    release: .24,
+    volume: -22,
+    filter: ARP_SAMPLE_BANKS[index] === 'xylophone' ? 2700 : 2300,
+  });
+  const makeMalletFallback = index => {
     const profile = MALLET_PROFILES[index];
     return new ToneApi.Synth({
       oscillator: {type: profile.oscillator},
@@ -628,6 +701,12 @@ function createEngine() {
       volume: economyAudio ? -29 : -25,
     }).connect(malletGain);
   };
+  const makeMalletVoice = index => makeSampledVoice('xylophone', malletGain, () => makeMalletFallback(index), {
+    attack: .002,
+    release: .42 + index * .08,
+    volume: -25,
+    filter: 2100 + index * 120,
+  });
   const makePercussionVoice = index => {
     return {
       pitched: true,
@@ -953,6 +1032,10 @@ async function togglePlayback() {
       await new Promise(resolve => requestAnimationFrame(resolve));
       state.engine = createEngine();
       await warmEngine(state.engine);
+      await Promise.race([
+        ToneApi.loaded().catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, 4500)),
+      ]);
       applyNetworkSound();
       ui.play.disabled = false;
       ui.play.classList.remove('loading');
