@@ -80,11 +80,11 @@ const LEAN_SNARES = [
   {noise: {type: 'pink'}, envelope: {attack: .015, decay: .25, sustain: 0}, volume: -12},
 ];
 const LEAN_HATS = [
-  {noise: {type: 'brown'}, envelope: {attack: .004, decay: .035, sustain: 0}, volume: -24},
-  {noise: {type: 'pink'}, envelope: {attack: .003, decay: .055, sustain: 0}, volume: -27},
-  {noise: {type: 'brown'}, envelope: {attack: .002, decay: .026, sustain: 0}, volume: -23},
-  {noise: {type: 'pink'}, envelope: {attack: .005, decay: .04, sustain: 0}, volume: -26},
-  {noise: {type: 'brown'}, envelope: {attack: .007, decay: .07, sustain: 0}, volume: -25},
+  {noise: {type: 'brown'}, envelope: {attack: .01, decay: .065, sustain: 0}, volume: -28},
+  {noise: {type: 'pink'}, envelope: {attack: .012, decay: .08, sustain: 0}, volume: -30},
+  {noise: {type: 'brown'}, envelope: {attack: .009, decay: .055, sustain: 0}, volume: -27},
+  {noise: {type: 'pink'}, envelope: {attack: .014, decay: .075, sustain: 0}, volume: -29},
+  {noise: {type: 'brown'}, envelope: {attack: .016, decay: .095, sustain: 0}, volume: -29},
 ];
 const PAD_PROFILES = [
   {oscillator: 'triangle4', attack: .8, decay: 1.2, sustain: .45, release: 1.8},
@@ -320,7 +320,7 @@ function renderTransactionVisuals(items) {
       bend: ((seed >>> 18) % 200 - 100) / 100,
       entryAngle: ((seed ^ (seed >>> 11)) % 6283) / 1000,
       orbit: ((seed >>> 5) & 1) ? 1 : -1,
-      crossesCenter: seed % 4 === 0,
+      crossesCenter: seed % 3 === 0,
     });
   });
   state.transactionVisuals = state.transactionVisuals.slice(-visualProfile.maxParticles);
@@ -529,12 +529,12 @@ function createEngine() {
   const dustGain = new ToneApi.Gain(ToneApi.dbToGain(economyAudio ? -52 : -39)).connect(musicBus);
   const textureGain = new ToneApi.Gain(ToneApi.dbToGain(-55)).connect(musicBus);
   const textureFilter = new ToneApi.Filter(2400, 'lowpass').connect(textureGain);
-  const whistleGain = new ToneApi.Gain(.42).connect(musicBus);
-  const whistleFilter = new ToneApi.Filter(1450, 'lowpass').connect(whistleGain);
+  const whistleGain = new ToneApi.Gain(.72).connect(musicBus);
+  const whistleFilter = new ToneApi.Filter(1750, 'lowpass').connect(whistleGain);
   const whistle = new ToneApi.Synth({
     oscillator: {type: 'sine'},
     envelope: {attack: .045, decay: .1, sustain: .035, release: .24},
-    volume: -22,
+    volume: -14,
   }).connect(whistleFilter);
   const delay = new ToneApi.FeedbackDelay('8n.', economyAudio ? .1 : .23).connect(melodyGain);
   delay.wet.value = economyAudio ? .035 : .12;
@@ -629,23 +629,13 @@ function createEngine() {
     }).connect(malletGain);
   };
   const makePercussionVoice = index => {
-    if ([1, 5, 6].includes(index)) {
-      return {
-        pitched: true,
-        node: new ToneApi.MembraneSynth({
-          pitchDecay: .025,
-          octaves: index === 5 ? 1.5 : 1.1,
-          envelope: {attack: .003, decay: index === 5 ? .2 : .08, sustain: 0, release: .08},
-          volume: -20,
-        }).connect(percussionGain),
-      };
-    }
     return {
-      pitched: false,
-      node: new ToneApi.NoiseSynth({
-        noise: {type: index % 2 ? 'brown' : 'pink'},
-        envelope: {attack: .003, decay: index === 2 ? .14 : .065, sustain: 0},
-        volume: index === 2 ? -22 : -26,
+      pitched: true,
+      node: new ToneApi.MembraneSynth({
+        pitchDecay: .018 + (index % 3) * .008,
+        octaves: index === 5 ? 1.5 : .75 + (index % 4) * .12,
+        envelope: {attack: .006, decay: index === 5 ? .2 : .07 + (index % 3) * .025, sustain: 0, release: .07},
+        volume: index === 5 ? -23 : -27,
       }).connect(percussionGain),
     };
   };
@@ -670,12 +660,11 @@ function createEngine() {
     {frequency: 110, envelope: {attack: .006, decay: .12, release: .04}, harmonicity: 2.1, modulationIndex: 7, resonance: 1500, octaves: .6, volume: -31},
     {frequency: 310, envelope: {attack: .001, decay: .022, release: .01}, harmonicity: 6.2, modulationIndex: 28, resonance: 4600, octaves: 1.8, volume: -34},
   ][index];
-  const textureTypes = ['brown', 'pink', 'white', 'pink'];
   const textureFrequencies = [1800, 4000, 1200, 2600];
-  const textureLevels = [-56, -52, -58, -61];
+  const textureLevels = [-62, -60, -64, -66];
   const dustFilter = economyAudio ? null : new ToneApi.Filter(1250, 'lowpass').connect(dustGain);
   const dust = economyAudio ? new ToneApi.Noise('pink').connect(dustGain).start() : new ToneApi.Noise('pink').connect(dustFilter).start();
-  const roomTexture = new ToneApi.Noise(textureTypes[state.composition.sound.textureVoice]).connect(textureFilter).start();
+  const roomTexture = new ToneApi.Noise('brown').connect(textureFilter).start();
   const lastTriggerTime = new WeakMap();
   const safeTriggerTime = (voice, requestedTime) => {
     const previous = lastTriggerTime.get(voice) ?? -Infinity;
@@ -717,22 +706,21 @@ function createEngine() {
       this.analyser = null;
     },
     setTexture(index) {
-      const nextType = textureTypes[index] || 'pink';
-      if (this.roomTexture.type !== nextType) this.roomTexture.type = nextType;
       this.textureFilter.frequency.rampTo(textureFrequencies[index] || 2400, 2);
-      this.textureGain.gain.rampTo(ToneApi.dbToGain(textureLevels[index] || -58), 2);
+      this.textureGain.gain.rampTo(ToneApi.dbToGain(textureLevels[index] || -64), 2);
     },
     playWhistle(transaction, proximity) {
       const nowMs = performance.now();
       if (!state.playing || nowMs - this.lastWhistleAt < 320) return;
       this.lastWhistleAt = nowMs;
       const feeMotion = Math.min(1, Math.log2(Math.max(1, transaction.feeRate || state.chain.fee)) / 9);
-      const duration = .14 + (1 - feeMotion) * .42;
-      const startFrequency = 390 + feeMotion * 170;
+      const audibleProximity = Math.max(.48, proximity);
+      const duration = .16 + (1 - feeMotion) * .5;
+      const startFrequency = 470 + feeMotion * 210;
       const now = ToneApi.now() + .01;
-      this.whistleFilter.frequency.rampTo(900 + proximity * 650, .08);
-      this.whistle.triggerAttack(startFrequency, now, .018 + proximity * .035);
-      this.whistle.frequency.rampTo(startFrequency * (1.035 + feeMotion * .045), duration);
+      this.whistleFilter.frequency.rampTo(1050 + audibleProximity * 800, .08);
+      this.whistle.triggerAttack(startFrequency, now, .065 + audibleProximity * .055);
+      this.whistle.frequency.rampTo(startFrequency * (1.045 + feeMotion * .06), duration);
       this.whistle.triggerRelease(now + duration);
     },
     chordVoice(index) { return this.chordVoices[index] ||= makeChordVoice(index); },
@@ -1148,7 +1136,7 @@ function drawTransactions(context, width, height, cx, cy, radius, now) {
     const arrival = progress < 1 ? 1 : Math.max(0, 1 - (elapsed - duration) / 1100);
     const particleRadius = Math.min(22, 3 + Math.sqrt(Math.min(100000, transaction.vsize)) / 8);
     const centerDistance = Math.hypot(x - cx, y - cy);
-    const whistleRange = radius * .34;
+    const whistleRange = Math.max(18, radius * .14);
     if (transaction.crossesCenter && centerDistance <= whistleRange && !transaction.whistled) {
       transaction.whistled = true;
       state.engine?.playWhistle(transaction, Math.max(0, 1 - centerDistance / whistleRange));
