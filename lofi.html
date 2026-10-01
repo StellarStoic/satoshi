@@ -68,6 +68,22 @@
       </div>
     </section>
 
+    <section class="block-replay" aria-labelledby="replayTitle">
+      <div class="replay-heading">
+        <span id="replayTitle">Replay a block</span>
+        <small>Same hash. Same track.</small>
+      </div>
+      <form id="replayForm" novalidate>
+        <label for="replayHash">Block hash</label>
+        <div class="replay-input-row">
+          <input id="replayHash" name="block" type="text" inputmode="text" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="64-character block hash">
+          <button type="submit"><i data-lucide="rotate-ccw"></i><span>Replay block</span></button>
+          <button type="button" class="return-live" id="returnLive" hidden><i data-lucide="radio"></i><span>Return live</span></button>
+        </div>
+        <output id="replayStatus" for="replayHash" aria-live="polite"></output>
+      </form>
+    </section>
+
     <section class="chain-console" aria-labelledby="chain-title">
       <div class="console-heading"><p class="lofi-eyebrow">The chain conducts</p><h2 id="chain-title">Live Bitcoin, bounded by music</h2><p>The block hash creates the musical world. Each incoming transaction changes its phrases, instruments and rhythm according to real size, fee and structure.</p></div>
       <dl class="chain-readings">

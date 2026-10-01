@@ -1,4 +1,4 @@
-import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions, transactionGravityPoint} from './lofiModel.mjs';
+import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayHash, replayCompositionFromHash, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from './lofiModel.mjs';
 
 const ToneApi = globalThis.Tone;
 const ui = {
@@ -33,6 +33,11 @@ const ui = {
   canvas: document.getElementById('lofiCanvas'),
   visualStage: document.getElementById('visualStage'),
   visualToggle: document.getElementById('visualToggle'),
+  replaySection: document.querySelector('.block-replay'),
+  replayForm: document.getElementById('replayForm'),
+  replayInput: document.getElementById('replayHash'),
+  replayStatus: document.getElementById('replayStatus'),
+  returnLive: document.getElementById('returnLive'),
 };
 
 const STORE_KEY = 'blockLofiSettings';
@@ -190,6 +195,8 @@ const state = {
   soundSignature: '',
   animationEnabled: true,
   animationFrame: 0,
+  replayMode: false,
+  replayHash: '',
 };
 
 function loadSettings() {
@@ -214,19 +221,128 @@ function saveSettings() {
   } catch { /* Playback does not require persistence. */ }
 }
 
+function setReplayStatus(message, invalid = false) {
+  ui.replayStatus.textContent = message;
+  if (invalid) ui.replayInput.setAttribute('aria-invalid', 'true');
+  else ui.replayInput.removeAttribute('aria-invalid');
+}
+
+function syncReplayUi() {
+  ui.replaySection.classList.toggle('replay-active', state.replayMode);
+  ui.returnLive.hidden = !state.replayMode;
+  if (state.replayMode) ui.replayInput.value = state.replayHash;
+}
+
+function cancelBlockTransition() {
+  const wasTransitioning = state.transitioning;
+  clearTimeout(state.transitionTimer);
+  state.transitioning = false;
+  state.pendingComposition = null;
+  ui.transition?.classList.remove('active', 'waiting');
+  if (wasTransitioning && state.engine) {
+    state.engine.releaseAllVoices();
+    state.engine.musicBus.gain.rampTo(.82, .2);
+  }
+}
+
+function updateReplayUrl(hash = null) {
+  const url = new URL(globalThis.location.href);
+  if (hash) {
+    url.searchParams.set('block', hash);
+    url.searchParams.set('engine', REPLAY_ENGINE_VERSION);
+  } else {
+    url.searchParams.delete('block');
+    url.searchParams.delete('engine');
+  }
+  globalThis.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+async function loadReplayMetadata(hash) {
+  try {
+    const block = await getJson(`https://mempool.space/api/block/${hash}`);
+    if (!state.replayMode || state.replayHash !== hash || !Number.isInteger(Number(block?.height))) return;
+    state.chain = {...state.chain, height: Number(block.height)};
+    ui.height.textContent = Number(block.height).toLocaleString();
+    renderChain();
+  } catch { /* The hash alone is enough to replay the track. */ }
+}
+
+function enterReplay(value, {updateUrl = true} = {}) {
+  const hash = normalizeReplayHash(value);
+  if (!hash) {
+    setReplayStatus('Enter a complete 64-character hexadecimal block hash.', true);
+    return false;
+  }
+  cancelBlockTransition();
+  clearTimeout(state.detailTimer);
+  clearTimeout(state.visualRefreshTimer);
+  state.detailQueue = [];
+  state.transactionSummary = summarizeTransactions();
+  state.transactionVisuals = [];
+  state.transactionVisualBuffer = [];
+  state.flowWindow = [];
+  state.flowPulse = 0;
+  state.pendingFlow = null;
+  state.replayMode = true;
+  state.replayHash = hash;
+  state.chain = replaySoundStateFromHash(hash);
+  state.flowSeed = hash;
+  state.soundSignature = '';
+  syncReplayUi();
+  if (updateUrl) updateReplayUrl(hash);
+  setReplayStatus(`Hash-only replay · engine ${REPLAY_ENGINE_VERSION}`);
+  queueComposition(replayCompositionFromHash(hash));
+  renderChain();
+  loadReplayMetadata(hash);
+  return true;
+}
+
+async function exitReplay() {
+  if (!state.replayMode) return;
+  cancelBlockTransition();
+  state.replayMode = false;
+  state.replayHash = '';
+  state.chain = fallbackChainState();
+  state.transactionSummary = summarizeTransactions();
+  state.transactionVisuals = [];
+  state.transactionVisualBuffer = [];
+  state.flowWindow = [];
+  state.flowPulse = 0;
+  state.pendingFlow = null;
+  state.soundSignature = '';
+  syncReplayUi();
+  updateReplayUrl();
+  setReplayStatus('Finding the live chain');
+  renderChain();
+  try {
+    const loaded = await loadSnapshot();
+    if (state.replayMode) return;
+    if (loaded) setReplayStatus('Live mode');
+    else {
+      queueComposition(makeComposition());
+      setReplayStatus('Live data is temporarily unavailable');
+    }
+  } catch {
+    if (state.replayMode) return;
+    queueComposition(makeComposition());
+    setReplayStatus('Live data is temporarily unavailable');
+  }
+}
+
 function titleFor(composition) {
   const bytes = composition.visual;
   return `${ADJECTIVES[bytes[0] % ADJECTIVES.length]} ${NOUNS[bytes[1] % NOUNS.length]}`;
 }
 
 function makeComposition() {
+  if (state.replayMode) return replayCompositionFromHash(state.replayHash);
   return compositionFromBlock(state.chain.hash, state.chain.height, state.pendingComposition || state.composition);
 }
 
 function showComposition(composition) {
   ui.track.textContent = titleFor(composition);
   ui.key.textContent = `${composition.scene} · ${composition.session} · ${composition.key}`;
-  ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : 'offline';
+  ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : state.replayMode ? 'replay' : 'offline';
   ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
   if (ui.harmony) ui.harmony.textContent = composition.sound.chordName;
   if (ui.lead) ui.lead.textContent = composition.sound.leadName;
@@ -261,7 +377,7 @@ function applyComposition(composition) {
 function queueComposition(composition) {
   if (state.playing) {
     state.pendingComposition = composition;
-    ui.transport.textContent = 'New block approaching';
+    ui.transport.textContent = state.replayMode ? 'Replay queued' : 'New block approaching';
     ui.transition?.classList.add('waiting');
   } else {
     applyComposition(composition);
@@ -308,7 +424,7 @@ function beginBlockTransition(nextComposition) {
     state.transitionTimer = setTimeout(() => {
       state.transitioning = false;
       ui.transition?.classList.remove('active');
-      ui.transport.textContent = state.chain.connected ? 'New block in the groove' : 'Offline groove';
+      ui.transport.textContent = state.replayMode ? 'Block replay' : state.chain.connected ? 'New block in the groove' : 'Offline groove';
     }, fadeInSeconds * 1000);
   }, fadeOutSeconds * 1000);
 }
@@ -319,6 +435,19 @@ function formatWeight(vsize) {
 }
 
 function renderChain() {
+  if (state.replayMode) {
+    ui.flow.textContent = 'deterministic';
+    ui.shape.textContent = 'hash replay';
+    ui.size.textContent = 'fixed seed';
+    ui.fee.textContent = 'not live';
+    ui.weight.textContent = 'hash only';
+    ui.transactions.textContent = 'not used';
+    ui.depth.textContent = 'not used';
+    ui.connection.classList.remove('live');
+    ui.connection.classList.add('replay');
+    ui.connection.querySelector('span').textContent = 'Deterministic block replay';
+    return;
+  }
   const now = Date.now();
   state.flowWindow = state.flowWindow.filter(batch => now - batch.time < 30000);
   const flowing = state.flowWindow.reduce((total, batch) => total + batch.count, 0);
@@ -330,6 +459,7 @@ function renderChain() {
   ui.weight.textContent = formatWeight(state.chain.vsize);
   ui.transactions.textContent = state.chain.count ? state.chain.count.toLocaleString() : 'quiet';
   ui.depth.textContent = `${Math.max(1, state.chain.projectedBlocks)} block${state.chain.projectedBlocks === 1 ? '' : 's'}`;
+  ui.connection.classList.remove('replay');
   ui.connection.classList.toggle('live', state.chain.connected);
   ui.connection.querySelector('span').textContent = state.chain.connected ? 'Live from mempool.space' : 'Offline composition';
 }
@@ -367,6 +497,7 @@ function addTransactionVisuals(items) {
 }
 
 function ingestTransactions(txids, sequence = 0, summary = null) {
+  if (state.replayMode) return;
   const incomingCount = Array.isArray(txids) ? txids.length : 0;
   const sampleLimit = lowPower ? 96 : 192;
   const stride = Math.max(1, Math.ceil(incomingCount / sampleLimit));
@@ -399,6 +530,7 @@ function ingestTransactions(txids, sequence = 0, summary = null) {
 }
 
 function applyTransactionDetails(transactions) {
+  if (state.replayMode) return;
   const valid = Array.isArray(transactions) ? transactions.filter(transaction => /^[0-9a-f]{64}$/i.test(transaction?.txid)) : [];
   if (!valid.length) return;
   const summary = summarizeTransactions(valid);
@@ -437,6 +569,7 @@ function drainTransactionDetails() {
 }
 
 function sampleTransactionDetails(txids, sequence = 0) {
+  if (state.replayMode) return;
   if (!Array.isArray(txids) || !txids.length) return;
   const txid = txids[Math.abs(Number(sequence) || 0) % txids.length];
   if (!state.detailQueue.includes(txid)) state.detailQueue.push(txid);
@@ -469,7 +602,8 @@ function rampAudioProperty(target, property, value, seconds = 0) {
 
 function applyNetworkSound(force = false) {
   if (!state.composition) return;
-  const mapped = mempoolToSound(state.chain);
+  const soundState = state.replayMode ? replaySoundStateFromHash(state.replayHash) : state.chain;
+  const mapped = mempoolToSound(soundState);
   const influence = 1;
   const bpm = state.composition.bpm + mapped.tempoLift * influence;
   ui.tempo.textContent = `${Math.round(bpm)} BPM`;
@@ -1077,7 +1211,7 @@ async function togglePlayback() {
     } else {
       transport.start();
       state.playing = true;
-      ui.transport.textContent = state.chain.connected ? 'Chain in the groove' : 'Offline groove';
+      ui.transport.textContent = state.replayMode ? 'Block replay' : state.chain.connected ? 'Chain in the groove' : 'Offline groove';
       ui.play.setAttribute('aria-label', 'Pause Block Lo-Fi');
       ui.play.innerHTML = '<i data-lucide="pause"></i>';
     }
@@ -1098,6 +1232,7 @@ async function togglePlayback() {
 }
 
 function updateChain(patch) {
+  if (state.replayMode) return;
   const previousHash = state.chain.hash;
   state.chain = {...state.chain, ...patch};
   renderChain();
@@ -1122,6 +1257,7 @@ async function getText(url) {
 }
 
 async function refreshBlockTip() {
+  if (state.replayMode) return;
   const [heightText, hash] = await Promise.all([
     getText('https://mempool.space/api/blocks/tip/height'),
     getText('https://mempool.space/api/blocks/tip/hash'),
@@ -1132,6 +1268,7 @@ async function refreshBlockTip() {
 }
 
 async function loadSnapshot() {
+  if (state.replayMode) return;
   const [blocks, fees, mempool, projected] = await Promise.allSettled([
     getJson('https://mempool.space/api/blocks'),
     getJson('https://mempool.space/api/v1/fees/recommended'),
@@ -1142,7 +1279,7 @@ async function loadSnapshot() {
   const feeData = fees.status === 'fulfilled' ? fees.value : null;
   const mempoolData = mempool.status === 'fulfilled' ? mempool.value : null;
   const projectedData = projected.status === 'fulfilled' ? projected.value : null;
-  if (!latest && !feeData && !mempoolData) return;
+  if (!latest && !feeData && !mempoolData) return false;
   updateChain({
     height: latest?.height ?? state.chain.height,
     hash: latest?.id ?? state.chain.hash,
@@ -1152,6 +1289,7 @@ async function loadSnapshot() {
     projectedBlocks: Array.isArray(projectedData) ? projectedData.length : state.chain.projectedBlocks,
     connected: true,
   });
+  return true;
 }
 
 function connectLiveData(delay = 3000) {
@@ -1290,7 +1428,7 @@ function drawBlockIdentity(context, cx, cy, radius) {
     context.restore();
   });
 
-  const blockHeight = state.chain.height ? Number(state.chain.height).toLocaleString() : 'OFFLINE';
+  const blockHeight = state.chain.height ? Number(state.chain.height).toLocaleString() : state.replayMode ? 'REPLAY' : 'OFFLINE';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillStyle = 'rgba(174,178,176,.72)';
@@ -1406,14 +1544,31 @@ function setAnimationEnabled(enabled, persist = true) {
 }
 
 loadSettings();
-applyComposition(makeComposition());
-renderChain();
+const initialUrl = new URL(globalThis.location.href);
+const requestedReplay = initialUrl.searchParams.get('block');
+const initialReplayHash = normalizeReplayHash(requestedReplay);
+if (initialReplayHash) {
+  enterReplay(initialReplayHash, {updateUrl: false});
+} else {
+  applyComposition(makeComposition());
+  renderChain();
+  if (requestedReplay) setReplayStatus('The block hash in this link is incomplete or invalid.', true);
+}
 setAnimationEnabled(state.animationEnabled, false);
-loadSnapshot().catch(() => {});
+if (!state.replayMode) loadSnapshot().catch(() => {});
 connectLiveData();
 state.blockPollTimer = setInterval(() => refreshBlockTip().catch(() => {}), 30000);
 
 ui.play.addEventListener('click', togglePlayback);
+ui.replayForm.addEventListener('submit', event => {
+  event.preventDefault();
+  enterReplay(ui.replayInput.value);
+});
+ui.returnLive.addEventListener('click', exitReplay);
+ui.replayInput.addEventListener('input', () => {
+  ui.replayInput.removeAttribute('aria-invalid');
+  if (!state.replayMode) ui.replayStatus.textContent = '';
+});
 ui.volume.addEventListener('input', () => {
   const outputLevel = Math.min(1.25, Number(ui.volume.value) / 100 * (economyAudio ? 1.35 : 1));
   state.engine?.master.gain.rampTo(outputLevel, 0.08);

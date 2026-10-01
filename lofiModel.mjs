@@ -98,6 +98,29 @@ export function hashBytes(value) {
   return cleanHash(value).match(/../g).map(part => Number.parseInt(part, 16));
 }
 
+export const REPLAY_ENGINE_VERSION = 'v1';
+
+export function normalizeReplayHash(value) {
+  const hash = String(value || '').trim().toLowerCase();
+  return /^[0-9a-f]{64}$/.test(hash) ? hash : null;
+}
+
+export function replaySoundStateFromHash(value) {
+  const hash = normalizeReplayHash(value);
+  if (!hash) throw new TypeError('A replay requires a 64-character hexadecimal block hash');
+  const random = seededRandom(`${hash}:replay-sound:${REPLAY_ENGINE_VERSION}`);
+  const bytes = Array.from({length: 6}, () => Math.floor(random() * 256));
+  return {
+    hash,
+    height: 0,
+    fee: 2 + bytes[0] % 72,
+    vsize: 3_000_000 + (bytes[1] * 131071 + bytes[2] * 8191),
+    count: 8_000 + bytes[3] * 257 + bytes[4],
+    projectedBlocks: 1 + bytes[5] % 7,
+    connected: false,
+  };
+}
+
 export function seededRandom(seed) {
   let state = hashBytes(seed).reduce((total, value, index) => (total ^ (value << (index % 24))) >>> 0, 0x9e3779b9);
   return () => {
@@ -284,6 +307,12 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     },
     visual: bytes.slice(5, 21),
   };
+}
+
+export function replayCompositionFromHash(value) {
+  const hash = normalizeReplayHash(value);
+  if (!hash) throw new TypeError('A replay requires a 64-character hexadecimal block hash');
+  return compositionFromBlock(hash, 0, null);
 }
 
 export function latestBlockFromFrame(frame = {}) {

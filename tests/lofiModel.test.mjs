@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
+import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayHash, replayCompositionFromHash, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -28,6 +28,29 @@ test('block composition is deterministic and musically bounded', () => {
   assert.ok(first.sound.percussionVoice >= 0 && first.sound.percussionVoice < 8);
   assert.ok(first.sound.textureVoice >= 0 && first.sound.textureVoice < 4);
   assert.ok(first.sound.reverbWet >= .04 && first.sound.reverbWet <= .21);
+});
+
+test('hash replay validates links and produces a versioned deterministic track', () => {
+  const uppercase = HASH.toUpperCase();
+  const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
+  assert.equal(normalizeReplayHash(`  ${uppercase}  `), HASH);
+  assert.equal(normalizeReplayHash('not-a-block'), null);
+  assert.equal(REPLAY_ENGINE_VERSION, 'v1');
+  assert.deepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(uppercase));
+  assert.notDeepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(otherHash));
+  assert.equal(replayCompositionFromHash(HASH).height, 0);
+});
+
+test('hash replay sound shading is deterministic and uses the full proof-of-work hash', () => {
+  const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
+  const first = replaySoundStateFromHash(HASH);
+  const repeated = replaySoundStateFromHash(HASH);
+  const other = replaySoundStateFromHash(otherHash);
+  assert.deepEqual(first, repeated);
+  assert.notDeepEqual(first, other);
+  assert.ok(first.fee >= 2 && first.fee <= 73);
+  assert.ok(first.projectedBlocks >= 1 && first.projectedBlocks <= 7);
+  assert.throws(() => replaySoundStateFromHash('bad hash'), /64-character/);
 });
 
 test('proof-of-work zero prefixes do not collapse real blocks into one style', () => {
