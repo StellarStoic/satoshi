@@ -98,11 +98,25 @@ export function hashBytes(value) {
   return cleanHash(value).match(/../g).map(part => Number.parseInt(part, 16));
 }
 
-export const REPLAY_ENGINE_VERSION = 'v1';
+export const REPLAY_ENGINE_VERSION = 'v2';
+export const REPLAY_HASH_ROLES = [
+  {name: 'Harmony', start: 24, end: 32, color: '#f2a900'},
+  {name: 'Groove', start: 32, end: 40, color: '#32d583'},
+  {name: 'Ensemble', start: 40, end: 48, color: '#4da3ff'},
+  {name: 'Texture', start: 48, end: 56, color: '#e45fb2'},
+];
 
 export function normalizeReplayHash(value) {
   const hash = String(value || '').trim().toLowerCase();
   return /^[0-9a-f]{64}$/.test(hash) ? hash : null;
+}
+
+export function normalizeReplayEngine(value) {
+  return value === 'v1' ? 'v1' : REPLAY_ENGINE_VERSION;
+}
+
+export function replayHashRoleAt(characterIndex) {
+  return REPLAY_HASH_ROLES.find(role => characterIndex >= role.start && characterIndex < role.end) || null;
 }
 
 export function replaySoundStateFromHash(value) {
@@ -198,9 +212,14 @@ function expandPattern(base, random, addChance = .08) {
   });
 }
 
-export function compositionFromBlock(hash, height = 0, previousComposition = null) {
+export function compositionFromBlock(hash, height = 0, previousComposition = null, decisionOverrides = null) {
   const random = seededRandom(`${cleanHash(hash)}${Number(height).toString(16)}`);
   const bytes = Array.from({length: 32}, () => Math.floor(random() * 256));
+  if (decisionOverrides) {
+    Object.entries(decisionOverrides).forEach(([index, value]) => {
+      bytes[Number(index)] = Number(value) & 255;
+    });
+  }
   const moodIndex = bytes[0] % MOODS.length;
   const mood = MOODS[moodIndex];
   let sceneIndex = bytes[27] % PRODUCTION_SCENES.length;
@@ -309,10 +328,24 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
   };
 }
 
-export function replayCompositionFromHash(value) {
+function replayDecisionOverrides(hash) {
+  const source = hashBytes(hash);
+  const overrides = {};
+  const assign = (sourceStart, targets) => targets.forEach((target, index) => {
+    overrides[target] = source[sourceStart + index % 4];
+  });
+  assign(12, [0, 1, 2, 19]);
+  assign(16, [3, 4, 28, 7, 24]);
+  assign(20, [27, 17, 13, 14, 15, 16]);
+  assign(24, [18, 29, 30, 31, 20, 12, 11, 10, 9]);
+  return overrides;
+}
+
+export function replayCompositionFromHash(value, engine = REPLAY_ENGINE_VERSION) {
   const hash = normalizeReplayHash(value);
   if (!hash) throw new TypeError('A replay requires a 64-character hexadecimal block hash');
-  return compositionFromBlock(hash, 0, null);
+  if (normalizeReplayEngine(engine) === 'v1') return compositionFromBlock(hash, 0, null);
+  return compositionFromBlock(hash, 0, null, replayDecisionOverrides(hash));
 }
 
 export function latestBlockFromFrame(frame = {}) {

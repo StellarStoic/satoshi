@@ -1,4 +1,4 @@
-import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayHash, replayCompositionFromHash, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from './lofiModel.mjs';
+import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from './lofiModel.mjs';
 
 const ToneApi = globalThis.Tone;
 const ui = {
@@ -38,6 +38,11 @@ const ui = {
   replayInput: document.getElementById('replayHash'),
   replayStatus: document.getElementById('replayStatus'),
   returnLive: document.getElementById('returnLive'),
+  hashInfluenceLegend: document.getElementById('hashInfluenceLegend'),
+  readingLabels: Object.fromEntries(['flow', 'shape', 'size', 'fee', 'weight', 'transaction', 'depth'].map(name => [name, {
+    label: document.getElementById(`${name}Label`),
+    hint: document.getElementById(`${name}Hint`),
+  }])),
 };
 
 const STORE_KEY = 'blockLofiSettings';
@@ -197,7 +202,11 @@ const state = {
   animationFrame: 0,
   replayMode: false,
   replayHash: '',
+  replayEngine: REPLAY_ENGINE_VERSION,
+  replayData: null,
+  schedulerRecovering: false,
 };
+const replayBlockCache = new Map();
 
 function loadSettings() {
   try {
@@ -230,6 +239,7 @@ function setReplayStatus(message, invalid = false) {
 function syncReplayUi() {
   ui.replaySection.classList.toggle('replay-active', state.replayMode);
   ui.returnLive.hidden = !state.replayMode;
+  ui.hashInfluenceLegend.hidden = !state.replayMode || state.replayEngine === 'v1';
   if (state.replayMode) ui.replayInput.value = state.replayHash;
 }
 
@@ -245,11 +255,11 @@ function cancelBlockTransition() {
   }
 }
 
-function updateReplayUrl(hash = null) {
+function updateReplayUrl(hash = null, engine = REPLAY_ENGINE_VERSION) {
   const url = new URL(globalThis.location.href);
   if (hash) {
     url.searchParams.set('block', hash);
-    url.searchParams.set('engine', REPLAY_ENGINE_VERSION);
+    url.searchParams.set('engine', normalizeReplayEngine(engine));
   } else {
     url.searchParams.delete('block');
     url.searchParams.delete('engine');
@@ -267,7 +277,88 @@ async function loadReplayMetadata(hash) {
   } catch { /* The hash alone is enough to replay the track. */ }
 }
 
-function enterReplay(value, {updateUrl = true} = {}) {
+function cacheReplayData(hash, data) {
+  replayBlockCache.set(hash, data);
+  try { sessionStorage.setItem(`blockLofiReplay:${REPLAY_ENGINE_VERSION}:${hash}`, JSON.stringify(data)); } catch {}
+}
+
+function cachedReplayData(hash) {
+  if (replayBlockCache.has(hash)) return replayBlockCache.get(hash);
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(`blockLofiReplay:${REPLAY_ENGINE_VERSION}:${hash}`));
+    if (cached?.hash === hash) {
+      replayBlockCache.set(hash, cached);
+      return cached;
+    }
+  } catch {}
+  return null;
+}
+
+function applyReplayBlockData(data) {
+  if (!state.replayMode || state.replayHash !== data.hash || state.replayEngine === 'v1') return;
+  state.replayData = data;
+  state.chain = {...state.chain, ...data.chain};
+  state.transactionSummary = data.summary;
+  state.flowSeed = data.flowSeed;
+  const composition = state.pendingComposition || state.composition;
+  if (composition?.hash === data.hash) {
+    const flow = flowFromTransactions(data.flowSeed, composition, data.summary);
+    if (state.playing) state.pendingFlow = flow;
+    else state.activeFlow = flow;
+    prepareVoices(composition, flow);
+  }
+  state.soundSignature = '';
+  applyNetworkSound(true);
+  if (state.animationEnabled) renderTransactionVisuals(data.summary.items);
+  renderChain();
+  setReplayStatus(`Recorded block loaded · ${data.chain.count.toLocaleString()} transactions · engine ${state.replayEngine}`);
+}
+
+async function loadReplayBlockData(hash) {
+  const cached = cachedReplayData(hash);
+  if (cached) {
+    applyReplayBlockData(cached);
+    return;
+  }
+  setReplayStatus(`Loading recorded block data · engine ${state.replayEngine}`);
+  const [blockResult, txidsResult, transactionsResult] = await Promise.allSettled([
+    getJson(`https://mempool.space/api/block/${hash}`),
+    getJson(`https://mempool.space/api/block/${hash}/txids`),
+    getJson(`https://mempool.space/api/block/${hash}/txs/0`),
+  ]);
+  if (!state.replayMode || state.replayHash !== hash || state.replayEngine === 'v1') return;
+  const block = blockResult.status === 'fulfilled' ? blockResult.value : null;
+  if (!block || !Number.isInteger(Number(block.height))) {
+    setReplayStatus(`Hash replay ready · recorded block data unavailable · engine ${state.replayEngine}`);
+    return;
+  }
+  const txids = txidsResult.status === 'fulfilled' && Array.isArray(txidsResult.value) ? txidsResult.value : [];
+  const transactions = transactionsResult.status === 'fulfilled' && Array.isArray(transactionsResult.value) ? transactionsResult.value : [];
+  const paidTransactions = transactions.filter(transaction => Number(transaction?.fee) > 0);
+  const sampled = summarizeTransactions(paidTransactions.length ? paidTransactions : transactions);
+  const count = Math.max(1, Number(block.tx_count) || txids.length || sampled.count);
+  const vsize = Math.max(1, (Number(block.weight) || Number(block.size) * 4 || sampled.totalVsize * 4) / 4);
+  const summary = {...sampled, count, totalVsize: vsize, averageVsize: vsize / count};
+  const flowSeed = txids.length ? foldTransactionIds(hash, txids, Number(block.height)) : hash;
+  const data = {
+    hash,
+    flowSeed,
+    summary,
+    chain: {
+      height: Number(block.height),
+      hash,
+      fee: sampled.averageFeeRate || replaySoundStateFromHash(hash).fee,
+      vsize,
+      count,
+      projectedBlocks: 1,
+      connected: false,
+    },
+  };
+  cacheReplayData(hash, data);
+  applyReplayBlockData(data);
+}
+
+function enterReplay(value, {updateUrl = true, engine = REPLAY_ENGINE_VERSION} = {}) {
   const hash = normalizeReplayHash(value);
   if (!hash) {
     setReplayStatus('Enter a complete 64-character hexadecimal block hash.', true);
@@ -285,15 +376,18 @@ function enterReplay(value, {updateUrl = true} = {}) {
   state.pendingFlow = null;
   state.replayMode = true;
   state.replayHash = hash;
+  state.replayEngine = normalizeReplayEngine(engine);
+  state.replayData = null;
   state.chain = replaySoundStateFromHash(hash);
   state.flowSeed = hash;
   state.soundSignature = '';
   syncReplayUi();
-  if (updateUrl) updateReplayUrl(hash);
-  setReplayStatus(`Hash-only replay · engine ${REPLAY_ENGINE_VERSION}`);
-  queueComposition(replayCompositionFromHash(hash));
+  if (updateUrl) updateReplayUrl(hash, state.replayEngine);
+  setReplayStatus(`Hash replay · engine ${state.replayEngine}`);
+  queueComposition(replayCompositionFromHash(hash, state.replayEngine));
   renderChain();
-  loadReplayMetadata(hash);
+  if (state.replayEngine === 'v1') loadReplayMetadata(hash);
+  else loadReplayBlockData(hash);
   return true;
 }
 
@@ -302,6 +396,7 @@ async function exitReplay() {
   cancelBlockTransition();
   state.replayMode = false;
   state.replayHash = '';
+  state.replayData = null;
   state.chain = fallbackChainState();
   state.transactionSummary = summarizeTransactions();
   state.transactionVisuals = [];
@@ -335,7 +430,7 @@ function titleFor(composition) {
 }
 
 function makeComposition() {
-  if (state.replayMode) return replayCompositionFromHash(state.replayHash);
+  if (state.replayMode) return replayCompositionFromHash(state.replayHash, state.replayEngine);
   return compositionFromBlock(state.chain.hash, state.chain.height, state.pendingComposition || state.composition);
 }
 
@@ -362,7 +457,9 @@ function showComposition(composition) {
 function applyComposition(composition) {
   state.composition = composition;
   state.pendingComposition = null;
-  state.flowSeed = composition.hash;
+  const replayData = state.replayMode && state.replayData?.hash === composition.hash ? state.replayData : null;
+  state.flowSeed = replayData?.flowSeed || composition.hash;
+  state.transactionSummary = replayData?.summary || state.transactionSummary;
   state.activeFlow = flowFromTransactions(state.flowSeed, composition, state.transactionSummary);
   state.pendingFlow = null;
   showComposition(composition);
@@ -434,20 +531,65 @@ function formatWeight(vsize) {
   return `${(vsize / 1_000_000).toFixed(vsize >= 100_000_000 ? 0 : 1)} MvB`;
 }
 
+const LIVE_READING_COPY = {
+  flow: ['Incoming flow', 'new phrases + voicings'],
+  shape: ['Transaction shape', 'script + input/output mix'],
+  size: ['Average size', 'note length + visual mass'],
+  fee: ['Half-hour fee', 'energy + brightness'],
+  weight: ['Mempool weight', 'tape texture'],
+  transaction: ['Unconfirmed transactions', 'currently waiting in the mempool'],
+  depth: ['Projected blocks', 'echo depth'],
+};
+const REPLAY_READING_COPY = {
+  flow: ['Recorded flow', 'all transaction IDs shape the phrases'],
+  shape: ['Transaction sample', 'first block transactions'],
+  size: ['Average block TX', 'block vsize divided by transaction count'],
+  fee: ['Sample fee rate', 'first paid transactions in the block'],
+  weight: ['Block virtual size', 'recorded block weight'],
+  transaction: ['Block transactions', 'confirmed in this block'],
+  depth: ['Source', 'immutable historical block'],
+};
+
+function setReadingCopy(copy) {
+  Object.entries(copy).forEach(([name, values]) => {
+    ui.readingLabels[name].label.textContent = values[0];
+    ui.readingLabels[name].hint.textContent = values[1];
+  });
+}
+
 function renderChain() {
   if (state.replayMode) {
-    ui.flow.textContent = 'deterministic';
-    ui.shape.textContent = 'hash replay';
-    ui.size.textContent = 'fixed seed';
-    ui.fee.textContent = 'not live';
-    ui.weight.textContent = 'hash only';
-    ui.transactions.textContent = 'not used';
-    ui.depth.textContent = 'not used';
+    ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : 'replay';
+    ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
+    if (state.replayEngine === 'v1') {
+      setReadingCopy(REPLAY_READING_COPY);
+      ui.flow.textContent = 'deterministic';
+      ui.shape.textContent = 'hash only';
+      ui.size.textContent = 'fixed seed';
+      ui.fee.textContent = '—';
+      ui.weight.textContent = '—';
+      ui.transactions.textContent = 'not used';
+      ui.depth.textContent = 'engine v1';
+      ui.connection.classList.remove('live');
+      ui.connection.classList.add('replay');
+      ui.connection.querySelector('span').textContent = 'Deterministic block replay';
+      return;
+    }
+    setReadingCopy(REPLAY_READING_COPY);
+    const recorded = state.replayData;
+    ui.flow.textContent = recorded ? `${recorded.chain.count.toLocaleString()} txids` : 'loading';
+    ui.shape.textContent = recorded?.summary.dominantType || 'hash replay';
+    ui.size.textContent = recorded ? `${Math.round(recorded.summary.averageVsize).toLocaleString()} vB` : '—';
+    ui.fee.textContent = recorded?.summary.averageFeeRate ? `${recorded.summary.averageFeeRate.toFixed(1)} sat/vB` : '—';
+    ui.weight.textContent = recorded ? formatWeight(recorded.chain.vsize) : '—';
+    ui.transactions.textContent = recorded ? recorded.chain.count.toLocaleString() : '—';
+    ui.depth.textContent = recorded ? 'mempool.space' : 'loading';
     ui.connection.classList.remove('live');
     ui.connection.classList.add('replay');
-    ui.connection.querySelector('span').textContent = 'Deterministic block replay';
+    ui.connection.querySelector('span').textContent = recorded ? 'Recorded block replay' : 'Loading block replay';
     return;
   }
+  setReadingCopy(LIVE_READING_COPY);
   const now = Date.now();
   state.flowWindow = state.flowWindow.filter(batch => now - batch.time < 30000);
   const flowing = state.flowWindow.reduce((total, batch) => total + batch.count, 0);
@@ -492,7 +634,7 @@ function addTransactionVisuals(items) {
     const buffered = state.transactionVisualBuffer.splice(0);
     renderTransactionVisuals(buffered);
   };
-  const wait = Math.max(0, 2000 - (performance.now() - state.lastVisualRefresh));
+  const wait = Math.max(0, 4000 - (performance.now() - state.lastVisualRefresh));
   if (!state.visualRefreshTimer) state.visualRefreshTimer = setTimeout(flush, wait);
 }
 
@@ -543,7 +685,7 @@ function applyTransactionDetails(transactions) {
 
 function drainTransactionDetails() {
   if (state.detailBusy || !state.detailQueue.length) return;
-  const sampleInterval = economyAudio ? 10000 : 1800;
+  const sampleInterval = economyAudio ? 12000 : 4000;
   const wait = Math.max(0, sampleInterval - (Date.now() - state.lastDetailAt));
   clearTimeout(state.detailTimer);
   state.detailTimer = setTimeout(async () => {
@@ -602,10 +744,11 @@ function rampAudioProperty(target, property, value, seconds = 0) {
 
 function applyNetworkSound(force = false) {
   if (!state.composition) return;
-  const soundState = state.replayMode ? replaySoundStateFromHash(state.replayHash) : state.chain;
+  const soundState = state.replayMode && !state.replayData ? replaySoundStateFromHash(state.replayHash) : state.chain;
   const mapped = mempoolToSound(soundState);
   const influence = 1;
-  const bpm = state.composition.bpm + mapped.tempoLift * influence;
+  const requestedBpm = state.composition.bpm + mapped.tempoLift * influence;
+  const bpm = state.engine?.tempoHash === state.composition.hash ? state.engine.targetBpm : requestedBpm;
   ui.tempo.textContent = `${Math.round(bpm)} BPM`;
   if (!state.engine) return;
   const signature = [
@@ -629,7 +772,13 @@ function applyNetworkSound(force = false) {
   }
   state.soundSignature = signature;
   state.lastSoundUpdate = now;
-  ToneApi.getTransport().bpm.rampTo(bpm, 2);
+  if (state.engine.tempoHash !== state.composition.hash) {
+    state.engine.tempoHash = state.composition.hash;
+    state.engine.targetBpm = requestedBpm;
+    const transportBpm = ToneApi.getTransport().bpm;
+    if (state.playing) transportBpm.rampTo(requestedBpm, 2);
+    else transportBpm.value = requestedBpm;
+  }
   const flowColor = (state.activeFlow?.brightness || 0) * 220 * influence;
   const filterBase = state.composition.sound.filterBase;
   const filterTarget = filterBase + state.composition.sound.filterBias + (mapped.filterHz - 1400) * influence + flowColor;
@@ -933,6 +1082,8 @@ function createEngine() {
     dustGain, textureGain,
     layerGains: {harmony: harmonyGain, bass: bassGain, melody: melodyGain, drums: drumsGain, dust: dustGain},
     step: 0,
+    tempoHash: '',
+    targetBpm: state.composition?.bpm || 72,
     percussionChance: 0.1,
     lastWhistleAt: 0,
     enableAnalyser() {
@@ -1221,12 +1372,56 @@ async function togglePlayback() {
     try { ToneApi.getTransport().stop(); } catch {}
     state.engine?.dispose();
     state.engine = null;
+    state.soundSignature = '';
     state.playing = false;
     ui.transport.textContent = 'Audio could not start';
     ui.play.disabled = false;
     ui.play.classList.remove('loading');
     ui.play.setAttribute('aria-label', 'Play Block Lo-Fi');
     ui.play.innerHTML = '<i data-lucide="play"></i>';
+    globalThis.lucide?.createIcons();
+  }
+}
+
+async function recoverAudioScheduler() {
+  if (state.schedulerRecovering || !state.playing) return;
+  const recoveryComposition = state.pendingComposition
+    || (state.composition?.hash !== state.chain.hash ? makeComposition() : null);
+  state.schedulerRecovering = true;
+  state.playing = false;
+  cancelBlockTransition();
+  ui.transport.textContent = 'Recovering the audio clock';
+  ui.play.disabled = true;
+  ui.play.classList.add('loading');
+  ui.play.innerHTML = '<i data-lucide="loader-circle"></i>';
+  globalThis.lucide?.createIcons();
+  try {
+    const transport = ToneApi.getTransport();
+    try { transport.stop(); } catch {}
+    try { state.engine?.dispose(); } catch {}
+    try { transport.cancel(0); } catch {}
+    state.engine = null;
+    state.soundSignature = '';
+    if (recoveryComposition) applyComposition(recoveryComposition);
+    await unlockAudio();
+    state.engine = createEngine();
+    await warmEngine(state.engine);
+    applyNetworkSound(true);
+    transport.start('+0.1');
+    state.playing = true;
+    ui.transport.textContent = state.replayMode ? 'Block replay' : state.chain.connected ? 'Chain in the groove' : 'Offline groove';
+    ui.play.setAttribute('aria-label', 'Pause Block Lo-Fi');
+    ui.play.innerHTML = '<i data-lucide="pause"></i>';
+  } catch (error) {
+    console.error('Could not recover Block Lo-Fi:', error);
+    state.playing = false;
+    ui.transport.textContent = 'Audio stopped · press play to restart';
+    ui.play.setAttribute('aria-label', 'Play Block Lo-Fi');
+    ui.play.innerHTML = '<i data-lucide="play"></i>';
+  } finally {
+    state.schedulerRecovering = false;
+    ui.play.disabled = false;
+    ui.play.classList.remove('loading');
     globalThis.lucide?.createIcons();
   }
 }
@@ -1421,9 +1616,16 @@ function drawBlockIdentity(context, cx, cy, radius) {
   context.textBaseline = 'middle';
   [...hash].forEach((character, index) => {
     const angle = -Math.PI / 2 + index / hash.length * Math.PI * 2;
+    const role = state.replayMode && state.replayEngine !== 'v1' ? replayHashRoleAt(index) : null;
     context.save();
     context.translate(cx + Math.cos(angle) * hashRadius, cy + Math.sin(angle) * hashRadius);
     context.rotate(angle + Math.PI / 2);
+    if (role) {
+      context.fillStyle = role.color;
+      context.shadowColor = role.color;
+      context.shadowBlur = 5;
+      context.font = `700 ${hashSize}px "Roboto Mono", monospace`;
+    }
     context.fillText(character, 0, 0);
     context.restore();
   });
@@ -1548,7 +1750,7 @@ const initialUrl = new URL(globalThis.location.href);
 const requestedReplay = initialUrl.searchParams.get('block');
 const initialReplayHash = normalizeReplayHash(requestedReplay);
 if (initialReplayHash) {
-  enterReplay(initialReplayHash, {updateUrl: false});
+  enterReplay(initialReplayHash, {updateUrl: false, engine: normalizeReplayEngine(initialUrl.searchParams.get('engine'))});
 } else {
   applyComposition(makeComposition());
   renderChain();
@@ -1578,6 +1780,16 @@ ui.visualToggle.addEventListener('change', () => setAnimationEnabled(ui.visualTo
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.playing) ui.transport.textContent = 'Playing in background';
   else if (!document.hidden) refreshBlockTip().catch(() => {});
+});
+globalThis.addEventListener('error', event => {
+  const stack = String(event.error?.stack || '');
+  const message = String(event.message || '');
+  const toneClockFailure = String(event.filename || '').includes('Tone.js')
+    && (stack.includes('getTicksAtTime') || (message.includes('undefined') && message.includes('time')));
+  if (!toneClockFailure) return;
+  event.preventDefault();
+  console.warn('Tone.js audio clock stalled; rebuilding the Block Lo-Fi scheduler.');
+  recoverAudioScheduler();
 });
 globalThis.addEventListener('beforeunload', () => {
   clearTimeout(state.reconnectTimer);

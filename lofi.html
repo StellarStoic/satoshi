@@ -42,6 +42,9 @@
         </div>
         <div class="block-stamp block-stamp-accessible" aria-live="polite"><span>Block</span><strong id="blockHeight">—</strong><code id="blockHash">000000…000000</code></div>
         <div class="block-transition" id="blockTransition" aria-live="polite"><i></i><span>NEW BLOCK</span><strong>Soft handover</strong></div>
+        <div class="hash-influence-legend" id="hashInfluenceLegend" hidden aria-label="Highlighted block hash roles">
+          <span class="harmony">Harmony</span><span class="groove">Groove</span><span class="ensemble">Ensemble</span><span class="texture">Texture</span>
+        </div>
         <div class="tx-legend" aria-hidden="true">
           <span class="taproot">Taproot</span><span class="segwit">SegWit</span><span class="legacy">Legacy</span><span class="batch">Batch</span><span class="consolidation">Consolidation</span><span class="data">Data</span>
           <span class="live">Live TXID = hash color</span>
@@ -87,13 +90,13 @@
     <section class="chain-console" aria-labelledby="chain-title">
       <div class="console-heading"><p class="lofi-eyebrow">The chain conducts</p><h2 id="chain-title">Live Bitcoin, bounded by music</h2><p>The block hash creates the musical world. Each incoming transaction changes its phrases, instruments and rhythm according to real size, fee and structure.</p></div>
       <dl class="chain-readings">
-        <div><dt>Incoming flow</dt><dd id="flowReading">—</dd><small>new phrases + voicings</small></div>
-        <div><dt>Transaction shape</dt><dd id="shapeReading">listening</dd><small>script + input/output mix</small></div>
-        <div><dt>Average size</dt><dd id="sizeReading">—</dd><small>note length + visual mass</small></div>
-        <div><dt>Half-hour fee</dt><dd id="feeReading">—</dd><small>energy + brightness</small></div>
-        <div><dt>Mempool weight</dt><dd id="weightReading">—</dd><small>tape texture</small></div>
-        <div><dt>Unconfirmed transactions</dt><dd id="transactionReading">—</dd><small>currently waiting in the mempool</small></div>
-        <div><dt>Projected blocks</dt><dd id="depthReading">—</dd><small>echo depth</small></div>
+        <div><dt id="flowLabel">Incoming flow</dt><dd id="flowReading">—</dd><small id="flowHint">new phrases + voicings</small></div>
+        <div><dt id="shapeLabel">Transaction shape</dt><dd id="shapeReading">listening</dd><small id="shapeHint">script + input/output mix</small></div>
+        <div><dt id="sizeLabel">Average size</dt><dd id="sizeReading">—</dd><small id="sizeHint">note length + visual mass</small></div>
+        <div><dt id="feeLabel">Half-hour fee</dt><dd id="feeReading">—</dd><small id="feeHint">energy + brightness</small></div>
+        <div><dt id="weightLabel">Mempool weight</dt><dd id="weightReading">—</dd><small id="weightHint">tape texture</small></div>
+        <div><dt id="transactionLabel">Unconfirmed transactions</dt><dd id="transactionReading">—</dd><small id="transactionHint">currently waiting in the mempool</small></div>
+        <div><dt id="depthLabel">Projected blocks</dt><dd id="depthReading">—</dd><small id="depthHint">echo depth</small></div>
       </dl>
       <div class="sonic-recipe" aria-live="polite">
         <span>Current blockchain ensemble</span>

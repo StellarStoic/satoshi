@@ -33,6 +33,14 @@
 .block-transition.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: #f2a900; content: ""; transform-origin: left; animation: block-handover var(--handover-time, 12s) linear both; }
 @keyframes block-spin { to { transform: rotate(360deg); } }
 @keyframes block-handover { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.hash-influence-legend { position: absolute; top: 20px; left: 20px; display: flex; flex-wrap: wrap; gap: 7px 12px; max-width: calc(100% - 40px); color: #858a8c; font-size: 8px; text-transform: uppercase; pointer-events: none; }
+.hash-influence-legend[hidden] { display: none; }
+.hash-influence-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.hash-influence-legend span::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ""; }
+.hash-influence-legend .harmony { color: #f2a900; }
+.hash-influence-legend .groove { color: #32d583; }
+.hash-influence-legend .ensemble { color: #4da3ff; }
+.hash-influence-legend .texture { color: #e45fb2; }
 .tx-legend { position: absolute; right: 22px; bottom: 22px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px 12px; width: min(470px, 61%); color: #979c9e; font-size: 9px; text-transform: uppercase; pointer-events: none; }
 .tx-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .tx-legend span::before { width: 6px; height: 6px; border-radius: 50%; background: #aaa; content: ""; }
@@ -100,7 +108,7 @@
 .replay-input-row .return-live { border-color: #414648; color: #a9adae; }
 .block-replay output { display: block; min-height: 15px; margin-top: 7px; color: #747a7c; font-size: 9px; }
 .block-replay.replay-active .replay-heading span, .block-replay.replay-active output { color: #f2a900; }
-.connection-state.replay i { color: #f2a900; }
+.connection-state.replay i { background: #f2a900; box-shadow: 0 0 10px rgba(242,169,0,.5); }
 
 .chain-console { display: grid; grid-template-columns: minmax(250px, .72fr) minmax(0, 1.28fr); gap: 70px; padding: 72px 0 55px; border-bottom: 1px solid #36393a; }
 .console-heading h2 { margin: 0; font-size: clamp(25px, 4vw, 42px); font-weight: 400; line-height: 1.08; }
@@ -170,6 +178,7 @@
   .studio-heading h1 { font-size: 48px; }
   .visual-stage, #lofiCanvas { min-height: 48svh; }
   .block-stamp { top: 14px; right: 14px; }
+  .hash-influence-legend { top: 12px; left: 12px; gap: 5px 9px; max-width: calc(100% - 24px); font-size: 7px; }
   .record-label { left: 18px; bottom: 22px; }
   .transport-row { grid-template-columns: 58px minmax(0, 1fr); gap: 10px; }
   .play-button { width: 58px; height: 58px; }

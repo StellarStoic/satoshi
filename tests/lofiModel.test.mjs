@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayHash, replayCompositionFromHash, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
+import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -35,10 +35,30 @@ test('hash replay validates links and produces a versioned deterministic track',
   const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
   assert.equal(normalizeReplayHash(`  ${uppercase}  `), HASH);
   assert.equal(normalizeReplayHash('not-a-block'), null);
-  assert.equal(REPLAY_ENGINE_VERSION, 'v1');
+  assert.equal(REPLAY_ENGINE_VERSION, 'v2');
   assert.deepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(uppercase));
   assert.notDeepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(otherHash));
   assert.equal(replayCompositionFromHash(HASH).height, 0);
+  assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null));
+  assert.equal(normalizeReplayEngine('v1'), 'v1');
+  assert.equal(normalizeReplayEngine('unknown'), 'v2');
+});
+
+test('replay hash highlights identify the characters that choose musical roles', () => {
+  assert.equal(replayHashRoleAt(23), null);
+  assert.equal(replayHashRoleAt(24).name, 'Harmony');
+  assert.equal(replayHashRoleAt(35).name, 'Groove');
+  assert.equal(replayHashRoleAt(44).name, 'Ensemble');
+  assert.equal(replayHashRoleAt(52).name, 'Texture');
+  assert.equal(replayHashRoleAt(56), null);
+
+  const baseHash = '0'.repeat(64);
+  const mutate = index => `${baseHash.slice(0, index)}1${baseHash.slice(index + 1)}`;
+  const base = replayCompositionFromHash(baseHash);
+  assert.notEqual(replayCompositionFromHash(mutate(25)).mood, base.mood);
+  assert.notEqual(replayCompositionFromHash(mutate(33)).bpm, base.bpm);
+  assert.notEqual(replayCompositionFromHash(mutate(41)).scene, base.scene);
+  assert.notEqual(replayCompositionFromHash(mutate(49)).texture, base.texture);
 });
 
 test('hash replay sound shading is deterministic and uses the full proof-of-work hash', () => {
