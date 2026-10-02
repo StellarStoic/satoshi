@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, transactionGravityPoint} from '../lofiModel.mjs';
+import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -30,6 +30,17 @@ test('block composition is deterministic and musically bounded', () => {
   assert.ok(first.sound.reverbWet >= .04 && first.sound.reverbWet <= .21);
 });
 
+test('track titles are stable for a block identity and do not repeat across heights', () => {
+  const title = trackTitleFromBlock(HASH, 900000);
+  assert.equal(title, trackTitleFromBlock(HASH.toUpperCase(), 900000));
+  assert.match(title, /900,000\/25e65a19d7ac$/);
+  assert.notEqual(title, trackTitleFromBlock(HASH, 900001));
+  assert.notEqual(title, trackTitleFromBlock(`${HASH.slice(0, -1)}d`, 900000));
+
+  const titles = Array.from({length: 10_000}, (_, index) => trackTitleFromBlock(HASH, 890000 + index));
+  assert.equal(new Set(titles).size, titles.length);
+});
+
 test('hash replay validates links and produces a versioned deterministic track', () => {
   const uppercase = HASH.toUpperCase();
   const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
@@ -42,6 +53,15 @@ test('hash replay validates links and produces a versioned deterministic track',
   assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null));
   assert.equal(normalizeReplayEngine('v1'), 'v1');
   assert.equal(normalizeReplayEngine('unknown'), 'v2');
+});
+
+test('replay accepts safe non-negative block heights', () => {
+  assert.equal(normalizeReplayHeight(' 900000 '), 900000);
+  assert.equal(normalizeReplayHeight(0), 0);
+  assert.equal(normalizeReplayHeight('-1'), null);
+  assert.equal(normalizeReplayHeight('900000.5'), null);
+  assert.equal(normalizeReplayHeight('not-a-height'), null);
+  assert.equal(normalizeReplayHeight('999999999999999999999'), null);
 });
 
 test('replay hash highlights identify the characters that choose musical roles', () => {

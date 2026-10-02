@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v105';
+const CACHE = 'satoshi-static-v108';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
@@ -11,7 +11,7 @@ const CORE = [
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
     '/isBip39.html', '/isBip39.css', '/isBip39.js', '/vendor/bip39.mjs',
     '/entropy.html', '/entropy.css', '/entropy.mjs', '/entropyModel.mjs',
-    '/lofi.html', '/lofi.css', '/lofi.mjs', '/lofiModel.mjs', '/vendor/tone/Tone.js', '/vendor/tone/Tone.js.map',
+    '/lofi.html', '/lofi.css', '/lofi.mjs', '/lofiModel.mjs', '/lofiInstruments.mjs', '/vendor/tone/Tone.js', '/vendor/tone/Tone.js.map',
     '/img/grain.png', '/siteEffects.js', '/siteEffects.css',
     '/living.html', '/living.css', '/living.mjs', '/livingModel.mjs',
     '/historical_data/generated/living-EU-observed.json',

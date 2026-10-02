@@ -30,6 +30,18 @@ const PROGRESSIONS = [
   [0, 2, 3, 5],
   [0, 4, 2, 5],
 ];
+const TRACK_ADJECTIVES = [
+  'Amber', 'Analog', 'Blue', 'Burnished', 'Calm', 'Copper', 'Distant', 'Dusty',
+  'Electric', 'Faded', 'Golden', 'Hidden', 'Late', 'Low', 'Midnight', 'Muted',
+  'Neon', 'Patient', 'Quiet', 'Rainy', 'Silver', 'Slow', 'Soft', 'Solar',
+  'Still', 'Sunday', 'Tangerine', 'Velvet', 'Warm', 'Worn', 'Zero', 'Afterglow',
+];
+const TRACK_NOUNS = [
+  'Beacon', 'Circuit', 'Coffee', 'Current', 'Echo', 'Halving', 'Horizon', 'Lantern',
+  'Ledger', 'Loop', 'Mempool', 'Midnight', 'Nonce', 'Orbit', 'Packet', 'Pulse',
+  'Relay', 'Reverb', 'Rhythm', 'Room', 'Signal', 'Static', 'Studio', 'Sunrise',
+  'Tape', 'Terminal', 'Transit', 'Voltage', 'Window', 'Witness', 'Wave', 'Whisper',
+];
 
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
@@ -98,6 +110,19 @@ export function hashBytes(value) {
   return cleanHash(value).match(/../g).map(part => Number.parseInt(part, 16));
 }
 
+export function trackTitleFromBlock(hash, height = 0) {
+  const normalizedHash = cleanHash(hash);
+  const bytes = hashBytes(normalizedHash);
+  const blockHeight = Math.max(0, Math.trunc(Number(height) || 0));
+  const heightLow = blockHeight >>> 0;
+  const adjectiveIndex = (bytes[7] ^ bytes[19] ^ (heightLow & 255)) % TRACK_ADJECTIVES.length;
+  const nounIndex = (bytes[13] ^ bytes[27] ^ ((heightLow >>> 8) & 255)) % TRACK_NOUNS.length;
+  const identity = blockHeight > 0
+    ? `${blockHeight.toLocaleString('en-US')}/${normalizedHash.slice(-12)}`
+    : normalizedHash.slice(-12);
+  return `${TRACK_ADJECTIVES[adjectiveIndex]} ${TRACK_NOUNS[nounIndex]} · ${identity}`;
+}
+
 export const REPLAY_ENGINE_VERSION = 'v2';
 export const REPLAY_HASH_ROLES = [
   {name: 'Harmony', start: 24, end: 32, color: '#f2a900'},
@@ -109,6 +134,13 @@ export const REPLAY_HASH_ROLES = [
 export function normalizeReplayHash(value) {
   const hash = String(value || '').trim().toLowerCase();
   return /^[0-9a-f]{64}$/.test(hash) ? hash : null;
+}
+
+export function normalizeReplayHeight(value) {
+  const height = String(value ?? '').trim();
+  if (!/^\d+$/.test(height)) return null;
+  const parsed = Number(height);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 export function normalizeReplayEngine(value) {

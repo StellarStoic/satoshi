@@ -3,6 +3,7 @@
 !/tools/history/
 !/tools/news/
 !/tools/price-scanner/
+!/tools/lofi/
 /tools/price-scanner/node_modules/
 __pycache__/
 .vscode
