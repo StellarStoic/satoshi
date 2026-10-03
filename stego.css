@@ -64,29 +64,27 @@
 
 #helpIcon {
   position: fixed;
-  top: max(18px, env(safe-area-inset-top));
-  right: 18px;
+  top: max(22px, env(safe-area-inset-top));
+  right: 22px;
   z-index: 2100;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   min-height: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid #555a5c;
-  border-radius: 50%;
-  background: rgba(16, 18, 19, .92);
-  color: #d7d9d5;
-  font: 500 1.15rem/1 "Roboto Mono", monospace;
+  border: 0;
+  background: transparent;
+  color: #777d82;
+  font: 400 1.25rem/1 "Roboto Mono", monospace;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
 }
 
 #helpIcon:hover,
 #helpIcon:focus-visible {
   color: var(--stego-orange);
-  border-color: var(--stego-orange);
+  outline: none;
 }
 
 .stego-app h2,
@@ -628,10 +626,11 @@
   }
 
   #helpIcon {
-    top: max(12px, env(safe-area-inset-top));
-    right: 12px;
-    width: 38px;
-    height: 38px;
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
   }
 
   .stego-hero { margin-bottom: 34px; }
