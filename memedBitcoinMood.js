@@ -115,7 +115,7 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/BEARISH_005.gif',
             './img/bitcoinMoodMemes/BEARISH_006.gif',
             './img/bitcoinMoodMemes/BEARISH_007.gif',
-            './img/bitcoinMoodMemes/BEARISH_008.jpg'
+            './img/bitcoinMoodMemes/BEARISH_008.gif'
         ]
     }
 };
