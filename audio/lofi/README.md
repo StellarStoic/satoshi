@@ -1,4 +1,4 @@
-# Block Lo-Fi instrument samples
+# 21FM instrument samples
 
 The complete web-ready MP3 sample collection comes from
 [`nbrosowsky/tonejs-instruments`](https://github.com/nbrosowsky/tonejs-instruments)
@@ -15,3 +15,7 @@ All 449 MP3 notes across the upstream library's 20 instruments are bundled.
 WAV and OGG duplicates are omitted because the site plays MP3 assets. The app
 loads only the instruments selected for the current block, and the service
 worker caches samples as they are used instead of precaching the 81 MB bank.
+
+The additional 28 real-world drum and percussion recordings are documented in
+[`real/README.md`](real/README.md). They come from the CC0 Versilian Community
+Sample Library and add less than 1 MB to the project.

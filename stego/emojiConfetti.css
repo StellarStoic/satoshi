@@ -1,0 +1,27 @@
+.confetti-emoji {
+    position: absolute;
+    user-select: none;
+    opacity: 0.9;
+    animation: fall 3s linear forwards, rotate 3s infinite linear;
+}
+
+.confetti-emoji img {
+    display: block;
+    height: auto;
+}
+
+@keyframes fall {
+    from {
+        transform: translateY(-10px) rotate(0deg);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+@keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

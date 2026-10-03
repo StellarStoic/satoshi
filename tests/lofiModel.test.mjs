@@ -12,16 +12,18 @@ test('block composition is deterministic and musically bounded', () => {
   assert.equal(first.chords.every(chord => chord.length >= 3 && chord.length <= 4), true);
   assert.equal(first.melody.length, 32);
   assert.equal(first.palette.length, 21);
-  assert.ok(first.bpm >= 56 && first.bpm <= 92);
+  assert.ok(first.bpm >= 48 && first.bpm <= 176);
   assert.ok(first.swing >= 0.5 && first.swing <= 0.68);
-  assert.equal(first.rhythm.kick.length, 64);
-  assert.equal(first.rhythm.snare.length, 64);
-  assert.equal(first.rhythm.chord.length, 64);
+  assert.ok([12, 14, 16, 20].includes(first.stepsPerBar));
+  assert.equal(first.totalSteps, first.stepsPerBar * 4);
+  assert.equal(first.rhythm.kick.length, first.totalSteps);
+  assert.equal(first.rhythm.snare.length, first.totalSteps);
+  assert.equal(first.rhythm.chord.length, first.totalSteps);
   assert.equal(first.arrangement.length, 4);
   assert.ok(first.sound.chordVoice >= 0 && first.sound.chordVoice < 8);
   assert.ok(first.sound.leadVoice >= 0 && first.sound.leadVoice < 11);
   assert.ok(first.sound.bassVoice >= 0 && first.sound.bassVoice < 7);
-  assert.ok(first.sound.drumKit >= 0 && first.sound.drumKit < 5);
+  assert.ok(first.sound.drumKit >= 0 && first.sound.drumKit < 10);
   assert.ok(first.sound.padVoice >= 0 && first.sound.padVoice < 5);
   assert.ok(first.sound.arpVoice >= 0 && first.sound.arpVoice < 8);
   assert.ok(first.sound.malletVoice >= 0 && first.sound.malletVoice < 5);
@@ -46,13 +48,30 @@ test('hash replay validates links and produces a versioned deterministic track',
   const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
   assert.equal(normalizeReplayHash(`  ${uppercase}  `), HASH);
   assert.equal(normalizeReplayHash('not-a-block'), null);
-  assert.equal(REPLAY_ENGINE_VERSION, 'v2');
+  assert.equal(REPLAY_ENGINE_VERSION, 'v3');
   assert.deepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(uppercase));
   assert.notDeepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(otherHash));
   assert.equal(replayCompositionFromHash(HASH).height, 0);
   assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null));
   assert.equal(normalizeReplayEngine('v1'), 'v1');
-  assert.equal(normalizeReplayEngine('unknown'), 'v2');
+  assert.equal(normalizeReplayEngine('unknown'), 'v3');
+});
+
+test('early block replays always select valid audio voices', () => {
+  const block22 = replayCompositionFromHash('0000000098b58d427a10c860335a21c1a9a7639e96c3d6f1a03d8c8c885b5e3b');
+  assert.equal(block22.scene, 'Wooden Jazzhop');
+  assert.equal(block22.sound.padVoice, 4);
+  assert.equal(block22.sound.padName, 'night drone');
+
+  const bounds = {chordVoice: 8, bassVoice: 7, leadVoice: 11, drumKit: 10, padVoice: 5, arpVoice: 8, malletVoice: 5, percussionVoice: 8, textureVoice: 4};
+  for (let index = 0; index < 1024; index += 1) {
+    const composition = replayCompositionFromHash(index.toString(16).padStart(64, '0'));
+    Object.entries(bounds).forEach(([role, limit]) => {
+      assert.ok(composition.sound[role] >= 0 && composition.sound[role] < limit, `${role} must be inside its voice bank`);
+    });
+    ['chordName', 'bassName', 'leadName', 'drumName', 'padName', 'arpName', 'malletName', 'percussionName', 'textureName']
+      .forEach(role => assert.equal(typeof composition.sound[role], 'string', `${role} must be present`));
+  }
 });
 
 test('replay accepts safe non-negative block heights', () => {
@@ -103,8 +122,12 @@ test('proof-of-work zero prefixes do not collapse real blocks into one style', (
 });
 
 test('a run of blocks explores the session, harmony and instrument palette', () => {
-  const blocks = Array.from({length: 64}, (_, index) => compositionFromBlock(index.toString(16).padStart(64, '0'), 900100 + index));
-  assert.ok(new Set(blocks.map(block => block.session)).size >= 8);
+  const blocks = Array.from({length: 512}, (_, index) => compositionFromBlock(index.toString(16).padStart(64, '0'), 900100 + index));
+  assert.ok(new Set(blocks.map(block => block.session)).size >= 20);
+  assert.deepEqual([...new Set(blocks.map(block => block.meter))].sort(), ['3/4', '4/4', '5/4', '6/8', '7/8']);
+  assert.ok(Math.min(...blocks.map(block => block.bpm)) <= 55);
+  assert.ok(Math.max(...blocks.map(block => block.bpm)) >= 160);
+  assert.ok(new Set(blocks.map(block => `${block.stepsPerBar}:${block.rhythm.kick.join('')}:${block.rhythm.snare.join('')}`)).size >= 100);
   assert.ok(new Set(blocks.map(block => block.voicing)).size >= 4);
   assert.ok(new Set(blocks.map(block => block.sound.leadVoice)).size >= 7);
   assert.ok(new Set(blocks.map(block => block.sound.drumKit)).size >= 3);

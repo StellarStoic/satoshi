@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Listen to 21FM: diverse generative music shaped by live Bitcoin blocks, fees, transactions, and mempool activity.">
+  <title>21FM | Bitcoin Block Music Generator | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/lofi.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+  <script src="/vendor/lucide/lucide.min.js" defer></script>
+  <script src="/vendor/tone/Tone.js" defer></script>
+  <script type="module" src="/lofi.mjs"></script>
+</head>
+<body class="lofi-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+  <button type="button" class="lofi-help-trigger" id="lofiHelpTrigger" aria-label="How 21FM music is generated" aria-haspopup="dialog" title="How is this music generated?">?</button>
+
+  <main class="lofi-studio">
+    <header class="studio-heading">
+      <div>
+        <p class="lofi-eyebrow">Live generative radio</p>
+        <h1>21FM</h1>
+      </div>
+      <div class="connection-state" id="connectionState"><i></i><span>Finding the chain</span></div>
+    </header>
+
+    <section class="player" aria-label="Bitcoin generative music player">
+      <div class="visual-stage" id="visualStage">
+        <canvas id="lofiCanvas" width="1200" height="720" aria-label="Animated visualization generated from the current Bitcoin block"></canvas>
+        <div class="record-label" aria-live="polite">
+          <span>NOW PLAYING</span>
+          <strong id="trackName">Waiting for block data</strong>
+          <small id="trackKey">—</small>
+        </div>
+        <div class="block-stamp block-stamp-accessible" aria-live="polite"><span>Block</span><strong id="blockHeight">—</strong><code id="blockHash">000000…000000</code></div>
+        <div class="block-transition" id="blockTransition" aria-live="polite"><i></i><span>NEW BLOCK</span><strong>Soft handover</strong></div>
+        <div class="hash-influence-legend" id="hashInfluenceLegend" hidden aria-label="Highlighted block hash roles">
+          <span class="harmony">Harmony</span><span class="groove">Groove</span><span class="ensemble">Ensemble</span><span class="texture">Texture</span>
+        </div>
+        <div class="tx-legend" aria-hidden="true">
+          <span class="taproot">Taproot</span><span class="segwit">SegWit</span><span class="legacy">Legacy</span><span class="batch">Batch</span><span class="consolidation">Consolidation</span><span class="data">Data</span>
+          <span class="live">Live TXID = hash color</span>
+          <span class="rbf">Ring = replaceable (RBF)</span>
+          <span class="motion"><i data-lucide="fast-forward"></i>Faster = higher fee</span>
+          <span class="motion"><i data-lucide="rewind"></i>Slower = lower fee</span>
+          <small>Bubble size = transaction vBytes</small>
+        </div>
+      </div>
+
+      <div class="player-controls">
+        <div class="transport-row">
+          <button type="button" class="play-button" id="playButton" aria-label="Play 21FM"><i data-lucide="play"></i></button>
+          <div><span id="transportLabel">Ready when you are</span><strong id="tempoLabel">— BPM</strong></div>
+        </div>
+
+        <label class="level-control" for="volumeControl"><span><i data-lucide="volume-2"></i>Volume</span><input id="volumeControl" type="range" min="0" max="100" value="68"></label>
+        <label class="visual-toggle" for="visualToggle">
+          <span><i data-lucide="audio-waveform"></i>Animation</span>
+          <input id="visualToggle" type="checkbox" role="switch" checked>
+          <b aria-hidden="true"></b>
+        </label>
+        <div class="radio-rule"><i data-lucide="radio"></i><span>The blockchain selects the session</span></div>
+      </div>
+    </section>
+
+    <section class="block-replay" aria-labelledby="replayTitle">
+      <div class="replay-heading">
+        <span id="replayTitle">Replay a block</span>
+        <small>Same block. Same title. Same track.</small>
+      </div>
+      <form id="replayForm" novalidate>
+        <label for="replayHash">Block height or hash</label>
+        <div class="replay-input-row">
+          <input id="replayHash" name="block" type="text" inputmode="text" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="900000 or 64-character block hash">
+          <button type="submit"><i data-lucide="rotate-ccw"></i><span>Replay block</span></button>
+          <button type="button" class="return-live" id="returnLive" hidden><i data-lucide="radio"></i><span>Return live</span></button>
+        </div>
+        <output id="replayStatus" for="replayHash" aria-live="polite"></output>
+      </form>
+    </section>
+
+    <section class="chain-console" aria-labelledby="chain-title">
+      <div class="console-heading"><p class="lofi-eyebrow">The chain conducts</p><h2 id="chain-title">Live Bitcoin, bounded by music</h2><p>The block hash creates the musical world. Each incoming transaction changes its phrases, instruments and rhythm according to real size, fee and structure.</p></div>
+      <dl class="chain-readings">
+        <div><dt id="flowLabel">Incoming flow</dt><dd id="flowReading">—</dd><small id="flowHint">new phrases + voicings</small></div>
+        <div><dt id="shapeLabel">Transaction shape</dt><dd id="shapeReading">listening</dd><small id="shapeHint">script + input/output mix</small></div>
+        <div><dt id="sizeLabel">Average size</dt><dd id="sizeReading">—</dd><small id="sizeHint">note length + visual mass</small></div>
+        <div><dt id="feeLabel">Half-hour fee</dt><dd id="feeReading">—</dd><small id="feeHint">energy + brightness</small></div>
+        <div><dt id="weightLabel">Mempool weight</dt><dd id="weightReading">—</dd><small id="weightHint">tape texture</small></div>
+        <div><dt id="transactionLabel">Unconfirmed transactions</dt><dd id="transactionReading">—</dd><small id="transactionHint">currently waiting in the mempool</small></div>
+        <div><dt id="depthLabel">Projected blocks</dt><dd id="depthReading">—</dd><small id="depthHint">echo depth</small></div>
+      </dl>
+      <div class="sonic-recipe" aria-live="polite">
+        <span>Current blockchain ensemble</span>
+        <dl>
+          <div><dt>Production scene</dt><dd id="productionScene">—</dd></div>
+          <div><dt>Harmony</dt><dd id="harmonyVoice">—</dd></div>
+          <div><dt>Lead</dt><dd id="leadVoice">—</dd></div>
+          <div><dt>Bass</dt><dd id="bassVoice">—</dd></div>
+          <div><dt>Drums</dt><dd id="drumVoice">—</dd></div>
+          <div><dt>Pad</dt><dd id="padVoice">—</dd></div>
+          <div><dt>Arp / pluck</dt><dd id="arpVoice">—</dd></div>
+          <div><dt>Mallet answer</dt><dd id="malletVoice">—</dd></div>
+          <div><dt>Extra percussion</dt><dd id="percussionVoice">—</dd></div>
+          <div><dt>Room texture</dt><dd id="textureVoice">—</dd></div>
+          <div><dt>Space + motion</dt><dd id="effectVoice">—</dd></div>
+        </dl>
+      </div>
+      <div class="mapping-line" aria-hidden="true"><span>block hash</span><i></i><span>musical world</span><i></i><span>live transaction data</span><i></i><span>endless phrases</span></div>
+    </section>
+
+    <section class="lofi-explainer" aria-labelledby="lofi-explainer-title">
+      <header>
+        <p class="lofi-eyebrow">Under the headphones</p>
+        <h2 id="lofi-explainer-title">How Bitcoin becomes a listening session</h2>
+        <p>This is not a playlist with blockchain decoration. The browser turns live public Bitcoin data into complete musical decisions, spanning quiet ambient sessions, beat music, dance rhythms, jazz, dub, Latin grooves and unusual meters.</p>
+      </header>
+      <ol class="signal-path">
+        <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique seed. It chooses one coherent production scene, then sets its key, progression, swing and arrangement. Keys, bass, lead, pluck, drums and room are selected as an ensemble, and consecutive blocks never reuse the same scene.</p></div><code>hash → musical world</code></li>
+        <li><span>02</span><div><h3>The mempool conducts it</h3><p>Waiting transaction count, projected blocks and fee pressure continuously shade tempo, brightness, percussion density, echo and noise. Busy does not simply mean loud; it means more energy and detail.</p></div><code>pressure → energy</code></li>
+        <li><span>03</span><div><h3>Transactions write phrases</h3><p>Incoming TXIDs reshape the next phrase. Sampled transaction size controls note length and visual mass; fee rate affects brightness and speed; inputs, outputs, RBF and script family influence rhythm, voicing and color.</p></div><code>transactions → variation</code></li>
+        <li><span>04</span><div><h3>Blocks never overlap</h3><p>The completed block fades fully to silence and its instruments are released. Only then does the new block choose its ensemble and fade in, so two block sessions never play over each other.</p></div><code>fade out -> reset -> fade in</code></li>
+      </ol>
+      <div class="data-legend" aria-label="Live data to music mapping">
+        <div><i data-lucide="box"></i><span>Block hash</span><strong>Key · progression · instruments · effects</strong></div>
+        <div><i data-lucide="activity"></i><span>Fee pressure</span><strong>Tempo · filter brightness · drum energy</strong></div>
+        <div><i data-lucide="circle-dot"></i><span>Transaction size</span><strong>Bubble mass · note length</strong></div>
+        <div><i data-lucide="git-branch"></i><span>Transaction structure</span><strong>Rhythm · voicing · timbre</strong></div>
+      </div>
+    </section>
+
+    <section class="lofi-note">
+      <i data-lucide="radio-tower"></i>
+      <p>Every incoming TXID shapes the local performance. A rate-limited transaction sample adds size, fee, value, input/output structure and script family without overwhelming the browser; nothing is stored. Pitched instruments use the <a href="https://github.com/nbrosowsky/tonejs-instruments" target="_blank" rel="noopener noreferrer">tonejs-instruments</a> sample collection under CC BY 3.0.</p>
+      <a href="https://mempool.space/docs/api/websocket" target="_blank" rel="noopener noreferrer">Data: mempool.space <i data-lucide="arrow-up-right"></i></a>
+    </section>
+  </main>
+
+  <dialog class="lofi-help-dialog" id="lofiHelpDialog" aria-labelledby="lofiHelpTitle">
+    <div class="lofi-help-shell">
+      <header class="lofi-help-header">
+        <div><span>Under the hood</span><h2 id="lofiHelpTitle">How Bitcoin becomes 21FM</h2></div>
+        <button type="button" class="lofi-help-close" id="lofiHelpClose" aria-label="Close explanation"><i data-lucide="x"></i></button>
+      </header>
+
+      <div class="lofi-help-body">
+        <p class="lofi-help-intro">This is music generated inside your browser, not a playlist placed over a Bitcoin animation. The block creates a repeatable musical world. Live mempool activity then performs variations inside that world while musical rules keep each style coherent.</p>
+
+        <section>
+          <span class="lofi-help-step">01 · The permanent seed</span>
+          <h3>A block builds the musical world</h3>
+          <p>A Bitcoin block hash contains 64 hexadecimal characters. The generator turns those characters into numbers and uses them as a deterministic seed. “Deterministic” simply means that the same hash always makes the same decisions; there is no hidden random button changing a replay.</p>
+          <p>The hash independently selects one of <strong>12 production scenes</strong> and one of <strong>25 groove sessions</strong>, plus a root note, musical mode, four-chord progression, chord shape, arrangement, drum kit, room texture and effects. A consecutive live block is prevented from reusing the immediately previous production scene.</p>
+          <div class="lofi-help-grid">
+            <div><b>10 modes</b><small>Major, minor, blues, dorian, phrygian, lydian, mixolydian and more.</small></div>
+            <div><b>25 grooves</b><small>Ambient, hip-hop, jazz, house, techno, jungle, funk, dub, Latin and more.</small></div>
+            <div><b>10 progressions</b><small>Each becomes four chords in the chosen key.</small></div>
+            <div><b>5 voicings</b><small>Triads, sevenths, ninths, shells or wide fifths.</small></div>
+          </div>
+          <p>The displayed title is also deterministic. Hash bytes and block height choose the two title words, while the height and final hash characters form its compact identity. That is why the same block reproduces the same name.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">02 · Notes and time</span>
+          <h3>The seed writes a four-bar composition</h3>
+          <p>The selected scale is expanded into a 21-note palette. The generator builds four chords, four bass roots, an eight-step melodic motif and a 32-step melody. Rests, small phrase lifts and a planned break keep it from sounding like every layer is playing all the time.</p>
+          <p>Every musical cycle contains four bars, but the bars are no longer forced into one rhythm. A block can choose <strong>3/4, 4/4, 5/4, 6/8 or 7/8</strong>, producing cycles from 48 to 80 scheduler steps. The groove supplies the kick, snare, hi-hat, chord, bass and melody positions, then seeded fills add controlled variation. Tempo ranges from <strong>48 to 176 BPM</strong> and swing ranges from <strong>50% to 68%</strong>.</p>
+          <p>Five arrangement shapes can drop and return, build gradually, alternate call and response, put rhythm first or open with the full ensemble. Melody is allowed into selected bars rather than running continuously. Chord inversions, bass pickups, arpeggios, mallet answers and small percussion patterns create movement around the main loop.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">03 · The virtual studio</span>
+          <h3>Sampled instruments meet Web Audio synthesis</h3>
+          <p>The project bundles <strong>449 MP3 notes from 20 instruments</strong>. The block chooses instruments from sensible roles instead of treating every sound as interchangeable:</p>
+          <ul>
+            <li><strong>Harmony:</strong> piano, acoustic/electric/nylon guitar, harmonium, organ, harp or xylophone.</li>
+            <li><strong>Bass:</strong> electric bass, contrabass, cello, bassoon, tuba or trombone.</li>
+            <li><strong>Lead:</strong> woodwinds, brass, strings, electric guitar, harp or xylophone.</li>
+            <li><strong>Pluck and mallet:</strong> guitars, harp, piano, harmonium and xylophone.</li>
+          </ul>
+          <p>Tone.js plays the nearest recorded note and pitch-shifts only when an exact sample is unavailable. Organic sessions use 28 compact CC0 recordings of acoustic bass drum, snare, sidestick, hi-hat, cajon, conga, bongos, shaker, claves, tambourine and woodblock. Paired recordings alternate on repeated hits. Electronic sessions retain synthesized drums, while pads, room texture and the subtle transaction whistle are generated locally. Reverb, delay, chorus, filtering, tremolo, phasing, distortion and stereo width are set by the block.</p>
+          <p>The mix intentionally puts drums, rhythm and bass ahead of the leading sounds. Harmony is lower, while lead, pad, arpeggio and mallet layers sit farther back so they color the beat instead of taking it over.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">04 · The live conductor</span>
+          <h3>The mempool changes the performance</h3>
+          <p>mempool.space supplies the latest block, its hash, the half-hour fee estimate, unconfirmed transaction count, total mempool virtual size and projected mempool blocks. A WebSocket then streams newly seen transaction IDs and block updates. The block defines the song; these changing values define how the current performance breathes.</p>
+          <dl class="lofi-help-map">
+            <div><dt>Fee pressure</dt><dd>Adds up to 4 BPM, opens the filter, strengthens the kick and can create more rhythmic detail.</dd></div>
+            <div><dt>Mempool size</dt><dd>Raises or lowers the quiet tape/vinyl texture.</dd></div>
+            <div><dt>Transaction count</dt><dd>Contributes to brightness and the live activity reading.</dd></div>
+            <div><dt>Projected blocks</dt><dd>Controls how wet the delay becomes.</dd></div>
+          </dl>
+          <p>Incoming TXIDs are folded into a rolling 32-byte flow seed. That seed chooses the next 16-note phrase, note velocities, chord inversions, lead/bass/harmony variations, hi-hat offset, fills and melodic register. Changes wait for a bar boundary, so new data does not tear the rhythm apart halfway through a phrase.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">05 · Transaction detail</span>
+          <h3>A representative transaction adds musical character</h3>
+          <p>There are too many transactions to download every full record safely. All received TXIDs can shape the rolling seed, while the browser fetches one representative transaction no more often than every <strong>4 seconds</strong> on regular devices or <strong>12 seconds</strong> in economy mode. Requests time out after 5 seconds and are size-limited.</p>
+          <dl class="lofi-help-map">
+            <div><dt>Fee rate</dt><dd>Brightness, kick energy and extra rhythmic detail.</dd></div>
+            <div><dt>Virtual size</dt><dd>Short, medium or long notes, plus bubble size.</dd></div>
+            <div><dt>Inputs and outputs</dt><dd>Complexity, chord variation, fills and bass pickups.</dd></div>
+            <div><dt>Average output value</dt><dd>Moves the melody into a lower or higher register.</dd></div>
+            <div><dt>Script family</dt><dd>Taproot, SegWit, legacy, data, batch and consolidation patterns can select different voice variations.</dd></div>
+            <div><dt>RBF and data outputs</dt><dd>Add rhythmic detail and distinct visual markings.</dd></div>
+          </dl>
+          <p>If transaction-detail sampling fails, the TXIDs still vary the music. No transaction content is invented to fill a missing response.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">06 · What the visualizer means</span>
+          <h3>The record is a second view of the same data</h3>
+          <p>Transaction bubbles are released in batches no more often than every 4 seconds. Their color represents a transaction family; their area grows with virtual size; a pale outer ring means replace-by-fee; and a square means a data output was detected. Higher-fee bubbles travel faster.</p>
+          <p>Bubbles enter from different directions and are curved back toward the record by its visual “gravity.” Roughly one third receive a path across the center. Crossing close enough can produce a quiet whistle whose speed and pitch follow fee motion and whose strength follows proximity. The whistle is intentionally a background detail.</p>
+          <p>The center shows block height and the complete block hash runs clockwise around the record. During replay, colored hash characters show the sections used for harmony, groove, ensemble and texture. Turning animation off stops canvas work and bubbles, but it does not stop the music or live data.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">07 · Blocks and replay</span>
+          <h3>A new block closes one session and opens another</h3>
+          <p>When a new block arrives, it is queued until the musical boundary. The completed block fades to silence, its voices and loaded samplers are released, the next block constructs its studio, and the new mix fades in. Old and new block sessions do not play over each other.</p>
+          <p>Replay accepts a height or full hash. A height is first resolved to its canonical hash. The browser then loads the block summary, the complete TXID list and a small transaction-detail sample. The hash rebuilds the musical world; block weight, count, fees, transaction structures and folded TXIDs rebuild its internal flow. Replay data is cached only for the browser session.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">08 · Performance and privacy</span>
+          <h3>Everything is generated on the device</h3>
+          <p>Faster devices receive denser visuals and the full effects path. Lower-power devices use fewer particles, a lower canvas frame rate, smaller synth polyphony and a leaner effects mix. Both use the same block identity and musical rules.</p>
+          <p>The browser contacts mempool.space for public Bitcoin data and downloads only the instrument banks selected by the current block. It does not upload microphone audio, wallet data or personal Bitcoin information. Used samples can be cached by the PWA for later playback.</p>
+          <p>This is a musical interpretation, not a scientific sonification where one satoshi equals one note. Bitcoin data makes real, bounded decisions; the composition system translates those decisions into something intended to remain listenable.</p>
+        </section>
+      </div>
+    </div>
+  </dialog>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
+    <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Open support QR codes" title="Support me with a sat or two!"></i>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+</body>
+</html>

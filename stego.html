@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Hide and recover encrypted messages in text or files, inspect Nostr events for concealed content, and explore reversible text ciphers entirely in your browser.">
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <title>Steganography and Cipher Tools | Satoshi.si</title>
+  <link rel="stylesheet" href="/stego/emojiConfetti.css">
+  <link rel="stylesheet" href="/stego/foundSecrets.css">
+  <style media="not all">
+    * {
+      box-sizing: border-box;
+    }
+
+    body.dark-theme {
+      --background-color: #121212;
+      --background-reverse-color: #f0f0f0;
+      --text-color: #00ff00;
+      --text-border: #00ff00;
+      --file-color: #FFA500;
+      --file-border: #FFA500;
+      --nostr-color: #9457b0;
+      --nostr-border: #9457b0;
+      --cipher-color: #07fbff;
+      --cipher-border: #07fbff;
+    }
+
+    body.light-theme {
+      --background-color: #eeeeee;
+      --background-reverse-color:#121212;
+      --text-color: #267b3a;
+      --text-border: #267b3a;
+      --file-color: #70592d;
+      --file-border: #70592d;
+      --nostr-color: #4d245e;
+      --nostr-border: #4d245e;
+      --cipher-color: #0a314d;
+      --cipher-border: #0a314d;
+    }
+
+    body {
+      background-color: var(--background-color);
+      color: var(--text-color);
+      font-family: 'Alegreya Sans SC', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #mainTitle {
+      color: #808080;
+      font-family: 'Major Mono Display', monospace;
+    }
+    canvas{
+      height: 100%;
+      width: 100%;
+      left: 0;
+      top: 0;
+    }
+
+    .sectionTitle {
+      font-family: 'Major Mono Display', monospace;
+      margin-top: 20px;
+      font-size: 1.5em;
+    }
+
+    #encodedOutput,
+    #decodedOutput,
+    #decodedHiddenText,
+    #nostrOutput {
+      font-family: sans-serif !important; /* override uppercase-only font Major Mono Display in the outputs (not in decrypt section!) */
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 1.8em;
+    }
+    h2 {
+      margin-top: 20px;
+      font-size: 1.8em;
+    }
+    h3 {
+      margin-top: 20px;
+      font-size: 1.5em;
+    }
+    .input-container {
+      width: 100%;
+      max-width: 550px;
+      text-align: left;
+      margin-bottom: 10px;
+    }
+    .input-container label {
+      font-size: 1.4rem;
+      margin-bottom: 5px;
+      display: block;
+      color: var(--text-color);
+    }
+    textarea, input, button {
+      width: 100%;
+      max-width: 550px;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid var(--text-border);
+      background-color: var(--background-color);
+      color: var(--text-color);
+      font-size: 1.1rem;
+      border-radius: 5px;
+      transition: all 0.3s ease-in-out;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    textarea:focus, input:focus, button:focus {
+      outline: none;
+      box-shadow: 0 0 10px #00ff00;
+    }
+    button {
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .output-container {
+      width: 100%;
+      max-width: 1200px;
+      text-align: left;
+      margin-top: 10px;
+    }
+    .output {
+      border: 1px dashed var(--text-border);
+      padding: 10px;
+      width: 100%;
+      min-height: 70px;
+      max-width: 550px;
+      word-break: break-word;
+      text-align: left;
+    }
+    .copy-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 5px;
+    }
+    .copy-button {
+      background-color: var(--text-color);
+      color: var(--background-color);
+      border: none;
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: 1rem;
+      border-radius: 3px;
+    }
+    .copy-button:hover {
+      background-color: var(--text-color);
+    }
+    /* New: Carrier image thumbnail */
+    .thumbnail-container {
+      width: 100%;
+      max-width: 500px;
+      margin-top: 10px;
+      text-align: center;
+    }
+    .thumbnail-container img {
+      max-width: 100%;
+      max-height: 300px;
+      display: none;
+      margin: 0 auto;
+      border: 1px solid var(--file-border);
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 1rem;
+      opacity: 0.7;
+    }
+    .loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2rem;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      z-index: 9999;
+    }
+
+    /*file section styling*/
+
+    .file-section {
+      color: var(--file-color);
+      width: 100%;
+      max-width: 550px; /* Match the input container's max-width */
+    }
+
+    /* Change the labels to orange */
+    .file-section .input-container label {
+      color: var(--file-color);
+    }
+
+    /* Override input, textarea, and button styling for the file section */
+    .file-section input,
+    .file-section textarea,
+    .file-section button {
+      border: 1px solid var(--file-border);
+      color: var(--file-color);
+    }
+
+    /* Adjust the output box border and text color */
+    .file-section .output {
+      border: 1px dashed var(--file-border);
+      color: var(--file-color);
+      font-size: 1.1rem;
+    }
+
+    /* Change the copy button background for file section */
+    .file-section .copy-button {
+      background-color: var(--file-color);
+      color: var(--background-color);
+    }
+
+    /* Update thumbnail image border */
+    .file-section .thumbnail-container img {
+      border: 1px solid #FFA500;
+    }
+
+    #stegoDownloadLink {
+      display: none;
+      color: var(--background-reverse-color); /* Alice Blue */
+    }
+
+    #imageHiddenDownloadLink {
+      display: none;
+      color: var(--background-color); /* Alice Blue */
+    }
+
+
+    /* Nostr Section (light purple theme) */
+    .nostr-section {
+      color: var(--nostr-color); /* dark purple */
+      width: 100%;
+      max-width: 550px; /* Match the input container's max-width */
+    }
+    .nostr-section h2, .nostr-section h3, .nostr-section label {
+      color: var(--nostr-color); /* dark purple */
+    }
+    .nostr-section input,
+    .nostr-section textarea,
+    .nostr-section button {
+      border: 1px solid var(--nostr-border);
+      color: var(--nostr-color);
+    }
+    .nostr-section .original-message {
+      opacity: 0.6;
+      font-size: 1.1rem;
+      border: 1px dotted var(--nostr-border);
+      padding: 5px;
+      color: darkgray;
+      margin-top: 10px;
+    }
+    .nostr-section .output {
+      border: 1px dashed var(--nostr-border);
+      font-size: 1.1rem;
+      color: var(--nostr-color);
+    }
+    .nostr-section .copy-button {
+      background-color: var(--nostr-color);
+      color: var(--background-color);
+    }
+
+    /* cipher section */
+
+    .cipher-section {
+      color: var(--cipher-color); /* dark purple */
+      width: 100%;
+      max-width: 550px; /* Match the input container's max-width */
+    }
+
+    .cipher-section h2, .cipher-section h3, .cipher-section label {
+      color: var(--cipher-color); /* dark purple */
+    }
+
+    #useObfuscation{
+      /* background-color: var(--cipher-color); */
+      border: 1px solid var(--cipher-border);
+      color: var(--cipher-color);
+    }
+    .cipher-section input,
+    .cipher-section textarea,
+    .cipher-section button {
+      border: 1px solid var(--cipher-border);
+      color: var(--cipher-color);
+    }
+    .cipher-section{
+      opacity: 0.6;
+      font-size: 1.1rem;
+      /* border: 1px dotted var(--cipher-border); */
+      padding: 5px;
+      color: darkgray;
+      margin-top: 10px;
+    }
+    .cipher-section .output-box {
+      border: 1px dashed var(--cipher-border);
+      font-size: 1.1rem;
+      color: var(--cipher-color);
+      word-wrap: break-word;
+    }
+
+    /* Change the copy button background for file section */
+    .cipher-section .copy-button {
+      background-color: var(--cipher-color);
+      color: var(--background-color);
+    }
+
+    #methodBubbleTitle {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--cipher-color);
+    }
+
+    #textTransformationMethod {
+  background-color: var(--background-color);        /* Background when closed */
+  color: var(--background-reverse-color);                   /* Text color */
+  border: 2px solid #555;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;     /* Smooth hover effects */
+  appearance: none;
+}
+
+#textTransformationMethod:hover {
+  border-color: #888;
+  background-color: #333;
+}
+
+#textTransformationMethod optgroup {
+  background-color: var(--cipher-color);     /* Changed to blue color */
+  color:var(--background-color);                   /* White text for better contrast */
+  font-weight: bold;             /* Make group labels stand out */
+}
+
+#textTransformationMethod option {
+  background-color: var(--background-color);        /* Background for individual options */
+  color: var(--background-reverse-color);                   /* Text color for options */
+}
+    .method-sequence {
+      margin-top: 10px;
+    }
+    .method-bubble {
+      display: inline-block;
+      padding: 5px 10px;
+      margin: 3px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      color: var(--background-reverse-color);
+    }
+    .mini-modal {
+      position: fixed;
+      background: var(--background-color);
+      color: var(--background-reverse-color);
+      border: 1px solid var(--cipher-border);
+      padding: 10px;
+      z-index: 10000;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    #modalMethodTitle {
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--cipher-color);
+      margin-bottom: 8px;
+    }
+
+    .delete-button {
+      background: #ff5555;
+      color: white;
+      padding: 6px 10px;
+      margin-top: 10px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .method-controls{
+      display: flex;               /* Default to flex */
+      justify-content: space-between;   /* Push buttons to edges */
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-start;
+      align-items: center;
+      margin-top: 10px;
+      flex-direction: row;
+    }
+
+    .method-controls.hidden {
+      display: none;               /* Use JS to toggle this */
+    }
+
+    /* Nice button scaling */
+    .method-controls button {
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      border-radius: 6px;
+      color: var(--cipher-color, #888);
+      cursor: pointer;
+      transition: var(--background-color) 0.3s ease;
+    }
+
+
+    /* Modal styling */
+    .modal {
+      position: fixed;
+      z-index: 9998;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+      display: none;
+    }
+    .modal-content {
+      background-color: var(--background-color);
+      color: var(--file-color);
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 90%;
+      max-width: 600px;
+      border-radius: 8px;
+      text-align: left;
+    }
+    /* the textObfuscation description */
+    #modalDescription {
+      word-break: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }
+
+    /* Light grey color for links inside the modal */
+    .modal-content a {
+        color: var(--background-reverse-color);
+        text-decoration: underline;
+    }
+
+    .modal-content a:hover {
+        color: #ff9800; /* Slightly brighter grey on hover for better UX */
+    }
+
+    .copy-nostr-id {
+        font-weight: bold;
+        color: #ff9800;
+        cursor: pointer;
+        word-wrap: break-word;
+        text-decoration: underline;
+        transition: color 0.2s ease-in-out;
+    }
+
+    .copy-nostr-id:hover {
+        color: #ffa726;
+    }
+
+    .qr-code-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center; /* Center content */
+      align-items: center;
+      gap: 30px; /* Space between items */
+      padding: 15px;
+    }
+
+    .qr-code-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 200px; /* Ensures equal width */
+    }
+
+    .qr-code {
+      max-width: 150px;
+      height: auto;
+      border: 1px solid #888;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .qr-code:hover {
+      transform: scale(1.1);
+    }
+
+    .qr-code-text {
+      font-family: monospace;
+      font-size: 0.75em;
+      word-break: break-word;
+      margin-top: 5px;
+      color: #aaa;
+      text-align: center;
+    }
+
+    /* Center the Alby link */
+    .alby-link-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 15px;
+    }
+
+    .alby-link-container a {
+      text-decoration: none;
+      color: #ff9800;
+      font-weight: bold;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .alby-link-container a:hover {
+      color: #ffa726;
+    }
+
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover, .close:focus {
+      color: #000;
+    }
+    /* Question Mark Icon */
+    #helpIcon {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+      z-index: 10001;
+    }
+    #helpIcon img {
+      width: 30px;
+      height: 30px;
+    }
+
+    /* toast message instead of alert */
+    #toastContainer {
+      position: fixed; /* Changed from sticky to fixed */
+      top: 20px; /* Distance from top */
+      left: 50%;
+      transform: translateX(-50%); /* Perfect horizontal centering */
+      z-index: 9999;
+      display: none;
+      padding: 12px 24px;
+      background: #333;
+      color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      font-family: sans-serif;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      max-width: 80%; /* Prevents toast from being too wide */
+      text-align: center;
+      pointer-events: none; /* Allows clicking through when hidden */
+    }
+
+    /* Class to show toast with fade-in animation */
+    #toastContainer.show {
+      display: block;
+      opacity: 1;
+    }
+
+    #toastContainer.show {
+    animation: toastSlideIn 0.3s ease-out;
+    }
+
+    /* click functional section separator */
+    .multi-section-hr {
+    display: flex;
+    height: 3px;
+    margin: 20px 0;
+    overflow: hidden;
+    border-radius: 1px;
+    }
+
+    .section-link {
+        flex: 1;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    .section-link:hover {
+        opacity: 0.7;
+    }
+
+    @keyframes toastSlideIn {
+      from { top: 0; opacity: 0; }
+      to { top: 20px; opacity: 1; }
+    }
+    /* Class to hide toast with fade-out animation */    
+    /* Responsive Styling */
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      h1 {
+        font-size: 1.5em;
+      }
+      textarea, input, button {
+        font-size: 14px;
+        padding: 10px;
+      }
+      .output {
+        font-size: 14px;
+        padding: 8px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/stego.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+  <script src="/vendor/lucide/lucide.min.js" defer></script>
+</head>
+<body class="dark-theme stego-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <div class="stego-app">
+  <div id="loader" class="loader" style="display:none;">Processing...</div>
+
+    <!-- Toast Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Question Mark Icon -->
+  <button type="button" id="helpIcon" aria-label="About the steganography and cipher tools" title="How these tools work">?</button>
+
+  <!-- Modal (empty initially) -->
+  <div id="infoModal" class="modal">
+    <div class="modal-content" id="modalContent">
+      <span id="closeModal" class="close">&times;</span>
+      <!-- Content will be injected here -->
+    </div>
+  </div>
+
+  <!-- Template for modal content -->
+  <template id="modalTemplate">
+    <h2>About This Steganography Playground</h2>
+    <p>
+      <strong>Overview:</strong><br>
+      This steganography tool allows you to hide secret messages or entire files within visible 
+      text and carrier files (such as images or videos or other binaries). The tool employs advanced 
+      techniques to cloak your data without drawing attention. You can also fetch Nostr event and 
+      check if text includes hidden messages.
+    </p>
+    <p>
+      <strong>How It Works:</strong><br>
+      Everything performed by this tool happens entirely client-side, meaning your data never 
+      leaves your device. The tool has two main functions: <em>Text Steganography</em> and <em>File Steganography</em>.
+      Text secrets are encoded as compact UTF-8 bytes using zero-width characters and appended invisibly to the visible message.
+      The versioned decoder also reads messages made with the earlier 32-bit format. Hidden files are encoded into Base64 and appended to carrier files using a unique marker.
+    </p>
+    <p>
+      <strong>Encryption:</strong><br>
+      When you provide an encryption key, the tool encrypts the hidden content using AES encryption. 
+      The same key is required to decrypt and extract the hidden data. It is advised to protect any 
+      private information or digital payment invoices with a password, as bots can easily be programmed 
+      to immediately claim these invoices.
+    </p>
+    <p>
+      <strong>Steganography Methods:</strong><br>
+      This tool leverages multiple steganography techniques and <strong>none of them</strong> is LSB (Least Significant Bit):
+      <ul>
+        <li>
+          <strong>Two Zero-Width Characters Method (ZWNJ & ZWJ) – Encode & Decode:</strong>
+          Binary data is encoded using <code>\u200C</code> and <code>\u200D</code> to represent bits 0 and 1 respectively. Used for plain text and emoji-based carrier messages.
+        </li>
+        <li>
+          <strong>Three Zero-Width Characters Method (ZWSP, ZWNJ & ZWJ) – Decode-Only (Fallback):</strong>
+          Provides enhanced compatibility for decoding messages hidden with other tools using <code>\u200B</code>, <code>\u200C</code>, and <code>\u200D</code>.
+        </li>
+        <li>
+          <strong>File Payload Embedding – Encode & Decode:</strong>
+          Hides files or text data inside other files (like images or documents) by appending Base64-encoded payloads with a unique marker.
+        </li>
+        <li>
+          <strong>Emoji Steganography (Paul Butler’s Method) – Decode-Only:</strong>
+          Extracts hidden bytes from Unicode variation selectors embedded in emoji characters. 
+          <br><em>Based on <a href="https://github.com/paulgb/emoji-encoder" target="_blank" rel="noopener noreferrer">Paul Butler’s emoji-encoder</a>.</em>
+          <br><strong>Note: This method currently supports decoding only.</strong>
+        </li>
+      </ul>
+      For further exploration, refer to:
+      <a href="https://exo.substack.com/p/the-exo-guide-to-data-cloaking" target="_blank">The EXO Guide to Data Cloaking</a>,
+      <a href="https://www.youtube.com/live/Nq_UCm4oCaA" target="_blank">Nulbyte's video tutorial</a>,
+      and their <a href="https://null-byte.wonderhowto.com/how-to/use-zero-width-characters-hide-secret-messages-0198696/" target="_blank">website tutorial</a>.
+    </p>
+    <p>
+      <strong>File Hiding Capabilities:</strong><br>
+      You can hide images, text files, or any file type - each file is encoded (and optionally encrypted) before being appended to a carrier file. 
+      However, please be aware that when you share images online, many social media platforms and websites automatically 
+      compress or convert the file format. This process often reduces file size and standardizes formats, but it may also 
+      remove additional data embedded within the file. In some cases, these platforms strip out metadata or extra hidden 
+      information during upload. As a result, if your hidden data relies on being preserved exactly, it might be altered 
+      or lost once shared on these sites.
+    </p>
+    <p>
+      <strong>Best Image Formats for Data and Text Embedding:</strong><br>
+      Lossless image formats are generally the best choice for embedding data, since they preserve every bit of the original 
+      image without discarding information. <em>PNG</em> and <em>TIFF</em> are popular options because they maintain all data, 
+      ensuring that your hidden information remains intact. Other lossless formats, like <em>GIF</em>, can also be used; however, 
+      keep in mind that <em>GIFs</em> are limited to a 256-color palette, which may not be ideal if you require higher color fidelity or 
+      have complex images. Additionally, formats like <em>BMP</em> or lossless modes of <em>WebP</em> might be considered, but 
+      they often have compatibility issues or less efficient compression compared to PNG.<br><br>
+      On the other hand, the vast majority of images on the internet—over 80%—are in the <em>JPEG</em> format. <em>JPEG</em> uses lossy 
+      compression, which significantly reduces file size by discarding some image data. This efficiency is critical for storing 
+      and transferring huge volumes of images (saving gazillions of terabytes of disk space), which is why it is so widely adopted. 
+      However, because <em>JPEG</em> compression removes some data permanently, it is not ideal for embedding information that needs to be 
+      preserved exactly. For preserving hidden data, a lossless format like <em>PNG</em> is usually recommended.
+    </p>
+    
+    <p><strong>What is Nostr?</strong><br>
+      Nostr, short for “Notes and Other Stuff Transmitted by Relays,” is a permissionless, censorship-resistant, open-source 
+      protocol (and much more...) designed to empower users and uphold the original principles of the internet: decentralization, freedom of expression, 
+      and user control. Unlike traditional social networks like Twitter or Instagram, Nostr operates on a client-relay model, 
+      eliminating centralized servers and giving users full ownership of their identity, data, audience and development on top of it.
+      <br><a href="https://njump.me/" target="_blank">Learn more about Nostr</a>.
+    </p>
+
+    <p>
+      <strong>Nostr Integration:</strong><br>
+      The tool uses the Nostr protocol to fetch events and extract hidden messages directly from relays.
+      By entering a Nostr event ID (HEX, note1, nevent) and optionally relay URLs, the tool connects via WebSockets, fetches the event,
+      and displays both the original and hidden secret message hidden in the text or emoji. 
+      When pasting in the nevent string the tool will automatically extract and use its relay hints.
+      Secrets in files are not available with this option. For testing purposes, you can use this event ID: 
+      <span class="copy-nostr-id" title="Click to copy">0001917b7176006a407f4c7d4a9b7408064fee7db0ad8a5b4f0f825bf0321b1b</span><br>
+      or this one with an image where image contain a hidden message: 
+      <span class="copy-nostr-id" title="Click to copy">note1hxdpv5xcneu6vqacrfg4adjh5n7zvue284fdu64x20ezlh900cqsqpdrdj</span>
+    </p>
+
+    <p>
+      <strong>Obfuscation & Cipher Tools</strong><br>
+      This tool allows you to apply a sequence of text transformations to hide, scramble, or encode messages. 
+      You can combine multiple methods to produce complex and layered ciphers that resemble gibberish or random text, 
+      and remain reversible when the copied method sequence is used.
+      <br><br>
+      The available methods include encoders/decoders for <em>Base64</em>, <em>Base32</em>, <em>Base58</em>, 
+      <em>Binary</em>, and <em>Morse Code</em>, as well as a collection of custom-built text manipulation techniques like 
+      <em>Full Flip</em>, <em>Word Flip</em>, <em>Sentence Inverter</em>, <em>Readable Reverser</em>, and 
+      <em>Scrambler</em>.
+      <br><br>
+      These transformations can be stacked together, forming a custom "method sequence" that records the order in which each method was applied. 
+      When you finish your transformation, you can copy this sequence in a versioned format like <code>mSeq=v1:1,3,7</code>.
+      Older sequences remain supported, and the tool can interpret formats such as <code>1,3,7</code>, <code>1 3 7</code>, <code>1.3.7</code>,
+      or even <code>1 know a s3cre7</code>, making it flexible for sharing and reuse. 
+      The system also smartly detects incompatible methods and will guide you by disabling invalid options to prevent errors.
+      <br><br>
+      To decipher a message, provide the transformed text and the original copied method sequence. The tool reverses the steps automatically.
+      This restores the original text exactly as it was before.
+      <br><br>
+      <strong>Special Notes:</strong>
+      <ul>
+          <li>Some methods are designed to preserve hidden data markers when used together with the steganography tool.</li>
+          <li>Decoder methods validate their input and stop instead of silently dropping invalid characters.</li>
+          <li>The system provides a visual "method history" bubble system, showing exactly which steps you applied.</li>
+          <li>Future updates may introduce even more encoding and scrambling methods.</li>
+      </ul>
+  </p>
+
+    <p>
+      <strong>Visual effects after successful decoding:</strong><br>
+      If the decoding of files and messages is successful, you will receive visual feedback.
+      In some cases, such as when the message includes at the start of the message prefixes 
+      like <code>bitcoin:</code>, <code>cashu</code>, <code>lnbc</code>, <code>monero:</code>, <code>nostr:</code> and others, 
+      it will show a visual effect relevant to the message content. If no special prefixes are included, you'll only see sparkles.
+      If you have any special visual effects requests, please reach out to me.
+    </p>
+
+    <!-- Zap the Developer Section with QR Codes -->
+    <div class="zap-dev-section">
+      <h3>Zap the Developer ⚡️</h3>
+      <p>If you find this website valuable, consider contributing a sat or two. Thank you.</p>
+
+      <div class="qr-code-container">
+        <div class="qr-code-wrapper">
+          <!-- Lightning QR Code -->
+          <img src="/stego/img/images/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" 
+              title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN"><br>
+          <span class="qr-code-text"><small>letterswiss19@walletofsatoshi.com</small></span>
+        </div>
+
+        <div class="qr-code-wrapper">
+          <!-- Onchain QR Code -->
+          <img src="/stego/img/images/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" 
+              title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e"><br>
+          <span class="qr-code-text" id="onchainAddress"><small>bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</small></span>
+        </div>
+      </div>
+
+      <div class="alby-link-container">
+        <p>
+          <a href="https://getalby.com/p/stellarstoic" target="_blank">My Alby page</a>
+      </p>
+    </div>
+  </template>
+
+<!-- Modal for Obfuscation Explanation -->
+<div id="obfuscationModal" class="modal" style="display:none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
+  <div class="modal-content" style="background-color: var(--background-color); margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; position: relative;">
+    <!-- Use a unique id for the close button in this modal -->
+    <span id="closeObfuscationModal" class="close-button" style="position: absolute; top: 10px; right: 10px; font-size: 24px; cursor: pointer;">&times;</span>
+    <h4 style="text-align: center;" id="modalMethodTitle"></h4>
+    <p id="modalDescription">Explanation text goes here...</p>
+    <div class="modal-buttons" style="text-align: right;">
+      <button id="useObfuscation">Use</button>
+    </div>
+  </div>
+</div>
+
+  <header class="stego-hero">
+    <p>Local privacy workshop</p>
+    <h1 id="mainTitle">Steganography Playground</h1>
+    <span>Hide a message in plain sight, recover concealed data, inspect Nostr events, or build a reversible cipher sequence. Processing stays in this browser.</span>
+  </header>
+
+  <!-- Section functional Separator -->
+  <div class="multi-section-hr">
+    <span class="section-link" style="background: var(--text-border);" onclick="scrollToSection('section1')" title="Text Steganography"></span>
+    <span class="section-link" style="background: var(--file-border);" onclick="scrollToSection('section2')" title="File Steganography"></span>
+    <span class="section-link" style="background: var(--nostr-border);" onclick="scrollToSection('section3')" title="Nostr Section"></span>
+    <span class="section-link" style="background: var(--cipher-border);" onclick="scrollToSection('section4')" title="Cipher Tools"></span>
+  </div>
+<br>
+  <!-- Text Steganography Section -->
+  <h2 class="sectionTitle">Text Steganography</h2>
+  <h3 id="section1">Encode a Hidden Message</h3>
+  <div class="input-container">
+    <label for="visibleMessage">Visible Message (Text or Emoji)</label>
+    <textarea id="visibleMessage" placeholder="Enter visible text or an emoji"></textarea>
+
+  
+    <label for="hiddenMessage">Hidden Message</label>
+    <textarea id="hiddenMessage" placeholder="Enter the hidden message"></textarea>
+    
+    <label for="encryptionKey">Optional Password or Recipient npub</label>
+    <input type="password" id="encryptionKey" placeholder="Password or npub1..." autocomplete="new-password" spellcheck="false">
+    <div id="nostrRecipientPreview" class="nostr-recipient-preview" role="status" aria-live="polite" hidden></div>
+  </div>
+  
+  <button id="encodeButton">Encode</button>
+  
+  <h5>Encoded Message</h5>
+  <div class="output-container">
+    <div class="output" id="encodedOutput"></div>
+    <div class="copy-container">
+      <button class="copy-button" onclick="copyToClipboard('encodedOutput')">Copy</button>
+    </div>
+  </div>
+  <br>
+    <hr>
+  <br>
+  <h3>Decode a Hidden Message</h3>
+  <div class="input-container">
+    <label for="encodedMessage">Paste Encoded Message</label>
+    <textarea id="encodedMessage" placeholder="Paste encoded emoji or text here"></textarea>
+  
+    <label for="decryptionKey">Password or Nostr Private Key (if used)</label>
+    <input type="password" id="decryptionKey" placeholder="Password, nsec, or hex private key" autocomplete="new-password" spellcheck="false">
+    <p id="privateKeyWarning" class="private-key-warning" hidden>Entering a Nostr private key here is highly discouraged. It is processed only in this browser and never saved. Prefer an external signer.</p>
+  </div>
+
+  <div class="decode-actions">
+    <button id="decodeButton">Decode</button>
+    <button id="nostrSignerButton" class="nostr-sign-button" type="button" title="Ask a NIP-07 browser signer to decrypt, or open Amber through NIP-55 on Android. Your private key stays in the signer.">Sign with Nostr</button>
+    <button id="showBunkerButton" class="nostr-sign-button" type="button" title="Connect to a NIP-46 remote signer using its bunker link. Your private key is never shared with this page.">Use bunker</button>
+  </div>
+  <div id="bunkerControls" class="bunker-controls" hidden>
+    <label for="bunkerUrl">NIP-46 bunker link</label>
+    <input id="bunkerUrl" type="password" placeholder="bunker://..." autocomplete="off" spellcheck="false">
+    <button id="bunkerDecryptButton" type="button">Connect and decrypt</button>
+  </div>
+  
+  <h5>Decoded Output</h5>
+  <div class="output-container">
+    <div class="output" id="decodedOutput"></div>
+    <div class="copy-container">
+      <button class="copy-button" onclick="copyToClipboard('decodedOutput')">Copy</button>
+    </div>
+  </div>
+
+  <br>
+  <!-- Section functional Separator -->
+  <div class="multi-section-hr">
+    <span class="section-link" style="background: var(--text-border);" onclick="scrollToSection('section1')" title="Text Steganography"></span>
+    <span class="section-link" style="background: var(--file-border);" onclick="scrollToSection('section2')" title="File Steganography"></span>
+    <span class="section-link" style="background: var(--nostr-border);" onclick="scrollToSection('section3')" title="Nostr Section"></span>
+    <span class="section-link" style="background: var(--cipher-border);" onclick="scrollToSection('section4')" title="Cipher Tools"></span>
+  </div>
+  <br>
+  <!-- File Steganography Section -->
+  <div class="file-section">
+  <h2 class="sectionTitle">File Steganography</h2>
+  <h3 id="section2">Encode a secret in a file</h3>
+  <div class="input-container">
+    <label for="carrierFile">Carrier File (e.g., image, video...)</label>
+    <input type="file" id="carrierFile">
+    <label for="fileHiddenFile">Hidden File</label>
+    <input type="file" id="fileHiddenFile">
+    <p style="color: #888; font-size: 0.85rem;">Submit either text or a file for encoding, but not both at the same time. Only one object is allowed per submission.</p>
+    <label for="hiddenText">Or Enter Hidden Text</label>
+    <textarea id="hiddenText" placeholder="Enter text to hide instead of a file"></textarea>
+  
+    <label for="fileEncryptionKey">Optional Password or Recipient npub</label>
+    <input type="password" id="fileEncryptionKey" placeholder="Password or npub1..." autocomplete="new-password" spellcheck="false">
+    <div id="fileNostrRecipientPreview" class="nostr-recipient-preview" role="status" aria-live="polite" hidden></div>
+  </div>
+  <button onclick="encodeFileStego()">Encode File</button>
+
+  <div class="output-container">
+    <div id="encodedFileTextOutput" class="output file-ready-output" role="status" aria-live="polite" style="display:none;"></div>
+  </div>
+  
+  <!-- New: Thumbnail preview for carrier file if it's an image -->
+  <div class="thumbnail-container">
+    <img id="carrierThumbnail" alt="Carrier Image Thumbnail">
+  </div>
+  
+  <div class="output-container">
+    <a id="stegoDownloadLink">Download carrier with secret</a>
+  </div>
+  <br>
+    <hr>
+  <br>
+  <h3 id="decodeFileInputContainer">Decode a Secret in a File</h3>
+  <div class="input-container" >
+    <label for="stegoFile">Choose a file</label>
+    <input type="file" id="stegoFile">
+    <label for="stegoFile">or paste a file URL</label>
+    <input type="text" id="stegoFileUrl" placeholder="file URL as https://example.com/file.png">
+  
+    <label for="fileDecryptionKey">Password or Nostr Private Key (if used)</label>
+    <input type="password" id="fileDecryptionKey" placeholder="Password, nsec, or hex private key" autocomplete="new-password" spellcheck="false">
+    <p id="filePrivateKeyWarning" class="private-key-warning" hidden>Entering a Nostr private key here is highly discouraged. It is processed only in this browser and never saved. Prefer an external signer.</p>
+  </div>
+  <div id="fileNostrUnlockActions">
+    <div class="decode-actions">
+      <button id="decodeFileButton" type="button">Decode File</button>
+      <button id="fileNostrSignerButton" class="nostr-sign-button" type="button" title="Ask a NIP-07 browser signer to decrypt, or open Amber through NIP-55 on Android. Your private key stays in the signer.">Sign with Nostr</button>
+      <button id="fileNostrBunkerButton" class="nostr-sign-button" type="button" title="Connect to a NIP-46 remote signer. Your private key is never shared with this page.">Use bunker</button>
+    </div>
+    <div id="fileNostrBunkerControls" class="bunker-controls" hidden>
+      <label for="fileNostrBunkerUrl">NIP-46 bunker link</label>
+      <input id="fileNostrBunkerUrl" type="password" placeholder="bunker://..." autocomplete="off" spellcheck="false">
+      <button id="fileNostrBunkerDecryptButton" type="button">Connect and decrypt</button>
+    </div>
+  </div>
+
+  <!-- Output Hidden Message (if text was hidden instead of a file) -->
+  <h6>Decoded Hidden Text (if applicable) will show here:</h6>
+  <div class="output-container">
+    <div id="decodedHiddenText" class="output" style="display:none;">Hidden Text Appears Here</div>
+    <div class="copy-container">
+      <button id="copyDecodedTextButton" class="copy-button" style="display:none;" onclick="copyToClipboard('decodedHiddenText')">Copy</button>
+    </div>
+  </div>
+
+  <!-- Decoded file download -->
+  <div class="output-container">
+    <a id="fileHiddenDownloadLink" style="display:none;">Download Secret File</a>
+  </div>
+  <!-- Decoded image preview (only shown if an image was extracted) -->
+  <div class="decodedImage-thumbnail-container thumbnail-container" >
+    <img id="decodedThumbnail" alt="Decoded Image Preview" style="display:none;">
+    <a id="imageHiddenDownloadLink">Download Decoded Image</a>
+  </div>
+  </div>
+
+  <br>
+  <!-- Section functional Separator -->
+  <div class="multi-section-hr">
+    <span class="section-link" style="background: var(--text-border);" onclick="scrollToSection('section1')" title="Text Steganography"></span>
+    <span class="section-link" style="background: var(--file-border);" onclick="scrollToSection('section2')" title="File Steganography"></span>
+    <span class="section-link" style="background: var(--nostr-border);" onclick="scrollToSection('section3')" title="Nostr Section"></span>
+    <span class="section-link" style="background: var(--cipher-border);" onclick="scrollToSection('section4')" title="Cipher Tools"></span>
+  </div>
+  <br>
+
+<!-- Nostr Section -->
+<div class="nostr-section">
+  <h2 id="section3" class="sectionTitle">Nostr Event Stego Fetcher</h2>
+  <div class="input-container">
+    <label for="nostrEventId">Enter Nostr Event ID (HEX, note1, nevent)</label>
+    <input type="text" id="nostrEventId" placeholder="Enter event ID">
+  </div>
+  <div class="input-container">
+    <label for="nostrDecryptionKey">Password or Nostr Private Key (if used)</label>
+    <input type="password" id="nostrDecryptionKey" placeholder="Password, nsec, or hex private key" autocomplete="new-password" spellcheck="false">
+    <p id="nostrPrivateKeyWarning" class="private-key-warning" hidden>Entering a Nostr private key here is highly discouraged. It is processed only in this browser and never saved. Prefer an external signer.</p>
+  </div>
+  <div id="nostrEventUnlockActions">
+    <div class="decode-actions">
+      <button id="fetchNostrButton" type="button">Fetch Nostr Event</button>
+      <button id="nostrEventSignerButton" class="nostr-sign-button" type="button" title="Ask a NIP-07 browser signer to decrypt, or open Amber through NIP-55 on Android. Your private key stays in the signer.">Sign with Nostr</button>
+      <button id="nostrEventBunkerButton" class="nostr-sign-button" type="button" title="Connect to a NIP-46 remote signer. Your private key is never shared with this page.">Use bunker</button>
+    </div>
+    <div id="nostrEventBunkerControls" class="bunker-controls" hidden>
+      <label for="nostrEventBunkerUrl">NIP-46 bunker link</label>
+      <input id="nostrEventBunkerUrl" type="password" placeholder="bunker://..." autocomplete="off" spellcheck="false">
+      <button id="nostrEventBunkerDecryptButton" type="button">Connect and decrypt</button>
+    </div>
+  </div>
+  <!-- Relay inputs container -->
+  <div id="relayContainer" class="input-container">
+    <label for="relayInput0">Relay URL: (optional)</label>
+    <input type="text" id="relayInput0" placeholder="wss://relay.damus.io">
+  </div>
+  <!-- Button to add more relay inputs -->
+  <button id="addRelayButton" title="Add Relay">+</button>
+  <br>
+  <label for="decodedNostrEvent" style="color: #444; font-size: 0.85rem;">Nostr fetcher decodes 
+    <strong>text and emojis only</strong>. For files like images, download them or copy the URL and use the 
+    <a style="color: #aaa; font-size: xx-small;" href="#decodeFileInputContainer">File Decoder Tool</a>
+  </label>
+  <div class="output-container">
+    <div id="nostrOriginal" class="output original-message" style="display:none;">Original message appears here</div>
+    <div class="copy-container">
+      <button class="copy-button" onclick="copyToClipboard('nostrOriginal')">Copy Original</button>
+    </div>
+  </div>
+  <div class="output-container">
+    <div id="nostrOutput" class="output" style="display:none;">Hidden message appears here</div>
+    <div class="copy-container">
+      <button class="copy-button" onclick="copyToClipboard('nostrOutput')">Copy Secret</button>
+    </div>
+  </div>
+</div>
+
+  <br>
+  <!-- Section functional Separator -->
+  <div class="multi-section-hr">
+    <span class="section-link" style="background: var(--text-border);" onclick="scrollToSection('section1')" title="Text Steganography"></span>
+    <span class="section-link" style="background: var(--file-border);" onclick="scrollToSection('section2')" title="File Steganography"></span>
+    <span class="section-link" style="background: var(--nostr-border);" onclick="scrollToSection('section3')" title="Nostr Section"></span>
+    <span class="section-link" style="background: var(--cipher-border);" onclick="scrollToSection('section4')" title="Cipher Tools"></span>
+  </div>
+  <br>
+
+<div id="cipherToolsSection" class="cipher-section">
+  <h2 id="section4">Cipher & Transformation Tools</h2>
+
+  <!-- Input for user text -->
+  <label for="cipherHiddenMessage">Text to Cipher:</label>
+  <textarea id="cipherHiddenMessage" rows="4" placeholder="Enter text you want to transform..."></textarea>
+
+  <div>
+    <!-- Dropdown for transformation method -->
+    <label for="textTransformationMethod">Select a Transformation Method:</label>
+    <select id="textTransformationMethod">
+      <optgroup label="Fun Text Ciphers">
+        <option value="none">Chose a Method</option>
+        <option value="fullFlip">Full Flip</option>
+        <option value="wordFlip">Flip Words</option>
+        <option value="readableReverser">Readable Reverser</option>
+        <option value="sentenceInverter">Sentence Inverter</option>
+        <option value="scrambler">Scrambler</option>
+        <option value="leetSpeak">Text → 1337</option>
+        <option value="leetDecoder">1337 → Text</option>
+      </optgroup>
+      <optgroup label="Morse Code">
+        <option value="morseCode">Text → Morse</option>
+        <option value="morseDecoder">Morse → Text</option>
+      </optgroup>
+      <optgroup label="Binary Tools">
+        <option value="binaryEncoder">Text → Binary</option>
+        <option value="binaryDecoder">Binary → Text</option>
+      </optgroup>
+      <optgroup label="Base Encoding">
+        <option value="base32Encoder">Text → Base32</option>
+        <option value="base32Decoder">Base32 → Text</option>
+        <option value="base58Encoder">Text → Base58</option>
+        <option value="base58Decoder">Base58 → Text</option>
+        <option value="base64Encoder">Text → Base64</option>
+        <option value="base64Decoder">Base64 → Text</option>
+      </optgroup>
+    </select>
+    <!-- X button -->
+  </div>
+
+
+  <!-- Colored method bubbles -->
+  <div id="methodSequence" class="method-sequence"></div>
+
+  <!-- Copy buttons (only shown if methods applied) -->
+  <div id="methodControlButtons" class="method-controls" style="display: none">
+    <button id="copyMethodSequence">Copy Sequence</button>
+    <button id="copyCipheredText" onclick="copyToClipboard('cipherHiddenMessage')">Copy Ciphered Text</button>
+  </div>
+
+    <!-- Input for deciphering process -->
+    <hr>
+    <label for="decipheredInput">Ciphered Text to Decipher:</label>
+    <textarea id="decipheredInput" rows="3" placeholder="Paste ciphered text here..."></textarea>
+
+    <div class="input-container">
+      <label for="methodSequenceInput">Sequence (e.g., mSeq=v1:1,7,13):</label>
+      <input id="methodSequenceInput" type="text" placeholder="mSeq=v1:1,3,7 or a legacy sequence">
+    </div>
+
+    <button id="decipherButton">Decipher</button>
+
+    <div class="output-container">
+      <div id="decipheredOutput"  class="output-box with-border"></div>
+      <button id="copyDecipheredOutput" class="copy-button" style="display:none">Copy</button>
+    </div>
+</div>
+
+<!-- Mini modal for method info + delete -->
+<div id="methodInfoModal" class="mini-modal" style="display: none">
+  <div id="methodBubbleTitle" class="modal-title"></div>
+  <button id="removeLastMethodBtn" class="delete-button" style="display:none; background-color:var(--cipher-border)">Remove last</button>
+  <button id="removeAllMethodsBtn" class="delete-button" style="display:none; background-color:rgb(220, 110, 110)">Remove all</button>
+</div>
+
+
+<div class="legal-disclaimer" style="font-size: 0.85rem; color: red; margin-top: 30px; padding: 10px; max-width: 500px; text-align: center; border-top: 1px solid #444;">
+  <strong>Legal Disclaimer:</strong> The creator of this website cannot be held responsible in case of misuse of this website for activities not permitted by law in the user's country.
+</div>
+</div>
+
+<footer class="footer" data-live-footer>
+  <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+  <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
+  <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+  <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Open support QR codes" title="Support me with a sat or two!"></i>
+</footer>
+  
+  <!-- Scripts -->
+  <script>
+    document.getElementById("copyDecipheredOutput").addEventListener("click", function() {
+      copyToClipboard("decipheredOutput");
+    });
+
+  function showToast(message) {
+    const toast = document.getElementById('toastContainer');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.opacity = '1', 10); // fade-in
+
+    // Auto-close after 4 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0'; // fade-out
+        setTimeout(() => toast.style.display = 'none', 500); // remove after fade-out
+    }, 4000);
+}
+
+function scrollToSection(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function copyToClipboard(elementId) {
+    
+    let element = document.getElementById(elementId);
+
+    if (!element) {
+      showToast("Element not found!");
+        return;
+    }
+
+    let text = "";
+
+    // ✅ If the element was truncated, use the full version from dataset
+    if (element.tagName === "TEXTAREA" || element.tagName === "INPUT") {
+        text = element.value.trim();   // ✅ FIX: read value for textareas and inputs
+    } else if (element.dataset.fullText) {
+        text = element.dataset.fullText.trim();
+    } else {
+        let tempElement = element.cloneNode(true);
+        tempElement.querySelectorAll("a, img, video, button").forEach(el => el.remove());
+        text = tempElement.textContent.trim();
+    }
+
+    if (!text) {
+      showToast("Nothing to copy!");
+        return;
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+      showToast("Copied to clipboard!");
+    }).catch(err => {
+      showToast("Failed to copy!");
+    });
+}
+
+    // Modal functionality using the template.
+    const helpIcon = document.getElementById("helpIcon");
+    const infoModal = document.getElementById("infoModal");
+    const closeModal = document.getElementById("closeModal");
+    const modalContent = document.getElementById("modalContent");
+    const modalTemplate = document.getElementById("modalTemplate");
+
+    helpIcon.addEventListener("click", function() {
+      // Inject the template content into the modal
+      modalContent.innerHTML = modalTemplate.innerHTML;
+      // Add the close button (if not present)
+      if (!modalContent.querySelector(".close")) {
+        const span = document.createElement("span");
+        span.id = "closeModal";
+        span.className = "close";
+        span.innerHTML = "&times;";
+        modalContent.insertBefore(span, modalContent.firstChild);
+        span.addEventListener("click", function() {
+          infoModal.style.display = "none";
+        });
+      }
+      infoModal.style.display = "block";
+    });
+
+    window.addEventListener("click", function(event) {
+      if (event.target === infoModal) {
+        infoModal.style.display = "none";
+      }
+    });
+  </script>
+    <script src="/stego/vendor/crypto-js.min.js"></script>
+    <script src="/stego/emojiDecoder.js"></script>
+    <script src="/stego/emojiConfetti.js"></script>
+    <script src="/stego/foundSecrets.js"></script>
+    <script src="/stego/threeZeroWidthCharactersDecoder.js"></script>
+    <script src="/stego/textTransformer.js"></script>
+    <script src="/stego/decipher.js"></script>
+    <script src="/stego/vendor/nostr-tools.bundle.js"></script>
+    <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
+    <script src="/stego/nostr-recipient.js"></script>
+    <script src="/stego/text-stego.js"></script>
+    <script src="/stego/file-stego.js"></script>
+    <script src="/stego/truncate.js"></script>
+    <script src="/stego/vendor/bech32.js"></script>
+    <script src="/stego/nostrStegoFetch.js"></script>
+    <script src="/stego/loader.js"></script>
+    <script src="/stego/clickToCopy.js"></script>
+    <script src="/burgerMenu.js"></script>
+</body>
+</html>

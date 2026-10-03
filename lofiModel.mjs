@@ -1,22 +1,42 @@
 const ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const MOODS = [
-  {name: 'After Hours', scale: [0, 2, 3, 5, 7, 8, 10], base: 48},
-  {name: 'Rainy Window', scale: [0, 2, 3, 5, 7, 9, 10], base: 46},
-  {name: 'Quiet Morning', scale: [0, 2, 4, 5, 7, 9, 11], base: 45},
-  {name: 'Blue Hour', scale: [0, 2, 3, 5, 7, 9, 10], base: 43},
-  {name: 'Sunday Tape', scale: [0, 2, 4, 7, 9], base: 48},
+  {name: 'After Hours', mode: 'minor', scale: [0, 2, 3, 5, 7, 8, 10], base: 48},
+  {name: 'Rainy Window', mode: 'dorian', scale: [0, 2, 3, 5, 7, 9, 10], base: 46},
+  {name: 'Quiet Morning', mode: 'major', scale: [0, 2, 4, 5, 7, 9, 11], base: 45},
+  {name: 'Blue Hour', mode: 'minor', scale: [0, 2, 3, 5, 7, 9, 10], base: 43},
+  {name: 'Sunday Tape', mode: 'major pentatonic', scale: [0, 2, 4, 7, 9], base: 48},
+  {name: 'Desert Signal', mode: 'phrygian', scale: [0, 1, 3, 5, 7, 8, 10], base: 45},
+  {name: 'Open Road', mode: 'mixolydian', scale: [0, 2, 4, 5, 7, 9, 10], base: 43},
+  {name: 'Neon Minor', mode: 'harmonic minor', scale: [0, 2, 3, 5, 7, 8, 11], base: 48},
+  {name: 'Electric Blue', mode: 'blues', scale: [0, 3, 5, 6, 7, 10], base: 46},
+  {name: 'Floating Glass', mode: 'lydian', scale: [0, 2, 4, 6, 7, 9, 11], base: 45},
 ];
 const SESSIONS = [
-  {name: 'Dusty boom bap', bpm: [70, 84], kick: [0, 7, 10], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0], bass: [0, 8], melody: [0, 2, 6, 8, 10, 14], chordDuration: '1m'},
-  {name: 'Lazy shuffle', bpm: [62, 76], kick: [0, 6, 11], snare: [4, 12], hat: [0, 3, 6, 9, 12, 15], chord: [0, 10], bass: [0, 6, 11], melody: [2, 6, 10, 14], chordDuration: '2n.'},
-  {name: 'Half-time haze', bpm: [58, 70], kick: [0, 9], snare: [8], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 8], bass: [0, 10], melody: [1, 5, 9, 13], chordDuration: '2n'},
-  {name: 'Jazzhop skip', bpm: [74, 90], kick: [0, 5, 11, 14], snare: [4, 12], hat: [0, 2, 5, 7, 10, 13, 15], chord: [0, 6, 11], bass: [0, 5, 11], melody: [1, 4, 7, 10, 13], chordDuration: '4n.'},
-  {name: 'Tape bossa', bpm: [76, 92], kick: [0, 3, 8, 11], snare: [4, 7, 12, 15], hat: [0, 2, 5, 8, 10, 13], chord: [0, 5, 10], bass: [0, 3, 8, 11], melody: [2, 5, 7, 10, 14], chordDuration: '4n'},
-  {name: 'Broken beat', bpm: [68, 86], kick: [0, 3, 10, 13], snare: [6, 12], hat: [0, 2, 3, 6, 8, 11, 14], chord: [0, 7, 13], bass: [0, 7, 10, 13], melody: [1, 3, 6, 9, 12, 15], chordDuration: '4n.'},
-  {name: 'Ambient drift', bpm: [56, 68], kick: [0, 12], snare: [8], hat: [3, 7, 11, 15], chord: [0], bass: [0, 12], melody: [4, 7, 12, 15], chordDuration: '1m'},
-  {name: 'Cassette soul', bpm: [66, 80], kick: [0, 7, 11], snare: [4, 12, 15], hat: [0, 3, 5, 8, 11, 13], chord: [0, 7], bass: [0, 7, 11], melody: [2, 5, 9, 13], chordDuration: '2n.'},
-  {name: 'Lo-Fi house', bpm: [92, 106], kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14], chord: [0, 3, 8, 11], bass: [0, 4, 7, 8, 12], melody: [2, 6, 10, 14], chordDuration: '8n.'},
-  {name: 'Dub study', bpm: [64, 78], kick: [0, 10], snare: [4, 12], hat: [2, 6, 11, 15], chord: [0, 6, 13], bass: [0, 3, 10], melody: [3, 7, 11, 15], chordDuration: '4n'},
+  {name: 'Boom bap', family: 'hip-hop', steps: 16, bpm: [70, 88], swing: [56, 66], kit: 0, kick: [0, 7, 10], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0], bass: [0, 8], melody: [0, 2, 6, 8, 10, 14], chordDuration: '1m'},
+  {name: 'Lazy shuffle', family: 'shuffle', steps: 16, bpm: [62, 80], swing: [62, 68], kit: 3, kick: [0, 6, 11], snare: [4, 12], hat: [0, 3, 6, 9, 12, 15], chord: [0, 10], bass: [0, 6, 11], melody: [2, 6, 10, 14], chordDuration: '2n.'},
+  {name: 'Half-time', family: 'downtempo', steps: 16, bpm: [56, 72], swing: [50, 58], kit: 2, kick: [0, 9], snare: [8], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 8], bass: [0, 10], melody: [1, 5, 9, 13], chordDuration: '2n'},
+  {name: 'Jazzhop', family: 'jazz', steps: 16, bpm: [74, 94], swing: [57, 66], kit: 3, kick: [0, 5, 11, 14], snare: [4, 12], hat: [0, 2, 5, 7, 10, 13, 15], chord: [0, 6, 11], bass: [0, 5, 11], melody: [1, 4, 7, 10, 13], chordDuration: '4n.'},
+  {name: 'Bossa nova', family: 'latin', steps: 16, bpm: [78, 104], swing: [50, 54], kit: 3, kick: [0, 3, 8, 11], snare: [4, 7, 12, 15], hat: [0, 2, 5, 8, 10, 13], chord: [0, 5, 10], bass: [0, 3, 8, 11], melody: [2, 5, 7, 10, 14], chordDuration: '4n'},
+  {name: 'Broken beat', family: 'broken beat', steps: 16, bpm: [82, 108], swing: [54, 63], kit: 2, kick: [0, 3, 10, 13], snare: [6, 12], hat: [0, 2, 3, 6, 8, 11, 14], chord: [0, 7, 13], bass: [0, 7, 10, 13], melody: [1, 3, 6, 9, 12, 15], chordDuration: '4n.'},
+  {name: 'Ambient drift', family: 'ambient', steps: 16, bpm: [48, 66], swing: [50, 55], kit: 2, kick: [0, 12], snare: [8], hat: [3, 7, 11, 15], chord: [0], bass: [0, 12], melody: [4, 7, 12, 15], chordDuration: '1m'},
+  {name: 'Neo soul', family: 'soul', steps: 16, bpm: [66, 86], swing: [55, 64], kit: 3, kick: [0, 7, 11], snare: [4, 12, 15], hat: [0, 3, 5, 8, 11, 13], chord: [0, 7], bass: [0, 7, 11], melody: [2, 5, 9, 13], chordDuration: '2n.'},
+  {name: 'Deep house', family: 'house', steps: 16, bpm: [112, 124], swing: [50, 55], kit: 4, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14], chord: [0, 3, 8, 11], bass: [0, 4, 7, 8, 12], melody: [2, 6, 10, 14], chordDuration: '8n.'},
+  {name: 'Dub', family: 'dub', steps: 16, bpm: [64, 82], swing: [52, 60], kit: 2, kick: [0, 10], snare: [4, 12], hat: [2, 6, 11, 15], chord: [0, 6, 13], bass: [0, 3, 10], melody: [3, 7, 11, 15], chordDuration: '4n'},
+  {name: 'Detroit techno', family: 'techno', steps: 16, bpm: [124, 138], swing: [50, 52], kit: 4, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14, 15], chord: [0, 6, 10], bass: [0, 3, 6, 8, 11, 14], melody: [1, 7, 9, 15], chordDuration: '8n'},
+  {name: 'Synthwave drive', family: 'synthwave', steps: 16, bpm: [88, 112], swing: [50, 53], kit: 4, kick: [0, 4, 8, 12], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 8], bass: [0, 3, 6, 8, 11, 14], melody: [2, 5, 9, 13], chordDuration: '2n'},
+  {name: 'Funk pocket', family: 'funk', steps: 16, bpm: [94, 116], swing: [54, 61], kit: 5, kick: [0, 3, 7, 10, 14], snare: [4, 12], hat: [0, 2, 3, 5, 6, 8, 10, 11, 13, 14], chord: [0, 6, 10, 14], bass: [0, 3, 5, 7, 10, 14], melody: [1, 4, 7, 11, 15], chordDuration: '8n'},
+  {name: 'Reggae one-drop', family: 'reggae', steps: 16, bpm: [72, 92], swing: [50, 57], kit: 2, kick: [8], snare: [8], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [2, 6, 10, 14], bass: [0, 7, 10], melody: [3, 7, 11, 15], chordDuration: '8n'},
+  {name: 'Afrobeat weave', family: 'afrobeat', steps: 16, bpm: [98, 120], swing: [52, 59], kit: 5, kick: [0, 3, 8, 11, 14], snare: [4, 7, 12, 15], hat: [0, 2, 5, 6, 8, 10, 13, 14], chord: [0, 6, 10], bass: [0, 3, 7, 11, 14], melody: [1, 4, 6, 9, 12, 15], chordDuration: '4n'},
+  {name: 'Drum and bass', family: 'drum and bass', steps: 16, bpm: [160, 176], swing: [50, 54], kit: 6, kick: [0, 7, 10], snare: [4, 12], hat: [0, 2, 3, 6, 8, 10, 11, 14], chord: [0, 8], bass: [0, 3, 7, 10, 14], melody: [1, 5, 9, 13], chordDuration: '2n'},
+  {name: 'Jungle break', family: 'jungle', steps: 16, bpm: [150, 172], swing: [51, 57], kit: 6, kick: [0, 6, 10, 15], snare: [4, 7, 12], hat: [0, 2, 3, 5, 8, 9, 11, 14], chord: [0, 10], bass: [0, 5, 8, 11, 14], melody: [2, 6, 10, 13, 15], chordDuration: '4n'},
+  {name: 'Trip-hop', family: 'trip-hop', steps: 16, bpm: [70, 94], swing: [54, 63], kit: 0, kick: [0, 6, 11], snare: [4, 12], hat: [1, 4, 7, 10, 13], chord: [0, 9], bass: [0, 6, 11], melody: [3, 7, 10, 15], chordDuration: '2n.'},
+  {name: 'Waltz', family: 'waltz', steps: 12, bpm: [72, 102], swing: [50, 54], kit: 3, kick: [0], snare: [4, 8], hat: [0, 2, 4, 6, 8, 10], chord: [0, 4, 8], bass: [0, 8], melody: [2, 5, 7, 10], chordDuration: '4n.'},
+  {name: 'Six-eight sway', family: '6/8', steps: 12, bpm: [76, 108], swing: [50, 53], kit: 3, kick: [0, 6], snare: [3, 9], hat: [0, 2, 4, 6, 8, 10], chord: [0, 6], bass: [0, 5, 8], melody: [1, 4, 7, 10], chordDuration: '4n.'},
+  {name: 'Five-four motion', family: '5/4', steps: 20, bpm: [82, 112], swing: [50, 56], kit: 9, kick: [0, 6, 10, 16], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18], chord: [0, 10, 16], bass: [0, 6, 10, 16], melody: [2, 5, 9, 13, 17], chordDuration: '2n'},
+  {name: 'Seven-eight circuit', family: '7/8', steps: 14, bpm: [104, 132], swing: [50, 53], kit: 8, kick: [0, 6, 10], snare: [4, 11], hat: [0, 2, 4, 6, 8, 10, 12], chord: [0, 8], bass: [0, 5, 10], melody: [1, 4, 7, 11, 13], chordDuration: '4n'},
+  {name: 'Disco floor', family: 'disco', steps: 16, bpm: [112, 128], swing: [50, 54], kit: 7, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14], chord: [0, 6, 10, 14], bass: [0, 3, 4, 7, 8, 11, 12, 15], melody: [2, 5, 9, 13], chordDuration: '8n'},
+  {name: 'UK garage', family: 'garage', steps: 16, bpm: [126, 140], swing: [55, 63], kit: 7, kick: [0, 6, 8, 14], snare: [4, 12], hat: [0, 2, 5, 7, 10, 13, 15], chord: [0, 7, 11], bass: [0, 3, 7, 10, 14], melody: [1, 5, 9, 13], chordDuration: '8n.'},
+  {name: 'Latin clave', family: 'latin', steps: 16, bpm: [94, 122], swing: [50, 55], kit: 5, kick: [0, 6, 10], snare: [3, 6, 10, 14], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 6, 10], bass: [0, 3, 8, 11, 14], melody: [2, 5, 7, 10, 13, 15], chordDuration: '4n'},
 ];
 const PROGRESSIONS = [
   [0, 5, 3, 6],
@@ -123,7 +143,7 @@ export function trackTitleFromBlock(hash, height = 0) {
   return `${TRACK_ADJECTIVES[adjectiveIndex]} ${TRACK_NOUNS[nounIndex]} · ${identity}`;
 }
 
-export const REPLAY_ENGINE_VERSION = 'v2';
+export const REPLAY_ENGINE_VERSION = 'v3';
 export const REPLAY_HASH_ROLES = [
   {name: 'Harmony', start: 24, end: 32, color: '#f2a900'},
   {name: 'Groove', start: 32, end: 40, color: '#32d583'},
@@ -207,7 +227,7 @@ const TEXTURES = [
 const CHORD_VOICES = ['felt upright piano', 'room acoustic guitar', 'warm drawbar organ', 'worn upright piano', 'tape organ', 'muted acoustic guitar', 'reed harmonium', 'nylon guitar'];
 const BASS_VOICES = ['fingered electric bass', 'round sub bass', 'dub electric bass', 'short electric bass', 'soft finger bass', 'rubber synth bass', 'low cello'];
 const LEAD_VOICES = ['breathy flute', 'soft xylophone', 'muted guitar', 'hollow flute', 'felt mallet', 'low flute', 'wooden bell', 'night guitar', 'velvet saxophone', 'bowed cello', 'soft harp'];
-const DRUM_KITS = ['dust kit', 'tight kit', 'soft kit', 'brush kit', 'machine kit'];
+const DRUM_KITS = ['dust kit', 'tight kit', 'soft kit', 'brush kit', 'machine kit', 'funk kit', 'breakbeat kit', 'club kit', 'electronic kit', 'cinematic kit'];
 const PAD_VOICES = ['tape strings', 'airy choir', 'warm organ', 'bowed glass', 'night drone'];
 const ARP_VOICES = ['nylon pluck', 'soft harp', 'kalimba', 'music box', 'wooden mallet', 'glass drop', 'concert harp', 'nylon pattern'];
 const MALLET_VOICES = ['vibraphone', 'marimba', 'celesta', 'low bell', 'chime cluster'];
@@ -222,7 +242,7 @@ const PRODUCTION_SCENES = [
   {name: 'Late-Night Upright', sessions: [2, 6], voices: [3, 1, 3, 3, 3, 3, 2, 3, 3]},
   {name: 'Muted Bossa Room', sessions: [4, 1], voices: [5, 4, 7, 3, 1, 0, 0, 6, 2]},
   {name: 'Tape Organ Dub', sessions: [9, 5], voices: [4, 2, 5, 4, 2, 4, 3, 5, 1]},
-  {name: 'Wooden Jazzhop', sessions: [3, 5], voices: [1, 3, 6, 0, 5, 2, 1, 7, 0]},
+  {name: 'Wooden Jazzhop', sessions: [3, 5], voices: [1, 3, 6, 0, 4, 2, 1, 7, 0]},
   {name: 'Sunday Piano Haze', sessions: [6, 7], voices: [0, 0, 4, 2, 0, 1, 4, 4, 3]},
   {name: 'Harmonium Hearth', sessions: [7, 9], voices: [6, 6, 8, 3, 2, 6, 3, 6, 1]},
   {name: 'Nylon Moonlight', sessions: [4, 6], voices: [7, 4, 9, 2, 4, 7, 0, 2, 2]},
@@ -234,13 +254,13 @@ function chordForDegree(mood, root, degree, voicing) {
   return voicing.steps.map(step => midiToNote(scaleMidi(mood, root, degree + step, 1)));
 }
 
-function expandPattern(base, random, addChance = .08) {
-  return Array.from({length: 64}, (_, step) => {
-    const sixteenth = step % 16;
-    const bar = Math.floor(step / 16);
-    if (base.includes(sixteenth)) return true;
-    const fillZone = bar === 3 && sixteenth >= 13;
-    return (fillZone || sixteenth % 4 !== 0) && random() < addChance;
+function expandPattern(base, random, stepsPerBar, addChance = .08) {
+  return Array.from({length: stepsPerBar * 4}, (_, step) => {
+    const position = step % stepsPerBar;
+    const bar = Math.floor(step / stepsPerBar);
+    if (base.includes(position)) return true;
+    const fillZone = bar === 3 && position >= stepsPerBar - 3;
+    return (fillZone || position % 4 !== 0) && random() < addChance;
   });
 }
 
@@ -259,7 +279,10 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     sceneIndex = (sceneIndex + 1 + (bytes[28] % (PRODUCTION_SCENES.length - 1))) % PRODUCTION_SCENES.length;
   }
   const scene = PRODUCTION_SCENES[sceneIndex];
-  const session = SESSIONS[scene.sessions[bytes[28] % scene.sessions.length]];
+  const session = SESSIONS[bytes[28] % SESSIONS.length];
+  const stepsPerBar = session.steps || 16;
+  const totalSteps = stepsPerBar * 4;
+  const meter = stepsPerBar === 20 ? '5/4' : stepsPerBar === 14 ? '7/8' : stepsPerBar === 12 && session.family === 'waltz' ? '3/4' : stepsPerBar === 12 ? '6/8' : '4/4';
   const voicing = VOICINGS[bytes[19] % VOICINGS.length];
   const texture = TEXTURES[bytes[18] % TEXTURES.length];
   const root = bytes[1] % 12;
@@ -278,32 +301,55 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     const phraseLift = step >= 24 && bytes[16] % 2 ? 1 : 0;
     return midiToNote(scaleMidi(mood, root, degree + phraseLift, melodyRegister));
   });
-  const kickPattern = expandPattern(session.kick, random, .025);
-  const snarePattern = expandPattern(session.snare, random, .018);
-  const hatPattern = expandPattern(session.hat, random, .07);
-  const chordPattern = expandPattern(session.chord, random, .015);
-  const bassPattern = expandPattern(session.bass, random, .045);
-  const melodyPattern = expandPattern(session.melody, random, .08);
+  const kickPattern = expandPattern(session.kick, random, stepsPerBar, .025);
+  const snarePattern = expandPattern(session.snare, random, stepsPerBar, .018);
+  const hatPattern = expandPattern(session.hat, random, stepsPerBar, .07);
+  const chordPattern = expandPattern(session.chord, random, stepsPerBar, .015);
+  const bassPattern = expandPattern(session.bass, random, stepsPerBar, .045);
+  const melodyPattern = expandPattern(session.melody, random, stepsPerBar, .08);
   const breakBar = 1 + (bytes[14] % 3);
   const breakMode = bytes[15] % 3;
-  const arrangement = Array.from({length: 4}, (_, bar) => ({
-    harmony: !(bar === breakBar && breakMode === 0),
-    bass: !(bar === breakBar && breakMode === 1),
-    drums: !(bar === breakBar && breakMode === 2),
-    melody: bar === 0 || Boolean(bytes[13] & (1 << bar)),
-  }));
+  const arrangementMode = bytes[13] % 5;
+  const arrangementNames = ['drop and return', 'slow build', 'call and response', 'rhythm first', 'full ensemble'];
+  const arrangement = Array.from({length: 4}, (_, bar) => {
+    if (arrangementMode === 1) return {harmony: true, bass: bar > 0, drums: bar > 0, melody: bar >= 2};
+    if (arrangementMode === 2) return {harmony: bar % 2 === 0, bass: true, drums: true, melody: bar % 2 === 1};
+    if (arrangementMode === 3) return {harmony: bar !== 2, bass: true, drums: true, melody: bar === 3};
+    if (arrangementMode === 4) return {harmony: true, bass: true, drums: true, melody: Boolean(bytes[17] & (1 << bar)) || bar === 0};
+    return {
+      harmony: !(bar === breakBar && breakMode === 0),
+      bass: !(bar === breakBar && breakMode === 1),
+      drums: !(bar === breakBar && breakMode === 2),
+      melody: bar === 0 || Boolean(bytes[13] & (1 << bar)),
+    };
+  });
+  const voiceAt = (slot, choices) => ((Number(scene.voices[slot]) || 0) % choices.length + choices.length) % choices.length;
+  const chordVoice = voiceAt(0, CHORD_VOICES);
+  const bassVoice = voiceAt(1, BASS_VOICES);
+  const leadVoice = voiceAt(2, LEAD_VOICES);
+  const drumKit = ((Number(session.kit) || 0) % DRUM_KITS.length + DRUM_KITS.length) % DRUM_KITS.length;
+  const padVoice = voiceAt(4, PAD_VOICES);
+  const arpVoice = voiceAt(5, ARP_VOICES);
+  const malletVoice = voiceAt(6, MALLET_VOICES);
+  const percussionVoice = voiceAt(7, PERCUSSION_VOICES);
+  const textureVoice = voiceAt(8, ROOM_TEXTURES);
   return {
     hash: cleanHash(hash),
     height: Number(height) || 0,
     mood: mood.name,
-    key: `${ROOTS[root]} ${moodIndex === 2 ? 'major' : moodIndex === 1 ? 'dorian' : 'minor'}`,
+    key: `${ROOTS[root]} ${mood.mode}`,
     session: session.name,
+    family: session.family,
+    arrangementName: arrangementNames[arrangementMode],
+    meter,
+    stepsPerBar,
+    totalSteps,
     voicing: voicing.name,
     texture: texture.name,
     scene: scene.name,
     sceneIndex,
     bpm: session.bpm[0] + (bytes[3] % (session.bpm[1] - session.bpm[0] + 1)),
-    swing: 0.5 + (bytes[4] % 19) / 100,
+    swing: (session.swing[0] + (bytes[4] % (session.swing[1] - session.swing[0] + 1))) / 100,
     chords,
     bass,
     palette,
@@ -319,25 +365,25 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     },
     arrangement,
     sound: {
-      chordVoice: scene.voices[0],
-      chordName: CHORD_VOICES[scene.voices[0]],
-      leadVoice: scene.voices[2],
-      leadName: LEAD_VOICES[scene.voices[2]],
-      bassVoice: scene.voices[1],
-      bassName: BASS_VOICES[scene.voices[1]],
-      drumKit: scene.voices[3],
-      drumName: DRUM_KITS[scene.voices[3]],
-      padVoice: scene.voices[4],
-      padName: PAD_VOICES[scene.voices[4]],
-      arpVoice: scene.voices[5],
-      arpName: ARP_VOICES[scene.voices[5]],
+      chordVoice,
+      chordName: CHORD_VOICES[chordVoice],
+      leadVoice,
+      leadName: LEAD_VOICES[leadVoice],
+      bassVoice,
+      bassName: BASS_VOICES[bassVoice],
+      drumKit,
+      drumName: DRUM_KITS[drumKit],
+      padVoice,
+      padName: PAD_VOICES[padVoice],
+      arpVoice,
+      arpName: ARP_VOICES[arpVoice],
       arpPattern: bytes[7] % 3,
-      malletVoice: scene.voices[6],
-      malletName: MALLET_VOICES[scene.voices[6]],
-      percussionVoice: scene.voices[7],
-      percussionName: PERCUSSION_VOICES[scene.voices[7]],
-      textureVoice: scene.voices[8],
-      textureName: ROOM_TEXTURES[scene.voices[8]],
+      malletVoice,
+      malletName: MALLET_VOICES[malletVoice],
+      percussionVoice,
+      percussionName: PERCUSSION_VOICES[percussionVoice],
+      textureVoice,
+      textureName: ROOM_TEXTURES[textureVoice],
       kickNote: ['C1', 'D1', 'E1'][bytes[24] % 3],
       chordVelocity: 0.3 + (bytes[25] % 24) / 100,
       melodyVelocity: 0.2 + (bytes[26] % 20) / 100,
@@ -501,6 +547,7 @@ export function flowFromTransactions(seed, composition, summary = {}) {
     if ((value + step) % restModulo === 0) return null;
     return palette[(value + bytes[(step + 9) % 32] + Math.round(valueWeight * 13)) % palette.length];
   });
+  const stepsPerBar = composition.stepsPerBar || 16;
   return {
     seed: cleanHash(seed),
     phrase,
@@ -516,8 +563,8 @@ export function flowFromTransactions(seed, composition, summary = {}) {
     kickVelocity: .58 + feeEnergy * .2,
     chordWeight: .82 + sizeWeight * .28,
     rhythmicDetail: clamp(complexity * .45 + rbfShare * .25 + dataShare * .2 + feeEnergy * .35, 0, 1),
-    extraKicks: [bytes[13] % 16, bytes[14] % 16],
-    extraSnares: [bytes[15] % 16],
+    extraKicks: [bytes[13] % stepsPerBar, bytes[14] % stepsPerBar],
+    extraSnares: [bytes[15] % stepsPerBar],
     melodyTranspose: valueWeight > .72 ? 12 : valueWeight < .32 ? -12 : 0,
     summary,
   };

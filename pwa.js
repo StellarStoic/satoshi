@@ -54,7 +54,8 @@ const MENU_ITEMS = [
     ]},
     {label: 'Tools', children: [
         {label: 'Entropy Lab', href: '/entropy.html'},
-        {label: 'Block Lo-Fi', href: '/lofi.html'},
+        {label: '21FM', href: '/21fm.html'},
+        {label: 'Steganography & Ciphers', href: '/stego.html'},
         {label: 'GhostQR', href: '/ghostQR.html'},
     ]},
     {label: 'News', href: '/news.html'},

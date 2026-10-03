@@ -1,5 +1,6 @@
 import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from './lofiModel.mjs';
 import {INSTRUMENT_BANKS, instrumentLabel, selectInstrument} from './lofiInstruments.mjs';
+import {REAL_DRUM_KITS, REAL_PERCUSSION} from './lofiRealSounds.mjs';
 
 const ToneApi = globalThis.Tone;
 const ui = {
@@ -40,6 +41,9 @@ const ui = {
   replayStatus: document.getElementById('replayStatus'),
   returnLive: document.getElementById('returnLive'),
   hashInfluenceLegend: document.getElementById('hashInfluenceLegend'),
+  helpTrigger: document.getElementById('lofiHelpTrigger'),
+  helpDialog: document.getElementById('lofiHelpDialog'),
+  helpClose: document.getElementById('lofiHelpClose'),
   readingLabels: Object.fromEntries(['flow', 'shape', 'size', 'fee', 'weight', 'transaction', 'depth'].map(name => [name, {
     label: document.getElementById(`${name}Label`),
     hint: document.getElementById(`${name}Hint`),
@@ -81,13 +85,18 @@ const LEAN_LEADS = [
   {name: 'cello phrase', oscillator: 'triangle4', attack: .14, decay: .55, release: 1.1},
   {name: 'harp answer', oscillator: 'triangle2', attack: .006, decay: .52, release: .7},
 ];
-const LEAN_DRUMS = ['dust-pocket kit', 'brush-room kit', 'cassette-break kit', 'soft boom-bap kit', 'late-night kit'];
+const LEAN_DRUMS = ['dust-pocket kit', 'brush-room kit', 'cassette-break kit', 'soft boom-bap kit', 'late-night kit', 'funk-pocket kit', 'breakbeat kit', 'club kit', 'electronic kit', 'cinematic kit'];
 const LEAN_KICKS = [
   {pitchDecay: .06, octaves: 2.7, envelope: {attack: .003, decay: .34, sustain: 0, release: .3}, volume: -4},
   {pitchDecay: .045, octaves: 2.2, envelope: {attack: .005, decay: .4, sustain: 0, release: .34}, volume: -5},
   {pitchDecay: .035, octaves: 3.1, envelope: {attack: .002, decay: .28, sustain: 0, release: .25}, volume: -6},
   {pitchDecay: .07, octaves: 2.5, envelope: {attack: .004, decay: .36, sustain: 0, release: .32}, volume: -4},
   {pitchDecay: .025, octaves: 2, envelope: {attack: .006, decay: .46, sustain: 0, release: .38}, volume: -5},
+  {pitchDecay: .035, octaves: 3.8, envelope: {attack: .002, decay: .2, sustain: 0, release: .2}, volume: -4},
+  {pitchDecay: .018, octaves: 4.8, envelope: {attack: .001, decay: .16, sustain: 0, release: .14}, volume: -4},
+  {pitchDecay: .028, octaves: 5.5, envelope: {attack: .001, decay: .24, sustain: 0, release: .2}, volume: -3},
+  {pitchDecay: .012, octaves: 6.2, envelope: {attack: .001, decay: .13, sustain: 0, release: .12}, volume: -5},
+  {pitchDecay: .09, octaves: 2.1, envelope: {attack: .009, decay: .52, sustain: 0, release: .5}, volume: -6},
 ];
 const LEAN_SNARES = [
   {noise: {type: 'pink'}, envelope: {attack: .008, decay: .16, sustain: 0}, volume: -13},
@@ -95,6 +104,11 @@ const LEAN_SNARES = [
   {noise: {type: 'pink'}, envelope: {attack: .004, decay: .12, sustain: 0}, volume: -14},
   {noise: {type: 'brown'}, envelope: {attack: .007, decay: .18, sustain: 0}, volume: -13},
   {noise: {type: 'pink'}, envelope: {attack: .015, decay: .25, sustain: 0}, volume: -12},
+  {noise: {type: 'white'}, envelope: {attack: .002, decay: .1, sustain: 0}, volume: -13},
+  {noise: {type: 'pink'}, envelope: {attack: .001, decay: .08, sustain: 0}, volume: -12},
+  {noise: {type: 'white'}, envelope: {attack: .001, decay: .14, sustain: 0}, volume: -14},
+  {noise: {type: 'brown'}, envelope: {attack: .003, decay: .09, sustain: 0}, volume: -13},
+  {noise: {type: 'pink'}, envelope: {attack: .02, decay: .32, sustain: 0}, volume: -15},
 ];
 const LEAN_HATS = [
   {noise: {type: 'brown'}, envelope: {attack: .01, decay: .065, sustain: 0}, volume: -28},
@@ -102,6 +116,11 @@ const LEAN_HATS = [
   {noise: {type: 'brown'}, envelope: {attack: .009, decay: .055, sustain: 0}, volume: -27},
   {noise: {type: 'pink'}, envelope: {attack: .014, decay: .075, sustain: 0}, volume: -29},
   {noise: {type: 'brown'}, envelope: {attack: .016, decay: .095, sustain: 0}, volume: -29},
+  {noise: {type: 'pink'}, envelope: {attack: .003, decay: .045, sustain: 0}, volume: -28},
+  {noise: {type: 'white'}, envelope: {attack: .001, decay: .032, sustain: 0}, volume: -31},
+  {noise: {type: 'white'}, envelope: {attack: .001, decay: .052, sustain: 0}, volume: -30},
+  {noise: {type: 'pink'}, envelope: {attack: .002, decay: .038, sustain: 0}, volume: -31},
+  {noise: {type: 'brown'}, envelope: {attack: .018, decay: .14, sustain: 0}, volume: -30},
 ];
 const PAD_PROFILES = [
   {oscillator: 'triangle4', attack: .8, decay: 1.2, sustain: .45, release: 1.8},
@@ -452,20 +471,20 @@ function makeComposition() {
 
 function showComposition(composition) {
   ui.track.textContent = titleFor(composition);
-  ui.key.textContent = `${composition.scene} · ${composition.session} · ${composition.key}`;
+  ui.key.textContent = `${composition.session} · ${composition.meter} · ${composition.key}`;
   ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : state.replayMode ? 'replay' : 'offline';
   ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
   if (ui.harmony) ui.harmony.textContent = `${instrumentLabel(selectedInstrument(composition, 'harmony'))} · ${composition.sound.chordName}`;
   if (ui.lead) ui.lead.textContent = `${instrumentLabel(selectedInstrument(composition, 'lead'))} · ${composition.sound.leadName}`;
   if (ui.bass) ui.bass.textContent = `${instrumentLabel(selectedInstrument(composition, 'bass'))} · ${composition.sound.bassName}`;
-  if (ui.drums) ui.drums.textContent = economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName;
+  if (ui.drums) ui.drums.textContent = REAL_DRUM_KITS[composition.sound.drumKit]?.name || (economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName);
   if (ui.pad) ui.pad.textContent = composition.sound.padName;
   if (ui.arp) ui.arp.textContent = `${instrumentLabel(selectedInstrument(composition, 'arp'))} · ${composition.sound.arpName}`;
   if (ui.mallet) ui.mallet.textContent = `${instrumentLabel(selectedInstrument(composition, 'mallet'))} · ${composition.sound.malletName}`;
-  if (ui.percussion) ui.percussion.textContent = composition.sound.percussionName;
+  if (ui.percussion) ui.percussion.textContent = REAL_PERCUSSION[composition.sound.percussionVoice]?.name || composition.sound.percussionName;
   if (ui.texture) ui.texture.textContent = composition.sound.textureName;
   if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.space} + ${composition.sound.motion}`;
-  if (ui.scene) ui.scene.textContent = composition.scene;
+  if (ui.scene) ui.scene.textContent = `${composition.scene} · ${composition.arrangementName}`;
   state.engine?.setTexture(composition.sound.textureVoice);
   applyNetworkSound();
 }
@@ -515,7 +534,7 @@ function beginBlockTransition(nextComposition) {
   if (!state.engine || state.transitioning || !nextComposition) return;
   state.transitioning = true;
   state.pendingComposition = null;
-  const barSeconds = Math.max(2.8, 240 / Math.max(56, ToneApi.getTransport().bpm.value));
+  const barSeconds = Math.max(1.8, (state.composition?.stepsPerBar || 16) * 15 / Math.max(48, ToneApi.getTransport().bpm.value));
   const fadeOutSeconds = economyAudio ? 1.4 : Math.min(3.5, barSeconds);
   const fadeInSeconds = economyAudio ? 2 : Math.min(5, barSeconds * 1.5);
   const bus = state.engine.musicBus.gain;
@@ -994,7 +1013,7 @@ function createEngine() {
     });
   };
   const makePadVoice = index => {
-    const profile = PAD_PROFILES[index];
+    const profile = PAD_PROFILES[index] || PAD_PROFILES[0];
     return new ToneApi.PolySynth(ToneApi.Synth, {
       maxPolyphony: 3,
       oscillator: {type: profile.oscillator},
@@ -1003,7 +1022,7 @@ function createEngine() {
     }).connect(padGain);
   };
   const makeArpFallback = index => {
-    const profile = ARP_PROFILES[index];
+    const profile = ARP_PROFILES[index] || ARP_PROFILES[0];
     return new ToneApi.Synth({
       oscillator: {type: profile.oscillator},
       envelope: {attack: profile.attack, decay: profile.decay, sustain: 0, release: profile.release},
@@ -1017,7 +1036,7 @@ function createEngine() {
     filter: bank === 'xylophone' ? 2700 : 2300,
   });
   const makeMalletFallback = index => {
-    const profile = MALLET_PROFILES[index];
+    const profile = MALLET_PROFILES[index] || MALLET_PROFILES[0];
     return new ToneApi.Synth({
       oscillator: {type: profile.oscillator},
       envelope: {attack: profile.attack, decay: profile.decay, sustain: 0, release: profile.release},
@@ -1030,23 +1049,41 @@ function createEngine() {
     volume: -25,
     filter: 2100 + index * 120,
   });
-  const makePercussionVoice = index => {
+  const makeRoundRobinVoice = (urls, output, baseVolume = -10, maxDuration = .5) => {
+    const players = urls.map(url => new ToneApi.Player({url, fadeOut: .025, volume: baseVolume}).connect(output));
+    let cursor = 0;
     return {
-      pitched: true,
-      node: new ToneApi.MembraneSynth({
-        pitchDecay: .018 + (index % 3) * .008,
-        octaves: index === 5 ? 1.5 : .75 + (index % 4) * .12,
-        envelope: {attack: .006, decay: index === 5 ? .2 : .07 + (index % 3) * .025, sustain: 0, release: .07},
-        volume: index === 5 ? -23 : -27,
-      }).connect(percussionGain),
+      triggerAttackRelease(...args) {
+        const time = args.at(-2);
+        const velocity = Math.max(.01, Number(args.at(-1)) || .5);
+        const player = players[cursor++ % players.length];
+        if (!player.loaded) return;
+        player.volume.value = baseVolume + 20 * Math.log10(velocity);
+        player.start(time, 0, maxDuration);
+      },
+      releaseAll() {
+        players.forEach(player => { try { player.stop(); } catch {} });
+      },
+      dispose() {
+        players.forEach(player => player.dispose());
+      },
     };
   };
+  const makePercussionVoice = index => ({
+    pitched: false,
+    node: makeRoundRobinVoice(REAL_PERCUSSION[index].urls, percussionGain, -13, .42),
+  });
   const makeKickVoice = index => [
     {pitchDecay: .06, octaves: 5, envelope: {attack: .002, decay: .34, sustain: 0, release: .32}, volume: -11},
     {pitchDecay: .025, octaves: 3, envelope: {attack: .001, decay: .13, sustain: 0, release: .16}, volume: -9},
     {pitchDecay: .08, octaves: 2.5, envelope: {attack: .008, decay: .25, sustain: 0, release: .42}, volume: -14},
     {pitchDecay: .045, octaves: 3.6, envelope: {attack: .006, decay: .22, sustain: 0, release: .26}, volume: -13},
     {pitchDecay: .018, octaves: 6, envelope: {attack: .001, decay: .11, sustain: 0, release: .12}, volume: -15},
+    {pitchDecay: .035, octaves: 4.2, envelope: {attack: .002, decay: .18, sustain: 0, release: .18}, volume: -10},
+    {pitchDecay: .015, octaves: 7, envelope: {attack: .001, decay: .12, sustain: 0, release: .1}, volume: -12},
+    {pitchDecay: .025, octaves: 5.8, envelope: {attack: .001, decay: .2, sustain: 0, release: .17}, volume: -9},
+    {pitchDecay: .012, octaves: 7.5, envelope: {attack: .001, decay: .1, sustain: 0, release: .09}, volume: -14},
+    {pitchDecay: .1, octaves: 2.2, envelope: {attack: .008, decay: .48, sustain: 0, release: .46}, volume: -14},
   ][index];
   const makeSnareVoice = index => [
     {noise: {type: 'pink'}, envelope: {attack: .003, decay: .13, sustain: 0}, volume: -18},
@@ -1054,6 +1091,11 @@ function createEngine() {
     {noise: {type: 'brown'}, envelope: {attack: .008, decay: .19, sustain: 0}, volume: -16},
     {noise: {type: 'pink'}, envelope: {attack: .012, decay: .27, sustain: 0}, volume: -22},
     {noise: {type: 'white'}, envelope: {attack: .001, decay: .045, sustain: 0}, volume: -25},
+    {noise: {type: 'white'}, envelope: {attack: .001, decay: .09, sustain: 0}, volume: -19},
+    {noise: {type: 'pink'}, envelope: {attack: .001, decay: .065, sustain: 0}, volume: -18},
+    {noise: {type: 'white'}, envelope: {attack: .001, decay: .12, sustain: 0}, volume: -20},
+    {noise: {type: 'brown'}, envelope: {attack: .002, decay: .08, sustain: 0}, volume: -18},
+    {noise: {type: 'pink'}, envelope: {attack: .018, decay: .3, sustain: 0}, volume: -20},
   ][index];
   const makeHatVoice = index => [
     {frequency: 190, envelope: {attack: .001, decay: .045, release: .02}, harmonicity: 4.8, modulationIndex: 18, resonance: 2800, octaves: 1.2, volume: -28},
@@ -1061,6 +1103,11 @@ function createEngine() {
     {frequency: 245, envelope: {attack: .001, decay: .028, release: .012}, harmonicity: 5.4, modulationIndex: 24, resonance: 3900, octaves: 1.5, volume: -31},
     {frequency: 110, envelope: {attack: .006, decay: .12, release: .04}, harmonicity: 2.1, modulationIndex: 7, resonance: 1500, octaves: .6, volume: -31},
     {frequency: 310, envelope: {attack: .001, decay: .022, release: .01}, harmonicity: 6.2, modulationIndex: 28, resonance: 4600, octaves: 1.8, volume: -34},
+    {frequency: 165, envelope: {attack: .001, decay: .052, release: .018}, harmonicity: 3.8, modulationIndex: 14, resonance: 2400, octaves: 1, volume: -29},
+    {frequency: 285, envelope: {attack: .001, decay: .025, release: .01}, harmonicity: 5.7, modulationIndex: 25, resonance: 4100, octaves: 1.6, volume: -32},
+    {frequency: 225, envelope: {attack: .001, decay: .04, release: .015}, harmonicity: 5, modulationIndex: 20, resonance: 3500, octaves: 1.3, volume: -31},
+    {frequency: 340, envelope: {attack: .001, decay: .02, release: .008}, harmonicity: 6.8, modulationIndex: 31, resonance: 4900, octaves: 2, volume: -35},
+    {frequency: 95, envelope: {attack: .008, decay: .15, release: .05}, harmonicity: 1.9, modulationIndex: 6, resonance: 1250, octaves: .5, volume: -31},
   ][index];
   const textureFrequencies = [1800, 4000, 1200, 2600];
   const textureLevels = [-62, -60, -64, -66];
@@ -1084,9 +1131,9 @@ function createEngine() {
     chordVoices: Array(8),
     bassVoices: Array(7),
     leadVoices: Array(11),
-    kickVoices: Array(5),
-    snareVoices: Array(5),
-    hatVoices: Array(5),
+    kickVoices: Array(10),
+    snareVoices: Array(10),
+    hatVoices: Array(10),
     padVoices: Array(5),
     arpVoices: Array(8),
     malletVoices: Array(5),
@@ -1135,19 +1182,24 @@ function createEngine() {
     malletVoice(index, bank) { return this.malletVoices[index] ||= makeMalletVoice(index, bank); },
     percussionVoice(index) { return this.percussionVoices[index] ||= makePercussionVoice(index); },
     kickVoice(index) {
-      return this.kickVoices[index] ||= new ToneApi.MembraneSynth(economyAudio
-        ? LEAN_KICKS[index]
-        : makeKickVoice(index)).connect(drumsGain);
+      const recorded = REAL_DRUM_KITS[index];
+      return this.kickVoices[index] ||= recorded
+        ? makeRoundRobinVoice(recorded.kick, drumsGain, -3, .72)
+        : new ToneApi.MembraneSynth(economyAudio ? LEAN_KICKS[index] : makeKickVoice(index)).connect(drumsGain);
     },
     snareVoice(index) {
-      return this.snareVoices[index] ||= new ToneApi.NoiseSynth(economyAudio
-        ? LEAN_SNARES[index]
-        : makeSnareVoice(index)).connect(drumsGain);
+      const recorded = REAL_DRUM_KITS[index];
+      return this.snareVoices[index] ||= recorded
+        ? makeRoundRobinVoice(recorded.snare, drumsGain, -7, .5)
+        : new ToneApi.NoiseSynth(economyAudio ? LEAN_SNARES[index] : makeSnareVoice(index)).connect(drumsGain);
     },
     hatVoice(index) {
-      return this.hatVoices[index] ||= economyAudio
-        ? new ToneApi.NoiseSynth(LEAN_HATS[index]).connect(drumsGain)
-        : new ToneApi.MetalSynth(makeHatVoice(index)).connect(drumsGain);
+      const recorded = REAL_DRUM_KITS[index];
+      return this.hatVoices[index] ||= recorded
+        ? makeRoundRobinVoice(recorded.hat, drumsGain, -13, .22)
+        : economyAudio
+          ? new ToneApi.NoiseSynth(LEAN_HATS[index]).connect(drumsGain)
+          : new ToneApi.MetalSynth(makeHatVoice(index)).connect(drumsGain);
     },
     releaseAllVoices() {
       const banks = [this.chordVoices, this.bassVoices, this.leadVoices, this.kickVoices, this.snareVoices, this.hatVoices, this.padVoices, this.arpVoices, this.malletVoices];
@@ -1208,14 +1260,16 @@ function createEngine() {
 
   engine.loop = new ToneApi.Loop(time => {
     if (!state.composition) return;
-    let step = engine.step % 64;
-    let sixteenth = step % 16;
-    let bar = Math.floor(step / 16);
-    if (sixteenth === 0 && state.pendingComposition && !state.transitioning) {
+    const stepsPerBar = state.composition.stepsPerBar || 16;
+    const totalSteps = state.composition.totalSteps || stepsPerBar * 4;
+    let step = engine.step % totalSteps;
+    let position = step % stepsPerBar;
+    let bar = Math.floor(step / stepsPerBar);
+    if (position === 0 && state.pendingComposition && !state.transitioning) {
       const nextComposition = state.pendingComposition;
       ToneApi.Draw.schedule(() => beginBlockTransition(nextComposition), time);
     }
-    if (sixteenth === 0 && state.pendingFlow) {
+    if (position === 0 && state.pendingFlow) {
       state.activeFlow = state.pendingFlow;
       state.pendingFlow = null;
       ToneApi.Draw.schedule(applyNetworkSound, time);
@@ -1240,35 +1294,38 @@ function createEngine() {
       const chordVelocity = Math.min(.72, composition.sound.chordVelocity * (flow.chordWeight || 1));
       chordVoice.triggerAttackRelease(chord, economyAudio ? '4n' : rhythm.chordDuration, safeTriggerTime(chordVoice, time), economyAudio ? chordVelocity * .82 : chordVelocity);
     }
-    if (arrangement.harmony && sixteenth === 0) {
+    if (arrangement.harmony && position === 0) {
       const padChord = composition.chords[bar].slice(0, 3).map(note => transposeNote(note, -12));
-      pad.triggerAttackRelease(padChord, '1m', safeTriggerTime(pad, time), economyAudio ? .16 : .22);
+      const barDuration = Math.max(.5, stepsPerBar * 15 / Math.max(48, composition.bpm));
+      pad.triggerAttackRelease(padChord, barDuration * .92, safeTriggerTime(pad, time), economyAudio ? .16 : .22);
     }
-    const arpTone = ARP_PATTERNS[composition.sound.arpPattern][sixteenth];
+    const arpPattern = ARP_PATTERNS[composition.sound.arpPattern];
+    const arpTone = arpPattern[Math.floor(position / stepsPerBar * arpPattern.length) % arpPattern.length];
     if (arrangement.harmony && bar % 2 === 0 && arpTone !== null) {
       const chord = composition.chords[bar];
       const note = chord[arpTone % chord.length];
       arp.triggerAttackRelease(note, '16n', safeTriggerTime(arp, time), economyAudio ? .16 : .22);
     }
-    if (arrangement.bass && (rhythm.bass[step] || (sixteenth === 14 && flow.bassPickup))) {
-      const bassBar = sixteenth === 14 ? (bar + 1) % 4 : bar;
+    const bassPickupStep = Math.max(1, stepsPerBar - 2);
+    if (arrangement.bass && (rhythm.bass[step] || (position === bassPickupStep && flow.bassPickup))) {
+      const bassBar = position === bassPickupStep ? (bar + 1) % 4 : bar;
       const bassVoice = engine.bassVoice(economyAudio ? composition.sound.bassVoice : flow.bassVoice ?? composition.sound.bassVoice, selectedInstrument(composition, 'bass'));
-      bassVoice.triggerAttackRelease(composition.bass[bassBar], sixteenth % 4 === 0 ? '4n' : '8n', safeTriggerTime(bassVoice, time), sixteenth === 14 ? .3 : .54);
+      bassVoice.triggerAttackRelease(composition.bass[bassBar], position % 4 === 0 ? '4n' : '8n', safeTriggerTime(bassVoice, time), position === bassPickupStep ? .3 : .54);
     }
     const drumsActive = economyAudio || arrangement.drums;
-    const transactionKick = !economyAudio && flow.rhythmicDetail > .32 && flow.extraKicks.includes(sixteenth);
-    const transactionSnare = !economyAudio && flow.rhythmicDetail > .58 && flow.extraSnares.includes(sixteenth);
+    const transactionKick = !economyAudio && flow.rhythmicDetail > .32 && flow.extraKicks.includes(position);
+    const transactionSnare = !economyAudio && flow.rhythmicDetail > .58 && flow.extraSnares.includes(position);
     if (drumsActive && (rhythm.kick[step] || transactionKick)) kick.triggerAttackRelease(economyAudio ? 'C1' : composition.sound.kickNote, '8n', safeTriggerTime(kick, time), transactionKick ? .34 : flow.kickVelocity || 0.68);
-    if (drumsActive && (rhythm.snare[step] || transactionSnare)) snare.triggerAttackRelease(transactionSnare ? '32n' : '16n', safeTriggerTime(snare, time), transactionSnare ? .15 : economyAudio ? .68 : sixteenth === 12 ? 0.42 : 0.5);
-    if (drumsActive && !economyAudio && !rhythm.snare[step] && !transactionSnare && sixteenth % 4 === 3 && flow.rhythmicDetail > .72) snare.triggerAttackRelease('32n', safeTriggerTime(snare, time), 0.12);
+    if (drumsActive && (rhythm.snare[step] || transactionSnare)) snare.triggerAttackRelease(transactionSnare ? '32n' : '16n', safeTriggerTime(snare, time), transactionSnare ? .15 : economyAudio ? .68 : position === Math.floor(stepsPerBar * .75) ? 0.42 : 0.5);
+    if (drumsActive && !economyAudio && !rhythm.snare[step] && !transactionSnare && position % 4 === 3 && flow.rhythmicDetail > .72) snare.triggerAttackRelease('32n', safeTriggerTime(snare, time), 0.12);
     const hatOffset = economyAudio ? 0 : flow.hatOffset;
-    const hatHit = rhythm.hat[(step + hatOffset) % 64];
+    const hatHit = rhythm.hat[(step + hatOffset) % totalSteps];
     if (hatHit) {
-      const hatVelocity = economyAudio ? (sixteenth % 4 === 2 ? .28 : .2) : .1;
+      const hatVelocity = economyAudio ? (position % 4 === 2 ? .28 : .2) : .1;
       hat.triggerAttackRelease('32n', safeTriggerTime(hat, time), hatVelocity);
     }
-    if (!economyAudio && !hatHit && flow.rhythmicDetail > .48 && sixteenth % 4 === 3) hat.triggerAttackRelease('32n', safeTriggerTime(hat, time), 0.055 + flow.rhythmicDetail * .04);
-    const accentStep = 48 + (composition.visual[3] % 12);
+    if (!economyAudio && !hatHit && flow.rhythmicDetail > .48 && position % 4 === 3) hat.triggerAttackRelease('32n', safeTriggerTime(hat, time), 0.055 + flow.rhythmicDetail * .04);
+    const accentStep = totalSteps - stepsPerBar + (composition.visual[3] % Math.max(1, stepsPerBar - 4));
     const melodyHit = economyAudio ? step === accentStep : rhythm.melody[step];
     if ((economyAudio || arrangement.melody) && melodyHit) {
       const phraseIndex = step % flow.phrase.length;
@@ -1279,15 +1336,19 @@ function createEngine() {
       const velocity = economyAudio ? .075 : flow.velocities[phraseIndex] ?? composition.sound.melodyVelocity;
       if (note) {
         const leadVoice = engine.leadVoice(economyAudio ? composition.sound.leadVoice : flow.leadVoice ?? composition.sound.leadVoice, selectedInstrument(composition, 'lead'));
-        leadVoice.triggerAttackRelease(note, economyAudio ? '8n' : flow.noteLength || (sixteenth % 4 ? '16n' : '8n'), safeTriggerTime(leadVoice, time), velocity);
+        leadVoice.triggerAttackRelease(note, economyAudio ? '8n' : flow.noteLength || (position % 4 ? '16n' : '8n'), safeTriggerTime(leadVoice, time), velocity);
       }
     }
-    if (bar % 2 === 1 && (sixteenth === 6 || sixteenth === 14)) {
+    const firstMalletStep = Math.max(1, Math.round(stepsPerBar * .375));
+    const secondMalletStep = Math.max(firstMalletStep + 1, stepsPerBar - 2);
+    if (bar % 2 === 1 && (position === firstMalletStep || position === secondMalletStep)) {
       const chord = composition.chords[bar];
-      const note = chord[(sixteenth === 6 ? 1 : 2) % chord.length];
+      const note = chord[(position === firstMalletStep ? 1 : 2) % chord.length];
       mallet.triggerAttackRelease(note, '8n', safeTriggerTime(mallet, time), economyAudio ? .11 : .16);
     }
-    if (PERCUSSION_PATTERNS[composition.sound.percussionVoice].includes(sixteenth)) {
+    const percussionHit = PERCUSSION_PATTERNS[composition.sound.percussionVoice]
+      .some(slot => Math.round(slot / 16 * stepsPerBar) === position);
+    if (percussionHit) {
       const percTime = safeTriggerTime(percussion.node, time);
       if (percussion.pitched) {
         const notes = ['C3', 'D3', 'E2', 'G2', 'A2', 'C2', 'E3', 'G3'];
@@ -1299,7 +1360,7 @@ function createEngine() {
     ToneApi.Draw.schedule(() => {
       state.visualStep = step;
     }, time);
-    engine.step = (step + 1) % 64;
+    engine.step = (step + 1) % totalSteps;
   }, '16n').start(0);
 
   return engine;
@@ -1370,18 +1431,18 @@ async function togglePlayback() {
       transport.pause();
       state.playing = false;
       ui.transport.textContent = 'Paused';
-      ui.play.setAttribute('aria-label', 'Play Block Lo-Fi');
+      ui.play.setAttribute('aria-label', 'Play 21FM');
       ui.play.innerHTML = '<i data-lucide="play"></i>';
     } else {
       transport.start();
       state.playing = true;
       ui.transport.textContent = state.replayMode ? 'Block replay' : state.chain.connected ? 'Chain in the groove' : 'Offline groove';
-      ui.play.setAttribute('aria-label', 'Pause Block Lo-Fi');
+      ui.play.setAttribute('aria-label', 'Pause 21FM');
       ui.play.innerHTML = '<i data-lucide="pause"></i>';
     }
     globalThis.lucide?.createIcons();
   } catch (error) {
-    console.error('Could not start Block Lo-Fi:', error);
+    console.error('Could not start 21FM:', error);
     try { ToneApi.getTransport().stop(); } catch {}
     state.engine?.dispose();
     state.engine = null;
@@ -1390,7 +1451,7 @@ async function togglePlayback() {
     ui.transport.textContent = 'Audio could not start';
     ui.play.disabled = false;
     ui.play.classList.remove('loading');
-    ui.play.setAttribute('aria-label', 'Play Block Lo-Fi');
+    ui.play.setAttribute('aria-label', 'Play 21FM');
     ui.play.innerHTML = '<i data-lucide="play"></i>';
     globalThis.lucide?.createIcons();
   }
@@ -1423,13 +1484,13 @@ async function recoverAudioScheduler() {
     transport.start('+0.1');
     state.playing = true;
     ui.transport.textContent = state.replayMode ? 'Block replay' : state.chain.connected ? 'Chain in the groove' : 'Offline groove';
-    ui.play.setAttribute('aria-label', 'Pause Block Lo-Fi');
+    ui.play.setAttribute('aria-label', 'Pause 21FM');
     ui.play.innerHTML = '<i data-lucide="pause"></i>';
   } catch (error) {
-    console.error('Could not recover Block Lo-Fi:', error);
+    console.error('Could not recover 21FM:', error);
     state.playing = false;
     ui.transport.textContent = 'Audio stopped · press play to restart';
-    ui.play.setAttribute('aria-label', 'Play Block Lo-Fi');
+    ui.play.setAttribute('aria-label', 'Play 21FM');
     ui.play.innerHTML = '<i data-lucide="play"></i>';
   } finally {
     state.schedulerRecovering = false;
@@ -1797,6 +1858,16 @@ ui.volume.addEventListener('input', () => {
   saveSettings();
 });
 ui.visualToggle.addEventListener('change', () => setAnimationEnabled(ui.visualToggle.checked));
+ui.helpTrigger?.addEventListener('click', () => {
+  ui.helpDialog?.showModal();
+  document.body.classList.add('lofi-help-open');
+});
+ui.helpClose?.addEventListener('click', () => ui.helpDialog?.close());
+ui.helpDialog?.addEventListener('click', event => {
+  if (event.target === ui.helpDialog) ui.helpDialog.close();
+});
+ui.helpDialog?.addEventListener('close', () => document.body.classList.remove('lofi-help-open'));
+ui.helpDialog?.addEventListener('cancel', () => document.body.classList.remove('lofi-help-open'));
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.playing) ui.transport.textContent = 'Playing in background';
   else if (!document.hidden) refreshBlockTip().catch(() => {});
@@ -1808,7 +1879,7 @@ globalThis.addEventListener('error', event => {
     && (stack.includes('getTicksAtTime') || (message.includes('undefined') && message.includes('time')));
   if (!toneClockFailure) return;
   event.preventDefault();
-  console.warn('Tone.js audio clock stalled; rebuilding the Block Lo-Fi scheduler.');
+  console.warn('Tone.js audio clock stalled; rebuilding the 21FM scheduler.');
   recoverAudioScheduler();
 });
 globalThis.addEventListener('beforeunload', () => {
