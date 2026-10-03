@@ -1,0 +1,124 @@
+.site-help-trigger {
+    position: fixed !important;
+    top: calc(35px + env(safe-area-inset-top)) !important;
+    right: 25px !important;
+    z-index: 900 !important;
+    display: grid !important;
+    place-items: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    margin: -8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #888 !important;
+    font: inherit !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+    transition: color 160ms ease, transform 160ms ease !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.site-help-trigger.site-help-trigger--offset {
+    right: 75px !important;
+}
+
+.site-help-trigger:hover,
+.site-help-trigger:focus-visible {
+    color: #f2a900 !important;
+    outline: none !important;
+    transform: scale(1.06);
+}
+
+.site-help-trigger .lni {
+    display: block;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    pointer-events: none;
+}
+
+.site-help-dialog {
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(78vh, 620px);
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #4a4d4f;
+    border-radius: 8px;
+    background: #17191a;
+    color: #f3f3f1;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .56);
+}
+
+.site-help-dialog::backdrop {
+    background: rgba(0, 0, 0, .72);
+    backdrop-filter: blur(3px);
+}
+
+.site-help-dialog__content {
+    position: relative;
+    padding: 28px 54px 30px 28px;
+    overflow: auto;
+}
+
+.site-help-dialog h2 {
+    margin: 0 0 12px;
+    color: #f2a900;
+    font-size: clamp(1.25rem, 4vw, 1.6rem);
+    letter-spacing: 0;
+}
+
+.site-help-dialog p {
+    margin: 0;
+    color: #d1d3d1;
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.site-help-dialog__close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #aeb1af;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.site-help-dialog__close:hover,
+.site-help-dialog__close:focus-visible {
+    color: #f2a900;
+    outline: 1px solid #f2a900;
+    outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+    .site-help-trigger {
+        top: calc(27px + env(safe-area-inset-top)) !important;
+        right: 18px !important;
+    }
+
+    .site-help-trigger.site-help-trigger--offset {
+        right: 66px !important;
+    }
+
+    .site-help-dialog__content {
+        padding: 24px 48px 26px 22px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .site-help-trigger { transition: none !important; }
+}

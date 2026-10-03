@@ -1,4 +1,4 @@
-import {compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from './lofiModel.mjs';
+import {bip39CodeToBlockHeight, compositionFromBlock, fallbackChainState, flowFromTransactions, foldTransactionIds, halvingEraFromHeight, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from './lofiModel.mjs';
 import {INSTRUMENT_BANKS, instrumentLabel, selectInstrument} from './lofiInstruments.mjs';
 import {REAL_DRUM_KITS, REAL_PERCUSSION} from './lofiRealSounds.mjs';
 
@@ -44,6 +44,8 @@ const ui = {
   helpTrigger: document.getElementById('lofiHelpTrigger'),
   helpDialog: document.getElementById('lofiHelpDialog'),
   helpClose: document.getElementById('lofiHelpClose'),
+  helpTabs: [...document.querySelectorAll('[data-help-panel]')],
+  helpPanels: [...document.querySelectorAll('.lofi-help-panel')],
   readingLabels: Object.fromEntries(['flow', 'shape', 'size', 'fee', 'weight', 'transaction', 'depth'].map(name => [name, {
     label: document.getElementById(`${name}Label`),
     hint: document.getElementById(`${name}Hint`),
@@ -52,6 +54,7 @@ const ui = {
 
 const STORE_KEY = 'blockLofiSettings';
 const SETTINGS_VERSION = 2;
+const MUSIC_BUS_LEVEL = 0.96;
 const selectedInstrument = (composition, role) => selectInstrument(composition.hash, role);
 const LEAN_KEYS = [
   {name: 'dusty Rhodes', oscillator: 'triangle8', attack: .045, decay: .72, sustain: .045, release: .65},
@@ -255,7 +258,7 @@ function cancelBlockTransition() {
   ui.transition?.classList.remove('active', 'waiting');
   if (wasTransitioning && state.engine) {
     state.engine.releaseAllVoices();
-    state.engine.musicBus.gain.rampTo(.82, .2);
+    state.engine.musicBus.gain.rampTo(MUSIC_BUS_LEVEL, .2);
   }
 }
 
@@ -399,9 +402,9 @@ async function enterReplay(value, options = {}) {
     return activateReplay(directHash, options);
   }
 
-  const height = normalizeReplayHeight(value);
+  const height = normalizeReplayHeight(value) ?? bip39CodeToBlockHeight(value);
   if (height === null) {
-    setReplayStatus('Enter a block height or a complete 64-character block hash.', true);
+    setReplayStatus('Enter a block height, hash, BIP39 block code or complete 21FM title.', true);
     return false;
   }
 
@@ -459,9 +462,37 @@ function titleFor(composition) {
   return trackTitleFromBlock(composition.hash, height);
 }
 
+function renderTrackTitle(composition) {
+  const title = titleFor(composition);
+  const height = state.replayMode ? state.chain.height || composition.height : composition.height;
+  const era = height > 0 ? halvingEraFromHeight(height) : null;
+  const words = title.split(' ');
+  if (!era || words.length === 0 || title.startsWith('Hash Replay')) {
+    ui.track.textContent = title;
+    ui.track.removeAttribute('title');
+    return;
+  }
+
+  const anchorIndex = era.anchor % words.length;
+  ui.track.replaceChildren(...words.flatMap((word, index) => {
+    const element = document.createElement('span');
+    element.className = index === anchorIndex ? 'halving-anchor' : 'track-word';
+    element.textContent = word;
+    return index < words.length - 1 ? [element, document.createTextNode(' ')] : [element];
+  }));
+  ui.track.title = `Halving era ${era.number} anchors “${words[anchorIndex]}”`;
+}
+
+function renderTrackIdentity(composition) {
+  renderTrackTitle(composition);
+  const height = state.replayMode ? state.chain.height || composition.height : composition.height;
+  const era = height > 0 ? halvingEraFromHeight(height) : null;
+  ui.key.textContent = `${composition.session} · ${composition.meter} · ${composition.key}${era ? ` · halving era ${era.number}` : ''}`;
+}
+
 function refreshTrackTitle() {
   const composition = state.pendingComposition || state.composition;
-  if (composition) ui.track.textContent = titleFor(composition);
+  if (composition) renderTrackIdentity(composition);
 }
 
 function makeComposition() {
@@ -470,12 +501,11 @@ function makeComposition() {
 }
 
 function showComposition(composition) {
-  ui.track.textContent = titleFor(composition);
-  ui.key.textContent = `${composition.session} · ${composition.meter} · ${composition.key}`;
+  renderTrackIdentity(composition);
   ui.height.textContent = state.chain.height ? state.chain.height.toLocaleString() : state.replayMode ? 'replay' : 'offline';
   ui.hash.textContent = `${state.chain.hash.slice(0, 6)}…${state.chain.hash.slice(-6)}`;
   if (ui.harmony) ui.harmony.textContent = `${instrumentLabel(selectedInstrument(composition, 'harmony'))} · ${composition.sound.chordName}`;
-  if (ui.lead) ui.lead.textContent = `${instrumentLabel(selectedInstrument(composition, 'lead'))} · ${composition.sound.leadName}`;
+  if (ui.lead) ui.lead.textContent = `${instrumentLabel(selectedInstrument(composition, 'lead'))} · ${composition.melodyForm}`;
   if (ui.bass) ui.bass.textContent = `${instrumentLabel(selectedInstrument(composition, 'bass'))} · ${composition.sound.bassName}`;
   if (ui.drums) ui.drums.textContent = REAL_DRUM_KITS[composition.sound.drumKit]?.name || (economyAudio ? LEAN_DRUMS[composition.sound.drumKit] : composition.sound.drumName);
   if (ui.pad) ui.pad.textContent = composition.sound.padName;
@@ -551,7 +581,7 @@ function beginBlockTransition(nextComposition) {
     prepareVoices(nextComposition, state.activeFlow);
     state.engine.step = 0;
     ui.transport.textContent = 'Fading in the new block';
-    bus.rampTo(.82, fadeInSeconds);
+    bus.rampTo(MUSIC_BUS_LEVEL, fadeInSeconds);
     applyNetworkSound();
     state.transitionTimer = setTimeout(() => {
       state.transitioning = false;
@@ -858,13 +888,13 @@ function createEngine() {
     filter.channelCount = 2;
     filter.channelCountMode = 'explicit';
   }
-  const musicBus = new ToneApi.Gain(0.82).connect(filter);
+  const musicBus = new ToneApi.Gain(MUSIC_BUS_LEVEL).connect(filter);
   const analyser = state.animationEnabled ? new ToneApi.Analyser('waveform', lowPower ? 64 : 128) : null;
   if (analyser) musicBus.connect(analyser);
 
   const harmonyGain = new ToneApi.Gain(economyAudio ? .44 : .66).connect(musicBus);
   const bassGain = new ToneApi.Gain(economyAudio ? 1.55 : 1.28).connect(musicBus);
-  const melodyGain = new ToneApi.Gain(economyAudio ? .12 : .48).connect(musicBus);
+  const melodyGain = new ToneApi.Gain(economyAudio ? .075 : .3).connect(musicBus);
   const drumsGain = new ToneApi.Gain(economyAudio ? 1.75 : 1.38).connect(musicBus);
   const padGain = new ToneApi.Gain(economyAudio ? .12 : .16).connect(musicBus);
   const arpGain = new ToneApi.Gain(economyAudio ? .16 : .21).connect(musicBus);
@@ -1325,18 +1355,19 @@ function createEngine() {
       hat.triggerAttackRelease('32n', safeTriggerTime(hat, time), hatVelocity);
     }
     if (!economyAudio && !hatHit && flow.rhythmicDetail > .48 && position % 4 === 3) hat.triggerAttackRelease('32n', safeTriggerTime(hat, time), 0.055 + flow.rhythmicDetail * .04);
-    const accentStep = totalSteps - stepsPerBar + (composition.visual[3] % Math.max(1, stepsPerBar - 4));
-    const melodyHit = economyAudio ? step === accentStep : rhythm.melody[step];
+    const melodyHit = economyAudio ? composition.economyMelodyPattern[step] : rhythm.melody[step];
     if ((economyAudio || arrangement.melody) && melodyHit) {
       const phraseIndex = step % flow.phrase.length;
       const baseNote = composition.melody[step % composition.melody.length];
-      const sourceNote = economyAudio ? composition.palette[7 + (composition.visual[4] % 7)] : bar % 3 === 0 ? baseNote : flow.phrase[phraseIndex];
-      const transpose = economyAudio ? -12 : flow.melodyTranspose;
+      const sourceNote = economyAudio ? baseNote : bar % 3 === 0 ? baseNote : flow.phrase[phraseIndex] || baseNote;
+      const transpose = economyAudio ? 0 : flow.melodyTranspose;
       const note = transposeNote(sourceNote, transpose);
-      const velocity = economyAudio ? .075 : flow.velocities[phraseIndex] ?? composition.sound.melodyVelocity;
+      const writtenVelocity = composition.leadVelocities[step] ?? composition.sound.melodyVelocity;
+      const velocity = economyAudio ? Math.min(.12, writtenVelocity * .42) : flow.velocities[phraseIndex] ?? writtenVelocity;
       if (note) {
         const leadVoice = engine.leadVoice(economyAudio ? composition.sound.leadVoice : flow.leadVoice ?? composition.sound.leadVoice, selectedInstrument(composition, 'lead'));
-        leadVoice.triggerAttackRelease(note, economyAudio ? '8n' : flow.noteLength || (position % 4 ? '16n' : '8n'), safeTriggerTime(leadVoice, time), velocity);
+        const writtenDuration = composition.leadDurations[step] || '8n';
+        leadVoice.triggerAttackRelease(note, economyAudio ? writtenDuration : flow.noteLength || writtenDuration, safeTriggerTime(leadVoice, time), velocity);
       }
     }
     const firstMalletStep = Math.max(1, Math.round(stepsPerBar * .375));
@@ -1862,6 +1893,18 @@ ui.helpTrigger?.addEventListener('click', () => {
   ui.helpDialog?.showModal();
   document.body.classList.add('lofi-help-open');
 });
+ui.helpTabs.forEach(tab => tab.addEventListener('click', () => {
+  const activePanel = tab.dataset.helpPanel;
+  ui.helpTabs.forEach(candidate => {
+    const selected = candidate === tab;
+    candidate.classList.toggle('active', selected);
+    candidate.setAttribute('aria-selected', String(selected));
+    candidate.tabIndex = selected ? 0 : -1;
+  });
+  ui.helpPanels.forEach(panel => {
+    panel.hidden = panel.id !== activePanel;
+  });
+}));
 ui.helpClose?.addEventListener('click', () => ui.helpDialog?.close());
 ui.helpDialog?.addEventListener('click', event => {
   if (event.target === ui.helpDialog) ui.helpDialog.close();

@@ -17,6 +17,20 @@ if (!document.querySelector('link[href="/analytics.css"]')) {
 import('/analytics.mjs').catch(error => console.warn('Analytics consent could not be loaded:', error));
 import('/seo.mjs').catch(error => console.warn('SEO metadata could not be loaded:', error));
 
+if (!document.querySelector('link[href*="lineicons.com"]')) {
+    const lineIconStyles = document.createElement('link');
+    lineIconStyles.rel = 'stylesheet';
+    lineIconStyles.href = 'https://cdn.lineicons.com/5.0/lineicons.css';
+    document.head.append(lineIconStyles);
+}
+if (!document.querySelector('link[href="/siteHelp.css"]')) {
+    const helpStyles = document.createElement('link');
+    helpStyles.rel = 'stylesheet';
+    helpStyles.href = '/siteHelp.css';
+    document.head.append(helpStyles);
+}
+import('/siteHelp.mjs').catch(error => console.warn('Page help could not be loaded:', error));
+
 const menuList = document.querySelector('#menu > ul');
 const menu = document.getElementById('menu');
 const menuToggle = document.getElementById('toggle');

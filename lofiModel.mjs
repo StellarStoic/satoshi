@@ -1,3 +1,5 @@
+import {englishWordlist} from './vendor/bip39.mjs';
+
 const ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const MOODS = [
   {name: 'After Hours', mode: 'minor', scale: [0, 2, 3, 5, 7, 8, 10], base: 48},
@@ -50,18 +52,66 @@ const PROGRESSIONS = [
   [0, 2, 3, 5],
   [0, 4, 2, 5],
 ];
-const TRACK_ADJECTIVES = [
-  'Amber', 'Analog', 'Blue', 'Burnished', 'Calm', 'Copper', 'Distant', 'Dusty',
-  'Electric', 'Faded', 'Golden', 'Hidden', 'Late', 'Low', 'Midnight', 'Muted',
-  'Neon', 'Patient', 'Quiet', 'Rainy', 'Silver', 'Slow', 'Soft', 'Solar',
-  'Still', 'Sunday', 'Tangerine', 'Velvet', 'Warm', 'Worn', 'Zero', 'Afterglow',
-];
-const TRACK_NOUNS = [
-  'Beacon', 'Circuit', 'Coffee', 'Current', 'Echo', 'Halving', 'Horizon', 'Lantern',
-  'Ledger', 'Loop', 'Mempool', 'Midnight', 'Nonce', 'Orbit', 'Packet', 'Pulse',
-  'Relay', 'Reverb', 'Rhythm', 'Room', 'Signal', 'Static', 'Studio', 'Sunrise',
-  'Tape', 'Terminal', 'Transit', 'Voltage', 'Window', 'Witness', 'Wave', 'Whisper',
-];
+const BIP39_BASE = englishWordlist.length;
+const BIP39_WORD_INDEX = new Map(englishWordlist.map((word, index) => [word, index]));
+const BIP39_BIG_BASE = BigInt(BIP39_BASE);
+const HALVING_INTERVAL = 210_000;
+
+export function blockHeightToBip39Code(value) {
+  const height = Number(value);
+  if (!Number.isSafeInteger(height) || height < 0) return null;
+  if (height === 0) return 'genesis';
+
+  const indexes = [];
+  let remaining = BigInt(height - 1);
+  let wordCount = 1;
+  let capacity = BIP39_BIG_BASE;
+  while (remaining >= capacity) {
+    remaining -= capacity;
+    wordCount += 1;
+    capacity *= BIP39_BIG_BASE;
+  }
+  while (indexes.length < wordCount) {
+    indexes.unshift(Number(remaining % BIP39_BIG_BASE));
+    remaining /= BIP39_BIG_BASE;
+  }
+  return indexes.map(index => englishWordlist[index]).join(' ');
+}
+
+export function bip39CodeToBlockHeight(value) {
+  const input = String(value || '').trim().toLowerCase();
+  const code = input.includes('·') ? input.split('·').at(-1).trim() : input;
+  if (code === 'genesis') return 0;
+  const words = code.split(/\s+/).filter(Boolean);
+  if (words.length < 1 || words.length > 5) return null;
+  const indexes = words.map(word => BIP39_WORD_INDEX.get(word));
+  if (indexes.some(index => index === undefined)) return null;
+  let offset = 1n;
+  let capacity = BIP39_BIG_BASE;
+  for (let length = 1; length < words.length; length += 1) {
+    offset += capacity;
+    capacity *= BIP39_BIG_BASE;
+  }
+  const encoded = indexes.reduce((total, index) => total * BIP39_BIG_BASE + BigInt(index), 0n);
+  const decoded = offset + encoded;
+  if (decoded > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const height = Number(decoded);
+  if (!Number.isSafeInteger(height) || blockHeightToBip39Code(height) !== words.join(' ')) return null;
+  return height;
+}
+
+export function halvingEraFromHeight(value) {
+  const height = Number(value);
+  if (!Number.isSafeInteger(height) || height < 0) return null;
+  const index = Math.floor(height / HALVING_INTERVAL);
+  return {
+    index,
+    number: index + 1,
+    start: index * HALVING_INTERVAL,
+    end: (index + 1) * HALVING_INTERVAL - 1,
+    anchor: index,
+  };
+}
 
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
@@ -132,18 +182,15 @@ export function hashBytes(value) {
 
 export function trackTitleFromBlock(hash, height = 0) {
   const normalizedHash = cleanHash(hash);
-  const bytes = hashBytes(normalizedHash);
   const blockHeight = Math.max(0, Math.trunc(Number(height) || 0));
-  const heightLow = blockHeight >>> 0;
-  const adjectiveIndex = (bytes[7] ^ bytes[19] ^ (heightLow & 255)) % TRACK_ADJECTIVES.length;
-  const nounIndex = (bytes[13] ^ bytes[27] ^ ((heightLow >>> 8) & 255)) % TRACK_NOUNS.length;
-  const identity = blockHeight > 0
-    ? `${blockHeight.toLocaleString('en-US')}/${normalizedHash.slice(-12)}`
-    : normalizedHash.slice(-12);
-  return `${TRACK_ADJECTIVES[adjectiveIndex]} ${TRACK_NOUNS[nounIndex]} · ${identity}`;
+  if (!blockHeight) return `Hash Replay ${normalizedHash.slice(-12)}`;
+  return blockHeightToBip39Code(blockHeight)
+    .split(' ')
+    .map(word => word[0].toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
-export const REPLAY_ENGINE_VERSION = 'v3';
+export const REPLAY_ENGINE_VERSION = 'v4';
 export const REPLAY_HASH_ROLES = [
   {name: 'Harmony', start: 24, end: 32, color: '#f2a900'},
   {name: 'Groove', start: 32, end: 40, color: '#32d583'},
@@ -249,6 +296,66 @@ const PRODUCTION_SCENES = [
   {name: 'Velvet Sax Lounge', sessions: [3, 1], voices: [3, 0, 8, 3, 1, 6, 1, 1, 0]},
   {name: 'Harp and Cello Drift', sessions: [6, 2], voices: [6, 6, 10, 2, 0, 6, 4, 4, 3]},
 ];
+const MELODIC_FORMS = [
+  {name: 'question and answer', question: [0, 1, 2, 4, 3, 2, 1, 2], answer: [2, 3, 4, 2, 1, 0, -1, 0]},
+  {name: 'slow ascent', question: [0, 0, 1, 2, 2, 3, 4, 5], answer: [2, 2, 3, 4, 5, 6, 5, 4]},
+  {name: 'falling line', question: [6, 5, 4, 3, 2, 2, 1, 0], answer: [4, 3, 2, 1, 0, -1, 0, 0]},
+  {name: 'wide arch', question: [0, 2, 4, 6, 7, 5, 3, 1], answer: [1, 3, 5, 7, 6, 4, 2, 0]},
+  {name: 'valley response', question: [5, 3, 2, 0, -1, 1, 3, 4], answer: [4, 2, 0, -2, 0, 2, 1, 0]},
+  {name: 'pedal and flight', question: [0, 0, 4, 0, 5, 0, 3, 0], answer: [0, 2, 0, 6, 0, 4, 1, 0]},
+  {name: 'broken thirds', question: [0, 2, 1, 3, 2, 4, 3, 5], answer: [5, 3, 4, 2, 3, 1, 2, 0]},
+  {name: 'fifth leaps', question: [0, 4, 1, 5, 2, 6, 3, 1], answer: [3, -1, 4, 0, 5, 1, 2, 0]},
+  {name: 'circling phrase', question: [0, 2, 1, 3, 2, 1, -1, 0], answer: [2, 4, 3, 1, 2, 0, 1, 0]},
+  {name: 'two-note conversation', question: [0, 0, 3, 3, 0, 3, 0, 3], answer: [2, 2, -1, -1, 2, -1, 2, 0]},
+  {name: 'stair-step release', question: [0, 1, 1, 2, 2, 3, 3, 5], answer: [5, 4, 4, 2, 2, 1, 1, 0]},
+  {name: 'wandering intervals', question: [0, 3, -1, 4, 1, 5, 2, -2], answer: [2, 5, 0, 3, -1, 2, 1, 0]},
+];
+const LEAD_RHYTHMS = [
+  {name: 'spacious statements', slots: [0, 6, 10, 14]},
+  {name: 'offbeat replies', slots: [2, 5, 9, 13]},
+  {name: 'long-short conversation', slots: [0, 3, 8, 10, 15]},
+  {name: 'syncopated steps', slots: [1, 4, 7, 11, 14]},
+  {name: 'three-note calls', slots: [0, 2, 5, 9, 11, 14]},
+  {name: 'late answers', slots: [3, 6, 10, 12, 15]},
+  {name: 'forward pulse', slots: [0, 4, 6, 8, 12, 14]},
+  {name: 'broken line', slots: [1, 3, 7, 8, 13]},
+  {name: 'held phrases', slots: [0, 7, 11]},
+  {name: 'quick exchanges', slots: [0, 2, 4, 7, 10, 12, 15]},
+  {name: 'backbeat melody', slots: [2, 6, 10, 14]},
+  {name: 'uneven breaths', slots: [0, 5, 7, 12, 15]},
+];
+
+function scaleLeadSlots(slots, stepsPerBar) {
+  return [...new Set(slots.map(slot => Math.min(stepsPerBar - 1, Math.round(slot / 16 * stepsPerBar))))];
+}
+
+function buildLeadPattern(formIndex, rhythmIndex, stepsPerBar, bytes, random) {
+  const totalSteps = stepsPerBar * 4;
+  const pattern = Array(totalSteps).fill(false);
+  const economyPattern = Array(totalSteps).fill(false);
+  const baseSlots = LEAD_RHYTHMS[rhythmIndex].slots;
+
+  for (let bar = 0; bar < 4; bar += 1) {
+    const responseShift = bar % 2 ? 1 + (bytes[(18 + bar) % 32] % 3) : 0;
+    const phraseShift = ((formIndex + bar + bytes[(21 + bar) % 32]) % 3) - 1;
+    const positions = scaleLeadSlots(baseSlots, stepsPerBar)
+      .map(position => Math.max(0, Math.min(stepsPerBar - 1, position + phraseShift + responseShift)))
+      .filter((position, index, all) => all.indexOf(position) === index)
+      .filter((position, index) => index === 0 || random() > .12);
+    if (bar === 2 && bytes[14] % 4 === 0) positions.splice(1);
+    if (!positions.length) positions.push(bytes[(8 + bar) % 32] % stepsPerBar);
+    positions.forEach(position => { pattern[bar * stepsPerBar + position] = true; });
+
+    const economyCount = 1 + (bytes[(24 + bar) % 32] % 2);
+    const economyOffset = bytes[(12 + bar) % 32] % positions.length;
+    for (let index = 0; index < Math.min(economyCount, positions.length); index += 1) {
+      const position = positions[(economyOffset + index * Math.max(1, Math.floor(positions.length / economyCount))) % positions.length];
+      economyPattern[bar * stepsPerBar + position] = true;
+    }
+  }
+
+  return {pattern, economyPattern};
+}
 
 function chordForDegree(mood, root, degree, voicing) {
   return voicing.steps.map(step => midiToNote(scaleMidi(mood, root, degree + step, 1)));
@@ -289,24 +396,35 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
   const progression = PROGRESSIONS[bytes[2] % PROGRESSIONS.length];
   const chords = progression.map(degree => chordForDegree(mood, root, degree, voicing));
   const bass = progression.map(degree => midiToNote(scaleMidi(mood, root, degree, -1)));
-  const palette = Array.from({length: 21}, (_, degree) => midiToNote(scaleMidi(mood, root, degree, 1)));
-  const melodyRegister = 1 + (bytes[17] % 2);
-  const motif = Array.from({length: 8}, (_, step) => {
-    if (random() < (step % 4 === 0 ? .12 : .38)) return null;
-    return Math.floor(random() * mood.scale.length) + (random() > .86 ? 7 : 0);
+  const melodyRegister = bytes[17] % 3 === 0 ? 1 : 0;
+  const palette = Array.from({length: 21}, (_, degree) => midiToNote(scaleMidi(mood, root, degree, melodyRegister)));
+  const melodicFormIndex = bytes[5] % MELODIC_FORMS.length;
+  const melodicForm = MELODIC_FORMS[melodicFormIndex];
+  const leadRhythmIndex = bytes[6] % LEAD_RHYTHMS.length;
+  const leadRhythm = LEAD_RHYTHMS[leadRhythmIndex];
+  const {pattern: melodyPattern, economyPattern: economyMelodyPattern} = buildLeadPattern(melodicFormIndex, leadRhythmIndex, stepsPerBar, bytes, random);
+  const melody = Array.from({length: totalSteps}, (_, step) => {
+    const bar = Math.floor(step / stepsPerBar);
+    const position = step % stepsPerBar;
+    const contour = bar % 2 ? melodicForm.answer : melodicForm.question;
+    const contourIndex = Math.min(contour.length - 1, Math.floor(position / stepsPerBar * contour.length));
+    const cadence = bar === 3 && position > stepsPerBar * .7 ? -1 : 0;
+    const variation = (bytes[(step + 7) % 32] + step) % 11 === 0 ? (bar % 2 ? -1 : 1) : 0;
+    const registerTurn = bar === 2 && bytes[16] % 3 === 0 ? -mood.scale.length : 0;
+    const degree = progression[bar] + contour[contourIndex] + cadence + variation + registerTurn;
+    return midiToNote(scaleMidi(mood, root, degree, melodyRegister));
   });
-  const melody = Array.from({length: 32}, (_, step) => {
-    const degree = motif[step % motif.length];
-    if (degree === null || (step >= 16 && random() < .16)) return null;
-    const phraseLift = step >= 24 && bytes[16] % 2 ? 1 : 0;
-    return midiToNote(scaleMidi(mood, root, degree + phraseLift, melodyRegister));
+  const leadDurations = Array.from({length: totalSteps}, (_, step) => {
+    const position = step % stepsPerBar;
+    const choice = (bytes[(step + 10) % 32] + position + melodicFormIndex) % 5;
+    return ['16n', '8n', '8n', '8n.', '4n'][choice];
   });
+  const leadVelocities = Array.from({length: totalSteps}, (_, step) => .16 + ((bytes[(step + 15) % 32] + step * 7) % 21) / 100);
   const kickPattern = expandPattern(session.kick, random, stepsPerBar, .025);
   const snarePattern = expandPattern(session.snare, random, stepsPerBar, .018);
   const hatPattern = expandPattern(session.hat, random, stepsPerBar, .07);
   const chordPattern = expandPattern(session.chord, random, stepsPerBar, .015);
   const bassPattern = expandPattern(session.bass, random, stepsPerBar, .045);
-  const melodyPattern = expandPattern(session.melody, random, stepsPerBar, .08);
   const breakBar = 1 + (bytes[14] % 3);
   const breakMode = bytes[15] % 3;
   const arrangementMode = bytes[13] % 5;
@@ -354,6 +472,11 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     bass,
     palette,
     melody,
+    melodyForm: melodicForm.name,
+    leadRhythm: leadRhythm.name,
+    leadDurations,
+    leadVelocities,
+    economyMelodyPattern,
     rhythm: {
       kick: kickPattern,
       snare: snarePattern,
@@ -541,17 +664,19 @@ export function flowFromTransactions(seed, composition, summary = {}) {
   const rbfShare = clamp(summary.rbfShare, 0, 1);
   const valueWeight = clamp(Math.log10(Math.max(1, numeric(summary.averageValue, 10000))) / 9, 0, 1);
   const voiceOffsetByType = {Taproot: 0, SegWit: 1, Legacy: 2, Data: 3, Batch: 4, Consolidation: 2, Mixed: 1};
-  const phrase = Array.from({length: 16}, (_, step) => {
-    const value = bytes[step];
+  const phraseLength = Math.max(16, composition?.totalSteps || 16);
+  const phrase = Array.from({length: phraseLength}, (_, step) => {
+    const value = bytes[step % bytes.length];
     const restModulo = complexity > .55 ? 7 : sizeWeight > .55 ? 4 : 5;
     if ((value + step) % restModulo === 0) return null;
-    return palette[(value + bytes[(step + 9) % 32] + Math.round(valueWeight * 13)) % palette.length];
+    if (step % 3 === 0 && composition?.melody?.[step]) return composition.melody[step];
+    return palette[(value + bytes[(step + 9) % 32] + Math.round(valueWeight * 13) + Math.floor(step / 8)) % palette.length];
   });
   const stepsPerBar = composition.stepsPerBar || 16;
   return {
     seed: cleanHash(seed),
     phrase,
-    velocities: Array.from({length: 16}, (_, step) => 0.18 + (bytes[(step + 16) % 32] % 25) / 100),
+    velocities: Array.from({length: phraseLength}, (_, step) => 0.16 + (bytes[(step + 16) % 32] % 23) / 100),
     chordInversions: Array.from({length: 4}, (_, bar) => bytes[bar + 3] % 3),
     leadVoice: (composition.sound.leadVoice + (voiceOffsetByType[summary.dominantType] ?? bytes[8])) % LEAD_VOICES.length,
     chordVoice: (composition.sound.chordVoice + (complexity > .65 ? 1 : 0)) % CHORD_VOICES.length,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from '../lofiModel.mjs';
+import {bip39CodeToBlockHeight, blockHeightToBip39Code, cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, halvingEraFromHeight, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -10,7 +10,16 @@ test('block composition is deterministic and musically bounded', () => {
   assert.deepEqual(first, second);
   assert.equal(first.chords.length, 4);
   assert.equal(first.chords.every(chord => chord.length >= 3 && chord.length <= 4), true);
-  assert.equal(first.melody.length, 32);
+  assert.equal(first.melody.length, first.totalSteps);
+  assert.equal(first.economyMelodyPattern.length, first.totalSteps);
+  assert.equal(first.leadDurations.length, first.totalSteps);
+  assert.equal(first.leadVelocities.length, first.totalSteps);
+  assert.equal(typeof first.melodyForm, 'string');
+  assert.equal(typeof first.leadRhythm, 'string');
+  for (let bar = 0; bar < 4; bar += 1) {
+    const economyNotes = first.economyMelodyPattern.slice(bar * first.stepsPerBar, (bar + 1) * first.stepsPerBar).filter(Boolean).length;
+    assert.ok(economyNotes >= 1 && economyNotes <= 2);
+  }
   assert.equal(first.palette.length, 21);
   assert.ok(first.bpm >= 48 && first.bpm <= 176);
   assert.ok(first.swing >= 0.5 && first.swing <= 0.68);
@@ -32,15 +41,36 @@ test('block composition is deterministic and musically bounded', () => {
   assert.ok(first.sound.reverbWet >= .04 && first.sound.reverbWet <= .21);
 });
 
-test('track titles are stable for a block identity and do not repeat across heights', () => {
+test('BIP39 track titles encode block heights without collisions', () => {
   const title = trackTitleFromBlock(HASH, 900000);
   assert.equal(title, trackTitleFromBlock(HASH.toUpperCase(), 900000));
-  assert.match(title, /900,000\/25e65a19d7ac$/);
+  assert.equal(blockHeightToBip39Code(0), 'genesis');
+  assert.equal(blockHeightToBip39Code(1), 'abandon');
+  assert.equal(blockHeightToBip39Code(2048), 'zoo');
+  assert.equal(blockHeightToBip39Code(2049), 'abandon abandon');
+  assert.equal(blockHeightToBip39Code(4_196_352), 'zoo zoo');
+  assert.equal(blockHeightToBip39Code(4_196_353), 'abandon abandon abandon');
+  assert.equal(blockHeightToBip39Code(969738), 'deposit license');
+  assert.equal(trackTitleFromBlock(HASH, 969738), 'Deposit License');
+  assert.equal(bip39CodeToBlockHeight('deposit license'), 969738);
+  assert.equal(bip39CodeToBlockHeight('Worn Terminal · deposit license'), 969738);
+  assert.equal(bip39CodeToBlockHeight('abandon'), 1);
+  assert.equal(bip39CodeToBlockHeight('zoo'), 2048);
+  assert.equal(bip39CodeToBlockHeight('abandon abandon'), 2049);
+  assert.equal(bip39CodeToBlockHeight('not bip39'), null);
   assert.notEqual(title, trackTitleFromBlock(HASH, 900001));
-  assert.notEqual(title, trackTitleFromBlock(`${HASH.slice(0, -1)}d`, 900000));
+  assert.equal(title, trackTitleFromBlock(`${HASH.slice(0, -1)}d`, 900000));
 
   const titles = Array.from({length: 10_000}, (_, index) => trackTitleFromBlock(HASH, 890000 + index));
   assert.equal(new Set(titles).size, titles.length);
+});
+
+test('halving eras are derived from height and rotate the title anchor', () => {
+  assert.deepEqual(halvingEraFromHeight(0), {index: 0, number: 1, start: 0, end: 209999, anchor: 0});
+  assert.equal(halvingEraFromHeight(209999).number, 1);
+  assert.equal(halvingEraFromHeight(210000).number, 2);
+  assert.equal(halvingEraFromHeight(969738).number, 5);
+  assert.equal(halvingEraFromHeight(-1), null);
 });
 
 test('hash replay validates links and produces a versioned deterministic track', () => {
@@ -48,13 +78,13 @@ test('hash replay validates links and produces a versioned deterministic track',
   const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
   assert.equal(normalizeReplayHash(`  ${uppercase}  `), HASH);
   assert.equal(normalizeReplayHash('not-a-block'), null);
-  assert.equal(REPLAY_ENGINE_VERSION, 'v3');
+  assert.equal(REPLAY_ENGINE_VERSION, 'v4');
   assert.deepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(uppercase));
   assert.notDeepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(otherHash));
   assert.equal(replayCompositionFromHash(HASH).height, 0);
   assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null));
   assert.equal(normalizeReplayEngine('v1'), 'v1');
-  assert.equal(normalizeReplayEngine('unknown'), 'v3');
+  assert.equal(normalizeReplayEngine('unknown'), 'v4');
 });
 
 test('early block replays always select valid audio voices', () => {
@@ -134,6 +164,9 @@ test('a run of blocks explores the session, harmony and instrument palette', () 
   assert.ok(new Set(blocks.map(block => block.sound.padVoice)).size >= 4);
   assert.ok(new Set(blocks.map(block => block.sound.arpVoice)).size >= 5);
   assert.ok(new Set(blocks.map(block => block.scene)).size >= 10);
+  assert.ok(new Set(blocks.map(block => block.melodyForm)).size >= 10);
+  assert.ok(new Set(blocks.map(block => block.leadRhythm)).size >= 10);
+  assert.ok(new Set(blocks.map(block => `${block.melodyForm}:${block.leadRhythm}:${block.melody.join(',')}:${block.rhythm.melody.join('')}`)).size >= 480);
 });
 
 test('live block parser accepts singular updates and block snapshots', () => {
@@ -170,7 +203,7 @@ test('live transaction IDs continually change the musical flow', () => {
   const second = flowFromTransactions(secondSeed, composition);
   assert.notEqual(firstSeed, secondSeed);
   assert.notDeepEqual(first.phrase, second.phrase);
-  assert.equal(first.phrase.length, 16);
+  assert.equal(first.phrase.length, composition.totalSteps);
   assert.equal(first.chordInversions.length, 4);
 });
 

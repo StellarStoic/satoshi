@@ -23,6 +23,7 @@
 .lofi-help-body p, .lofi-help-body li, .lofi-help-map dd { color: #a2a6a6; font-size: 11px; line-height: 1.75; }
 .lofi-help-body p { margin: 12px 0 0; }
 .lofi-help-body strong, .lofi-help-body b { color: #e9e9e5; }
+.lofi-help-body code { color: #d3b96f; font-family: "Roboto Mono", monospace; overflow-wrap: anywhere; }
 .lofi-help-body ul { margin: 14px 0 0; padding-left: 20px; }
 .lofi-help-body li + li { margin-top: 7px; }
 .lofi-help-grid, .lofi-help-map { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin: 18px 0 0; background: #343738; border: 1px solid #343738; }
@@ -31,6 +32,15 @@
 .lofi-help-grid small { display: block; color: #858a8c; font-size: 9px; line-height: 1.6; }
 .lofi-help-map { margin-bottom: 4px; }
 .lofi-help-map dd { margin: 0; }
+.lofi-help-modes { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0 -24px; padding: 12px 24px; border-bottom: 1px solid #343738; background: #111314; }
+.lofi-help-modes button { min-height: 36px; padding: 7px 12px; border: 1px solid #3b3f40; border-radius: 3px; background: #17191a; color: #858a8c; font: 600 10px/1.2 "Roboto Mono", monospace; cursor: pointer; text-transform: uppercase; }
+.lofi-help-modes button:hover, .lofi-help-modes button:focus-visible { border-color: #74622d; color: #d9d9d4; outline: 0; }
+.lofi-help-modes button.active { border-color: #f2a900; background: #211d13; color: #f2a900; }
+.lofi-help-panel[hidden] { display: none; }
+.lofi-help-story { display: grid; gap: 1px; margin-top: 18px; border: 1px solid #343738; background: #343738; }
+.lofi-help-story > div { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 12px; align-items: start; padding: 15px; background: #151718; }
+.lofi-help-story b { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #665426; border-radius: 50%; color: #f2a900; font-size: 10px; }
+.lofi-help-story p { margin: 1px 0 0; }
 body.lofi-help-open { overflow: hidden; }
 
 .studio-heading { display: flex; align-items: end; justify-content: space-between; gap: 30px; padding: 0 0 24px; border-bottom: 1px solid #36393a; }
@@ -47,6 +57,8 @@ body.lofi-help-open { overflow: hidden; }
 .record-label { position: absolute; left: clamp(20px, 5vw, 60px); bottom: clamp(22px, 6vw, 62px); max-width: min(390px, calc(100% - 40px)); padding-left: 14px; border-left: 2px solid #f2a900; }
 .record-label span, .block-stamp span { display: block; color: #868b8e; font-size: 10px; text-transform: uppercase; }
 .record-label strong { display: block; margin: 7px 0 5px; color: #f2f2ed; font-size: clamp(19px, 3vw, 31px); font-weight: 400; }
+.record-label strong .halving-anchor { display: inline; margin: 0; color: #f2a900; font-size: inherit; font-weight: 800; text-transform: none; text-shadow: 0 0 14px rgba(242,169,0,.2); }
+.record-label strong .track-word { display: inline; color: inherit; font-size: inherit; font-weight: inherit; text-transform: none; }
 .record-label small { color: #a9adae; font-size: 11px; }
 .block-stamp { position: absolute; top: 22px; right: 22px; max-width: 180px; padding: 12px; border: 1px solid rgba(130,136,138,.42); background: rgba(10,12,13,.76); text-align: right; }
 .block-stamp strong { display: block; margin: 5px 0; color: #f2a900; font-size: 16px; }
@@ -222,6 +234,7 @@ body.lofi-help-open { overflow: hidden; }
   .lofi-help-header { padding: 18px 16px; }
   .lofi-help-body { padding: 0 16px 28px; }
   .lofi-help-intro { margin-inline: -16px; padding: 20px 16px; }
+  .lofi-help-modes { margin-inline: -16px; padding-inline: 16px; }
   .lofi-help-grid, .lofi-help-map { grid-template-columns: 1fr; }
 }
 
