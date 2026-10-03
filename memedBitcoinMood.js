@@ -115,6 +115,7 @@ const MOOD_CATEGORIES = {
             './img/bitcoinMoodMemes/BEARISH_005.gif',
             './img/bitcoinMoodMemes/BEARISH_006.gif',
             './img/bitcoinMoodMemes/BEARISH_007.gif',
+            './img/bitcoinMoodMemes/BEARISH_008.jpg'
         ]
     }
 };
@@ -128,26 +129,26 @@ const SPECIAL_DATES = {
     '01-03': { // January 3 - Genesis Block
         name: '🎂 Happy Bitcoin Birthday!',
         memes: [
-            './img/bitcoinMoodMemes/HAPPYBIRTHDAYBITCON.jpg',
+            './img/bitcoinMoodMemes/HAPPYBIRTHDAYBITCOIN_001.jpg',
         ],
-        frequency: 0.6 // 50% chance to show birthday meme
+        frequency: 0.6 // 60% chance
     },
     '10-31': { // October 31 - Whitepaper Day
         name: '📄 Happy Bitcoin Whitepaper Day!',
         memes: [
-            './img/bitcoinMoodMemes/HAPPYBITCOINWHITEPAPERDAY.jpg',
+            './img/bitcoinMoodMemes/HAPPYBITCOINWHITEPAPERDAY_001.png',
         ],
-        frequency: 0.6 // Higher chance for this important day
+        frequency: 0.6 // 60% chance
     },
     '05-22': { // May 22 - Bitcoin Pizza Day
         name: '🍕 Happy Bitcoin Pizza Day!',
         memes: [
-            './img/bitcoinMoodMemes/BITCOINPIZZADAY_001',
-            './img/bitcoinMoodMemes/BITCOINPIZZADAY_002',
-            './img/bitcoinMoodMemes/BITCOINPIZZADAY_003',
-            './img/bitcoinMoodMemes/BITCOINPIZZADAY_004',
+            './img/bitcoinMoodMemes/BITCOINPIZZADAY_001.gif',
+            './img/bitcoinMoodMemes/BITCOINPIZZADAY_002.gif',
+            './img/bitcoinMoodMemes/BITCOINPIZZADAY_003.gif',
+            './img/bitcoinMoodMemes/BITCOINPIZZADAY_004.gif',
         ],
-        frequency: 0.6 // Very high chance - this is THE meme day
+        frequency: 0.6 // 60% chance - this is THE meme day
     },
     // '11-09': { // any date - test
     //     name: '🍕 Test!',
@@ -167,7 +168,7 @@ const SPECIAL_DATES = {
 const HALVING_CELEBRATION = {
     name: '🪓 Bitcoin Halving Day!',
     memes: [
-        './img/bitcoinMoodMemes/HALVINGISNEAR_001.gif',
+        './img/bitcoinMoodMemes/HALVING_001.gif',
     ],
     frequency: 0.5
 };
