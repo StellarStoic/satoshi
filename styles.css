@@ -273,7 +273,10 @@ p, #text {
     text-align: center; /* Center the text inside the notification */
     color: #4d4d4e; /* White text color */
     display: none; /* Initially hidden */
-    z-index: 1500; /* High enough z-index to overlay other content */
+    z-index: 1000000; /* Must beat every dialog layer: the support modal computes to
+                         z-index 4000 and other pages go up to 100000, which left the
+                         toast painted behind the modal, so the message could not be
+                         read. A 3.5s copy confirmation belongs on top of everything. */
     box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
 }
 
