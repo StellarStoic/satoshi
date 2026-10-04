@@ -69,7 +69,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir /tmp/satoshi-pages
-          rsync -a --exclude='.git/' --exclude='.github/' --exclude='tools/' --exclude='tests/' --exclude='__pycache__/' ./ /tmp/satoshi-pages/
+          rsync -a --exclude='.git/' --exclude='.github/' --exclude='tools/' --exclude='tests/' --exclude='services/' --exclude='__pycache__/' ./ /tmp/satoshi-pages/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: /tmp/satoshi-pages
