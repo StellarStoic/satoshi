@@ -5,16 +5,7 @@ import init, {
   validateArkAddress,
   validateMnemonic,
 } from './vendor/bark/bark_ffi_wasm.js';
-import {
-  balanceTotal,
-  classifyPaymentDestination,
-  describeBackgroundNotificationError,
-  formatSats,
-  notificationMovement,
-  normalizeMnemonic,
-  parseBolt11AmountSats,
-  receivedMovementAmount,
-} from './walletModel.mjs';
+import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
 import {englishWordlist} from './vendor/bip39.mjs';
 import {
   LEGACY_WALLET_PROFILE_KEY,
@@ -625,8 +616,14 @@ async function enableBackgroundNotifications({quiet = false} = {}) {
     }
   }
 
-  const authorizationSeconds = Math.min(86400, Number(config.authorizationSeconds) || 86400);
   const existing = readPushState();
+  // The period is the user's choice: the dialog offers the lifetimes the service
+  // advertises, a renewal reuses the period already granted, and the service
+  // refuses anything past a year on its own.
+  const authorizationSeconds = selectAuthorizationSeconds(config, {
+    requested: quiet ? 0 : Number(document.querySelector('input[name="notificationLifetime"]:checked')?.value) || 0,
+    stored: Number(existing?.lifetimeSeconds) || 0,
+  });
   const requestBody = JSON.stringify({
     network: activeNetwork.id,
     serverAddress: activeNetwork.serverAddress,
@@ -649,9 +646,9 @@ async function enableBackgroundNotifications({quiet = false} = {}) {
   }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'Could not register background notifications.');
-  writePushState({id: result.id, secret: result.secret || existing?.secret, expiresAt: result.expiresAt});
+  writePushState({id: result.id, secret: result.secret || existing?.secret, expiresAt: result.expiresAt, lifetimeSeconds: authorizationSeconds});
   updateNotificationPermissionUi();
-  if (!quiet) setNotice('Background payment alerts are active for 24 hours.', 'success');
+  if (!quiet) setNotice(`Background payment alerts are active for ${notificationLifetimeLabel(authorizationSeconds)}.`, 'success');
 }
 
 async function disableBackgroundNotifications() {

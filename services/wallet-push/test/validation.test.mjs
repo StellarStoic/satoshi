@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorizationExpiry, currentMailboxCheckpoint, redactLogValue, validateDelegation} from '../src/validation.mjs';
+import {AUTH_LIFETIME_OPTIONS, MAX_AUTH_SECONDS, authorizationExpiry, currentMailboxCheckpoint, expiryTimerDelay, redactLogValue, validateDelegation} from '../src/validation.mjs';
 
 function body(now, overrides = {}) {
   const mailbox = Buffer.concat([Buffer.from([2]), Buffer.alloc(32, 7)]);
@@ -17,19 +17,45 @@ function body(now, overrides = {}) {
   };
 }
 
+function withExpiry(now, seconds) {
+  const request = body(now);
+  const auth = Buffer.from(request.authorization, 'hex');
+  auth.writeBigInt64LE(BigInt(now + seconds), 33);
+  return {...request, authorization: auth.toString('hex')};
+}
+
 test('validates a short-lived matching mailbox delegation', () => {
   const now = 2_000_000_000;
   const result = validateDelegation(body(now), now);
   assert.equal(authorizationExpiry(result.authorization), now + 3600);
 });
 
-test('rejects mismatched mailbox identifiers and long authorization windows', () => {
+test('rejects mismatched mailbox identifiers and anything past the one-year ceiling', () => {
   const now = 2_000_000_000;
   assert.throws(() => validateDelegation(body(now, {mailboxIdentifier: Buffer.alloc(33, 1).toString('hex')}), now), /does not match/);
-  const request = body(now);
-  const auth = Buffer.from(request.authorization, 'hex');
-  auth.writeBigInt64LE(BigInt(now + 90000), 33);
-  assert.throws(() => validateDelegation({...request, authorization: auth.toString('hex')}, now), /24-hour/);
+  assert.throws(() => validateDelegation(withExpiry(now, 366 * 24 * 60 * 60), now), /1-year/);
+  assert.throws(() => validateDelegation(withExpiry(now, 30), now), /too soon/);
+});
+
+test('accepts every lifetime the wallet offers', () => {
+  const now = 2_000_000_000;
+  assert.deepEqual(AUTH_LIFETIME_OPTIONS.map(option => option.seconds), [86_400, 7_776_000, 15_552_000, 31_536_000]);
+  for (const option of AUTH_LIFETIME_OPTIONS) {
+    const result = validateDelegation(withExpiry(now, option.seconds), now);
+    assert.equal(authorizationExpiry(result.authorization), now + option.seconds);
+  }
+  assert.equal(MAX_AUTH_SECONDS, 31_536_000);
+});
+
+test('re-arms long expiries instead of handing them to setTimeout', () => {
+  const now = 2_000_000_000;
+  const nowMs = now * 1000;
+  // Above ~24.8 days setTimeout fires almost immediately, so a one-year window
+  // scheduled in one call would tear its own watcher down at once.
+  assert.equal(expiryTimerDelay(now + MAX_AUTH_SECONDS, nowMs), 21_600_000);
+  assert.equal(expiryTimerDelay(now + 60, nowMs), 60_000);
+  assert.equal(expiryTimerDelay(now - 1, nowMs), 0);
+  assert.equal(expiryTimerDelay(undefined, nowMs), 0);
 });
 
 test('rejects mismatched networks and arbitrary push destinations', () => {

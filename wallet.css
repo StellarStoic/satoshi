@@ -1173,3 +1173,11 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
   .wallet-actions button { min-height: 52px; padding-inline: 3px; }
   .wallet-actions svg { width: 15px; height: 15px; }
 }
+
+/* Lifetime picker in the notification consent dialog: the options sit in one row
+   on wide screens and wrap on narrow ones, instead of running together. */
+.notification-lifetime {border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 0.5rem; padding: 0.7rem 0.9rem 0.8rem; margin: 0.9rem 0;}
+.notification-lifetime legend {padding: 0 0.35rem; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.72;}
+.notification-lifetime label {display: inline-flex; align-items: center; gap: 0.4rem; margin: 0.25rem 1.1rem 0.25rem 0; cursor: pointer; white-space: nowrap;}
+.notification-lifetime input {accent-color: currentColor; margin: 0; width: 1rem; height: 1rem;}
+@media (max-width: 26rem) {.notification-lifetime label {display: flex; margin-right: 0;}}

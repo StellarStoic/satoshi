@@ -1,6 +1,24 @@
 import crypto from 'node:crypto';
 
-export const MAX_AUTH_SECONDS = 24 * 60 * 60;
+// Mailbox authorizations are read capabilities that cannot be revoked at the Ark
+// server before they expire, so this ceiling is a deliberate trade: long enough
+// that background alerts keep working for someone who does not open the wallet
+// every day, short enough that no single grant outlives a year. The wallet offers
+// the four lifetimes below; anything in between is accepted, so a client cannot
+// quietly ask for ten years and the server never has to trust the UI.
+export const MAX_AUTH_SECONDS = 365 * 24 * 60 * 60;
+export const AUTH_LIFETIME_OPTIONS = Object.freeze([
+  {seconds: 24 * 60 * 60, label: '24 hours'},
+  {seconds: 90 * 24 * 60 * 60, label: '3 months'},
+  {seconds: 180 * 24 * 60 * 60, label: '6 months'},
+  {seconds: MAX_AUTH_SECONDS, label: '1 year'},
+]);
+
+// setTimeout truncates any delay above 2^31-1 ms (about 24.8 days) and fires
+// almost immediately instead, which would tear down a one-year watcher the moment
+// it started. Long expiries are therefore re-armed in slices this long.
+export const MAX_TIMER_DELAY_MS = 6 * 60 * 60 * 1000;
+
 export const ALLOWED_SERVERS = new Set([
   'https://ark.second.tech',
   'https://ark.signet.2nd.dev',
@@ -67,7 +85,7 @@ export function validateDelegation(body, nowSeconds = Math.floor(Date.now() / 10
   }
   const expiresAt = authorizationExpiry(authorization);
   if (expiresAt <= nowSeconds + 60) throw new Error('Mailbox authorization expires too soon');
-  if (expiresAt > nowSeconds + MAX_AUTH_SECONDS + 60) throw new Error('Mailbox authorization exceeds the 24-hour limit');
+  if (expiresAt > nowSeconds + MAX_AUTH_SECONDS + 60) throw new Error('Mailbox authorization exceeds the 1-year limit');
 
   const subscription = body.subscription;
   if (!subscription || typeof subscription.endpoint !== 'string' || !/^https:\/\//.test(subscription.endpoint)) {
@@ -88,6 +106,15 @@ export function validateDelegation(body, nowSeconds = Math.floor(Date.now() / 10
 export function currentMailboxCheckpoint(nowMs = Date.now()) {
   // A short overlap tolerates clock skew between this host and the Ark server.
   return (BigInt(Math.max(0, nowMs - 30_000)) << 20n).toString();
+}
+
+// How long the watcher may sleep before it has to re-check the expiry. Returns 0
+// when the authorization is already finished, so the caller can tear the watcher
+// down instead of scheduling an immediate, pointless wake-up.
+export function expiryTimerDelay(expiresAtSeconds, nowMs = Date.now()) {
+  const remaining = Number(expiresAtSeconds) * 1000 - nowMs;
+  if (!Number.isFinite(remaining) || remaining <= 0) return 0;
+  return Math.min(remaining, MAX_TIMER_DELAY_MS);
 }
 
 export function publicRecord(record) {

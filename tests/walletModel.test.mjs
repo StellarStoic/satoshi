@@ -5,10 +5,12 @@ import {
   classifyPaymentDestination,
   describeBackgroundNotificationError,
   formatSats,
+  notificationLifetimeLabel,
   notificationMovement,
   normalizeMnemonic,
   parseBolt11AmountSats,
   receivedMovementAmount,
+  selectAuthorizationSeconds,
 } from '../walletModel.mjs';
 
 test('normalizes mnemonic whitespace and case', () => {
@@ -78,4 +80,34 @@ test('does not misattribute unrelated failures to the push service or to Brave',
   assert.equal(denied.message, 'Notification permission was not granted.');
   assert.doesNotMatch(denied.message, /Google services/);
   assert.equal(denied.hint, '');
+});
+
+test('lets the user choose any lifetime the service offers', () => {
+  const service = {
+    authorizationSeconds: 31_536_000,
+    authorizationOptions: [{seconds: 86_400}, {seconds: 7_776_000}, {seconds: 15_552_000}, {seconds: 31_536_000}],
+  };
+  assert.equal(selectAuthorizationSeconds(service, {requested: 7_776_000}), 7_776_000);
+  assert.equal(selectAuthorizationSeconds(service, {requested: 31_536_000}), 31_536_000);
+  // A renewal has nothing on screen, so it reuses the period already granted.
+  assert.equal(selectAuthorizationSeconds(service, {stored: 15_552_000}), 15_552_000);
+  // No choice and nothing stored falls back to the longest period offered.
+  assert.equal(selectAuthorizationSeconds(service), 31_536_000);
+});
+
+test('clamps a stale page instead of refusing to register alerts', () => {
+  const service = {authorizationSeconds: 31_536_000, authorizationOptions: [{seconds: 86_400}, {seconds: 7_776_000}]};
+  assert.equal(selectAuthorizationSeconds(service, {requested: 10_000_000}), 7_776_000);
+  assert.equal(selectAuthorizationSeconds(service, {requested: 3_000_000}), 86_400);
+  // A service advertising no list keeps the old behaviour rather than breaking.
+  assert.equal(selectAuthorizationSeconds({}), 86_400);
+  assert.equal(selectAuthorizationSeconds({authorizationSeconds: 86_400}, {requested: 99_999_999}), 86_400);
+});
+
+test('names the chosen period for the confirmation notice', () => {
+  assert.equal(notificationLifetimeLabel(86_400), '24 hours');
+  assert.equal(notificationLifetimeLabel(7_776_000), '3 months');
+  assert.equal(notificationLifetimeLabel(15_552_000), '6 months');
+  assert.equal(notificationLifetimeLabel(31_536_000), '1 year');
+  assert.equal(notificationLifetimeLabel(172_800), '2 days');
 });

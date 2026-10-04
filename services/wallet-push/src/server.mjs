@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import webpush from 'web-push';
-import {currentMailboxCheckpoint, publicRecord, redactLogValue, validateDelegation} from './validation.mjs';
+import {AUTH_LIFETIME_OPTIONS, MAX_AUTH_SECONDS, currentMailboxCheckpoint, expiryTimerDelay, publicRecord, redactLogValue, validateDelegation} from './validation.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const protoDirectory = path.resolve(directory, '../proto');
@@ -100,7 +100,10 @@ async function notify(record) {
     url: `/wallet.html?network=${record.network}`,
   });
   try {
-    await webpush.sendNotification(record.subscription, payload, {TTL: 120, urgency: 'high'});
+    // 25 hours: longer than any authorization, so a phone that was offline for a
+    // while still receives the alert when it reconnects instead of the push
+    // service dropping it after two minutes.
+    await webpush.sendNotification(record.subscription, payload, {TTL: 90_000, urgency: 'high'});
   } catch (error) {
     if ([404, 410].includes(error.statusCode)) {
       records.delete(record.id);
@@ -155,11 +158,20 @@ function startWatcher(record) {
       authorization: Buffer.from(record.authorization, 'hex'),
       checkpoint: record.checkpoint,
     }, metadata);
-    call.expiryTimer = setTimeout(() => {
-      stopWatcher(record.id);
-      records.delete(record.id);
-      void persist();
-    }, Math.max(0, record.expiresAt * 1000 - Date.now()));
+    // Arm the expiry in slices: setTimeout fires almost immediately above about
+    // 24.8 days, so a one-year authorization scheduled in a single call would
+    // tear its own watcher down the moment it started.
+    const armExpiry = () => {
+      const delay = expiryTimerDelay(record.expiresAt);
+      if (delay <= 0) {
+        stopWatcher(record.id);
+        records.delete(record.id);
+        void persist();
+        return;
+      }
+      call.expiryTimer = setTimeout(armExpiry, delay);
+    };
+    armExpiry();
     streams.set(record.id, call);
     call.on('data', message => {
       record.checkpoint = String(message.checkpoint);
@@ -216,7 +228,7 @@ const server = http.createServer(async (request, response) => {
   }
   const url = new URL(request.url, 'http://localhost');
   if (request.method === 'GET' && url.pathname === '/wallet-notifications/v1/config') {
-    return json(response, 200, {vapidPublicKey: VAPID_PUBLIC_KEY, authorizationSeconds: 86400}, origin);
+    return json(response, 200, {vapidPublicKey: VAPID_PUBLIC_KEY, authorizationSeconds: MAX_AUTH_SECONDS, authorizationOptions: AUTH_LIFETIME_OPTIONS}, origin);
   }
   if (request.method === 'GET' && url.pathname === '/wallet-notifications/v1/health') {
     return json(response, 200, {ok: true, watchers: streams.size}, origin);

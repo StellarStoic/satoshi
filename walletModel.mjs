@@ -44,6 +44,35 @@ export function notificationMovement(notification = {}) {
   return notification.movement && typeof notification.movement === 'object' ? notification.movement : null;
 }
 
+const LIFETIME_LABELS = [[86_400, '24 hours'], [7_776_000, '3 months'], [15_552_000, '6 months'], [31_536_000, '1 year']];
+
+// The period is the user's choice, offered against the list the service
+// advertises. A value that is not on that list is clamped to the closest offered
+// period rather than refused: a page cached from an older build must never leave
+// the wallet unable to switch alerts on, and the service enforces its own
+// one-year ceiling whatever the page asks for.
+export function selectAuthorizationSeconds(config = {}, {requested = 0, stored = 0} = {}) {
+  const offered = (Array.isArray(config?.authorizationOptions) ? config.authorizationOptions : [])
+    .map(option => Number(option?.seconds))
+    .filter(seconds => Number.isSafeInteger(seconds) && seconds > 0)
+    .sort((a, b) => a - b);
+  const advertised = Number(config?.authorizationSeconds);
+  const ceiling = offered.length ? offered[offered.length - 1]
+    : (Number.isSafeInteger(advertised) && advertised > 0 ? advertised : 86_400);
+  const wanted = Number(requested) > 0 ? Number(requested) : (Number(stored) > 0 ? Number(stored) : ceiling);
+  if (!offered.length) return Math.min(wanted, ceiling);
+  if (offered.includes(wanted)) return wanted;
+  return offered.reduce((best, seconds) => (Math.abs(seconds - wanted) < Math.abs(best - wanted) ? seconds : best), offered[0]);
+}
+
+export function notificationLifetimeLabel(seconds) {
+  const value = Number(seconds);
+  const known = LIFETIME_LABELS.find(([option]) => option === value);
+  if (known) return known[1];
+  const hours = Math.max(1, Math.round(value / 3600));
+  return hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hours`;
+}
+
 const PUSH_UNREACHABLE = /push service error|registration failed/i;
 
 // Turns the browser's opaque "Registration failed - push service error" into

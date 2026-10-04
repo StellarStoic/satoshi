@@ -1,6 +1,6 @@
 # Wallet push service
 
-This service turns Bark unified-mailbox events into generic Web Push notifications. It never receives a mnemonic, password, private spending key, address, amount, or transaction body. The browser delegates temporary mailbox read access with a Bark authorization that expires after at most 24 hours.
+This service turns Bark unified-mailbox events into generic Web Push notifications. It never receives a mnemonic, password, private spending key, or transaction body, and the push message it sends carries only the fact that bitcoin arrived. To notice an arrival it reads the mailbox, where an incoming Lightning payment message does include the amount; amounts are never stored and its logs are redacted. The browser delegates read-only mailbox access with a Bark authorization whose lifetime the user chooses — 24 hours, 3 months, 6 months or 1 year — and the service accepts nothing beyond a year.
 
 ## Configuration
 

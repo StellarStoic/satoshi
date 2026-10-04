@@ -87,7 +87,7 @@ Use the selected page section to answer questions such as "What does this button
     - **Receive panel**: Generate an Ark address or a Lightning invoice with amount/description.
     - **Send form (`#sendForm`)**: Pay an Ark address, Lightning invoice, Lightning address, or on-chain Bitcoin address.
     - **Sync (`#syncWallet`) / Lock (`#lockWallet`)**: Manually refresh wallet state or lock the wallet.
-    - **Background alerts (`#enableWalletNotifications`)**: Optional generic push notifications for incoming Ark/Lightning payments. A temporary signed mailbox authorization leaves the browser and expires within 24 hours; the recovery phrase, password, private spending keys, addresses, amounts, and transaction contents are not sent to the notification service.
+    - **Background alerts (`#enableWalletNotifications`)**: Optional generic push notifications for incoming Ark/Lightning payments. A signed, read-only mailbox authorization leaves the browser for a lifetime the user chooses (24 hours, 3 months, 6 months or 1 year); the recovery phrase, password, private spending keys, addresses and transaction contents never leave the browser, and the push the service sends says only that bitcoin arrived. To notice an arrival the service reads the mailbox, where an incoming Lightning payment includes the amount, which it never stores and redacts from its logs.
     - **Dialogs**: Network, help/terms, backup words, password, receive payment, notification consent, payment confirmation, and error dialogs.
     - **[Ignore unless specifically asked for]**: Footer content. Analytics and Synthetic Satoshi are disabled on this page.
 
