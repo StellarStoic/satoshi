@@ -83,6 +83,7 @@ let notificationGeneration = 0;
 let notificationRestartTimer;
 let notificationRefreshTimer;
 let paymentToastTimer;
+let pushServiceAvailable = false;
 const seenIncomingMovements = new Set();
 const PUSH_API = 'https://mcp.satoshi.si/wallet-notifications/v1';
 const PUSH_STATE_PREFIX = 'satoshiBarkPushV1:';
@@ -547,10 +548,21 @@ async function showSystemPaymentNotification(movement, amount) {
 function updateNotificationPermissionUi() {
   const supported = 'Notification' in window && 'serviceWorker' in navigator;
   const active = Boolean(readPushState());
-  elements.enableWalletNotifications.hidden = !supported;
+  elements.enableWalletNotifications.hidden = !supported || (!pushServiceAvailable && !active);
   elements.enableWalletNotifications.dataset.active = String(active);
   elements.enableWalletNotifications.querySelector('span').textContent = active ? 'Background alerts on' : 'Background alerts';
   if (!supported) elements.enableWalletNotifications.title = 'System notifications are unavailable in this browser.';
+}
+
+async function probePushService() {
+  try {
+    const response = await fetch(`${PUSH_API}/config`, {cache: 'no-store', credentials: 'omit'});
+    const config = response.ok ? await response.json() : null;
+    pushServiceAvailable = Boolean(config?.vapidPublicKey);
+  } catch {
+    pushServiceAvailable = false;
+  }
+  updateNotificationPermissionUi();
 }
 
 function vapidKeyBytes(value) {
@@ -1351,6 +1363,7 @@ renderRestoreInputs();
 applyNetworkUi();
 updateEntryState();
 updateNotificationPermissionUi();
+void probePushService();
 if (!acceptedTerms) showDialog(elements.barkHelpDialog);
 else if (!initialNetworkId) openNetworkSelection();
 else await showNetworkEntryNotice();
