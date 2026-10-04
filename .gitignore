@@ -4,6 +4,7 @@
 !/tools/news/
 !/tools/price-scanner/
 !/tools/lofi/
+!/tools/nip05-store/
 /tools/price-scanner/node_modules/
 /services/wallet-push/node_modules/
 /services/wallet-push/data/
