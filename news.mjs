@@ -236,15 +236,24 @@ async function fetchCustomRss(source) {
 }
 
 function bech32NpubToHex(npub) {
+  // BIP-173: the checksum covers hrpExpand('npub') followed by the data, plus the
+  // six checksum characters. This previously folded in only the data, so it threw
+  // "Invalid npub checksum" on genuine npubs like npub10tteryu... (the lottery
+  // bot), while accepting the occasional key that passed by accident. Verified
+  // against nostr.json, which files that same npub as 7ad79193....
   const alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-  const separator = npub.lastIndexOf('1');
-  if (!npub.toLowerCase().startsWith('npub1') || separator < 1) throw new Error('Invalid npub');
-  const encoded = [...npub.toLowerCase().slice(separator + 1)].map(char => alphabet.indexOf(char));
-  if (encoded.some(value => value < 0) || encoded.length < 7) throw new Error('Invalid npub');
-  const polymod = encoded.reduce((checksum, value) => {
+  const generators = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const raw = (npub || '').trim();
+  if (raw !== raw.toLowerCase() && raw !== raw.toUpperCase()) throw new Error('Invalid npub: mixed case');
+  const source = raw.toLowerCase();
+  const separator = source.lastIndexOf('1');
+  if (separator < 1 || source.slice(0, separator) !== 'npub') throw new Error('Invalid npub');
+  const encoded = [...source.slice(separator + 1)].map(char => alphabet.indexOf(char));
+  if (encoded.length < 7 || encoded.some(value => value < 0)) throw new Error('Invalid npub');
+  const hrpExpand = [...'npub'].map(char => char.charCodeAt(0) >> 5).concat([0], [...'npub'].map(char => char.charCodeAt(0) & 31));
+  const polymod = hrpExpand.concat(encoded).reduce((checksum, value) => {
     const top = checksum >>> 25;
     let next = ((checksum & 0x1ffffff) << 5) ^ value;
-    const generators = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
     generators.forEach((generator, index) => { if ((top >>> index) & 1) next ^= generator; });
     return next;
   }, 1);
@@ -262,6 +271,7 @@ function bech32NpubToHex(npub) {
       bytes.push((accumulator >> bits) & 255);
     }
   }
+  if (bits >= 5 || ((accumulator << (8 - bits)) & 255)) throw new Error('Invalid npub padding');
   if (bytes.length !== 32) throw new Error('Invalid npub length');
   return bytes.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }

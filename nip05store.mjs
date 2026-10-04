@@ -41,28 +41,46 @@ let polls = 0;
 let shownRail = null;
 
 // ---------------------------------------------------------------- npub decoding
-// Same implementation the news page uses (bech32 with checksum verification), so
-// there is one decoder behaviour across the site rather than two that disagree.
-function bech32NpubToHex(npub) {
-  const alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-  const separator = npub.lastIndexOf('1');
-  if (!npub.toLowerCase().startsWith('npub1') || separator < 1) throw new Error('Invalid npub');
-  const encoded = [...npub.toLowerCase().slice(separator + 1)].map(c => alphabet.indexOf(c));
-  if (encoded.some(value => value < 0) || encoded.length < 7) throw new Error('Invalid npub');
-  const polymod = encoded.reduce((checksum, value) => {
+// BIP-173 bech32 with the human-readable part folded into the checksum. The
+// version this replaced omitted hrpExpand('npub'), so it rejected genuine npubs
+// and only accepted the rare one that passed by accident. Verified against
+// nostr.json: npub10tteryu... decodes to 7ad79193..., the key filed for
+// bitcoinlightninglottery.
+const NPUB_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const NPUB_GENERATORS = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+
+function npubPolymod(values) {
+  let checksum = 1;
+  for (const value of values) {
     const top = checksum >>> 25;
-    let next = ((checksum & 0x1ffffff) << 5) ^ value;
-    [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3].forEach((generator, index) => {
-      if ((top >>> index) & 1) next ^= generator;
-    });
-    return next;
-  }, 1);
-  if (polymod !== 1) throw new Error('Invalid npub checksum');
-  const values = encoded.slice(0, -6);
+    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
+    NPUB_GENERATORS.forEach((generator, index) => { if ((top >>> index) & 1) checksum ^= generator; });
+  }
+  return checksum;
+}
+
+function npubHrpExpand(hrp) {
+  return [
+    ...[...hrp].map(char => char.charCodeAt(0) >> 5),
+    0,
+    ...[...hrp].map(char => char.charCodeAt(0) & 31),
+  ];
+}
+
+function bech32NpubToHex(npub) {
+  const raw = (npub || '').trim();
+  if (raw !== raw.toLowerCase() && raw !== raw.toUpperCase()) throw new Error('Invalid npub: mixed case');
+  const source = raw.toLowerCase();
+  const separator = source.lastIndexOf('1');
+  if (separator < 1 || source.slice(0, separator) !== 'npub') throw new Error('Invalid npub');
+  const values = [...source.slice(separator + 1)].map(char => NPUB_ALPHABET.indexOf(char));
+  if (values.length < 7 || values.some(value => value < 0)) throw new Error('Invalid npub: bad characters');
+  if (npubPolymod([...npubHrpExpand('npub'), ...values]) !== 1) throw new Error('Invalid npub checksum');
+
+  const bytes = [];
   let accumulator = 0;
   let bits = 0;
-  const bytes = [];
-  for (const value of values) {
+  for (const value of values.slice(0, -6)) {
     accumulator = (accumulator << 5) | value;
     bits += 5;
     while (bits >= 8) {
@@ -70,6 +88,7 @@ function bech32NpubToHex(npub) {
       bytes.push((accumulator >> bits) & 255);
     }
   }
+  if (bits >= 5 || ((accumulator << (8 - bits)) & 255)) throw new Error('Invalid npub: bad padding');
   if (bytes.length !== 32) throw new Error('Invalid npub length');
   return bytes.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -180,7 +199,10 @@ function onKeyInput() {
 // ------------------------------------------------------------------ rendering
 function qrImage(value, kind) {
   const image = document.createElement('img');
-  image.className = 'store-qr';
+  // `qr-code` as well as `store-qr`: the site's copy-to-clipboard binds to
+  // .qr-code / .qr-code-text, so the image must carry that class or tapping the
+  // QR itself does nothing.
+  image.className = 'store-qr qr-code';
   image.alt = `${kind} QR code`;
   image.title = value; // the copier reads this
   loadQr().then(ready => {
