@@ -95,9 +95,27 @@ function hasNearbyTopRightControl() {
     return Boolean(document.querySelector('.wordlist-settings-trigger'));
 }
 
+const TOP_RIGHT_COMPANIONS = Object.freeze({
+    '/quotes.html': {selector: '#next-quote'},
+    '/converter.html': {selector: '.add-currency-icon', reparent: true},
+    '/news.html': {selector: '#openNewsSettings'},
+    '/priceScanner.html': {selector: '.scanner-top-controls', wide: true}
+});
+
+function alignTopRightControls(trigger) {
+    const config = TOP_RIGHT_COMPANIONS[normalisePath(location.pathname)];
+    if (!config) return;
+    const companion = document.querySelector(config.selector);
+    if (!companion) return;
+    companion.classList.add('site-help-companion');
+    if (config.reparent) document.documentElement.append(companion);
+    trigger.classList.add(config.wide ? 'site-help-trigger--wide-offset' : 'site-help-trigger--offset');
+}
+
 function styleExistingTrigger(trigger) {
     trigger.classList.add('site-help-trigger');
     if (hasNearbyTopRightControl()) trigger.classList.add('site-help-trigger--offset');
+    alignTopRightControls(trigger);
     trigger.innerHTML = iconMarkup();
     trigger.setAttribute('aria-haspopup', 'dialog');
 
@@ -113,6 +131,7 @@ function styleExistingTrigger(trigger) {
             trigger.click();
         });
     }
+    if (trigger.parentElement !== document.documentElement) document.documentElement.append(trigger);
 }
 
 function createHelpDialog(help) {
@@ -159,7 +178,8 @@ function createHelpTrigger(dialog, help) {
     trigger.title = help.title;
     trigger.innerHTML = iconMarkup();
     trigger.addEventListener('click', () => dialog.showModal());
-    document.body.append(trigger);
+    alignTopRightControls(trigger);
+    document.documentElement.append(trigger);
 }
 
 export function initialiseSiteHelp() {

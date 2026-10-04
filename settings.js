@@ -25,7 +25,28 @@
 (() => {
   const output = document.getElementById('pwaVersion');
   const cachePrefix = 'satoshi-static-v';
+  const metadataUrl = '/__satoshi_pwa_metadata__';
   const numericVersion = name => Number.parseInt(name.slice(cachePrefix.length), 10);
+  let installed = null;
+
+  function relativeTime(isoDate) {
+    const elapsed = Date.now() - Date.parse(isoDate);
+    if (!Number.isFinite(elapsed) || elapsed < 0) return '';
+    const units = [
+      ['day', 86400000],
+      ['hour', 3600000],
+      ['minute', 60000],
+    ];
+    const [unit, duration] = units.find(([, milliseconds]) => elapsed >= milliseconds) || ['second', 1000];
+    const amount = Math.max(1, Math.floor(elapsed / duration));
+    return `${amount} ${unit}${amount === 1 ? '' : 's'} ago`;
+  }
+
+  function renderInstalledVersion() {
+    if (!installed) return;
+    const age = relativeTime(installed.updatedAt);
+    output.textContent = `v${installed.version}${age ? ` · updated ${age}` : ''}`;
+  }
 
   async function showInstalledVersion() {
     try {
@@ -34,13 +55,24 @@
         .map(numericVersion)
         .filter(Number.isFinite)
         .sort((a, b) => b - a);
-      output.textContent = versions.length ? `v${versions[0]}` : 'not installed';
+      if (!versions.length) {
+        installed = null;
+        output.textContent = 'not installed';
+        return;
+      }
+      const version = versions[0];
+      const cache = await caches.open(`${cachePrefix}${version}`);
+      const metadata = await cache.match(metadataUrl);
+      const details = metadata ? await metadata.json().catch(() => ({})) : {};
+      installed = {version, updatedAt: details.updatedAt || ''};
+      renderInstalledVersion();
     } catch {
       output.textContent = 'not available';
     }
   }
 
   showInstalledVersion();
+  setInterval(renderInstalledVersion, 60000);
   navigator.serviceWorker?.addEventListener('controllerchange', showInstalledVersion);
 })();
 

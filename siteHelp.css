@@ -1,7 +1,7 @@
 .site-help-trigger {
     position: fixed !important;
-    top: calc(35px + env(safe-area-inset-top)) !important;
-    right: 25px !important;
+    top: calc(18px + env(safe-area-inset-top)) !important;
+    right: max(16px, env(safe-area-inset-right)) !important;
     z-index: 900 !important;
     display: grid !important;
     place-items: center !important;
@@ -9,7 +9,7 @@
     height: 40px !important;
     min-width: 40px !important;
     min-height: 40px !important;
-    margin: -8px !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
@@ -25,7 +25,19 @@
 }
 
 .site-help-trigger.site-help-trigger--offset {
-    right: 75px !important;
+    right: max(66px, calc(50px + env(safe-area-inset-right))) !important;
+}
+
+.site-help-trigger.site-help-trigger--wide-offset {
+    right: max(120px, calc(104px + env(safe-area-inset-right))) !important;
+}
+
+.site-help-companion {
+    position: fixed !important;
+    top: calc(18px + env(safe-area-inset-top)) !important;
+    right: max(16px, env(safe-area-inset-right)) !important;
+    z-index: 900 !important;
+    margin: 0 !important;
 }
 
 .site-help-trigger:hover,
@@ -106,12 +118,16 @@
 
 @media (max-width: 600px) {
     .site-help-trigger {
-        top: calc(27px + env(safe-area-inset-top)) !important;
-        right: 18px !important;
+        top: calc(18px + env(safe-area-inset-top)) !important;
+        right: max(16px, env(safe-area-inset-right)) !important;
     }
 
     .site-help-trigger.site-help-trigger--offset {
-        right: 66px !important;
+        right: max(66px, calc(50px + env(safe-area-inset-right))) !important;
+    }
+
+    .site-help-trigger.site-help-trigger--wide-offset {
+        right: max(120px, calc(104px + env(safe-area-inset-right))) !important;
     }
 
     .site-help-dialog__content {

@@ -1,4 +1,5 @@
 const CACHE = 'satoshi-static-v133';
+const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
@@ -32,6 +33,10 @@ self.addEventListener('install', event => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE);
         await cache.addAll(CORE);
+        await cache.put(CACHE_METADATA_URL, new Response(JSON.stringify({
+            version: CACHE.slice(CACHE.lastIndexOf('v')),
+            updatedAt: new Date().toISOString()
+        }), {headers: {'content-type': 'application/json'}}));
         await self.skipWaiting();
     })());
 });
