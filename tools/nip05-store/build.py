@@ -17,9 +17,19 @@ TARGET = REPO / 'nip05store.html'
 
 lines = SOURCE.read_text(encoding='utf-8').splitlines()
 
-# --- boundaries (asserted, so a later edit to nip05.html fails this build loudly) ---
-HEAD_END = 39      # the burger toggle
-NAV_START, NAV_END = 40, 114   # <div id="menu"> .. its closing </div>
+# --- boundaries: located, not hardcoded, so an edit to nip05.html's head or its
+# nav menu cannot silently shift the cut. Both are asserted below.
+menu_start = next(i for i, line in enumerate(lines) if '<div id="menu">' in line)
+depth = 0
+menu_end = None
+for i in range(menu_start, len(lines)):
+    depth += lines[i].count('<div') - lines[i].count('</div>')
+    if depth == 0:
+        menu_end = i
+        break
+assert menu_end is not None, 'the nav menu is never closed'
+HEAD_END = menu_start            # 0-based: everything above <div id="menu">
+NAV_START, NAV_END = menu_start + 1, menu_end + 1
 
 # The tail starts at the separator comment above the footer, located rather than
 # hardcoded so an edit higher up the file cannot silently shift it.

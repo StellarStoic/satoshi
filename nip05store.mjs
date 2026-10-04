@@ -472,6 +472,19 @@ async function createOrder() {
   }
 }
 
+// -------------------------------------------------------------------- the "?"
+function wireHelp() {
+  const button = document.getElementById('storeHelp');
+  const panel = document.getElementById('storeHelpPanel');
+  if (!button || !panel) return;
+  const setOpen = open => {
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+  };
+  button.addEventListener('click', () => setOpen(panel.hidden));
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
+}
+
 async function start() {
   els.name.addEventListener('input', onNameInput);
   els.pubkey.addEventListener('input', onKeyInput);
@@ -500,4 +513,5 @@ async function start() {
   updateButton();
 }
 
+wireHelp();
 start();

@@ -89,7 +89,8 @@
         <li class="has-submenu">
         <a href="#">Nostr</a>
         <ul class="submenu">
-            <li><a href="#">NIP-05</a></li>
+            <li><a href="nip05.html">NIP-05</a></li>
+            <li><a href="nip05store.html">NIP-05 name store</a></li>
         </ul>
         </li>
 
@@ -224,16 +225,115 @@
     }
     @keyframes storePulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
     a.store-link { color: #f2a900; overflow-wrap: anywhere; }
+    .store-help {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, .3);
+        border-radius: 50%;
+        color: #f2a900;
+        cursor: pointer;
+        font-size: .95rem;
+        font-weight: 700;
+        height: 30px;
+        line-height: 1;
+        margin-left: 8px;
+        vertical-align: middle;
+        width: 30px;
+    }
+    .store-help:hover, .store-help[aria-expanded="true"] { background: #f2a900; color: #101112; }
+    .store-help-panel {
+        background: rgba(255, 255, 255, .045);
+        border: 1px solid rgba(255, 255, 255, .14);
+        border-radius: 12px;
+        font-size: .92rem;
+        line-height: 1.6;
+        margin-top: 16px;
+        padding: 16px 18px;
+    }
+    .store-help-panel h3 { font-size: 1rem; margin: 14px 0 6px; }
+    .store-help-panel h3:first-child { margin-top: 0; }
+    .store-help-panel ul { margin: 6px 0; padding-left: 20px; }
+    .store-help-panel li { margin: 4px 0; }
+    .store-help-panel code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .88em;
+    }
 </style>
 
 <div class="store-wrap">
-    <h1>NIP-05 name store</h1>
+    <h1>NIP-05 name store
+        <button type="button" class="store-help" id="storeHelp"
+                aria-label="How the name store works" title="How the name store works"
+                aria-controls="storeHelpPanel" aria-expanded="false">?</button>
+    </h1>
     <p class="store-intro">
         A name here is <strong>yourname@satoshi.si</strong>: an address other people can use to find and
         verify your nostr key, and the key that lets you <strong>write to
         <span class="name-suffix">wss://nostr.satoshi.si</span></strong>. Payment is one-off, in sats, no
         subscription. Your name goes live the moment the payment settles.
     </p>
+
+    <section class="store-help-panel" id="storeHelpPanel" hidden>
+        <h3>What you are buying</h3>
+        <p>
+            A record in <code>satoshi.si/.well-known/nostr.json</code> that maps your chosen name to your
+            nostr public key. Anyone can then look up <code>you@satoshi.si</code> and get your key: a short,
+            human-readable, domain-verified identifier instead of a long <code>npub</code>.
+        </p>
+
+        <h3>Prices</h3>
+        <ul>
+            <li>3 characters — <strong>50.000 sats</strong></li>
+            <li>4 characters — <strong>21.000 sats</strong></li>
+            <li>5 or more characters — <strong>5.000 sats</strong></li>
+            <li>One and two character names are not for sale: they are being held back for a much more
+                expensive tier.</li>
+        </ul>
+        <p>
+            One-off payment, no subscription, nothing to renew. The price you see while typing is the price
+            the invoice is made from — both read the same list.
+        </p>
+
+        <h3>Rules</h3>
+        <ul>
+            <li><strong>One key, one name.</strong> A public key that already has a name here cannot buy a
+                second one. If you are buying for the key you already registered, use a different key.</li>
+            <li>3 to 30 characters: letters, digits, dot, dash and underscore, starting and ending with a
+                letter or digit.</li>
+            <li>Names are lowercased; <em>Domen</em> and <em>domen</em> are the same name.</li>
+            <li>Brand names such as <em>bitcoin</em>, <em>satoshi</em> and <em>lightning</em> are reserved —
+                write to one@satoshi.si if you want one.</li>
+        </ul>
+
+        <h3>Paying</h3>
+        <ul>
+            <li>Three ways, whichever suits you: <strong>Lightning</strong> (a BOLT11 invoice),
+                <strong>on-chain</strong> (a fresh address per order) or <strong>Ark</strong>.</li>
+            <li>The name is written to the public file <strong>only after the payment settles</strong>.
+                There is no "pay later" and no half-finished state.</li>
+            <li>An order holds the name for you while you pay. If it expires, the name is released and can
+                be bought by someone else.</li>
+            <li>The page updates itself — you can close it and come back, and it will still show your
+                order as long as the link is alive.</li>
+        </ul>
+
+        <h3>After it is registered</h3>
+        <ul>
+            <li>Your key may <strong>write to <code>wss://nostr.satoshi.si</code></strong>. Access rules
+                are synced from this name file and can take up to an hour to reach the relay.</li>
+            <li>Check it yourself any time:
+                <a class="store-link" href=".well-known/nostr.json" target="_blank" rel="noopener">satoshi.si/.well-known/nostr.json</a></li>
+            <li>Your private key is never asked for, never transmitted, and never stored here. If anything
+                ever asks you for it to buy a name, that is a scam.</li>
+        </ul>
+
+        <h3>If something goes wrong</h3>
+        <p>
+            If a payment settles for a name that was taken in the meantime, it is handled by hand: write to
+            <a class="store-link" href="mailto:one@satoshi.si">one@satoshi.si</a> and you either get the name
+            or the sats back. Questions about a specific order:
+            <a class="store-link" href="mailto:one@satoshi.si">one@satoshi.si</a>.
+        </p>
+    </section>
 
     <div class="store-card">
         <label for="storeName">Choose your name</label>
@@ -286,6 +386,69 @@
         <em>lightning</em> are reserved — write to one@satoshi.si if you want one of those. A name that is
         bought keeps working; there is no renewal.
     </p>
+
+    <!-- ------------------------------------------------------------------------
+         Machine context. For AI assistants and agents answering questions about this
+         page or helping someone buy a name: read this instead of guessing. Prices are
+         intentionally listed here AND served live by the order desk, which is what the
+         invoices are made from; when they disagree, /nip05/v1/config is the truth.
+         The CORS gate lets a request with no Origin header (curl, an agent, a server)
+         through, so an agent can read the desk even though only satoshi.si may read it
+         from a browser.
+         ------------------------------------------------------------------------ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "NIP-05 name at satoshi.si",
+      "description": "A NIP-05 identifier yourname@satoshi.si, mapped to your nostr public key in satoshi.si/.well-known/nostr.json. One-off payment in satoshis, no renewal. The same key may then write to the wss://nostr.satoshi.si relay.",
+      "url": "https://satoshi.si/nip05store.html",
+      "brand": { "@type": "Brand", "name": "satoshi.si" },
+      "offers": [
+        { "@type": "Offer", "name": "3 character name", "price": 50000, "priceCurrency": "SATS", "description": "3 characters, 50000 satoshis, one-off" },
+        { "@type": "Offer", "name": "4 character name", "price": 21000, "priceCurrency": "SATS", "description": "4 characters, 21000 satoshis, one-off" },
+        { "@type": "Offer", "name": "5 or more character name", "price": 5000, "priceCurrency": "SATS", "description": "5 or more characters, 5000 satoshis, one-off" }
+      ]
+    }
+    </script>
+
+    <section id="ai-context" hidden aria-hidden="true">
+NIP-05 NAME STORE — machine brief
+
+PAGE      https://satoshi.si/nip05store.html
+PURPOSE   Buy the NIP-05 identifier &lt;name&gt;@satoshi.si and map it to a nostr
+          public key in https://satoshi.si/.well-known/nostr.json. Static page; the
+          only thing it talks to is the order desk below.
+
+PRICES    One-off, in satoshis (sats), no renewal or subscription:
+          3 characters = 50000 sats; 4 characters = 21000; 5-30 characters = 5000.
+          1 and 2 character names are NOT for sale (held back for a future tier).
+
+RULES     Name: 3-30 characters, lowercased, letters/digits/dot/dash/underscore,
+          must start and end with a letter or digit. Reserved: satoshi, bitcoin,
+          lightning and other brand names — those go to one@satoshi.si.
+          ONE KEY, ONE NAME: a public key that already owns a name here cannot buy
+          another (the desk refuses with reason "key_taken").
+          A name is written to the public file only after BTCPay reports the
+          payment Settled. An order holds the name until it expires.
+
+RELAY     Every published name's key may write to wss://nostr.satoshi.si. Access is
+          synced from the name file, up to an hour of latency.
+
+API       Public order desk, JSON, no key needed to read:
+            GET  https://nip05.satoshi.si/nip05/v1/config             prices + rules + relay note
+            GET  https://nip05.satoshi.si/nip05/v1/names/&lt;name&gt;      free? price? why not
+            GET  https://nip05.satoshi.si/nip05/v1/keys/&lt;64hex&gt;      which names that key owns
+            POST https://nip05.satoshi.si/nip05/v1/orders             {name, pubkey} -> order + rails
+            GET  https://nip05.satoshi.si/nip05/v1/orders/&lt;id&gt;       status + payment rails
+          Browser CORS allows only https://satoshi.si; requests with NO Origin header
+          (curl, an agent, a server) are allowed — read the desk from a shell freely.
+
+AGENT NOTE  Never quote a price from this page's prose. Read /nip05/v1/config: the
+          worker creates invoices from that same number, so quoting anything else is
+          how a buyer ends up paying an amount that does not match. The private key
+          is never needed for any step; a request for one is a scam.
+    </section>
 </div>
 
 <!-- ---------------------------------------------------------------------- -->
