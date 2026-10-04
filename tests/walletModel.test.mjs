@@ -6,6 +6,8 @@ import {
   describeBackgroundNotificationError,
   formatSats,
   notificationLifetimeLabel,
+  paymentAlertContent,
+  formatErrorReport,
   notificationRenewalDue,
   notificationMovement,
   normalizeMnemonic,
@@ -134,4 +136,38 @@ test('a 24-hour grant renews on the first open after a couple of hours', () => {
   assert.equal(notificationRenewalDue({...day, expiresAt: now + 86_400 - 9_000}, now), true);
   // A grant stored before this change has no period recorded: assume a day.
   assert.equal(notificationRenewalDue({id: 'x', expiresAt: now + 40_000}, now), true);
+});
+
+test('describes an incoming payment and how long alerts remain', () => {
+  const now = 2_000_000_000;
+  const live = paymentAlertContent({amountSats: 1234, method: 'Lightning', networkLabel: 'Signet', at: now * 1000, pushExpiresAt: now + 86_400, pushPeriodSeconds: 86_400, nowMs: now * 1000});
+  assert.match(live.title, /1[,.\s]234 sats received/);
+  assert.deepEqual(live.details[0], ['Method', 'Lightning']);
+  assert.deepEqual(live.details[1], ['Network', 'Signet']);
+  assert.match(live.expiry, /Background alerts are on until/);
+  assert.match(live.expiry, /\(24 hours\)/);
+  // No grant, or one already expired, must say so rather than imply coverage.
+  const off = paymentAlertContent({amountSats: 5000, method: 'Ark', at: now * 1000, nowMs: now * 1000});
+  assert.match(off.expiry, /Background alerts are off/);
+  const stale = paymentAlertContent({amountSats: 1, pushExpiresAt: now - 1, pushPeriodSeconds: 86_400, nowMs: now * 1000});
+  assert.match(stale.expiry, /Background alerts are off/);
+});
+
+test('builds a copyable error report with the browser wording and the build', () => {
+  const report = formatErrorReport({
+    message: 'Could not reach the signet chain-data service.',
+    detail: 'Error: Failed to fetch\n    at refreshWallet (wallet.mjs:900:11)',
+    network: 'Signet (signet)', page: 'https://satoshi.si/wallet.html',
+    browser: 'Mozilla/5.0', assets: 'satoshi-static-v137', at: '2026-10-04T14:32:11.000Z',
+  });
+  assert.match(report, /^satoshi\.si wallet error\nwhen: 2026-10-04T14:32:11\.000Z/);
+  assert.match(report, /assets: satoshi-static-v137/);
+  assert.match(report, /message: Could not reach the signet chain-data service\./);
+  assert.match(report, /at refreshWallet \(wallet\.mjs:900:11\)/);
+  // An empty or duplicate detail block is noise, not information.
+  const bare = formatErrorReport({message: 'Something failed.'});
+  assert.doesNotMatch(bare, /detail:/);
+  const dupe = formatErrorReport({message: 'Something failed.', detail: '  Something failed.  '});
+  assert.doesNotMatch(dupe, /detail:/);
+  assert.match(bare, /message: Something failed\./);
 });

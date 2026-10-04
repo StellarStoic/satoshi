@@ -93,6 +93,40 @@ export function notificationRenewalDue(state, nowSeconds = Math.floor(Date.now()
   return remaining <= period / RENEWAL_REMAINING_FRACTION || elapsed >= period / RENEWAL_ELAPSED_FRACTION;
 }
 
+// What the centred alert says when a payment arrives while the wallet is open:
+// what arrived, how, when, and how long background alerts are still watching.
+export function paymentAlertContent({amountSats = 0, method = 'Ark', networkLabel = '', at = Date.now(), pushExpiresAt = 0, pushPeriodSeconds = 0, nowMs = Date.now()} = {}) {
+  const amount = Number(amountSats);
+  const title = Number.isFinite(amount) && amount > 0 ? `${formatSats(amount)} received` : 'Bitcoin received';
+  const details = [['Method', String(method || 'Ark')]];
+  if (networkLabel) details.push(['Network', String(networkLabel)]);
+  details.push(['Received', new Date(at).toLocaleString()]);
+  const expires = Number(pushExpiresAt);
+  let expiry;
+  if (Number.isFinite(expires) && expires * 1000 > nowMs) {
+    const period = Number(pushPeriodSeconds) > 0 ? ` (${notificationLifetimeLabel(pushPeriodSeconds)})` : '';
+    expiry = `Background alerts are on until ${new Date(expires * 1000).toLocaleString()}${period}.`;
+  } else {
+    expiry = 'Background alerts are off, so this only shows while the page is open.';
+  }
+  return {title, details, expiry};
+}
+
+// A paste-ready error report. The user sees one friendly sentence; whoever reads
+// the report needs the browser's own words, the build served, and the page.
+export function formatErrorReport({message = '', detail = '', network = '', page = '', browser = '', assets = '', at = new Date().toISOString()} = {}) {
+  const lines = ['satoshi.si wallet error', `when: ${at}`];
+  if (page) lines.push(`page: ${page}`);
+  if (network) lines.push(`network: ${network}`);
+  if (assets) lines.push(`assets: ${assets}`);
+  if (browser) lines.push(`browser: ${browser}`);
+  const shown = String(message).replace(/\s+/g, ' ').trim();
+  lines.push('', `message: ${shown || '(none)'}`);
+  const extra = String(detail || '').trim();
+  if (extra && extra.replace(/\s+/g, ' ').trim() !== shown) lines.push('', 'detail:', extra);
+  return lines.join('\n');
+}
+
 const PUSH_UNREACHABLE = /push service error|registration failed/i;
 
 // Turns the browser's opaque "Registration failed - push service error" into

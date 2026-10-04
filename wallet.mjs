@@ -5,7 +5,7 @@ import init, {
   validateArkAddress,
   validateMnemonic,
 } from './vendor/bark/bark_ffi_wasm.js';
-import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, notificationRenewalDue, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
+import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatErrorReport, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, notificationRenewalDue, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
 import {englishWordlist} from './vendor/bip39.mjs';
 import {
   LEGACY_WALLET_PROFILE_KEY,
@@ -48,10 +48,12 @@ const elements = Object.fromEntries([
   'receivePaymentDialog', 'receivePaymentTitle', 'receivePaymentMethod', 'receivePaymentQr',
   'receivePaymentDetails', 'receivePaymentValue', 'copyReceivePayment',
   'walletErrorDialog', 'walletErrorMessage', 'closeWalletError', 'retryWalletConnection',
+  'walletErrorDetailWrapper', 'walletErrorDetail', 'copyWalletError', 'walletErrorCopyState',
   'openNetworkDialog', 'currentNetworkLabel', 'networkWarning', 'signetFaucet',
   'networkDialog', 'networkForm', 'closeNetworkDialog', 'signetProfileStatus', 'mainnetProfileStatus',
   'arkNetworkName', 'arkServerName', 'confirmPaymentTitle', 'walletLiveChannel', 'walletLiveStatus',
-  'enableWalletNotifications', 'walletPaymentToast', 'walletPaymentToastTitle', 'walletPaymentToastBody',
+  'enableWalletNotifications', 'paymentAlertDialog', 'paymentAlertTitle', 'paymentAlertBody', 'paymentAlertMeta',
+  'paymentAlertExpiry', 'closePaymentAlert', 'dismissPaymentAlert',
   'notificationConsentDialog', 'notificationConsentForm', 'notificationConsentCheck', 'confirmNotificationConsent',
   'cancelNotificationConsent', 'cancelNotificationConsentFooter',
 ].map(id => [id, document.getElementById(id)]));
@@ -66,6 +68,8 @@ let currentInvoice = '';
 let operationRunning = false;
 let pendingPasswordMnemonic = '';
 let errorTimer;
+let lastRawError = '';
+let lastErrorDetail = '';
 let inactivityTimer;
 let acceptedTerms;
 let activeNetwork = NETWORKS.signet;
@@ -74,7 +78,6 @@ let notificationHolder;
 let notificationGeneration = 0;
 let notificationRestartTimer;
 let notificationRefreshTimer;
-let paymentToastTimer;
 let pushServiceAvailable = false;
 const seenIncomingMovements = new Set();
 const PUSH_API = 'https://notify.satoshi.si/wallet-notifications/v1';
@@ -120,25 +123,34 @@ function readWalletProfile(networkId = activeNetwork.id) {
   return readJson(LEGACY_WALLET_PROFILE_KEY);
 }
 
-function showTimedError(message) {
+function showTimedError(message, detail = '') {
   clearTimeout(errorTimer);
+  lastErrorDetail = String(detail || lastRawError || '').trim();
+  lastRawError = '';
   elements.walletErrorMessage.textContent = message;
   elements.retryWalletConnection.hidden = !message.includes('chain-data service');
-  const bar = elements.walletErrorDialog.querySelector('.error-timeout');
-  bar.classList.remove('running');
-  void bar.offsetWidth;
-  bar.classList.add('running');
+  elements.walletErrorDetailWrapper.hidden = !lastErrorDetail;
+  elements.walletErrorDetail.textContent = lastErrorDetail;
+  elements.walletErrorCopyState.hidden = true;
+  // The dialog no longer closes itself: it carries a report to copy now, and a
+  // dialog that disappears mid-read cannot be copied from.
   showDialog(elements.walletErrorDialog);
-  errorTimer = setTimeout(() => closeDialog(elements.walletErrorDialog), 6500);
 }
 
-function setNotice(message, tone = 'neutral') {
+function setNotice(message, tone = 'neutral', detail = '') {
   elements.walletNotice.textContent = message;
   elements.walletNotice.dataset.tone = tone;
-  if (tone === 'error') showTimedError(message);
+  if (tone === 'error') showTimedError(message, detail);
 }
 
 function errorMessage(error, fallback = 'The wallet operation failed.') {
+  // Keep what the browser actually said. The sentence on screen is written for a
+  // person; a report needs the untranslated error, its stack, and any detail the
+  // throwing site attached (a push failure carries the raw service error).
+  lastRawError = error instanceof Error
+    ? [error.detail ? `detail: ${error.detail}` : '', `${error.name || 'Error'}: ${error.stack || error.message}`]
+        .filter(Boolean).join('\n')
+    : String(error ?? '');
   const message = error instanceof Error ? error.message : String(error || fallback);
   const clean = message.replace(/\s+/g, ' ').trim();
   if (/failed to fetch|error sending request|failed to create chain source/i.test(clean)) {
@@ -509,18 +521,32 @@ function movementMethod(movement) {
   return 'Ark';
 }
 
-function showPaymentToast(movement, amount) {
-  clearTimeout(paymentToastTimer);
-  elements.walletPaymentToastTitle.textContent = `${formatSats(amount)} received`;
-  elements.walletPaymentToastBody.textContent = `${movementMethod(movement)} on ${activeNetwork.label}`;
-  elements.walletPaymentToast.hidden = false;
-  elements.walletPaymentToast.classList.remove('show');
-  void elements.walletPaymentToast.offsetWidth;
-  elements.walletPaymentToast.classList.add('show');
-  paymentToastTimer = setTimeout(() => {
-    elements.walletPaymentToast.classList.remove('show');
-    elements.walletPaymentToast.hidden = true;
-  }, 8000);
+// A payment that arrives while the wallet is open is announced in the middle of
+// the screen and stays until it is dismissed, so a tab in the background cannot
+// swallow it the way an eight-second toast did.
+function showPaymentAlert(movement, amount) {
+  const state = readPushState();
+  const content = paymentAlertContent({
+    amountSats: amount,
+    method: movementMethod(movement),
+    networkLabel: activeNetwork.label,
+    at: Date.now(),
+    pushExpiresAt: Number(state?.expiresAt) || 0,
+    pushPeriodSeconds: Number(state?.lifetimeSeconds) || 0,
+  });
+  elements.paymentAlertTitle.textContent = content.title;
+  elements.paymentAlertBody.textContent = 'Payment received while the wallet was open.';
+  elements.paymentAlertMeta.replaceChildren(...content.details.map(([label, value]) => {
+    const row = document.createElement('div');
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const definition = document.createElement('dd');
+    definition.textContent = value;
+    row.append(term, definition);
+    return row;
+  }));
+  elements.paymentAlertExpiry.textContent = content.expiry;
+  showDialog(elements.paymentAlertDialog);
 }
 
 async function showSystemPaymentNotification(movement, amount) {
@@ -612,7 +638,7 @@ async function enableBackgroundNotifications({quiet = false} = {}) {
       const advice = describeBackgroundNotificationError(error, {isBrave: await detectBraveBrowser()});
       console.warn(`Background alert push registration failed [${advice.reason}] ${advice.detail}`);
       if (advice.hint) elements.enableWalletNotifications.title = advice.hint;
-      throw new Error(advice.message);
+      throw Object.assign(new Error(advice.message), {detail: advice.detail});
     }
   }
 
@@ -696,7 +722,7 @@ function handleWalletNotification(notification) {
   const key = incomingMovementKey(movement);
   if (amount && !seenIncomingMovements.has(key)) {
     seenIncomingMovements.add(key);
-    showPaymentToast(movement, amount);
+    showPaymentAlert(movement, amount);
     void showSystemPaymentNotification(movement, amount);
   }
   elements.walletLiveStatus.textContent = 'Listening for incoming payments';
@@ -1358,6 +1384,56 @@ elements.notificationConsentForm.addEventListener('submit', async event => {
     elements.confirmNotificationConsent.disabled = !elements.notificationConsentCheck.checked;
   }
 });
+async function currentAssetVersion() {
+  try {
+    const names = await caches.keys();
+    return names.filter(name => name.startsWith('satoshi-static-')).sort().pop() || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const scratch = document.createElement('textarea');
+      scratch.value = text;
+      scratch.setAttribute('readonly', '');
+      scratch.style.position = 'fixed';
+      scratch.style.opacity = '0';
+      // Anything outside an open <dialog> is inert, so a scratch element parked on
+      // document.body cannot be selected or copied while the dialog is up. It has
+      // to live inside the dialog that triggered the copy.
+      (document.querySelector('dialog[open]') || document.body).append(scratch);
+      scratch.select();
+      const ok = document.execCommand('copy');
+      scratch.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+elements.closePaymentAlert.addEventListener('click', () => closeDialog(elements.paymentAlertDialog));
+elements.dismissPaymentAlert.addEventListener('click', () => closeDialog(elements.paymentAlertDialog));
+elements.copyWalletError.addEventListener('click', async () => {
+  const report = formatErrorReport({
+    message: elements.walletErrorMessage.textContent,
+    detail: lastErrorDetail,
+    network: `${activeNetwork.label} (${activeNetwork.id})`,
+    page: location.href,
+    browser: navigator.userAgent,
+    assets: await currentAssetVersion(),
+  });
+  const copied = await copyToClipboard(report);
+  elements.walletErrorCopyState.hidden = false;
+  elements.walletErrorCopyState.textContent = copied ? 'Copied to clipboard' : 'Could not copy — select the detail above';
+});
+
 elements.closeWalletError.addEventListener('click', () => {
   clearTimeout(errorTimer);
   closeDialog(elements.walletErrorDialog);

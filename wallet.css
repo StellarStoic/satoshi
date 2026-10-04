@@ -1139,14 +1139,14 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
   color: #f6f4f1;
   background: rgba(24, 18, 18, .94);
   box-shadow: 0 25px 70px rgba(0, 0, 0, .55);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px); max-height: 90vh; overflow-y: auto; box-sizing: border-box;
 }
 .wallet-error-dialog::backdrop { background: rgba(0, 0, 0, .68); backdrop-filter: blur(3px); }
 .wallet-error-dialog > div { position: relative; display: grid; justify-items: center; padding: 32px 26px 24px; text-align: center; }
 .wallet-error-dialog > div > svg { width: 30px; height: 30px; color: var(--wallet-red); }
 .wallet-error-dialog h2 { margin: 12px 0 4px; font-size: 1.15rem; }
 .wallet-error-dialog p { margin: 6px 0 10px; color: #d2cdca; line-height: 1.5; }
-.wallet-error-dialog button { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; color: #eee; background: transparent; cursor: pointer; }
+.wallet-error-dialog #closeWalletError { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; color: #eee; background: transparent; cursor: pointer; }
 .wallet-error-dialog .error-retry { position: static; width: auto; min-width: 120px; height: auto; margin-top: 5px; padding: 10px 14px; border: 1px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .04); }
 .error-timeout { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; transform-origin: left; background: var(--wallet-red); }
 .error-timeout.running { animation: wallet-error-timeout 6.5s linear forwards; }
@@ -1181,3 +1181,24 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
 .notification-lifetime label {display: inline-flex; align-items: center; gap: 0.4rem; margin: 0.25rem 1.1rem 0.25rem 0; cursor: pointer; white-space: nowrap;}
 .notification-lifetime input {accent-color: currentColor; margin: 0; width: 1rem; height: 1rem;}
 @media (max-width: 26rem) {.notification-lifetime label {display: flex; margin-right: 0;}}
+
+/* Centred payment alert: a payment that arrives while the wallet is open is
+   announced in the middle of the screen and stays until it is dismissed. */
+.payment-alert-dialog {max-width: 30rem;}
+.payment-alert-meta {display: grid; gap: 0.4rem; margin: 0.9rem 0 0;}
+.payment-alert-meta div {display: flex; justify-content: space-between; gap: 1rem;}
+.payment-alert-meta dt {opacity: 0.7; font-size: 0.78rem;}
+.payment-alert-meta dd {margin: 0; font: 500 0.78rem/1.4 "Roboto Mono", monospace;}
+.payment-alert-expiry {margin-top: 1rem; font-size: 0.78rem; opacity: 0.82;}
+/* Error detail: full text, selectable, and short enough to stay readable. */
+.wallet-error-dialog pre {max-height: 12rem; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 400 0.72rem/1.45 "Roboto Mono", monospace; background: rgba(0, 0, 0, 0.35); border-radius: 8px; padding: 0.6rem 0.7rem; margin: 0.5rem 0 0;}
+.error-actions {display: flex; align-items: center; gap: 0.7rem; margin-top: 0.85rem;}
+.error-copy-state {font-size: 0.72rem; opacity: 0.78;}
+
+/* The detail panel and the copy row are children of a centred grid dialog, so
+   they need their own alignment: full width and left aligned, unlike the message
+   and the icon above them. */
+.wallet-error-dialog details {width: 100%; text-align: left; margin-top: 0.6rem;}
+.wallet-error-dialog details > div,
+.wallet-error-dialog pre {width: 100%; box-sizing: border-box;}
+.wallet-error-dialog .error-actions {justify-content: center;}

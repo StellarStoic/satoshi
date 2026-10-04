@@ -203,14 +203,20 @@
   </dialog>
 
   <dialog class="wallet-error-dialog" id="walletErrorDialog" aria-labelledby="walletErrorTitle">
-    <div><i data-lucide="circle-alert"></i><h2 id="walletErrorTitle">Wallet error</h2><p id="walletErrorMessage"></p><button type="button" class="wallet-secondary error-retry" id="retryWalletConnection" hidden>Try again</button><button type="button" id="closeWalletError" aria-label="Close error"><i data-lucide="x"></i></button><span class="error-timeout" aria-hidden="true"></span></div>
+    <div><button type="button" id="closeWalletError" aria-label="Close error"><i data-lucide="x"></i></button><i data-lucide="circle-alert"></i><h2 id="walletErrorTitle">Wallet error</h2><p id="walletErrorMessage"></p><details id="walletErrorDetailWrapper" hidden><summary>Technical detail</summary><pre id="walletErrorDetail"></pre></details><div class="error-actions"><button type="button" class="wallet-secondary" id="copyWalletError"><i data-lucide="copy"></i> Copy error</button><span class="error-copy-state" id="walletErrorCopyState" hidden>Copied to clipboard</span></div><button type="button" class="wallet-secondary error-retry" id="retryWalletConnection" hidden>Try again</button></div>
   </dialog>
 
   <dialog class="bark-dialog" id="confirmPaymentDialog" aria-labelledby="confirmPaymentTitle">
     <div class="bark-dialog-shell payment-confirm"><header><div><span>Irreversible payment</span><h2 id="confirmPaymentTitle">Confirm real bitcoin payment</h2></div><button type="button" data-cancel-payment aria-label="Cancel"><i data-lucide="x"></i></button></header><div class="bark-dialog-body" id="paymentSummary"></div><footer><button type="button" class="wallet-quiet" data-cancel-payment>Cancel</button><button type="button" class="wallet-danger" id="confirmPayment">Send bitcoin</button></footer></div>
   </dialog>
 
-  <div class="wallet-payment-toast" id="walletPaymentToast" role="status" aria-live="assertive" hidden><i data-lucide="circle-check-big" aria-hidden="true"></i><div><strong id="walletPaymentToastTitle">Bitcoin received</strong><span id="walletPaymentToastBody"></span></div></div>
+  <dialog class="bark-dialog payment-alert-dialog" id="paymentAlertDialog" aria-labelledby="paymentAlertTitle">
+    <div class="bark-dialog-shell">
+      <header><div><span>Incoming payment</span><h2 id="paymentAlertTitle">Bitcoin received</h2></div><button type="button" id="closePaymentAlert" aria-label="Close"><i data-lucide="x"></i></button></header>
+      <div class="bark-dialog-body"><p id="paymentAlertBody"></p><dl class="payment-alert-meta" id="paymentAlertMeta"></dl><p class="payment-alert-expiry" id="paymentAlertExpiry"></p></div>
+      <footer><button type="button" class="wallet-primary" id="dismissPaymentAlert">Dismiss</button></footer>
+    </div>
+  </dialog>
 
   <footer class="footer" data-live-footer>
     <a href="mailto:one@satoshi.si">one@satoshi.si</a><span id="block-height">Block --</span><span id="fee-rate">-- sat/vB</span><i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
