@@ -8,6 +8,7 @@ import init, {
 import {
   balanceTotal,
   classifyPaymentDestination,
+  describeBackgroundNotificationError,
   formatSats,
   notificationMovement,
   normalizeMnemonic,
@@ -570,6 +571,20 @@ function vapidKeyBytes(value) {
   return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
 }
 
+// Brave exposes itself through navigator.brave, which is the only reliable way
+// to tell it apart from Chrome for this purpose: it reports a Chrome user agent.
+// Cached because the check is async and the answer never changes mid-session.
+let braveBrowser = null;
+async function detectBraveBrowser() {
+  if (braveBrowser !== null) return braveBrowser;
+  try {
+    braveBrowser = Boolean(navigator.brave && await navigator.brave.isBrave());
+  } catch {
+    braveBrowser = false;
+  }
+  return braveBrowser;
+}
+
 async function enableBackgroundNotifications({quiet = false} = {}) {
   if (!wallet) throw new Error('Unlock the wallet before enabling background alerts.');
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !window.isSecureContext) {
@@ -594,10 +609,20 @@ async function enableBackgroundNotifications({quiet = false} = {}) {
     }
   }
   if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey,
-    });
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+    } catch (error) {
+      // The browser refuses to reach its own push service here, before any
+      // request reaches our notifier — the access log proves it never arrives.
+      // Say why, and what to change, instead of showing "push service error".
+      const advice = describeBackgroundNotificationError(error, {isBrave: await detectBraveBrowser()});
+      console.warn(`Background alert push registration failed [${advice.reason}] ${advice.detail}`);
+      if (advice.hint) elements.enableWalletNotifications.title = advice.hint;
+      throw new Error(advice.message);
+    }
   }
 
   const authorizationSeconds = Math.min(86400, Number(config.authorizationSeconds) || 86400);

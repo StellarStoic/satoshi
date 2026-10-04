@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   balanceTotal,
   classifyPaymentDestination,
+  describeBackgroundNotificationError,
   formatSats,
   notificationMovement,
   normalizeMnemonic,
@@ -49,4 +50,29 @@ test('detects credited movements from wallet notifications', () => {
   assert.equal(receivedMovementAmount({effectiveBalanceSats: -500}), 0);
   assert.equal(receivedMovementAmount({intendedBalanceSats: 500, effectiveBalanceSats: 0}), 0);
   assert.equal(notificationMovement({type: 'ChannelLagging'}), null);
+});
+
+test('names the exact Brave setting when Brave blocks the push service', () => {
+  const advice = describeBackgroundNotificationError(new Error('Registration failed - push service error'), {isBrave: true});
+  assert.equal(advice.reason, 'brave-push-disabled');
+  assert.match(advice.message, /Google services for push messaging/);
+  assert.match(advice.message, /brave:\/\/settings\/privacy/);
+  assert.match(advice.hint, /brave:\/\/settings\/privacy/);
+});
+
+test('keeps an actionable message for browsers without a reachable push service', () => {
+  const advice = describeBackgroundNotificationError(
+    Object.assign(new Error('Registration failed - push service error'), {name: 'AbortError'}),
+    {isBrave: false});
+  assert.equal(advice.reason, 'push-service-unreachable');
+  assert.doesNotMatch(advice.message, /brave:\/\/settings/);
+  assert.match(advice.message, /push service/);
+});
+
+test('does not misattribute unrelated failures to the push service or to Brave', () => {
+  const denied = describeBackgroundNotificationError(new Error('Notification permission was not granted.'), {isBrave: true});
+  assert.equal(denied.reason, 'other');
+  assert.equal(denied.message, 'Notification permission was not granted.');
+  assert.doesNotMatch(denied.message, /Google services/);
+  assert.equal(denied.hint, '');
 });
