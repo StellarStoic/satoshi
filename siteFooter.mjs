@@ -171,7 +171,7 @@ function renderBlock() {
   body.innerHTML = `
     <span class="footer-modal-kicker">Bitcoin network</span>
     <div class="mempool-title-row"><div><h2 id="mempoolModalTitle">Block ${Number(block.height).toLocaleString()}</h2><p>${formatAge(block.timestamp)}</p></div>
-      <div class="mempool-block-nav" aria-label="Browse recent blocks"><button type="button" data-newer aria-label="Newer block" ${state.blockIndex === 0 ? 'disabled' : ''}>‹</button><span>${state.blockIndex + 1}/${state.blocks.length}</span><button type="button" data-older aria-label="Older block" ${state.blockIndex >= state.blocks.length - 1 ? 'disabled' : ''}>›</button></div>
+      <div class="mempool-block-nav" aria-label="Browse recent blocks"><button type="button" data-older aria-label="Older block" ${state.blockIndex >= state.blocks.length - 1 ? 'disabled' : ''}>‹</button><span>${state.blockIndex + 1}/${state.blocks.length}</span><button type="button" data-newer aria-label="Newer block" ${state.blockIndex === 0 ? 'disabled' : ''}>›</button></div>
     </div>
     <div class="mempool-pool"><div class="pool-logo">${logo}</div><div><span>Mined by</span><strong>${escapeHtml(poolName)}</strong></div></div>
     <div class="mempool-metric-grid">

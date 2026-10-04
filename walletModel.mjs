@@ -64,7 +64,7 @@ export function describeBackgroundNotificationError(error, {isBrave = false} = {
     return {
       message: 'Brave blocks background alerts by default: it disables Google\'s push service, so the alert could not register. '
         + 'Open brave://settings/privacy and turn on "Use Google services for push messaging" (search the settings for "push"), '
-        + 'then reload this page and try again. Firefox, Safari and other Chromium browsers do not need that step.',
+        + 'then reload this page and try again.',
       hint: 'Brave: enable "Use Google services for push messaging" in brave://settings/privacy, then reload',
       reason: 'brave-push-disabled',
       detail: `${name}: ${raw}`,
@@ -73,8 +73,8 @@ export function describeBackgroundNotificationError(error, {isBrave = false} = {
 
   return {
     message: 'This browser could not reach its push service, so background alerts stayed off. '
-      + 'A content blocker, a DNS filter or a VPN that blocks the push provider causes this, and Brave ships with push disabled '
-      + `until it is enabled in its privacy settings. Alerts while the wallet is open are unaffected. (${name}: ${raw})`,
+      + 'Possible causes include a temporary push-provider outage, a content blocker, a DNS filter, a VPN, or browser or operating-system restrictions. '
+      + 'Alerts while the wallet is open are unaffected. Technical details were written to the browser console.',
     hint: 'This browser could not reach its push service',
     reason: 'push-service-unreachable',
     detail: `${name}: ${raw}`,

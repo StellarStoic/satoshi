@@ -67,6 +67,9 @@ test('keeps an actionable message for browsers without a reachable push service'
   assert.equal(advice.reason, 'push-service-unreachable');
   assert.doesNotMatch(advice.message, /brave:\/\/settings/);
   assert.match(advice.message, /push service/);
+  assert.match(advice.message, /Possible causes/);
+  assert.doesNotMatch(advice.message, /AbortError|Registration failed/);
+  assert.match(advice.detail, /AbortError/);
 });
 
 test('does not misattribute unrelated failures to the push service or to Brave', () => {
