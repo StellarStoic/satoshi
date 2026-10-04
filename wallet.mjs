@@ -5,9 +5,25 @@ import init, {
   validateArkAddress,
   validateMnemonic,
 } from './vendor/bark/bark_ffi_wasm.js';
-import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatErrorReport, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, notificationRenewalDue, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
+import {
+  balanceTotal,
+  bitcoinAddressMatchesNetwork,
+  classifyPaymentDestination,
+  describeBackgroundNotificationError,
+  formatErrorReport,
+  formatSats,
+  notificationMovement,
+  notificationLifetimeLabel,
+  notificationRenewalDue,
+  normalizeMnemonic,
+  parseBolt11AmountSats,
+  recommendedOnchainFeeRate,
+  receivedMovementAmount,
+  selectAuthorizationSeconds,
+} from './walletModel.mjs';
 import {englishWordlist} from './vendor/bip39.mjs';
 import {
+  AUTO_LOCK_KEY,
   LEGACY_WALLET_PROFILE_KEY,
   decryptWalletSecret,
   encryptWalletSecret,
@@ -39,8 +55,12 @@ const elements = Object.fromEntries([
   'openTermsInline', 'barkHelpDialog', 'backupDialog', 'backupForm', 'cancelBackup', 'mnemonicWords',
   'backupCheck', 'backupWordsStep', 'backupVerifyStep', 'startBackupVerification', 'spendableBalance', 'btcBalance', 'walletFingerprint', 'lastSync', 'syncWallet',
   'lockWallet', 'receiveView', 'sendView', 'activityView', 'arkReceivePanel', 'lightningReceivePanel', 'newArkAddress',
-  'invoiceAmount', 'invoiceDescription', 'sendForm',
+  'openWalletSettings', 'onchainBalance', 'onchainPending', 'moveView', 'onchainReceivePanel', 'newOnchainAddress',
+  'invoiceAmount', 'invoiceDescription', 'sendForm', 'onchainSendForm', 'onchainSendDestination', 'onchainSendAmount',
+  'onchainFeePriority', 'onchainFeeHint', 'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount',
   'sendDestination', 'sendAmount', 'destinationHint', 'walletHistory', 'confirmPaymentDialog',
+  'onchainHistory', 'walletSettingsDialog', 'walletAutoLockSetting', 'openRevealSeed', 'revealSeedDialog',
+  'revealSeedForm', 'revealSeedPassword', 'revealedMnemonicWords', 'cancelRevealSeed', 'closeRevealedSeed', 'confirmRevealSeed',
   'paymentSummary', 'confirmPayment',
   'arkRoundInterval', 'arkVtxoLifetime', 'arkExitDelay',
   'walletTermsAgreement', 'acceptWalletTerms', 'termsAccepted', 'termsAgreementLabel',
@@ -74,6 +94,7 @@ let inactivityTimer;
 let acceptedTerms;
 let activeNetwork = NETWORKS.signet;
 let pendingPasswordNetwork = '';
+let pendingPasswordShouldScan = false;
 let notificationHolder;
 let notificationGeneration = 0;
 let notificationRestartTimer;
@@ -419,9 +440,10 @@ function clearRestoreInputs() {
   elements.restoreWordsGrid.querySelectorAll('input').forEach(input => { input.value = ''; input.className = ''; });
 }
 
-function showPasswordSetup(mnemonic) {
+function showPasswordSetup(mnemonic, {scanOnchain = false} = {}) {
   pendingPasswordMnemonic = mnemonic;
   pendingPasswordNetwork = activeNetwork.id;
+  pendingPasswordShouldScan = scanOnchain;
   elements.passwordTitle.textContent = `Create a ${activeNetwork.shortLabel} wallet password`;
   pendingMnemonic = '';
   elements.newWalletPassword.value = '';
@@ -500,6 +522,34 @@ function renderHistory(movements) {
     time.textContent = Number.isNaN(date.valueOf()) ? '' : date.toLocaleString();
     item.append(title, amount, status, time);
     elements.walletHistory.append(item);
+  });
+}
+
+function renderOnchainHistory(transactions) {
+  elements.onchainHistory.replaceChildren();
+  if (!Array.isArray(transactions) || !transactions.length) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No on-chain activity yet.';
+    elements.onchainHistory.append(empty);
+    return;
+  }
+
+  transactions.slice().sort((a, b) => Number(b.confirmation?.height || 0) - Number(a.confirmation?.height || 0)).slice(0, 5).forEach(transaction => {
+    const item = document.createElement('article');
+    item.className = 'history-item';
+    const title = document.createElement('strong');
+    title.textContent = Number(transaction.balanceChangeSats) >= 0 ? 'Received on-chain' : 'Sent on-chain';
+    const amountValue = Number(transaction.balanceChangeSats) || 0;
+    const amount = document.createElement('strong');
+    amount.className = amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : '';
+    amount.textContent = `${amountValue > 0 ? '+' : ''}${formatSats(amountValue)}`;
+    const status = document.createElement('span');
+    status.textContent = transaction.confirmation ? `Confirmed in block ${Number(transaction.confirmation.height).toLocaleString()}` : 'Unconfirmed';
+    const reference = document.createElement('code');
+    reference.title = transaction.txid || '';
+    reference.textContent = transaction.txid ? `${transaction.txid.slice(0, 10)}...${transaction.txid.slice(-8)}` : '';
+    item.append(title, amount, status, reference);
+    elements.onchainHistory.append(item);
   });
 }
 
@@ -813,17 +863,25 @@ async function renderArkServerInfo() {
 }
 
 async function refreshWallet({announce = true, seedIncoming = false} = {}) {
-  if (!wallet || operationRunning) return;
+  if (!wallet || !onchain || operationRunning) return;
   setOperationState(true, 'Synchronizing Bark wallet...');
   try {
     await wallet.sync();
-    const [balance, history] = await Promise.all([wallet.balance(), wallet.history()]);
+    await onchain.sync();
+    const [balance, history, chainBalance, chainHistory] = await Promise.all([
+      wallet.balance(), wallet.history(), onchain.balance(), onchain.transactions(),
+    ]);
     const spendable = Number(balance.spendableSats) || 0;
     const total = balanceTotal(balance);
+    const confirmedOnchain = Number(chainBalance.confirmedSats) || 0;
+    const pendingOnchain = Number(chainBalance.pendingSats) || 0;
     elements.spendableBalance.textContent = formatSats(spendable);
     elements.btcBalance.textContent = `${(spendable / 100_000_000).toFixed(8)} BTC`;
+    elements.onchainBalance.textContent = formatSats(confirmedOnchain);
+    elements.onchainPending.textContent = pendingOnchain ? `${formatSats(pendingOnchain)} pending` : 'No pending funds';
     elements.lastSync.textContent = `Synced ${new Date().toLocaleTimeString()}`;
     renderHistory(history);
+    renderOnchainHistory(chainHistory);
     if (seedIncoming) rememberExistingIncoming(history);
     if (announce) {
       const pending = total - spendable;
@@ -840,6 +898,8 @@ async function refreshWallet({announce = true, seedIncoming = false} = {}) {
 async function disposeWallet({announce = true, message = `${activeNetwork.shortLabel} wallet locked. Enter its password to reopen it.`} = {}) {
   clearTimeout(inactivityTimer);
   stopWalletNotifications();
+  if (elements.revealSeedDialog.open) closeDialog(elements.revealSeedDialog);
+  clearRevealedSeed();
   const oldWallet = wallet;
   const oldOnchain = onchain;
   wallet = undefined;
@@ -854,6 +914,14 @@ async function disposeWallet({announce = true, message = `${activeNetwork.shortL
   clearRestoreInputs();
   elements.sendDestination.value = '';
   elements.sendAmount.value = '';
+  elements.onchainSendDestination.value = '';
+  elements.onchainSendAmount.value = '';
+  elements.boardAmount.value = '';
+  elements.offboardAmount.value = '';
+  elements.spendableBalance.textContent = '0 sats';
+  elements.btcBalance.textContent = '0 BTC';
+  elements.onchainBalance.textContent = '0 sats';
+  elements.onchainPending.textContent = 'No pending funds';
   elements.receivePaymentQr.replaceChildren();
   elements.walletDashboard.hidden = true;
   elements.walletOnboarding.hidden = false;
@@ -861,7 +929,7 @@ async function disposeWallet({announce = true, message = `${activeNetwork.shortL
   if (announce || message) setNotice(message, 'success');
 }
 
-async function openWalletWithMnemonic(mnemonic, {passwordToSave = ''} = {}) {
+async function openWalletWithMnemonic(mnemonic, {passwordToSave = '', scanOnchain = false} = {}) {
   const openingNetwork = activeNetwork;
   const config = networkConfig(openingNetwork);
   setOperationState(true, `Opening the ${openingNetwork.shortLabel} wallet and scanning for recoverable funds...`);
@@ -871,14 +939,13 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = ''} = {}) {
     await ensureSdk();
     const normalized = normalizeMnemonic(mnemonic);
     if (!validateMnemonic(normalized)) throw new Error('The recovery phrase is not a valid BIP39 mnemonic.');
-    if (passwordToSave) {
-      const profile = await encryptWalletSecret(normalized, passwordToSave, {network: openingNetwork.id});
-      localStorage.setItem(walletProfileKey(openingNetwork.id), JSON.stringify(profile));
-      updateNetworkProfileStatuses();
-    }
     await checkChainSource(openingNetwork);
     const names = await walletDatabaseNames(normalized, openingNetwork);
     localOnchain = await OnchainWallet.default({network: openingNetwork.sdkName, mnemonic: normalized, config, dbName: names.chain});
+    if (scanOnchain) {
+      setNotice('Scanning past addresses for restored on-chain bitcoin...');
+      await localOnchain.initialScan();
+    }
     localWallet = await Wallet.openWithOnchain(openingNetwork.sdkName, normalized, config, localOnchain, {
       runDaemon: true,
       indexedDbName: names.ark,
@@ -886,11 +953,17 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = ''} = {}) {
       createWithoutServer: false,
       skipRecovery: false,
     });
+    if (passwordToSave) {
+      const profile = await encryptWalletSecret(normalized, passwordToSave, {network: openingNetwork.id});
+      localStorage.setItem(walletProfileKey(openingNetwork.id), JSON.stringify(profile));
+      updateNetworkProfileStatuses();
+    }
     wallet = localWallet;
     onchain = localOnchain;
     pendingMnemonic = '';
     pendingPasswordMnemonic = '';
     pendingPasswordNetwork = '';
+    pendingPasswordShouldScan = false;
     clearRestoreInputs();
     elements.walletFingerprint.textContent = `Wallet ${wallet.fingerprint()}`;
     elements.walletOnboarding.hidden = true;
@@ -907,6 +980,7 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = ''} = {}) {
     pendingMnemonic = '';
     pendingPasswordMnemonic = '';
     pendingPasswordNetwork = '';
+    pendingPasswordShouldScan = false;
     updateEntryState();
     setNotice(`Wallet could not open: ${errorMessage(error)}`, 'error');
     return;
@@ -918,9 +992,9 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = ''} = {}) {
   void renewBackgroundNotifications();
 }
 
-function renderMnemonicWords(mnemonic) {
+function renderMnemonicInto(container, mnemonic) {
   const words = mnemonic.split(' ');
-  elements.mnemonicWords.replaceChildren(...words.map((word, index) => {
+  container.replaceChildren(...words.map((word, index) => {
     const item = document.createElement('li');
     const position = document.createElement('span');
     position.className = 'mnemonic-position';
@@ -930,6 +1004,10 @@ function renderMnemonicWords(mnemonic) {
     item.append(position, value);
     return item;
   }));
+}
+
+function renderMnemonicWords(mnemonic) {
+  renderMnemonicInto(elements.mnemonicWords, mnemonic);
 }
 
 function shuffledWordPositions(length) {
@@ -972,7 +1050,15 @@ function createBackupChallenge(mnemonic) {
 }
 
 function destinationTypeLabel(type) {
-  return ({ark: 'Ark payment', 'lightning-invoice': 'Lightning invoice', 'lightning-address': 'Lightning Address', 'on-chain': 'Bitcoin on-chain payment'})[type] || 'Unknown destination';
+  return ({
+    ark: 'Ark payment',
+    'lightning-invoice': 'Lightning invoice',
+    'lightning-address': 'Lightning Address',
+    'on-chain': 'Bitcoin on-chain payment from Ark',
+    'native-onchain': 'Bitcoin on-chain payment',
+    board: 'Move on-chain bitcoin to Ark',
+    'offboard-self': 'Move Ark bitcoin on-chain',
+  })[type] || 'Unknown destination';
 }
 
 function updateDestinationHint() {
@@ -997,9 +1083,16 @@ function updateDestinationHint() {
 }
 
 function renderPaymentSummary(payment) {
+  elements.confirmPaymentTitle.textContent = payment.source === 'move'
+    ? 'Confirm balance move'
+    : activeNetwork.id === 'mainnet' ? 'Confirm real bitcoin payment' : 'Confirm Signet test payment';
+  elements.confirmPayment.textContent = payment.source === 'move' ? 'Confirm move' : 'Send bitcoin';
   const list = document.createElement('dl');
   list.className = 'payment-summary-list';
-  [['Method', destinationTypeLabel(payment.type)], ['Amount', formatSats(payment.amount, {fractional: true})], ['Estimated fee', formatSats(payment.fee)], ['Destination', payment.destination]]
+  const feeDetail = payment.feeRate
+    ? ['Fee rate', `${payment.feeRate} sat/vB`]
+    : ['Estimated fee', formatSats(payment.fee)];
+  [['Method', destinationTypeLabel(payment.type)], ['Amount', formatSats(payment.amount, {fractional: true})], feeDetail, ['Destination', payment.destination]]
     .forEach(([term, value]) => {
       const dt = document.createElement('dt');
       const dd = document.createElement('dd');
@@ -1019,6 +1112,9 @@ async function estimatePayment(destination, type, amount) {
 }
 
 async function executePayment(payment) {
+  if (payment.type === 'native-onchain') return onchain.send(payment.destination, payment.amount, payment.feeRate);
+  if (payment.type === 'board') return wallet.boardAmount(payment.amount);
+  if (payment.type === 'offboard-self') return wallet.sendOnchain(payment.destination, payment.amount);
   if (payment.type === 'ark') return wallet.sendArkoorPayment(payment.destination, payment.amount);
   if (payment.type === 'lightning-invoice') {
     const args = {invoice: payment.destination, wait: true};
@@ -1033,6 +1129,60 @@ async function executePayment(payment) {
 
 elements.openBarkInfo.addEventListener('click', () => showDialog(elements.barkHelpDialog));
 elements.openTermsInline.addEventListener('click', () => showDialog(elements.barkHelpDialog));
+elements.openWalletSettings.addEventListener('click', () => {
+  elements.walletAutoLockSetting.value = String(readAutoLockMinutes());
+  showDialog(elements.walletSettingsDialog);
+});
+elements.walletAutoLockSetting.addEventListener('change', () => {
+  try {
+    localStorage.setItem(AUTO_LOCK_KEY, elements.walletAutoLockSetting.value);
+  } catch {
+    setNotice('The lock setting could not be saved in this browser.', 'error');
+    return;
+  }
+  resetInactivityTimer();
+  setNotice(elements.walletAutoLockSetting.value === '0' ? 'Automatic wallet locking is off.' : `Wallet will lock after ${elements.walletAutoLockSetting.selectedOptions[0].textContent.toLowerCase()} of inactivity.`, 'success');
+});
+
+function clearRevealedSeed() {
+  elements.revealSeedPassword.value = '';
+  elements.revealedMnemonicWords.replaceChildren();
+  elements.revealedMnemonicWords.hidden = true;
+  elements.confirmRevealSeed.hidden = false;
+  elements.closeRevealedSeed.textContent = 'Cancel';
+}
+
+elements.openRevealSeed.addEventListener('click', () => {
+  const profile = readWalletProfile();
+  if (!profile) return setNotice('No encrypted wallet profile is saved for this network.', 'error');
+  closeDialog(elements.walletSettingsDialog);
+  clearRevealedSeed();
+  showDialog(elements.revealSeedDialog);
+  elements.revealSeedPassword.focus();
+});
+elements.cancelRevealSeed.addEventListener('click', () => closeDialog(elements.revealSeedDialog));
+elements.closeRevealedSeed.addEventListener('click', () => closeDialog(elements.revealSeedDialog));
+elements.revealSeedDialog.addEventListener('close', clearRevealedSeed);
+elements.revealSeedForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const profile = readWalletProfile();
+  if (!profile) return setNotice('No encrypted wallet profile is saved for this network.', 'error');
+  elements.confirmRevealSeed.disabled = true;
+  try {
+    const mnemonic = await decryptWalletSecret(profile, elements.revealSeedPassword.value, {network: activeNetwork.id});
+    elements.revealSeedPassword.value = '';
+    renderMnemonicInto(elements.revealedMnemonicWords, mnemonic);
+    elements.revealedMnemonicWords.hidden = false;
+    elements.confirmRevealSeed.hidden = true;
+    elements.closeRevealedSeed.textContent = 'Hide words';
+    setNotice('Recovery words revealed. Hide them as soon as your backup is complete.');
+  } catch (error) {
+    elements.revealSeedPassword.value = '';
+    setNotice(errorMessage(error), 'error');
+  } finally {
+    elements.confirmRevealSeed.disabled = false;
+  }
+});
 elements.openNetworkDialog.addEventListener('click', openNetworkSelection);
 elements.closeNetworkDialog.addEventListener('click', () => closeDialog(elements.networkDialog));
 elements.networkDialog.addEventListener('cancel', event => {
@@ -1174,7 +1324,7 @@ elements.restoreForm.addEventListener('submit', async event => {
     setNotice('These words do not form a valid BIP39 recovery phrase. Check every word and its position.', 'error');
     return;
   }
-  showPasswordSetup(mnemonic);
+  showPasswordSetup(mnemonic, {scanOnchain: true});
 });
 
 elements.passwordForm.addEventListener('submit', async event => {
@@ -1185,15 +1335,17 @@ elements.passwordForm.addEventListener('submit', async event => {
   if (password !== elements.confirmWalletPassword.value) return setNotice('The two wallet passwords do not match.', 'error');
   if (pendingPasswordNetwork !== activeNetwork.id) return setNotice('The selected network changed. Start wallet setup again.', 'error');
   const mnemonic = pendingPasswordMnemonic;
+  const scanOnchain = pendingPasswordShouldScan;
   closeDialog(elements.passwordDialog);
   elements.newWalletPassword.value = '';
   elements.confirmWalletPassword.value = '';
-  await openWalletWithMnemonic(mnemonic, {passwordToSave: password});
+  await openWalletWithMnemonic(mnemonic, {passwordToSave: password, scanOnchain});
 });
 
 elements.cancelPasswordSetup.addEventListener('click', () => {
   pendingPasswordMnemonic = '';
   pendingPasswordNetwork = '';
+  pendingPasswordShouldScan = false;
   elements.newWalletPassword.value = '';
   elements.confirmWalletPassword.value = '';
   closeDialog(elements.passwordDialog);
@@ -1226,6 +1378,7 @@ document.querySelectorAll('[data-wallet-view]').forEach(button => button.addEven
   const view = button.dataset.walletView;
   elements.receiveView.hidden = view !== 'receive';
   elements.sendView.hidden = view !== 'send';
+  elements.moveView.hidden = view !== 'move';
   elements.activityView.hidden = view !== 'activity';
   document.querySelectorAll('[data-wallet-view]').forEach(candidate => candidate.classList.toggle('active', candidate === button));
 }));
@@ -1234,7 +1387,29 @@ document.querySelectorAll('[data-receive-mode]').forEach(button => button.addEve
   const mode = button.dataset.receiveMode;
   elements.arkReceivePanel.hidden = mode !== 'ark';
   elements.lightningReceivePanel.hidden = mode !== 'lightning';
+  elements.onchainReceivePanel.hidden = mode !== 'onchain';
   document.querySelectorAll('[data-receive-mode]').forEach(candidate => {
+    const selected = candidate === button;
+    candidate.classList.toggle('active', selected);
+    candidate.setAttribute('aria-selected', String(selected));
+  });
+}));
+
+document.querySelectorAll('[data-send-source]').forEach(button => button.addEventListener('click', () => {
+  const source = button.dataset.sendSource;
+  document.querySelectorAll('[data-send-panel]').forEach(panel => { panel.hidden = panel.dataset.sendPanel !== source; });
+  document.querySelectorAll('[data-send-source]').forEach(candidate => {
+    const selected = candidate === button;
+    candidate.classList.toggle('active', selected);
+    candidate.setAttribute('aria-selected', String(selected));
+  });
+}));
+
+document.querySelectorAll('[data-history-mode]').forEach(button => button.addEventListener('click', () => {
+  const mode = button.dataset.historyMode;
+  elements.walletHistory.hidden = mode !== 'ark';
+  elements.onchainHistory.hidden = mode !== 'onchain';
+  document.querySelectorAll('[data-history-mode]').forEach(candidate => {
     const selected = candidate === button;
     candidate.classList.toggle('active', selected);
     candidate.setAttribute('aria-selected', String(selected));
@@ -1255,6 +1430,25 @@ elements.newArkAddress.addEventListener('click', async () => {
     setNotice('Fresh Ark address ready.', 'success');
   } catch (error) {
     setNotice(`Could not generate an Ark address: ${errorMessage(error)}`, 'error');
+  } finally {
+    setOperationState(false);
+  }
+});
+
+elements.newOnchainAddress.addEventListener('click', async () => {
+  if (!onchain || operationRunning) return;
+  setOperationState(true, 'Generating a fresh Bitcoin address...');
+  try {
+    const address = await onchain.newAddress();
+    showReceivePayment({
+      title: 'Bitcoin receive address',
+      method: 'On-chain Bitcoin',
+      value: address,
+      details: {Network: activeNetwork.label, Amount: 'Any amount'},
+    });
+    setNotice('Fresh on-chain address ready.', 'success');
+  } catch (error) {
+    setNotice(`Could not generate a Bitcoin address: ${errorMessage(error)}`, 'error');
   } finally {
     setOperationState(false);
   }
@@ -1318,12 +1512,89 @@ elements.sendForm.addEventListener('submit', async event => {
     const [estimate, balance] = await Promise.all([estimatePayment(destination, type, amount), wallet.balance()]);
     const fee = Number(estimate.feeSats) || 0;
     if ((Number(balance.spendableSats) || 0) < amount + fee) throw new Error('The spendable balance is lower than the amount plus estimated fee.');
-    pendingPayment = {destination, type, amount, fee};
+    pendingPayment = {source: 'ark', destination, type, amount, fee};
     renderPaymentSummary(pendingPayment);
     showDialog(elements.confirmPaymentDialog);
     setNotice('Review the irreversible payment before confirming.');
   } catch (error) {
     setNotice(`Payment review failed: ${errorMessage(error)}`, 'error');
+  } finally {
+    setOperationState(false);
+  }
+});
+
+elements.onchainSendForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!onchain || operationRunning) return;
+  const destination = elements.onchainSendDestination.value.trim();
+  const amount = Number(elements.onchainSendAmount.value);
+  if (!bitcoinAddressMatchesNetwork(destination, activeNetwork.id)) {
+    setNotice(`Enter a valid-looking ${activeNetwork.shortLabel} Bitcoin address.`, 'error');
+    return;
+  }
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    setNotice('The payment amount must be a positive whole number of satoshis.', 'error');
+    return;
+  }
+  setOperationState(true, 'Checking on-chain funds and the current fee rate...');
+  try {
+    await onchain.sync();
+    const [balance, rates] = await Promise.all([onchain.balance(), onchain.feeRates()]);
+    const feeRate = recommendedOnchainFeeRate(rates, elements.onchainFeePriority.value);
+    if ((Number(balance.confirmedSats) || 0) <= amount) throw new Error('Confirmed on-chain funds must cover the amount and its mining fee.');
+    elements.onchainFeeHint.textContent = `${feeRate} sat/vB selected from the current ${elements.onchainFeePriority.selectedOptions[0].textContent.toLowerCase()} estimate.`;
+    pendingPayment = {source: 'onchain', destination, type: 'native-onchain', amount, feeRate};
+    renderPaymentSummary(pendingPayment);
+    showDialog(elements.confirmPaymentDialog);
+    setNotice('Review the irreversible on-chain payment before confirming.');
+  } catch (error) {
+    setNotice(`Payment review failed: ${errorMessage(error)}`, 'error');
+  } finally {
+    setOperationState(false);
+  }
+});
+
+elements.boardForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!wallet || !onchain || operationRunning) return;
+  const amount = Number(elements.boardAmount.value);
+  if (!Number.isSafeInteger(amount) || amount <= 0) return setNotice('Enter a positive whole-satoshi amount to move.', 'error');
+  setOperationState(true, 'Estimating the move into Ark...');
+  try {
+    await wallet.sync();
+    await onchain.sync();
+    const [balance, estimate] = await Promise.all([onchain.balance(), wallet.estimateBoardFee(amount)]);
+    const fee = Number(estimate.feeSats) || 0;
+    const required = Number(estimate.grossAmountSats) || amount + fee;
+    if ((Number(balance.confirmedSats) || 0) < required) throw new Error('Confirmed on-chain funds are lower than the amount plus estimated fee.');
+    pendingPayment = {source: 'move', type: 'board', amount, fee, destination: 'Your Ark balance'};
+    renderPaymentSummary(pendingPayment);
+    showDialog(elements.confirmPaymentDialog);
+  } catch (error) {
+    setNotice(`Move review failed: ${errorMessage(error)}`, 'error');
+  } finally {
+    setOperationState(false);
+  }
+});
+
+elements.offboardForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!wallet || !onchain || operationRunning) return;
+  const amount = Number(elements.offboardAmount.value);
+  if (!Number.isSafeInteger(amount) || amount <= 0) return setNotice('Enter a positive whole-satoshi amount to move.', 'error');
+  setOperationState(true, 'Estimating the move back on-chain...');
+  try {
+    await wallet.sync();
+    const destination = await onchain.newAddress();
+    const [balance, estimate] = await Promise.all([wallet.balance(), wallet.estimateSendOnchainFee(destination, amount)]);
+    const fee = Number(estimate.feeSats) || 0;
+    const required = Number(estimate.grossAmountSats) || amount + fee;
+    if ((Number(balance.spendableSats) || 0) < required) throw new Error('The Ark balance is lower than the amount plus estimated fee.');
+    pendingPayment = {source: 'move', type: 'offboard-self', amount, fee, destination};
+    renderPaymentSummary(pendingPayment);
+    showDialog(elements.confirmPaymentDialog);
+  } catch (error) {
+    setNotice(`Move review failed: ${errorMessage(error)}`, 'error');
   } finally {
     setOperationState(false);
   }
@@ -1337,8 +1608,14 @@ elements.confirmPayment.addEventListener('click', async () => {
   setOperationState(true, activeNetwork.id === 'mainnet' ? 'Sending real bitcoin...' : 'Sending Signet test bitcoin...');
   try {
     const result = await executePayment(payment);
-    elements.sendForm.reset();
-    updateDestinationHint();
+    if (payment.source === 'onchain') elements.onchainSendForm.reset();
+    else if (payment.source === 'move') {
+      elements.boardForm.reset();
+      elements.offboardForm.reset();
+    } else {
+      elements.sendForm.reset();
+      updateDestinationHint();
+    }
     const txid = typeof result === 'string' ? ` Transaction: ${result}` : '';
     setNotice(`Payment submitted.${txid}`, 'success');
   } catch (error) {

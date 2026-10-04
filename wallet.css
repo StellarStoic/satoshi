@@ -16,6 +16,22 @@ body.bark-wallet-page {
   padding-bottom: calc(42px + env(safe-area-inset-bottom));
 }
 
+.wallet-settings-trigger {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  color: #929797;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wallet-settings-trigger:hover,
+.wallet-settings-trigger:focus-visible { color: var(--wallet-orange); outline: 0; }
+.wallet-settings-trigger svg { width: 21px; height: 21px; }
+
 .wallet-shell {
   width: min(1060px, calc(100% - 32px));
   margin: 0 auto;
@@ -294,6 +310,18 @@ button:disabled {
   background: linear-gradient(105deg, rgba(242, 169, 0, 0.12), transparent 55%);
 }
 
+.wallet-balances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 1 1 auto;
+  gap: 26px;
+}
+
+.wallet-balances > div + div {
+  padding-left: 26px;
+  border-left: 1px solid var(--wallet-line);
+}
+
 .balance-band span,
 .balance-band small {
   display: block;
@@ -459,6 +487,13 @@ button:disabled {
   border: 1px solid var(--wallet-line);
 }
 
+.receive-modes:not(.send-source-modes):not(.activity-modes) {
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+}
+
+.send-source-modes,
+.activity-modes { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
+
 .receive-modes button {
   border: 0;
   border-radius: 0;
@@ -475,6 +510,48 @@ button:disabled {
 .send-form {
   max-width: 720px;
 }
+
+.send-form select,
+.wallet-setting-row select,
+.reveal-seed-dialog input {
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid var(--wallet-line);
+  border-radius: 8px;
+  outline: 0;
+  color: #f4f5f2;
+  background: #0c0e0f;
+  font: 600 .78rem/1.3 "Roboto Mono", monospace;
+}
+
+.wallet-move-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.wallet-move-grid .send-form {
+  align-content: start;
+  padding: 20px;
+  border: 1px solid var(--wallet-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.wallet-move-grid h3 { margin: 0; font-size: 1rem; }
+.wallet-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--wallet-line);
+}
+.wallet-setting-row:last-child { border-bottom: 0; }
+.wallet-setting-row > span { display: grid; gap: 4px; }
+.wallet-setting-row small { color: var(--wallet-muted); line-height: 1.4; }
+.reveal-seed-dialog label { display: grid; gap: 8px; color: #dfe1df; font-size: .76rem; font-weight: 700; }
 
 .wallet-qr {
   display: grid;
@@ -1015,7 +1092,7 @@ button:disabled {
 .receive-modes,
 .receive-modes button { border-radius: 11px; }
 
-.wallet-actions { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.wallet-actions { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .wallet-actions button:first-child { border-radius: 0 0 0 10px; }
 .wallet-actions button:last-child { border-radius: 0 0 10px 0; }
 
@@ -1162,6 +1239,10 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
   .wallet-live-channel { grid-template-columns: auto minmax(0, 1fr); }
   .wallet-live-channel .wallet-quiet { grid-column: 2; justify-self: start; }
   .wallet-payment-toast { right: 12px; bottom: calc(58px + env(safe-area-inset-bottom)); }
+  .wallet-balances { width: 100%; gap: 14px; }
+  .wallet-balances > div + div { padding-left: 14px; }
+  .wallet-balances strong { font-size: clamp(1.25rem, 6vw, 2rem); }
+  .wallet-move-grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1172,6 +1253,8 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
 @media (max-width: 420px) {
   .wallet-actions button { min-height: 52px; padding-inline: 3px; }
   .wallet-actions svg { width: 15px; height: 15px; }
+  .wallet-actions span { font-size: .56rem; }
+  .wallet-setting-row { align-items: stretch; flex-direction: column; }
 }
 
 /* Lifetime picker in the notification consent dialog: the options sit in one row

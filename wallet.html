@@ -27,6 +27,7 @@
   <button type="button" class="info-modal-trigger" id="openBarkInfo" aria-label="About the Bark wallet" title="About the Bark wallet">
     <i class="lni lni-question-mark-circle" aria-hidden="true"></i>
   </button>
+  <button type="button" class="wallet-settings-trigger" id="openWalletSettings" aria-label="Wallet settings" title="Wallet settings"><i data-lucide="settings" aria-hidden="true"></i></button>
 
   <main class="wallet-shell">
     <header class="wallet-heading">
@@ -65,13 +66,17 @@
 
     <section class="wallet-dashboard" id="walletDashboard" hidden>
       <div class="balance-band">
-        <div><span>Spendable balance</span><strong id="spendableBalance">0 sats</strong><small id="btcBalance">0 BTC</small></div>
+        <div class="wallet-balances">
+          <div><span>Ark balance</span><strong id="spendableBalance">0 sats</strong><small id="btcBalance">0 BTC</small></div>
+          <div><span>On-chain balance</span><strong id="onchainBalance">0 sats</strong><small id="onchainPending">No pending funds</small></div>
+        </div>
         <div class="wallet-state"><span id="walletFingerprint">Wallet ----</span><small id="lastSync">Not synchronized</small></div>
       </div>
 
       <nav class="wallet-actions" aria-label="Wallet actions">
         <button type="button" data-wallet-view="receive" class="active"><i data-lucide="arrow-down-to-line"></i><span>Receive</span></button>
         <button type="button" data-wallet-view="send"><i data-lucide="arrow-up-from-line"></i><span>Send</span></button>
+        <button type="button" data-wallet-view="move"><i data-lucide="arrow-left-right"></i><span>Move</span></button>
         <button type="button" data-wallet-view="activity"><i data-lucide="list-clock"></i><span>Activity</span></button>
         <button type="button" id="syncWallet"><i data-lucide="refresh-cw"></i><span>Sync</span></button>
         <button type="button" id="lockWallet"><i data-lucide="lock-keyhole"></i><span>Lock</span></button>
@@ -84,11 +89,12 @@
       </div>
 
       <section class="wallet-view" id="receiveView" aria-labelledby="receiveTitle">
-        <div class="view-heading"><span class="section-index">02</span><div><h2 id="receiveTitle">Receive bitcoin</h2><p>Use an Ark address for direct Ark payments, or create a Lightning invoice.</p></div></div>
+        <div class="view-heading"><span class="section-index">02</span><div><h2 id="receiveTitle">Receive bitcoin</h2><p>Receive through Ark, Lightning, or directly on the Bitcoin blockchain.</p></div></div>
         <div class="signet-faucet" id="signetFaucet"><div><strong>Need free Signet sats?</strong><span>Generate an Ark address below, then fund it from Second's test faucet.</span></div><a href="https://signet.2nd.dev/" target="_blank" rel="noopener noreferrer">Open faucet <i data-lucide="external-link"></i></a></div>
         <div class="receive-modes" role="tablist" aria-label="Receive method">
           <button type="button" class="active" data-receive-mode="ark" role="tab" aria-selected="true">Ark</button>
           <button type="button" data-receive-mode="lightning" role="tab" aria-selected="false">Lightning</button>
+          <button type="button" data-receive-mode="onchain" role="tab" aria-selected="false">On-chain</button>
         </div>
         <div class="receive-panel" id="arkReceivePanel">
           <p>Generate a fresh Ark address. Its QR code and full payment details open separately.</p>
@@ -98,22 +104,48 @@
           <div class="input-pair"><label>Amount<input id="invoiceAmount" type="number" min="1" step="1" inputmode="numeric" required><span>sats</span></label><label>Description<input id="invoiceDescription" type="text" maxlength="120" placeholder="Optional"></label></div>
           <button type="submit" class="wallet-primary"><i data-lucide="zap"></i>Create Lightning invoice</button>
         </form>
+        <div class="receive-panel" id="onchainReceivePanel" hidden>
+          <p>Generate a fresh address for ordinary on-chain bitcoin. Funds received here remain separate from your Ark balance until you move them to Ark.</p>
+          <div class="form-actions"><button type="button" class="wallet-primary" id="newOnchainAddress"><i data-lucide="qr-code"></i>Generate Bitcoin address</button></div>
+        </div>
       </section>
 
       <section class="wallet-view" id="sendView" aria-labelledby="sendTitle" hidden>
-        <div class="view-heading"><span class="section-index">03</span><div><h2 id="sendTitle">Send bitcoin</h2><p>Pay an Ark address, Lightning invoice, Lightning address, or Bitcoin address from your Ark balance.</p></div></div>
-        <form id="sendForm" class="send-form">
+        <div class="view-heading"><span class="section-index">03</span><div><h2 id="sendTitle">Send bitcoin</h2><p>Choose which balance pays the transaction.</p></div></div>
+        <div class="receive-modes send-source-modes" role="tablist" aria-label="Spend from">
+          <button type="button" class="active" data-send-source="ark" role="tab" aria-selected="true">Ark balance</button>
+          <button type="button" data-send-source="onchain" role="tab" aria-selected="false">On-chain balance</button>
+        </div>
+        <form id="sendForm" class="send-form" data-send-panel="ark">
           <label for="sendDestination">Destination</label>
           <textarea id="sendDestination" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Ark address, Lightning invoice, name@domain, or Bitcoin address" required></textarea>
           <label class="send-amount" for="sendAmount">Amount<input id="sendAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="Read from invoice when included"><span>sats</span></label>
           <p id="destinationHint">Destination type will appear here.</p>
           <button type="submit" class="wallet-primary"><i data-lucide="scan-search"></i>Review payment</button>
         </form>
+        <form id="onchainSendForm" class="send-form" data-send-panel="onchain" hidden>
+          <label for="onchainSendDestination">Bitcoin address</label>
+          <textarea id="onchainSendDestination" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Bitcoin address" required></textarea>
+          <label class="send-amount" for="onchainSendAmount">Amount<input id="onchainSendAmount" type="number" min="1" step="1" inputmode="numeric" required><span>sats</span></label>
+          <label for="onchainFeePriority">Fee priority<select id="onchainFeePriority"><option value="regular">Normal</option><option value="fast">Fast</option><option value="slow">Economy</option></select></label>
+          <p id="onchainFeeHint">The current fee rate is checked before confirmation.</p>
+          <button type="submit" class="wallet-primary"><i data-lucide="scan-search"></i>Review on-chain payment</button>
+        </form>
+      </section>
+
+      <section class="wallet-view" id="moveView" aria-labelledby="moveTitle" hidden>
+        <div class="view-heading"><span class="section-index">04</span><div><h2 id="moveTitle">Move between balances</h2><p>Board confirmed on-chain bitcoin into Ark, or move Ark bitcoin back to your own on-chain wallet.</p></div></div>
+        <div class="wallet-move-grid">
+          <form id="boardForm" class="send-form"><h3>Move to Ark</h3><p>Spends confirmed on-chain funds and creates Ark VTXOs after confirmation.</p><label class="send-amount" for="boardAmount">Amount<input id="boardAmount" type="number" min="1" step="1" inputmode="numeric" required><span>sats</span></label><button type="submit" class="wallet-primary">Review move to Ark</button></form>
+          <form id="offboardForm" class="send-form"><h3>Move on-chain</h3><p>Sends from the Ark balance to a fresh address owned by this wallet.</p><label class="send-amount" for="offboardAmount">Amount<input id="offboardAmount" type="number" min="1" step="1" inputmode="numeric" required><span>sats</span></label><button type="submit" class="wallet-secondary">Review move on-chain</button></form>
+        </div>
       </section>
 
       <section class="wallet-view wallet-history" id="activityView" aria-labelledby="historyTitle" hidden>
-        <div class="view-heading compact"><span class="section-index">04</span><div><h2 id="historyTitle">Activity</h2><p>Recent Bark wallet movements stored by the local wallet engine.</p></div></div>
+        <div class="view-heading compact"><span class="section-index">05</span><div><h2 id="historyTitle">Activity</h2><p>Recent Ark and on-chain wallet activity stored by the local wallet engine.</p></div></div>
+        <div class="receive-modes activity-modes" role="tablist" aria-label="Activity type"><button type="button" class="active" data-history-mode="ark" role="tab" aria-selected="true">Ark</button><button type="button" data-history-mode="onchain" role="tab" aria-selected="false">On-chain</button></div>
         <div id="walletHistory" class="history-list"><p>No wallet activity yet.</p></div>
+        <div id="onchainHistory" class="history-list" hidden><p>No on-chain activity yet.</p></div>
       </section>
     </section>
   </main>
@@ -138,7 +170,7 @@
       <div class="bark-dialog-body">
         <section class="terms-first"><h3>Short terms of service</h3><p>This is an experimental Bitcoin Layer 2 wallet with separate Signet and mainnet modes. Signet coins have no monetary value. Mainnet uses real bitcoin: use only an amount you can afford to lose. Satoshi.si does not receive, custody, control, insure, or recover funds. You are responsible for your recovery phrase, device, payments, taxes, legal compliance, and any loss caused by misuse, software defects, browser storage loss, an unavailable provider, or protocol failure.</p><p>The wallet depends on Second's Ark server and chain-data service. VTXOs expire and must be refreshed, spent, or exited in time. IndexedDB can be erased by the browser and is not a backup. With compatible Bark software, phrase recovery can restore spendable VTXOs that the selected server's mailbox still knows about. It does not restore payment history or provide a reliable way to resume an unfinished exit. This interface does not currently expose Bark's unilateral-exit workflow.</p><label class="terms-agreement" id="termsAgreementLabel"><input type="checkbox" id="walletTermsAgreement"><span>I have read and agree to these terms.</span></label><button type="button" class="wallet-primary" id="acceptWalletTerms" disabled>Agree and continue</button><p class="terms-accepted" id="termsAccepted" hidden></p></section>
 
-        <section class="bark-simple"><h3>Ark is the protocol. Bark is the wallet.</h3><p><strong>Ark</strong> is a Bitcoin Layer 2 protocol. <strong>Bark</strong> is Second's open-source implementation running locally on this page. There is no Bark coin or wrapped token: the balance is bitcoin represented by VTXOs, and Bitcoin's blockchain is the final settlement layer.</p><div class="protocol-flow" aria-label="How an Ark payment works"><span>Bitcoin UTXO</span><i data-lucide="arrow-right"></i><span>Shared transaction tree</span><i data-lucide="arrow-right"></i><span>Your VTXO</span></div><p>A VTXO is a virtual transaction output: a claim in a tree of pre-signed Bitcoin transactions. Many users share one on-chain UTXO, so ordinary payments can be fast and the on-chain cost can be shared.</p></section>
+        <section class="bark-simple"><h3>Ark is the protocol. Bark is the wallet.</h3><p><strong>Ark</strong> is a Bitcoin Layer 2 protocol. <strong>Bark</strong> is Second's open-source implementation running locally on this page. There is no Bark coin or wrapped token: the balance is bitcoin represented by VTXOs, and Bitcoin's blockchain is the final settlement layer.</p><div class="protocol-flow" aria-label="How an Ark payment works"><span>Bitcoin UTXO</span><i data-lucide="arrow-right"></i><span>Shared transaction tree</span><i data-lucide="arrow-right"></i><span>Your VTXO</span></div><p>A VTXO is a virtual transaction output: a claim in a tree of pre-signed Bitcoin transactions. Many users share one on-chain UTXO, so ordinary payments can be fast and the on-chain cost can be shared.</p><p>This wallet also has a separate native on-chain balance. Use <strong>Move to Ark</strong> to board confirmed on-chain funds, or <strong>Move on-chain</strong> to send Ark funds to a fresh Bitcoin address owned by this wallet. On-chain transfers need mining confirmations and fees.</p></section>
 
         <section><h3>What the Ark server does</h3><p>The Ark Service Provider, or ASP, coordinates batches called rounds, supplies liquidity, co-signs instant Ark payments, forwards Lightning payments, and helps wallets refresh expiring VTXOs. The ASP holds a key used in the cooperative spending path: a VTXO leaf uses a 2-of-2 user-and-server path, while transaction-tree branches include the server in an n-of-n path. The ASP does not hold <em>your</em> private key and cannot spend an unexpired, non-forfeited VTXO without your signature.</p><p>Before expiry, an honest user can exit unilaterally. That protection no longer applies after the VTXO expires or after its old state has been forfeited. The ASP can also see connection and payment metadata, refuse service, censor new payments, or become unavailable.</p><p>An instant Ark payment is normally an <strong>out-of-round payment</strong>, also called arkoor. It arrives quickly, but until the receiver refreshes it in a round, security assumes the sender and ASP do not collude to double-spend it. Bark's background maintenance handles normal synchronization and refresh work while the wallet is running.</p></section>
 
@@ -150,7 +182,7 @@
 
         <section><h3>Connected service</h3><div class="ark-facts"><div><span>Network</span><strong id="arkNetworkName">Bitcoin Signet</strong></div><div><span>Ark server</span><strong id="arkServerName">ark.signet.2nd.dev</strong></div><div><span>Round interval</span><strong id="arkRoundInterval">Available after wallet opens</strong></div><div><span>VTXO lifetime</span><strong id="arkVtxoLifetime">Available after wallet opens</strong></div><div><span>Exit delay</span><strong id="arkExitDelay">Available after wallet opens</strong></div></div><p>These are read from the connected server rather than assumed from an article. Server policy and fees can change.</p></section>
 
-        <section><h3>Recovery, password, and local storage</h3><p>The pinned Bark WebAssembly engine stores changing wallet state in this site's IndexedDB. To reopen it without repeatedly exposing your recovery phrase, this page encrypts the phrase with AES-256-GCM using a key derived from your password with PBKDF2-SHA-256 and a random salt. The password is never stored. Use a long, unique password: an attacker who copies the encrypted profile can still attempt guesses offline.</p><p>Your unlocked wallet automatically locks after inactivity. Change the delay in <a href="/settings.html#walletSecurity">Wallet security settings</a>. The phrase remains an essential safety net, but it is not a complete Bark backup. Phrase-only recovery depends on the ASP mailbox and restores only spendable VTXOs the mailbox still knows about. It does not restore payment history and is not a reliable unfinished-exit recovery workflow. IndexedDB and local storage can both be erased, so keep the paper recovery phrase safe. Analytics and Synthetic Satoshi are disabled on this page.</p></section>
+        <section><h3>Recovery, password, and local storage</h3><p>The pinned Bark WebAssembly engine stores changing wallet state in this site's IndexedDB. To reopen it without repeatedly exposing your recovery phrase, this page encrypts the phrase with AES-256-GCM using a key derived from your password with PBKDF2-SHA-256 and a random salt. The password is never stored. Use a long, unique password: an attacker who copies the encrypted profile can still attempt guesses offline.</p><p>The gear beside this help button controls automatic locking and can reveal the phrase only after the correct password decrypts it. The same lock delay is available in <a href="/settings.html#walletSecurity">Wallet security settings</a>. The phrase remains an essential safety net, but it is not a complete Bark backup. Phrase-only recovery depends on the ASP mailbox and restores only spendable VTXOs the mailbox still knows about. It does not restore payment history and is not a reliable unfinished-exit recovery workflow. IndexedDB and local storage can both be erased, so keep the paper recovery phrase safe. Analytics and Synthetic Satoshi are disabled on this page.</p></section>
 
         <details><summary>Live and background payment alerts</summary><div><p>While the wallet is open and unlocked, Bark keeps a live event channel and shows new Ark and Lightning receipts immediately. This uses Bark events rather than repeatedly polling the server.</p><p>Background alerts are optional. When enabled, the wallet sends a signed, read-only mailbox authorization to Satoshi.si's notification service. It lasts as long as you choose, from 24 hours up to a year, and cannot be revoked early at the Ark server. The push message deliberately says only that bitcoin arrived: no address, amount, or transaction content. To notice a payment the service reads the mailbox, and an incoming Lightning payment message there includes the amount; the service stores no amounts and redacts its logs.</p><p>A push wakes the installed PWA so you can open and synchronize the wallet, but it cannot unlock your encrypted wallet or complete a Lightning receive while the app is closed. Open the wallet promptly when waiting for Lightning. Browser and phone power-saving rules may delay notifications.</p><p><strong>Brave users:</strong> Brave disables Google's push service by default, so background alerts cannot register until you turn on "Use Google services for push messaging" under Settings &rarr; Privacy and security (search the settings for "push"), then reload this page. Other browsers use their own push setup, whose availability still depends on the browser, operating system and network.</p></div></details>
 
@@ -191,15 +223,26 @@
 
   <dialog class="bark-dialog notification-consent-dialog" id="notificationConsentDialog" aria-labelledby="notificationConsentTitle">
     <form class="bark-dialog-shell" id="notificationConsentForm">
-      <header><div><span>Optional mobile alerts</span><h2 id="notificationConsentTitle">Enable background payment alerts?</h2></div><button type="button" id="cancelNotificationConsent" aria-label="Cancel"><i data-lucide="x"></i></button></header>
+      <header><div><span>Optional alerts</span><h2 id="notificationConsentTitle">Notify me when bitcoin arrives?</h2></div><button type="button" id="cancelNotificationConsent" aria-label="Cancel"><i data-lucide="x"></i></button></header>
       <div class="bark-dialog-body">
-        <p>Satoshi.si will receive a signed, read-only permission to watch this wallet's Ark mailbox for the period you choose. It cannot spend funds, and it cannot be revoked at the Ark server before it expires — so pick the shortest period you are willing to maintain.</p>
+        <p>Choose how long Satoshi.si may check for incoming payments. This access is read-only and cannot move your bitcoin.</p>
         <fieldset class="notification-lifetime"><legend>How long should the permission last?</legend><label><input type="radio" name="notificationLifetime" value="86400"><span>24 hours</span></label><label><input type="radio" name="notificationLifetime" value="7776000"><span>3 months</span></label><label><input type="radio" name="notificationLifetime" value="15552000"><span>6 months</span></label><label><input type="radio" name="notificationLifetime" value="31536000" checked><span>1 year</span></label></fieldset>
-        <ul class="notification-privacy-list"><li>No seed phrase, password, or spending key leaves this browser.</li><li>The push message says only that bitcoin arrived: no amount, address, or transaction content.</li><li>To notice an arrival the service reads the mailbox, and an incoming Lightning payment message there includes the amount. It stores no amounts and redacts its logs.</li><li>Alerts stop when the permission expires, until you open the wallet again.</li></ul>
-        <label class="terms-agreement"><input type="checkbox" id="notificationConsentCheck"><span>I understand and want to send this read-only mailbox permission.</span></label>
+        <p>Your seed, password and spending keys stay on this device. Notifications do not show amounts or addresses.</p>
+        <label class="terms-agreement"><input type="checkbox" id="notificationConsentCheck"><span>I understand and want alerts.</span></label>
       </div>
       <footer><button type="button" class="wallet-quiet" id="cancelNotificationConsentFooter">Cancel</button><button type="submit" class="wallet-primary" id="confirmNotificationConsent" disabled>Enable alerts</button></footer>
     </form>
+  </dialog>
+
+  <dialog class="bark-dialog wallet-settings-dialog" id="walletSettingsDialog" aria-labelledby="walletSettingsTitle">
+    <div class="bark-dialog-shell"><header><div><span>Stored in this browser</span><h2 id="walletSettingsTitle">Wallet settings</h2></div><button type="button" data-close-dialog aria-label="Close wallet settings"><i data-lucide="x"></i></button></header><div class="bark-dialog-body">
+      <label class="wallet-setting-row" for="walletAutoLockSetting"><span><strong>Lock after inactivity</strong><small>Applies whenever this wallet is unlocked.</small></span><select id="walletAutoLockSetting"><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="0">Never</option></select></label>
+      <div class="wallet-setting-row"><span><strong>Recovery words</strong><small>Password required. Never reveal them where anyone can see your screen.</small></span><button type="button" class="wallet-danger" id="openRevealSeed">Reveal words</button></div>
+    </div></div>
+  </dialog>
+
+  <dialog class="bark-dialog reveal-seed-dialog" id="revealSeedDialog" aria-labelledby="revealSeedTitle">
+    <form class="bark-dialog-shell" id="revealSeedForm"><header><div><span>Sensitive information</span><h2 id="revealSeedTitle">Reveal recovery words</h2></div><button type="button" id="cancelRevealSeed" aria-label="Cancel"><i data-lucide="x"></i></button></header><div class="bark-dialog-body"><p>Make sure nobody can see or record your screen.</p><label for="revealSeedPassword">Wallet password<input id="revealSeedPassword" type="password" autocomplete="current-password" required></label><ol class="mnemonic-grid" id="revealedMnemonicWords" hidden></ol></div><footer><button type="button" class="wallet-quiet" id="closeRevealedSeed">Cancel</button><button type="submit" class="wallet-danger" id="confirmRevealSeed">Reveal words</button></footer></form>
   </dialog>
 
   <dialog class="wallet-error-dialog" id="walletErrorDialog" aria-labelledby="walletErrorTitle">

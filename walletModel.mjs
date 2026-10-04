@@ -33,6 +33,19 @@ export function balanceTotal(balance = {}) {
     .reduce((total, key) => total + (Number(balance[key]) || 0), 0);
 }
 
+export function recommendedOnchainFeeRate(rates = {}, priority = 'regular') {
+  const field = ({slow: 'slowSatPerKwu', fast: 'fastSatPerKwu'})[priority] || 'regularSatPerKwu';
+  const satsPerKwu = Number(rates[field]);
+  return Number.isFinite(satsPerKwu) && satsPerKwu > 0 ? Math.max(1, Math.ceil(satsPerKwu / 250)) : 1;
+}
+
+export function bitcoinAddressMatchesNetwork(address, network = 'mainnet') {
+  const value = String(address || '').trim().toLowerCase();
+  if (!/^(?:bc1|tb1|bcrt1|[123mn])[a-z0-9]{20,}$/i.test(value)) return false;
+  if (network === 'mainnet') return /^(?:bc1|1|3)/.test(value);
+  return /^(?:tb1|bcrt1|m|n|2)/.test(value);
+}
+
 export function receivedMovementAmount(movement = {}) {
   const amount = Number(movement.effectiveBalanceSats);
   return Number.isFinite(amount) && amount > 0 ? amount : 0;

@@ -99,7 +99,8 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
     '/quotes.html': {selector: '#next-quote'},
     '/converter.html': {selector: '.add-currency-icon', reparent: true},
     '/news.html': {selector: '#openNewsSettings'},
-    '/priceScanner.html': {selector: '.scanner-top-controls', wide: true}
+    '/priceScanner.html': {selector: '.scanner-top-controls', wide: true},
+    '/wallet.html': {selector: '#openWalletSettings'}
 });
 
 function alignTopRightControls(trigger) {

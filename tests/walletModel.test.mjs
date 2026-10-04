@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   balanceTotal,
+  bitcoinAddressMatchesNetwork,
   classifyPaymentDestination,
   describeBackgroundNotificationError,
   formatSats,
@@ -12,6 +13,7 @@ import {
   notificationMovement,
   normalizeMnemonic,
   parseBolt11AmountSats,
+  recommendedOnchainFeeRate,
   receivedMovementAmount,
   selectAuthorizationSeconds,
 } from '../walletModel.mjs';
@@ -46,6 +48,22 @@ test('classifies supported payment destinations', () => {
 test('totals Bark balance buckets and formats sats', () => {
   assert.equal(balanceTotal({spendableSats: 100, pendingInRoundSats: 20, pendingExitSats: 3}), 123);
   assert.match(formatSats(1234), /1[,.\s]234 sats/);
+});
+
+test('converts Bark chain fee rates from sat/kwu to whole sat/vB', () => {
+  const rates = {slowSatPerKwu: 251, regularSatPerKwu: 500, fastSatPerKwu: 751};
+  assert.equal(recommendedOnchainFeeRate(rates, 'slow'), 2);
+  assert.equal(recommendedOnchainFeeRate(rates, 'regular'), 2);
+  assert.equal(recommendedOnchainFeeRate(rates, 'fast'), 4);
+  assert.equal(recommendedOnchainFeeRate({}, 'regular'), 1);
+});
+
+test('rejects Bitcoin addresses from the other network before sending', () => {
+  assert.equal(bitcoinAddressMatchesNetwork(`bc1q${'a'.repeat(38)}`, 'mainnet'), true);
+  assert.equal(bitcoinAddressMatchesNetwork(`tb1q${'a'.repeat(38)}`, 'mainnet'), false);
+  assert.equal(bitcoinAddressMatchesNetwork(`tb1q${'a'.repeat(38)}`, 'signet'), true);
+  assert.equal(bitcoinAddressMatchesNetwork(`bc1q${'a'.repeat(38)}`, 'signet'), false);
+  assert.equal(bitcoinAddressMatchesNetwork('bc1not-an-address', 'mainnet'), false);
 });
 
 test('detects credited movements from wallet notifications', () => {
