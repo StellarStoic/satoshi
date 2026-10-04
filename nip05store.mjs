@@ -194,10 +194,29 @@ function onNameInput() {
   }, 350);
 }
 
+let keyCheckToken = 0;
+
 function onKeyInput() {
   const result = pubkeyFrom(els.pubkey.value);
   setVerdict(els.keyVerdict, result.message, result.ok ? 'ok' : (result.message ? 'bad' : 'muted'));
   updateButton();
+  if (result.ok) checkKeyOwner(result.hex);
+}
+
+// Is this key already used by another name here? NIP-05 allows aliases, so this is
+// a warning and never a refusal — but the buyer is paying for a name, and being
+// sold a second pointer to a key they already own should be their decision.
+async function checkKeyOwner(hex) {
+  const token = ++keyCheckToken;
+  try {
+    const response = await fetch(`${API}/nip05/v1/keys/${hex}`);
+    const data = await response.json();
+    if (token !== keyCheckToken || !data || !data.ok || !data.known) return;
+    const names = (data.names || []).map(name => `${name}@satoshi.si`).join(', ');
+    setVerdict(els.keyVerdict, `${names} already points at this key. You can still buy another name — it will point at the same key.`, 'held');
+  } catch (error) {
+    // A courtesy check: if it fails, the order must still be possible.
+  }
 }
 
 // ------------------------------------------------------------------ rendering
@@ -463,6 +482,15 @@ async function start() {
   renderTiers(0);
   els.priceLine.textContent = 'Type a name to see its price.';
   setVerdict(els.verdict, '', 'muted');
+
+  // Arrived from a price card on nip05.html ("3 characters = 50.000 sats"):
+  // highlight that tier and put the cursor in the field, so the click lands
+  // somewhere useful instead of on a page asking them to start from scratch.
+  const wanted = Number(new URLSearchParams(window.location.search).get('tier'));
+  if (Number.isInteger(wanted) && wanted >= 3) {
+    renderTiers(wanted);
+    els.name.focus();
+  }
   onKeyInput();
   updateButton();
 }
