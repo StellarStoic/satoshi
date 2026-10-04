@@ -109,21 +109,6 @@
     }
     @keyframes storePulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
     a.store-link { color: #f2a900; overflow-wrap: anywhere; }
-    .store-help {
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, .3);
-        border-radius: 50%;
-        color: #f2a900;
-        cursor: pointer;
-        font-size: .95rem;
-        font-weight: 700;
-        height: 30px;
-        line-height: 1;
-        margin-left: 8px;
-        vertical-align: middle;
-        width: 30px;
-    }
-    .store-help:hover, .store-help[aria-expanded="true"] { background: #f2a900; color: #101112; }
     .store-help-panel {
         background: rgba(255, 255, 255, .045);
         border: 1px solid rgba(255, 255, 255, .14);
@@ -131,10 +116,17 @@
         font-size: .92rem;
         line-height: 1.6;
         margin-top: 16px;
-        padding: 16px 18px;
+        padding: 14px 18px;
     }
+    .store-help-panel > summary {
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        list-style-position: inside;
+    }
+    .store-help-panel[open] { padding-bottom: 16px; }
     .store-help-panel h3 { font-size: 1rem; margin: 14px 0 6px; }
-    .store-help-panel h3:first-child { margin-top: 0; }
+    .store-help-panel h3:first-of-type { margin-top: 14px; }
     .store-help-panel ul { margin: 6px 0; padding-left: 20px; }
     .store-help-panel li { margin: 4px 0; }
     .store-help-panel code {
@@ -144,11 +136,7 @@
 </style>
 
 <div class="store-wrap">
-    <h1>NIP-05 name store
-        <button type="button" class="store-help" id="storeHelp"
-                aria-label="How the name store works" title="How the name store works"
-                aria-controls="storeHelpPanel" aria-expanded="false">?</button>
-    </h1>
+    <h1>NIP-05 name store</h1>
     <p class="store-intro">
         A name here is <strong>yourname@satoshi.si</strong>: an address other people can use to find and
         verify your nostr key, and the key that lets you <strong>write to
@@ -156,7 +144,8 @@
         subscription. Your name goes live the moment the payment settles.
     </p>
 
-    <section class="store-help-panel" id="storeHelpPanel" hidden>
+    <details class="store-help-panel">
+        <summary>How it works — prices, rules, payment</summary>
         <h3>What you are buying</h3>
         <p>
             A record in <code>satoshi.si/.well-known/nostr.json</code> that maps your chosen name to your
@@ -217,7 +206,7 @@
             or the sats back. Questions about a specific order:
             <a class="store-link" href="mailto:one@satoshi.si">one@satoshi.si</a>.
         </p>
-    </section>
+    </details>
 
     <div class="store-card">
         <label for="storeName">Choose your name</label>

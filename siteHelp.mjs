@@ -39,6 +39,10 @@ export const PAGE_HELP = Object.freeze({
         title: 'About NIP-05',
         description: 'Learn about readable Nostr identifiers and the available satoshi.si NIP-05 names that can point to your Nostr public key.'
     },
+    '/nip05store.html': {
+        title: 'About the NIP-05 name store',
+        description: 'Buy a name like yourname@satoshi.si: pick it, see its price by length, pay in sats over Lightning, on-chain or Ark, and it goes live in the public nostr.json the moment the payment settles. One-off payment with no renewal, one name per public key, and the same key may then write to wss://nostr.satoshi.si.'
+    },
     '/offers.html': {
         title: 'About the P2P order book',
         description: 'Compare public peer-to-peer Bitcoin buy and sell offers from several markets in one place, then continue on the original platform.'
