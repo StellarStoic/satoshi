@@ -152,7 +152,9 @@ function setVerdict(element, text, kind) {
 function updateButton() {
   const name = els.name.value.trim();
   const key = pubkeyFrom(els.pubkey.value);
-  els.button.disabled = Boolean(localProblem(name)) || !key.ok || Boolean(els.verdict.dataset.blocked);
+  els.button.disabled = Boolean(localProblem(name)) || !key.ok
+    || Boolean(els.verdict.dataset.blocked)      // name taken, reserved or disallowed
+    || Boolean(els.keyVerdict.dataset.blocked);  // key already has a name here
 }
 
 // -------------------------------------------------------------- availability
@@ -197,15 +199,15 @@ function onNameInput() {
 let keyCheckToken = 0;
 
 function onKeyInput() {
+  els.keyVerdict.dataset.blocked = '';
   const result = pubkeyFrom(els.pubkey.value);
   setVerdict(els.keyVerdict, result.message, result.ok ? 'ok' : (result.message ? 'bad' : 'muted'));
   updateButton();
   if (result.ok) checkKeyOwner(result.hex);
 }
 
-// Is this key already used by another name here? NIP-05 allows aliases, so this is
-// a warning and never a refusal — but the buyer is paying for a name, and being
-// sold a second pointer to a key they already own should be their decision.
+// One key, one name. If this key already owns a name here, the order button is
+// disabled: the desk refuses it too, so a bypass cannot cost anyone sats.
 async function checkKeyOwner(hex) {
   const token = ++keyCheckToken;
   try {
@@ -213,9 +215,12 @@ async function checkKeyOwner(hex) {
     const data = await response.json();
     if (token !== keyCheckToken || !data || !data.ok || !data.known) return;
     const names = (data.names || []).map(name => `${name}@satoshi.si`).join(', ');
-    setVerdict(els.keyVerdict, `${names} already points at this key. You can still buy another name — it will point at the same key.`, 'held');
+    els.keyVerdict.dataset.blocked = 'yes';
+    setVerdict(els.keyVerdict, `${names} already uses this key. One key, one name — use a different key.`, 'bad');
   } catch (error) {
-    // A courtesy check: if it fails, the order must still be possible.
+    // Unreachable: the desk still refuses a second name on submit.
+  } finally {
+    if (token === keyCheckToken) updateButton();
   }
 }
 
