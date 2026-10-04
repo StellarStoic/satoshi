@@ -214,13 +214,33 @@ Use the selected page section to answer questions such as "What does this button
 
 ### Page: [NIP-05]
 - **URL**: /nip05.html
-- **Purpose**: Offers Nostr NIP-05 identifier registration under the `satoshi.si` domain (e.g., `yourname@satoshi.si`).
+- **Purpose**: Explains Nostr NIP-05 identifiers under the `satoshi.si` domain (e.g., `yourname@satoshi.si`) and links to the store where one can be claimed.
 - **Key Elements**:
-    - **Image cards**: Clickable cards explaining NIP-05 and pricing tiers.
-    - **Pricing tiers**: 5+ characters = 2,100 sats; 4 characters = 21,000 sats; 3 characters = 210,000 sats. Premium words (bitcoin, satoshi, etc.) negotiable.
-    - **Contact buttons**: Email the site owner to claim an identifier.
+    - **Image cards**: The first card opens the explanation of what NIP-05 is. The three price cards (5+, 4 and 3 characters) open the store on that tier; they are shortcuts into `/nip05store.html?tier=N`, not explanations.
+    - **Pricing tiers**: 5 or more characters = 5,000 sats; 4 characters = 21,000 sats; 3 characters = 50,000 sats. Premium words (bitcoin, satoshi, etc.) are reserved and handled by hand. One and two character names are not sold.
+    - **Contact buttons**: Email the site owner to claim a reserved identifier or arrange something by hand.
     - **Burger menu / Footer / Contact modal**: Standard.
     - **[Ignore unless specifically asked for]**: Footer content.
+
+### Page: [NIP-05 name store]
+- **URL**: /nip05store.html
+- **Purpose**: Self-service checkout for a NIP-05 name. The buyer picks a name, sees its price as they type, pastes the nostr public key the name should point to, and pays in sats. After the payment settles, the name is written into the site's public `/.well-known/nostr.json`.
+- **Key Elements**:
+    - **Name field (`#storeName`)**: Prices live by character count as the buyer types, and checks whether the name is still free.
+    - **Public key field (`#storePubkey`)**: Accepts an `npub` or 64 hex characters. Never a private key.
+    - **Create order (`#createOrder`)**: Disabled until the name is valid, free and the key is acceptable — including when the key already has a name here.
+    - **Payment card (`#payCard`)**: Three rails for the same invoice: Lightning (BOLT11), on-chain (a fresh address per order) and Ark. The page polls itself and shows the registered state when the payment settles.
+    - **"?" button (`#storeHelp`)**: Opens the full rules in plain language (what a name is, prices, name rules, one key one name, the three rails, what happens after registration, and what to do if a payment settles for a name that was taken).
+    - **Burger menu / Footer / Contact modal**: Standard.
+    - **[Ignore unless specifically asked for]**: Footer content.
+- **Facts an answer must get right**:
+    - **One-off payment, no renewal.** Prices: 3 characters = 50,000 sats; 4 characters = 21,000 sats; 5 or more = 5,000 sats. Treat prices as changeable and say so; the page's live figures come from the store's own service, not from the prose here.
+    - **One key, one name**: a public key that already owns a name under satoshi.si cannot buy another one. Availability is also checked for the name itself.
+    - **1 and 2 character names are not for sale**, and brand names (satoshi, bitcoin, lightning) are reserved and arranged by hand.
+    - **The name is written only after the payment settles.** An unpaid order holds the name until it expires, then the name is released. If a payment settles for a name that was taken in the meantime, it is resolved by hand (the name or the sats back).
+    - **Relay access**: a name's key may write to `wss://nostr.satoshi.si`. Access is synced from the name file and can take up to an hour to take effect.
+    - **Verification**: the buyer can check `satoshi.si/.well-known/nostr.json` themselves.
+    - **Never ask for a private key** (`nsec`, seed phrase, wallet backup) in any part of this flow, and tell the user that anything asking for one is a scam.
 
 ### Page: [Game39 Multi Player]
 - **URL**: /game39.html
