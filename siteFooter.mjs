@@ -111,6 +111,93 @@ function ensureSupportModal() {
   return modal;
 }
 
+// The site is static, so a fresh on-chain address cannot be derived in the browser:
+// that would mean putting a BTCPay API key into the page. Instead the worker on
+// D's Start9 keeps one BTCPay invoice open and publishes its address at
+// donate.satoshi.si, and this modal reads it when it opens.
+//
+// The address only changes when a donation arrives or the invoice expires, so
+// opening the modal never re-rolls it. If the endpoint is unreachable, blocked, or
+// slow, the hardcoded address already in the markup stays exactly as it is.
+const DONATION_ADDRESS_URL = 'https://donate.satoshi.si/donate/v1/address';
+let qrGeneratorPromise = null;
+
+function loadQrGenerator() {
+  if (typeof window.qrcode === 'function') return Promise.resolve(true);
+  if (!qrGeneratorPromise) {
+    qrGeneratorPromise = new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = '/qrCodeGenerator_1_4_4.js';
+      script.onload = () => resolve(typeof window.qrcode === 'function');
+      script.onerror = () => resolve(false);
+      document.head.append(script);
+    });
+  }
+  return qrGeneratorPromise;
+}
+
+function renderQrImage(image, address) {
+  loadQrGenerator().then(ready => {
+    if (!ready || image.dataset.address === address) return;
+    try {
+      const qr = window.qrcode(0, 'M');
+      qr.addData(`bitcoin:${address}`);
+      qr.make();
+      if (typeof qr.createDataURL === 'function') {
+        image.src = qr.createDataURL(6, 8);
+      } else {
+        const count = qr.getModuleCount();
+        const cell = 6;
+        const margin = 8;
+        const canvas = document.createElement('canvas');
+        canvas.width = count * cell + margin * 2;
+        canvas.height = canvas.width;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = '#000000';
+        for (let row = 0; row < count; row += 1) {
+          for (let column = 0; column < count; column += 1) {
+            if (qr.isDark(row, column)) context.fillRect(margin + column * cell, margin + row * cell, cell, cell);
+          }
+        }
+        image.src = canvas.toDataURL('image/png');
+      }
+      image.dataset.address = address;
+    } catch (error) {
+      // Leave the shipped QR in place rather than showing a broken image.
+    }
+  });
+}
+
+function onchainWrapper(modal) {
+  const wrappers = Array.from(modal.querySelectorAll('.qr-code-wrapper'));
+  return wrappers.find(wrapper => /on-?chain/i.test(wrapper.querySelector('strong')?.textContent || '')) || null;
+}
+
+function refreshSupportAddress(modal) {
+  const wrapper = modal && onchainWrapper(modal);
+  const addressText = wrapper?.querySelector('.qr-code-text');
+  if (!wrapper || !addressText) return;  // markup changed: stay silent, keep what shipped
+  const shown = addressText.textContent.trim();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5000);
+  fetch(DONATION_ADDRESS_URL, {cache: 'no-store', signal: controller.signal})
+    .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+    .then(payload => {
+      const address = payload && payload.ok ? String(payload.address || '').trim() : '';
+      if (!address || address === shown) return;
+      addressText.textContent = address;
+      const qrImage = wrapper.querySelector('img.qr-code');
+      if (qrImage) {
+        qrImage.alt = `On-chain Bitcoin QR code for ${address}`;
+        renderQrImage(qrImage, address);
+      }
+    })
+    .catch(() => { /* keep the hardcoded address */ })
+    .finally(() => window.clearTimeout(timeout));
+}
+
 function ensureDataModal() {
   let modal = document.getElementById('mempoolTinyDataModal');
   if (!modal) {
@@ -269,7 +356,10 @@ if (footer) {
   const supportModal = ensureSupportModal();
   bindAction(controls.block, () => { openModal(dataModal); refreshNetworkData('block'); });
   bindAction(controls.fee, () => { openModal(dataModal); refreshNetworkData('fees'); });
-  bindAction(controls.bolt, () => openModal(supportModal));
+  bindAction(controls.bolt, () => {
+    openModal(supportModal);
+    refreshSupportAddress(supportModal);
+  });
   refreshNetworkData();
   const refreshTimer = window.setInterval(() => refreshNetworkData(), 60000);
   window.addEventListener('beforeunload', () => { window.clearInterval(refreshTimer); state.controller.abort(); }, {once: true});
