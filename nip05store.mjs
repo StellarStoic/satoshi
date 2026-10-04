@@ -129,7 +129,11 @@ function renderTiers(activeLength) {
 
 function localProblem(name) {
   if (!config) return 'Prices are still loading.';
-  if (name.length < config.minLength) return `At least ${config.minLength} characters, please.`;
+  if (name.length < config.minLength) {
+    return name.length === 1 || name.length === 2
+      ? 'One and two character names are not for sale yet — they are being held back for a much more expensive tier.'
+      : `At least ${config.minLength} characters, please.`;
+  }
   if (name.length > config.maxLength) return `At most ${config.maxLength} characters.`;
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(name)) {
     return 'Letters, digits, dot, dash and underscore only, and it must start and end with a letter or digit.';
