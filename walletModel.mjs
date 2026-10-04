@@ -36,7 +36,15 @@ export function balanceTotal(balance = {}) {
 export function recommendedOnchainFeeRate(rates = {}, priority = 'regular') {
   const field = ({slow: 'slowSatPerKwu', fast: 'fastSatPerKwu'})[priority] || 'regularSatPerKwu';
   const satsPerKwu = Number(rates[field]);
-  return Number.isFinite(satsPerKwu) && satsPerKwu > 0 ? Math.max(1, Math.ceil(satsPerKwu / 250)) : 1;
+  return Number.isFinite(satsPerKwu) && satsPerKwu > 0
+    ? Math.max(0.01, Math.ceil((satsPerKwu / 250) * 100) / 100)
+    : 1;
+}
+
+export function requiredSatsForEstimate(estimate = {}, fallbackAmount = 0) {
+  const gross = Number(estimate.grossAmountSats);
+  if (Number.isFinite(gross) && gross > 0) return gross;
+  return (Number(fallbackAmount) || 0) + (Number(estimate.feeSats) || 0);
 }
 
 export function bitcoinAddressMatchesNetwork(address, network = 'mainnet') {

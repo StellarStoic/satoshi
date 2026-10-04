@@ -1,6 +1,7 @@
 import init, {
   OnchainWallet,
   Wallet,
+  extractTxFromPsbt,
   generateMnemonic,
   validateArkAddress,
   validateMnemonic,
@@ -18,6 +19,7 @@ import {
   normalizeMnemonic,
   parseBolt11AmountSats,
   recommendedOnchainFeeRate,
+  requiredSatsForEstimate,
   receivedMovementAmount,
   selectAuthorizationSeconds,
 } from './walletModel.mjs';
@@ -25,10 +27,15 @@ import {englishWordlist} from './vendor/bip39.mjs';
 import {
   AUTO_LOCK_KEY,
   LEGACY_WALLET_PROFILE_KEY,
+  PRIVACY_MODE_KEY,
   decryptWalletSecret,
   encryptWalletSecret,
   readAutoLockMinutes,
+  readPrivacyMode,
+  readRefreshThresholdBlocks,
+  refreshThresholdKey,
   validateWalletPassword,
+  walletDatabaseBelongsToNetwork,
   walletProfileKey,
 } from './walletSecurity.mjs';
 
@@ -57,9 +64,15 @@ const elements = Object.fromEntries([
   'lockWallet', 'receiveView', 'sendView', 'activityView', 'arkReceivePanel', 'lightningReceivePanel', 'newArkAddress',
   'openWalletSettings', 'onchainBalance', 'onchainPending', 'moveView', 'onchainReceivePanel', 'newOnchainAddress',
   'invoiceAmount', 'invoiceDescription', 'sendForm', 'onchainSendForm', 'onchainSendDestination', 'onchainSendAmount',
-  'onchainFeePriority', 'onchainFeeHint', 'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount',
+  'onchainFeeRate', 'onchainFeeHint', 'useSuggestedOnchainFee', 'arkSendMaxOption', 'arkSendMax',
+  'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount',
   'sendDestination', 'sendAmount', 'destinationHint', 'walletHistory', 'confirmPaymentDialog',
-  'onchainHistory', 'walletSettingsDialog', 'walletAutoLockSetting', 'openRevealSeed', 'revealSeedDialog',
+  'onchainHistory', 'walletSettingsDialog', 'walletAutoLockSetting', 'walletRefreshThreshold', 'walletPrivacyMode', 'openRevealSeed', 'revealSeedDialog',
+  'walletDangerZone', 'openDeleteWallet', 'deleteWalletDialog', 'deleteWalletStep', 'deleteWalletTitle',
+  'deleteWalletPrompt', 'cancelDeleteWallet', 'confirmDeleteWallet',
+  'openEmergencyExit', 'emergencyExitDialog', 'emergencyExitStatus', 'emergencyExitFees',
+  'emergencyExitAgreement', 'emergencyExitAgreementLabel', 'closeEmergencyExit', 'cancelEmergencyExit',
+  'progressEmergencyExit', 'claimEmergencyExit', 'confirmEmergencyExit',
   'revealSeedForm', 'revealSeedPassword', 'revealedMnemonicWords', 'cancelRevealSeed', 'closeRevealedSeed', 'confirmRevealSeed',
   'paymentSummary', 'confirmPayment',
   'arkRoundInterval', 'arkVtxoLifetime', 'arkExitDelay',
@@ -88,9 +101,11 @@ let currentInvoice = '';
 let operationRunning = false;
 let pendingPasswordMnemonic = '';
 let errorTimer;
+let noticeTimer;
 let lastRawError = '';
 let lastErrorDetail = '';
 let inactivityTimer;
+let deleteWalletConfirmationStep = 0;
 let acceptedTerms;
 let activeNetwork = NETWORKS.signet;
 let pendingPasswordNetwork = '';
@@ -159,8 +174,14 @@ function showTimedError(message, detail = '') {
 }
 
 function setNotice(message, tone = 'neutral', detail = '') {
+  clearTimeout(noticeTimer);
   elements.walletNotice.textContent = message;
   elements.walletNotice.dataset.tone = tone;
+  elements.walletNotice.hidden = false;
+  noticeTimer = setTimeout(() => {
+    elements.walletNotice.hidden = true;
+    elements.walletNotice.textContent = '';
+  }, 6000);
   if (tone === 'error') showTimedError(message, detail);
 }
 
@@ -183,7 +204,7 @@ function errorMessage(error, fallback = 'The wallet operation failed.') {
 
 function setOperationState(running, message) {
   operationRunning = running;
-  document.querySelectorAll('.wallet-primary, .wallet-secondary, .wallet-danger, .wallet-actions button')
+  document.querySelectorAll('.wallet-primary, .wallet-secondary, .wallet-danger, .wallet-delete, .wallet-actions button')
     .forEach(button => {
       button.disabled = running || ((button === elements.createWallet || button === elements.showRestore) && !acceptedTerms);
     });
@@ -213,7 +234,12 @@ async function checkChainSource(network) {
 }
 
 function networkConfig(network = activeNetwork) {
-  return Object.freeze({serverAddress: network.serverAddress, esploraAddress: network.esploraAddress, userAgent: 'satoshi-si/1.0.0'});
+  return Object.freeze({
+    serverAddress: network.serverAddress,
+    esploraAddress: network.esploraAddress,
+    userAgent: 'satoshi-si/1.0.0',
+    vtxoRefreshExpiryThreshold: readRefreshThresholdBlocks(network.id),
+  });
 }
 
 async function walletDatabaseNames(mnemonic, network = activeNetwork) {
@@ -269,11 +295,9 @@ function openNetworkSelection() {
   showDialog(elements.networkDialog);
 }
 
-async function showNetworkEntryNotice() {
+function showNetworkEntryNotice() {
   if (readWalletProfile()) {
     setNotice(`${activeNetwork.shortLabel} wallet found. Enter its password to unlock it.`, 'success');
-  } else if (await hasLegacyWalletData()) {
-    setNotice(`Existing ${activeNetwork.shortLabel} wallet data found. Restore it once with the recovery words to add secure password unlock.`, 'success');
   } else {
     setNotice(`Create or restore a separate ${activeNetwork.shortLabel} wallet.`);
   }
@@ -327,17 +351,6 @@ function updateEntryState() {
     elements.walletTermsAgreement.disabled = false;
     elements.termsAgreementLabel.querySelector('span').textContent = 'I have read and agree to these terms.';
     elements.acceptWalletTerms.hidden = false;
-  }
-}
-
-async function hasLegacyWalletData() {
-  if (readWalletProfile() || typeof indexedDB.databases !== 'function') return false;
-  try {
-    const databases = await indexedDB.databases();
-    if (activeNetwork.id === 'signet') return databases.some(database => database.name?.startsWith('satoshi-bark-signet-') || database.name?.startsWith('satoshi-bark-chain-signet-'));
-    return databases.some(database => /^satoshi-bark-(?:chain-)?[a-f0-9]{20}$/.test(database.name || ''));
-  } catch {
-    return false;
   }
 }
 
@@ -512,6 +525,7 @@ function renderHistory(movements) {
     title.textContent = movement.subsystemName || movement.subsystemKind || 'Bark movement';
     const amountValue = Number(movement.effectiveBalanceSats || movement.intendedBalanceSats || 0);
     const amount = document.createElement('strong');
+    amount.classList.add('wallet-private-value');
     amount.className = amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : '';
     amount.textContent = `${amountValue > 0 ? '+' : ''}${formatSats(amountValue)}`;
     const status = document.createElement('span');
@@ -541,6 +555,7 @@ function renderOnchainHistory(transactions) {
     title.textContent = Number(transaction.balanceChangeSats) >= 0 ? 'Received on-chain' : 'Sent on-chain';
     const amountValue = Number(transaction.balanceChangeSats) || 0;
     const amount = document.createElement('strong');
+    amount.classList.add('wallet-private-value');
     amount.className = amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : '';
     amount.textContent = `${amountValue > 0 ? '+' : ''}${formatSats(amountValue)}`;
     const status = document.createElement('span');
@@ -1058,6 +1073,7 @@ function destinationTypeLabel(type) {
     'native-onchain': 'Bitcoin on-chain payment',
     board: 'Move on-chain bitcoin to Ark',
     'offboard-self': 'Move Ark bitcoin on-chain',
+    'offboard-all': 'Send entire Ark balance on-chain',
   })[type] || 'Unknown destination';
 }
 
@@ -1080,6 +1096,17 @@ function updateDestinationHint() {
     elements.destinationHint.textContent = destinationTypeLabel(type);
     elements.sendAmount.disabled = false;
   }
+  const supportsMaximum = type === 'on-chain';
+  elements.arkSendMaxOption.hidden = !supportsMaximum;
+  if (!supportsMaximum) elements.arkSendMax.checked = false;
+  if (supportsMaximum && !elements.arkSendMax.checked) {
+    elements.destinationHint.textContent = 'Ark withdrawal to Bitcoin. The Ark server sets this withdrawal fee rate.';
+  }
+  if (supportsMaximum && elements.arkSendMax.checked) {
+    elements.sendAmount.disabled = true;
+    elements.sendAmount.value = '';
+    elements.destinationHint.textContent = 'Entire Ark balance; the server-set withdrawal fee is deducted from what arrives.';
+  }
 }
 
 function renderPaymentSummary(payment) {
@@ -1092,7 +1119,10 @@ function renderPaymentSummary(payment) {
   const feeDetail = payment.feeRate
     ? ['Fee rate', `${payment.feeRate} sat/vB`]
     : ['Estimated fee', formatSats(payment.fee)];
-  [['Method', destinationTypeLabel(payment.type)], ['Amount', formatSats(payment.amount, {fractional: true})], feeDetail, ['Destination', payment.destination]]
+  const rows = [['Method', destinationTypeLabel(payment.type)]];
+  if (payment.grossAmount) rows.push(['Ark balance spent', formatSats(payment.grossAmount)]);
+  rows.push([payment.type === 'offboard-all' ? 'Address receives' : 'Amount', formatSats(payment.amount, {fractional: true})], feeDetail, ['Destination', payment.destination]);
+  rows
     .forEach(([term, value]) => {
       const dt = document.createElement('dt');
       const dd = document.createElement('dd');
@@ -1115,6 +1145,7 @@ async function executePayment(payment) {
   if (payment.type === 'native-onchain') return onchain.send(payment.destination, payment.amount, payment.feeRate);
   if (payment.type === 'board') return wallet.boardAmount(payment.amount);
   if (payment.type === 'offboard-self') return wallet.sendOnchain(payment.destination, payment.amount);
+  if (payment.type === 'offboard-all') return wallet.offboardAll(payment.destination);
   if (payment.type === 'ark') return wallet.sendArkoorPayment(payment.destination, payment.amount);
   if (payment.type === 'lightning-invoice') {
     const args = {invoice: payment.destination, wait: true};
@@ -1131,6 +1162,13 @@ elements.openBarkInfo.addEventListener('click', () => showDialog(elements.barkHe
 elements.openTermsInline.addEventListener('click', () => showDialog(elements.barkHelpDialog));
 elements.openWalletSettings.addEventListener('click', () => {
   elements.walletAutoLockSetting.value = String(readAutoLockMinutes());
+  elements.walletRefreshThreshold.value = String(readRefreshThresholdBlocks(activeNetwork.id));
+  elements.walletPrivacyMode.checked = readPrivacyMode();
+  const hasProfile = Boolean(readWalletProfile());
+  elements.walletDangerZone.hidden = !hasProfile;
+  elements.openEmergencyExit.disabled = !wallet;
+  elements.openEmergencyExit.title = wallet ? '' : 'Unlock this wallet to use an emergency exit.';
+  elements.openDeleteWallet.textContent = `Delete ${activeNetwork.shortLabel} wallet`;
   showDialog(elements.walletSettingsDialog);
 });
 elements.walletAutoLockSetting.addEventListener('change', () => {
@@ -1142,6 +1180,21 @@ elements.walletAutoLockSetting.addEventListener('change', () => {
   }
   resetInactivityTimer();
   setNotice(elements.walletAutoLockSetting.value === '0' ? 'Automatic wallet locking is off.' : `Wallet will lock after ${elements.walletAutoLockSetting.selectedOptions[0].textContent.toLowerCase()} of inactivity.`, 'success');
+});
+
+elements.walletRefreshThreshold.addEventListener('change', () => {
+  localStorage.setItem(refreshThresholdKey(activeNetwork.id), elements.walletRefreshThreshold.value);
+  setNotice(`VTXOs will refresh below ${elements.walletRefreshThreshold.selectedOptions[0].textContent.toLowerCase()}. This takes effect the next time the wallet opens.`, 'success');
+});
+
+function applyPrivacyMode(enabled) {
+  document.body.classList.toggle('wallet-privacy', enabled);
+  elements.walletPrivacyMode.checked = enabled;
+}
+
+elements.walletPrivacyMode.addEventListener('change', () => {
+  localStorage.setItem(PRIVACY_MODE_KEY, String(elements.walletPrivacyMode.checked));
+  applyPrivacyMode(elements.walletPrivacyMode.checked);
 });
 
 function clearRevealedSeed() {
@@ -1182,6 +1235,256 @@ elements.revealSeedForm.addEventListener('submit', async event => {
   } finally {
     elements.confirmRevealSeed.disabled = false;
   }
+});
+
+let emergencyExitCanStart = false;
+
+function renderEmergencyExitFees(rows = []) {
+  elements.emergencyExitFees.replaceChildren(...rows.map(([label, value]) => {
+    const row = document.createElement('div');
+    const term = document.createElement('dt');
+    const definition = document.createElement('dd');
+    term.textContent = label;
+    definition.textContent = value;
+    row.append(term, definition);
+    return row;
+  }));
+}
+
+async function inspectEmergencyExit({progress = false} = {}) {
+  if (!wallet || !onchain) throw new Error('Unlock this wallet before using an emergency exit.');
+  elements.emergencyExitStatus.textContent = progress ? 'Progressing exit transactions and checking the Bitcoin chain...' : 'Checking exit state and fees...';
+  elements.progressEmergencyExit.disabled = true;
+  elements.claimEmergencyExit.disabled = true;
+  elements.confirmEmergencyExit.disabled = true;
+  emergencyExitCanStart = false;
+  if (progress) await wallet.progressExits({});
+
+  const [tracked, claimable, pending] = await Promise.all([
+    wallet.getExitVtxos(),
+    wallet.listClaimableExits(),
+    wallet.hasPendingExits(),
+  ]);
+  const terminalStates = new Set(['claimed', 'vtxo-already-spent', 'canceled']);
+  const liveExits = tracked.filter(exit => !terminalStates.has(exit.state?.type));
+  if (liveExits.length) {
+    const total = liveExits.reduce((sum, exit) => sum + (Number(exit.amountSats) || 0), 0);
+    const claimableTotal = claimable.reduce((sum, exit) => sum + (Number(exit.amountSats) || 0), 0);
+    elements.emergencyExitStatus.textContent = claimable.length
+      ? `${claimable.length} exit ${claimable.length === 1 ? 'output is' : 'outputs are'} ready to claim on-chain.${pending ? ' Other exits still need more blocks.' : ''}`
+      : 'The emergency exit is in progress. Keep this wallet open and check again after new blocks arrive.';
+    renderEmergencyExitFees([
+      ['Tracked exits', String(liveExits.length)],
+      ['Value in exit', formatSats(total)],
+      ['Ready to claim', formatSats(claimableTotal)],
+    ]);
+    elements.emergencyExitAgreementLabel.hidden = true;
+    elements.confirmEmergencyExit.hidden = true;
+    elements.progressEmergencyExit.hidden = false;
+    elements.claimEmergencyExit.hidden = !claimable.length;
+    elements.progressEmergencyExit.disabled = false;
+    elements.claimEmergencyExit.disabled = !claimable.length;
+    return;
+  }
+
+  const balance = await wallet.balance();
+  if ((Number(balance.spendableSats) || 0) <= 0) {
+    elements.emergencyExitStatus.textContent = tracked.some(exit => exit.state?.type === 'claimed')
+      ? 'The previous emergency exit has been claimed. There is no spendable Ark balance to exit.'
+      : 'There is no spendable Ark balance to exit.';
+    renderEmergencyExitFees();
+    elements.emergencyExitAgreementLabel.hidden = true;
+    elements.confirmEmergencyExit.hidden = true;
+    elements.progressEmergencyExit.hidden = true;
+    elements.claimEmergencyExit.hidden = true;
+    return;
+  }
+
+  const estimate = await wallet.estimateEmergencyExitFee([], null, null);
+  renderEmergencyExitFees([
+    ['Broadcast fees paid now', formatSats(estimate.exitBroadcastFeeSats)],
+    ['Final claim fee', formatSats(estimate.claimFeeSats)],
+    ['Estimated total', formatSats(estimate.totalFeeSats)],
+    ['Transactions to broadcast', String(estimate.txsToBroadcast)],
+  ]);
+  elements.emergencyExitStatus.textContent = estimate.fundable
+    ? 'The confirmed on-chain balance can fund the estimated exit transactions.'
+    : `The confirmed on-chain balance cannot cover the estimated ${formatSats(estimate.exitBroadcastFeeSats)} broadcast cost. Receive on-chain bitcoin before starting.`;
+  emergencyExitCanStart = Boolean(estimate.fundable);
+  elements.emergencyExitAgreementLabel.hidden = false;
+  elements.emergencyExitAgreement.checked = false;
+  elements.confirmEmergencyExit.hidden = false;
+  elements.progressEmergencyExit.hidden = true;
+  elements.claimEmergencyExit.hidden = true;
+  elements.confirmEmergencyExit.disabled = true;
+}
+
+async function openEmergencyExitDialog() {
+  if (!wallet) return setNotice('Unlock this wallet before using an emergency exit.', 'error');
+  closeDialog(elements.walletSettingsDialog);
+  showDialog(elements.emergencyExitDialog);
+  try {
+    await inspectEmergencyExit();
+  } catch (error) {
+    elements.emergencyExitStatus.textContent = `Emergency exit check failed: ${errorMessage(error)}`;
+    renderEmergencyExitFees();
+  }
+}
+
+elements.openEmergencyExit.addEventListener('click', openEmergencyExitDialog);
+elements.closeEmergencyExit.addEventListener('click', () => closeDialog(elements.emergencyExitDialog));
+elements.cancelEmergencyExit.addEventListener('click', () => closeDialog(elements.emergencyExitDialog));
+elements.emergencyExitAgreement.addEventListener('change', () => {
+  elements.confirmEmergencyExit.disabled = !(emergencyExitCanStart && elements.emergencyExitAgreement.checked);
+});
+elements.confirmEmergencyExit.addEventListener('click', async () => {
+  if (!wallet || !emergencyExitCanStart || !elements.emergencyExitAgreement.checked) return;
+  elements.confirmEmergencyExit.disabled = true;
+  try {
+    elements.emergencyExitStatus.textContent = 'Starting the emergency exit and broadcasting the first stage...';
+    await wallet.startExitForEntireWallet();
+    await inspectEmergencyExit({progress: true});
+    setNotice('Emergency exit started. Keep the wallet open and check its progress after new blocks.', 'success');
+    await refreshWallet({announce: false});
+  } catch (error) {
+    elements.emergencyExitStatus.textContent = `Emergency exit could not start: ${errorMessage(error)}`;
+    elements.confirmEmergencyExit.disabled = false;
+  }
+});
+elements.progressEmergencyExit.addEventListener('click', async () => {
+  try {
+    await inspectEmergencyExit({progress: true});
+    await refreshWallet({announce: false});
+  } catch (error) {
+    elements.emergencyExitStatus.textContent = `Exit progress failed: ${errorMessage(error)}`;
+    elements.progressEmergencyExit.disabled = false;
+  }
+});
+elements.claimEmergencyExit.addEventListener('click', async () => {
+  if (!wallet || !onchain) return;
+  elements.claimEmergencyExit.disabled = true;
+  try {
+    elements.emergencyExitStatus.textContent = 'Building and broadcasting the final claim transaction...';
+    const address = await onchain.newAddress();
+    const claim = await wallet.drainExits({vtxoIds: [], drainAll: true, address});
+    const txid = await wallet.broadcastTx(extractTxFromPsbt(claim.psbtBase64));
+    await wallet.syncExits();
+    await onchain.sync();
+    setNotice(`Emergency exit claimed to this wallet's on-chain balance. Transaction: ${txid}`, 'success');
+    await inspectEmergencyExit();
+    await refreshWallet({announce: false});
+  } catch (error) {
+    elements.emergencyExitStatus.textContent = `Exit claim failed: ${errorMessage(error)}`;
+    elements.claimEmergencyExit.disabled = false;
+  }
+});
+
+const deleteWalletPrompts = networkLabel => [
+  {
+    title: `Delete the ${networkLabel} wallet?`,
+    message: 'This removes its saved profile and local wallet data from this browser. Wallets do not grow back when watered.',
+    action: 'Yes, continue',
+  },
+  {
+    title: 'Still absolutely sure?',
+    message: 'The undo button has packed its bags. You will need the recovery words to recover anything recoverable later.',
+    action: 'I am still sure',
+  },
+  {
+    title: 'Last chance',
+    message: 'After this click, even Ctrl+Z will shrug. Deleting this browser wallet cannot be undone.',
+    action: `Delete ${networkLabel} wallet`,
+  },
+];
+
+function renderDeleteWalletPrompt() {
+  const prompt = deleteWalletPrompts(activeNetwork.shortLabel)[deleteWalletConfirmationStep];
+  elements.deleteWalletStep.textContent = `${deleteWalletConfirmationStep + 1} of 3`;
+  elements.deleteWalletTitle.textContent = prompt.title;
+  elements.deleteWalletPrompt.textContent = prompt.message;
+  elements.confirmDeleteWallet.textContent = prompt.action;
+}
+
+function deleteIndexedDatabase(name) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error || new Error(`Could not delete ${name}.`));
+    request.onblocked = () => reject(new Error(`Close other Satoshi.si tabs before deleting ${name}.`));
+  });
+}
+
+async function removeWalletDatabases(networkId) {
+  if (typeof indexedDB.databases !== 'function') return false;
+  const databases = await indexedDB.databases();
+  const names = databases
+    .map(database => database.name)
+    .filter(name => walletDatabaseBelongsToNetwork(name, networkId));
+  await Promise.all(names.map(deleteIndexedDatabase));
+  return true;
+}
+
+function removeWalletPushRegistration(networkId) {
+  const state = readPushState(networkId);
+  writePushState(null, networkId);
+  if (!state) return;
+  void fetch(`${PUSH_API}/subscriptions/${state.id}`, {
+    method: 'DELETE', mode: 'cors', credentials: 'omit', headers: {authorization: `Bearer ${state.secret}`},
+  }).catch(() => {});
+}
+
+async function deleteCurrentWallet() {
+  const network = activeNetwork;
+  elements.confirmDeleteWallet.disabled = true;
+  elements.cancelDeleteWallet.disabled = true;
+  let databaseWarning = '';
+  try {
+    if (wallet || onchain) await disposeWallet({announce: false, message: ''});
+    try {
+      const removed = await removeWalletDatabases(network.id);
+      if (!removed) databaseWarning = ' This browser could not remove the older wallet database.';
+    } catch (error) {
+      databaseWarning = ` Older wallet data could not be removed: ${errorMessage(error)}`;
+    }
+    removeWalletPushRegistration(network.id);
+    localStorage.removeItem(walletProfileKey(network.id));
+    if (network.id === 'mainnet') localStorage.removeItem(LEGACY_WALLET_PROFILE_KEY);
+    pendingMnemonic = '';
+    pendingPasswordMnemonic = '';
+    pendingPasswordNetwork = '';
+    pendingPasswordShouldScan = false;
+    closeDialog(elements.deleteWalletDialog);
+    closeDialog(elements.walletSettingsDialog);
+    updateNetworkProfileStatuses();
+    updateEntryState();
+    setNotice(`${network.shortLabel} wallet deleted from this browser. You can create or restore another wallet.${databaseWarning}`, databaseWarning ? 'neutral' : 'success');
+  } catch (error) {
+    setNotice(`Wallet deletion stopped: ${errorMessage(error)}`, 'error');
+  } finally {
+    elements.confirmDeleteWallet.disabled = false;
+    elements.cancelDeleteWallet.disabled = false;
+  }
+}
+
+elements.openDeleteWallet.addEventListener('click', () => {
+  if (!readWalletProfile()) return setNotice(`No ${activeNetwork.shortLabel} wallet is saved in this browser.`);
+  deleteWalletConfirmationStep = 0;
+  renderDeleteWalletPrompt();
+  closeDialog(elements.walletSettingsDialog);
+  showDialog(elements.deleteWalletDialog);
+});
+elements.cancelDeleteWallet.addEventListener('click', () => {
+  closeDialog(elements.deleteWalletDialog);
+  deleteWalletConfirmationStep = 0;
+});
+elements.deleteWalletDialog.addEventListener('cancel', () => { deleteWalletConfirmationStep = 0; });
+elements.confirmDeleteWallet.addEventListener('click', async () => {
+  if (deleteWalletConfirmationStep < 2) {
+    deleteWalletConfirmationStep += 1;
+    renderDeleteWalletPrompt();
+    return;
+  }
+  await deleteCurrentWallet();
 });
 elements.openNetworkDialog.addEventListener('click', openNetworkSelection);
 elements.closeNetworkDialog.addEventListener('click', () => closeDialog(elements.networkDialog));
@@ -1486,6 +1789,7 @@ elements.lightningReceivePanel.addEventListener('submit', async event => {
 });
 
 elements.sendDestination.addEventListener('input', updateDestinationHint);
+elements.arkSendMax.addEventListener('change', updateDestinationHint);
 
 elements.sendForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -1493,13 +1797,14 @@ elements.sendForm.addEventListener('submit', async event => {
   const destination = elements.sendDestination.value.trim().replace(/^lightning:/i, '');
   let type;
   try { type = classifyPaymentDestination(destination, validateArkAddress); } catch { type = null; }
+  const sendEntireBalance = type === 'on-chain' && elements.arkSendMax.checked;
   const encodedAmount = type === 'lightning-invoice' ? parseBolt11AmountSats(destination) : null;
   const amount = encodedAmount || Number(elements.sendAmount.value);
   if (!type) {
     setNotice(`Enter a valid ${activeNetwork.shortLabel} Ark address, Lightning invoice, Lightning Address, or Bitcoin address.`, 'error');
     return;
   }
-  if (!Number.isSafeInteger(amount) || amount <= 0) {
+  if (!sendEntireBalance && (!Number.isSafeInteger(amount) || amount <= 0)) {
     setNotice('The payment amount must be a positive whole number of satoshis.', 'error');
     return;
   }
@@ -1509,9 +1814,25 @@ elements.sendForm.addEventListener('submit', async event => {
     if (type === 'ark' && !(await wallet.validateArkoorAddress(destination))) {
       throw new Error('This Ark address is not compatible with the connected Ark server.');
     }
+    if (sendEntireBalance) {
+      const [estimate, balance] = await Promise.all([wallet.estimateOffboardAllFee(destination), wallet.balance()]);
+      const grossAmount = Number(estimate.grossAmountSats) || Number(balance.spendableSats) || 0;
+      const fee = Number(estimate.feeSats) || 0;
+      const netAmount = Number(estimate.netAmountSats) || grossAmount - fee;
+      if (grossAmount <= 0 || netAmount <= 0) throw new Error('The Ark balance is too small to cover the server-set withdrawal fee.');
+      pendingPayment = {source: 'ark', destination, type: 'offboard-all', amount: netAmount, grossAmount, fee};
+      renderPaymentSummary(pendingPayment);
+      showDialog(elements.confirmPaymentDialog);
+      setNotice('Review the full-balance Ark withdrawal before confirming.');
+      return;
+    }
     const [estimate, balance] = await Promise.all([estimatePayment(destination, type, amount), wallet.balance()]);
     const fee = Number(estimate.feeSats) || 0;
-    if ((Number(balance.spendableSats) || 0) < amount + fee) throw new Error('The spendable balance is lower than the amount plus estimated fee.');
+    const spendable = Number(balance.spendableSats) || 0;
+    const required = requiredSatsForEstimate(estimate, amount);
+    if (spendable < required) {
+      throw new Error(`This payment needs ${formatSats(required)}, including the fee, but only ${formatSats(spendable)} is spendable. Reduce the amount or select "Send entire Ark balance" for an on-chain withdrawal.`);
+    }
     pendingPayment = {source: 'ark', destination, type, amount, fee};
     renderPaymentSummary(pendingPayment);
     showDialog(elements.confirmPaymentDialog);
@@ -1521,6 +1842,28 @@ elements.sendForm.addEventListener('submit', async event => {
   } finally {
     setOperationState(false);
   }
+});
+
+async function useSuggestedOnchainFee() {
+  if (!onchain || operationRunning) return;
+  elements.useSuggestedOnchainFee.disabled = true;
+  try {
+    const feeRate = recommendedOnchainFeeRate(await onchain.feeRates(), 'regular');
+    elements.onchainFeeRate.value = String(feeRate);
+    elements.onchainFeeHint.textContent = `Current normal estimate: ${feeRate} sat/vB. You may edit it.`;
+  } catch (error) {
+    setNotice(`Could not load a fee estimate: ${errorMessage(error)}`, 'error');
+  } finally {
+    elements.useSuggestedOnchainFee.disabled = false;
+  }
+}
+
+elements.useSuggestedOnchainFee.addEventListener('click', useSuggestedOnchainFee);
+elements.onchainFeeRate.addEventListener('input', () => {
+  const feeRate = Number(elements.onchainFeeRate.value);
+  elements.onchainFeeHint.textContent = Number.isFinite(feeRate) && feeRate > 0 && feeRate < 1
+    ? 'A fee below 1 sat/vB will be attempted, but peers may reject it or confirmation may take a long time.'
+    : 'Enter a fee rate or use the current normal estimate.';
 });
 
 elements.onchainSendForm.addEventListener('submit', async event => {
@@ -1539,10 +1882,17 @@ elements.onchainSendForm.addEventListener('submit', async event => {
   setOperationState(true, 'Checking on-chain funds and the current fee rate...');
   try {
     await onchain.sync();
-    const [balance, rates] = await Promise.all([onchain.balance(), onchain.feeRates()]);
-    const feeRate = recommendedOnchainFeeRate(rates, elements.onchainFeePriority.value);
+    const balance = await onchain.balance();
+    let feeRate = Number(elements.onchainFeeRate.value);
+    if (!elements.onchainFeeRate.value) {
+      feeRate = recommendedOnchainFeeRate(await onchain.feeRates(), 'regular');
+      elements.onchainFeeRate.value = String(feeRate);
+    }
+    if (!Number.isFinite(feeRate) || feeRate <= 0) throw new Error('Enter a fee rate greater than 0 sat/vB.');
     if ((Number(balance.confirmedSats) || 0) <= amount) throw new Error('Confirmed on-chain funds must cover the amount and its mining fee.');
-    elements.onchainFeeHint.textContent = `${feeRate} sat/vB selected from the current ${elements.onchainFeePriority.selectedOptions[0].textContent.toLowerCase()} estimate.`;
+    elements.onchainFeeHint.textContent = feeRate < 1
+      ? `${feeRate} sat/vB will be attempted. Very low fees may be rejected by peers or remain unconfirmed.`
+      : `${feeRate} sat/vB will be used for this transaction.`;
     pendingPayment = {source: 'onchain', destination, type: 'native-onchain', amount, feeRate};
     renderPaymentSummary(pendingPayment);
     showDialog(elements.confirmPaymentDialog);
@@ -1565,7 +1915,7 @@ elements.boardForm.addEventListener('submit', async event => {
     await onchain.sync();
     const [balance, estimate] = await Promise.all([onchain.balance(), wallet.estimateBoardFee(amount)]);
     const fee = Number(estimate.feeSats) || 0;
-    const required = Number(estimate.grossAmountSats) || amount + fee;
+    const required = requiredSatsForEstimate(estimate, amount);
     if ((Number(balance.confirmedSats) || 0) < required) throw new Error('Confirmed on-chain funds are lower than the amount plus estimated fee.');
     pendingPayment = {source: 'move', type: 'board', amount, fee, destination: 'Your Ark balance'};
     renderPaymentSummary(pendingPayment);
@@ -1588,7 +1938,7 @@ elements.offboardForm.addEventListener('submit', async event => {
     const destination = await onchain.newAddress();
     const [balance, estimate] = await Promise.all([wallet.balance(), wallet.estimateSendOnchainFee(destination, amount)]);
     const fee = Number(estimate.feeSats) || 0;
-    const required = Number(estimate.grossAmountSats) || amount + fee;
+    const required = requiredSatsForEstimate(estimate, amount);
     if ((Number(balance.spendableSats) || 0) < required) throw new Error('The Ark balance is lower than the amount plus estimated fee.');
     pendingPayment = {source: 'move', type: 'offboard-self', amount, fee, destination};
     renderPaymentSummary(pendingPayment);
@@ -1749,11 +2099,13 @@ window.addEventListener('pagehide', () => {
 
 const supported = window.isSecureContext && Boolean(globalThis.crypto?.subtle) && Boolean(globalThis.indexedDB);
 elements.secureContextError.hidden = supported;
+setNotice(elements.walletNotice.textContent);
 if (!supported) setNotice('Wallet engine unavailable in this browser context.', 'error');
 
 const requestedNetworkId = new URLSearchParams(location.search).get('network');
 const initialNetworkId = NETWORKS[requestedNetworkId] ? requestedNetworkId : storedNetworkId();
 activeNetwork = NETWORKS[initialNetworkId] || NETWORKS.signet;
+applyPrivacyMode(readPrivacyMode());
 renderRestoreInputs();
 applyNetworkUi();
 updateEntryState();

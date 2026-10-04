@@ -10,6 +10,7 @@ import {
   spanishWordlist,
   traditionalChineseWordlist,
 } from './vendor/bip39.mjs';
+import {readBip39Position} from './bip39Lookup.mjs';
 
 const LANGUAGE_STORAGE_KEY = 'bip39WordlistLanguage';
 const DENSITY_STORAGE_KEY = 'bip39SuggestionDensity';
@@ -239,10 +240,24 @@ function ordinal(number) {
   return `${number}${{1: 'st', 2: 'nd', 3: 'rd'}[number % 10] || 'th'}`;
 }
 
-function setValidity(value) {
+function setValidity(value, positionLookup) {
   input.classList.remove('valid', 'invalid');
   validity.replaceChildren();
   if (!value) return;
+  if (positionLookup.isPosition) {
+    input.classList.add(positionLookup.valid ? 'valid' : 'invalid');
+    if (!positionLookup.valid) {
+      const state = document.createElement('strong');
+      state.className = 'word-invalid';
+      state.textContent = '1 to 2,048';
+      validity.append('Enter a BIP39 position from ', state, '.');
+      return;
+    }
+    const entry = entries[positionLookup.index];
+    validity.append(`Position ${positionLookup.position} in the ${language.statusLabel || language.label} BIP39 wordlist is "`,
+      emphasizedWord(entry.display), '".');
+    return;
+  }
   const entry = wordIndex.get(value);
   const valid = Boolean(entry);
   input.classList.add(valid ? 'valid' : 'invalid');
@@ -256,15 +271,20 @@ function setValidity(value) {
 }
 
 function render() {
-  const value = normalizeWord(input.value);
-  setValidity(value);
+  const rawValue = input.value.trim();
+  const value = normalizeWord(rawValue);
+  const positionLookup = readBip39Position(rawValue, entries.length);
+  setValidity(value, positionLookup);
   const availableSlots = matchMedia('(max-width: 650px)').matches ? narrowSlots : wideSlots;
   const screenCapacity = matchMedia('(max-height: 560px)').matches
     ? Math.min(14, availableSlots.length)
     : availableSlots.length;
   const suggestionCount = Math.max(1, Math.round(screenCapacity * suggestionDensity / 100));
   const slots = availableSlots.slice(0, suggestionCount);
-  const words = rankedWords(value, slots.length);
+  const indexedEntry = positionLookup.valid ? entries[positionLookup.index] : null;
+  const words = indexedEntry
+    ? [indexedEntry, ...rankedWords(indexedEntry.normalized, Math.max(0, slots.length - 1))]
+    : rankedWords(positionLookup.isPosition ? '' : value, slots.length);
   const nodes = words.map((entry, index) => {
     const button = document.createElement('button');
     const [x, y] = slots[index];
@@ -273,7 +293,7 @@ function render() {
     button.className = 'word-suggestion';
     button.dataset.rank = String(index);
     button.append(emphasizedWord(entry.display));
-    button.setAttribute('aria-label', `Use ${language.statusLabel || language.label} BIP39 word ${entry.display}`);
+    button.setAttribute('aria-label', `Use ${language.statusLabel || language.label} BIP39 word ${entry.display}, position ${entry.index + 1}`);
     button.style.setProperty('--word-x', `${x}%`);
     button.style.setProperty('--word-y', `${y}%`);
     button.style.setProperty('--word-size', `${prominence}px`);

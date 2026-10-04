@@ -19,18 +19,20 @@ body.bark-wallet-page {
 .wallet-settings-trigger {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
   color: #929797;
   background: transparent;
+  font-size: 24px;
+  line-height: 1;
   cursor: pointer;
 }
 
 .wallet-settings-trigger:hover,
 .wallet-settings-trigger:focus-visible { color: var(--wallet-orange); outline: 0; }
-.wallet-settings-trigger svg { width: 21px; height: 21px; }
+.wallet-settings-trigger .lni { display: block; font-size: 24px; line-height: 1; pointer-events: none; }
 
 .wallet-shell {
   width: min(1060px, calc(100% - 32px));
@@ -160,6 +162,55 @@ body[data-wallet-network="signet"] .network-badge > i:first-child { background: 
 .real-funds-warning svg {
   flex: 0 0 auto;
   width: 19px;
+}
+
+.ark-liveness-warning {
+  max-width: 62ch;
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid rgba(242, 169, 0, 0.38);
+  border-left: 3px solid var(--wallet-orange);
+  background: rgba(242, 169, 0, 0.055);
+}
+
+.ark-liveness-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #f2f3ef;
+}
+
+.ark-liveness-heading svg {
+  width: 19px;
+  height: 19px;
+  color: var(--wallet-orange);
+}
+
+.ark-liveness-warning p {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.ark-safety-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin-top: 14px;
+}
+
+.ark-safety-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #f4c967;
+  font-size: 0.75rem;
+  text-underline-offset: 3px;
+}
+
+.ark-safety-links svg {
+  width: 12px;
+  height: 12px;
 }
 
 .wallet-entry {
@@ -525,6 +576,48 @@ button:disabled {
   font: 600 .78rem/1.3 "Roboto Mono", monospace;
 }
 
+.send-max-option {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 10px !important;
+  padding: 12px;
+  border: 1px solid var(--wallet-line);
+  border-radius: 10px;
+  background: rgba(242, 169, 0, .05);
+  cursor: pointer;
+}
+
+.send-max-option[hidden] { display: none !important; }
+.send-max-option input { width: 18px; min-height: 18px; margin: 0; accent-color: var(--wallet-orange); }
+.send-max-option small { grid-column: 2; color: var(--wallet-muted); font-weight: 400; line-height: 1.4; }
+
+.fee-rate-control {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.fee-rate-control label {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  color: #dfe1df;
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.fee-rate-control label span {
+  position: absolute;
+  right: 12px;
+  bottom: 15px;
+  color: var(--wallet-muted);
+  font: 500 .72rem/1 "Roboto Mono", monospace;
+}
+
+.fee-rate-control input { padding-right: 70px; }
+
 .wallet-move-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -551,6 +644,57 @@ button:disabled {
 .wallet-setting-row:last-child { border-bottom: 0; }
 .wallet-setting-row > span { display: grid; gap: 4px; }
 .wallet-setting-row small { color: var(--wallet-muted); line-height: 1.4; }
+.wallet-toggle-row input {
+  width: 40px;
+  height: 22px;
+  accent-color: var(--wallet-orange);
+}
+.wallet-privacy .wallet-private-value,
+.wallet-privacy .wallet-balances strong,
+.wallet-privacy .wallet-balances small {
+  filter: blur(8px);
+  user-select: none;
+}
+.wallet-danger-zone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid rgba(255, 100, 100, .34);
+  border-radius: 10px;
+  background: rgba(159, 63, 73, .08);
+}
+.wallet-danger-zone[hidden] { display: none; }
+.wallet-danger-zone > div { display: grid; gap: 5px; }
+.wallet-danger-zone span { color: #ff7b83; font-size: .68rem; font-weight: 700; text-transform: uppercase; }
+.wallet-danger-zone strong { color: #f4f5f2; font-size: .86rem; }
+.wallet-danger-zone p { margin: 0; color: var(--wallet-muted); font-size: .72rem; line-height: 1.5; }
+.wallet-danger-actions { min-width: 148px; }
+.wallet-danger-actions button { width: 100%; }
+.emergency-exit-dialog .bark-dialog-shell { width: min(570px, calc(100vw - 28px)); }
+.emergency-exit-status { padding: 13px; border: 1px solid var(--wallet-line); background: rgba(255,255,255,.025); line-height: 1.55; }
+.emergency-exit-fees { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; margin: 0; }
+.emergency-exit-fees div { display: contents; }
+.emergency-exit-fees dt { color: var(--wallet-muted); }
+.emergency-exit-fees dd { margin: 0; text-align: right; font-weight: 700; }
+.wallet-delete {
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid #a8414c;
+  border-radius: 8px;
+  background: #7d2933;
+  color: #fff;
+  font: 700 .72rem/1.25 "Roboto Mono", monospace;
+  cursor: pointer;
+}
+.wallet-delete:hover,
+.wallet-delete:focus-visible { background: #993642; outline: 2px solid rgba(255, 100, 100, .22); outline-offset: 2px; }
+.wallet-delete:disabled { cursor: wait; opacity: .55; }
+.delete-wallet-dialog .bark-dialog-shell { width: min(500px, calc(100vw - 28px)); }
+.delete-wallet-warning { padding: 12px; border-left: 3px solid #ff6464; background: rgba(255, 100, 100, .07); }
+.delete-wallet-warning strong { color: #ff8a91; }
 .reveal-seed-dialog label { display: grid; gap: 8px; color: #dfe1df; font-size: .76rem; font-weight: 700; }
 
 .wallet-qr {
@@ -980,6 +1124,14 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .ark-liveness-warning {
+    padding: 15px;
+  }
+
+  .ark-safety-links {
+    display: grid;
+  }
+
   .balance-band {
     align-items: flex-start;
     flex-direction: column;
@@ -1255,6 +1407,10 @@ body[data-wallet-network="signet"] .real-funds-warning { color: #a9dfb8 !importa
   .wallet-actions svg { width: 15px; height: 15px; }
   .wallet-actions span { font-size: .56rem; }
   .wallet-setting-row { align-items: stretch; flex-direction: column; }
+  .fee-rate-control { grid-template-columns: 1fr; }
+  .wallet-danger-zone { grid-template-columns: 1fr; }
+  .wallet-danger-zone .wallet-delete { width: 100%; }
+  .emergency-exit-dialog footer { flex-wrap: wrap; }
 }
 
 /* Lifetime picker in the notification consent dialog: the options sit in one row

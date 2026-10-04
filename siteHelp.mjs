@@ -91,17 +91,27 @@ function iconMarkup() {
     return '<i class="lni lni-question-mark-circle" aria-hidden="true"></i>';
 }
 
-function hasNearbyTopRightControl() {
-    return Boolean(document.querySelector('.wordlist-settings-trigger'));
-}
-
 const TOP_RIGHT_COMPANIONS = Object.freeze({
-    '/quotes.html': {selector: '#next-quote'},
-    '/converter.html': {selector: '.add-currency-icon', reparent: true},
-    '/news.html': {selector: '#openNewsSettings'},
+    '/quotes.html': {selector: '#next-quote', group: true, icon: true},
+    '/converter.html': {selector: '.add-currency-icon', group: true, icon: true},
+    '/news.html': {selector: '#openNewsSettings', group: true, icon: true},
     '/priceScanner.html': {selector: '.scanner-top-controls', wide: true},
-    '/wallet.html': {selector: '#openWalletSettings'}
+    '/isBip39.html': {selector: '#openWordlistSettings', group: true, icon: true},
+    '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true}
 });
+
+function groupTopRightControls(trigger, companion) {
+    let group = document.querySelector('.site-help-actions');
+    if (!group) {
+        group = document.createElement('div');
+        group.className = 'site-help-actions';
+        group.setAttribute('aria-label', 'Page controls');
+        document.body.append(group);
+    }
+    trigger.classList.add('site-help-trigger--grouped');
+    companion.classList.add('site-help-companion--grouped');
+    group.append(trigger, companion);
+}
 
 function alignTopRightControls(trigger) {
     const config = TOP_RIGHT_COMPANIONS[normalisePath(location.pathname)];
@@ -109,13 +119,17 @@ function alignTopRightControls(trigger) {
     const companion = document.querySelector(config.selector);
     if (!companion) return;
     companion.classList.add('site-help-companion');
+    if (config.icon) companion.classList.add('site-help-companion--icon');
+    if (config.group) {
+        groupTopRightControls(trigger, companion);
+        return;
+    }
     if (config.reparent) document.documentElement.append(companion);
     trigger.classList.add(config.wide ? 'site-help-trigger--wide-offset' : 'site-help-trigger--offset');
 }
 
 function styleExistingTrigger(trigger) {
     trigger.classList.add('site-help-trigger');
-    if (hasNearbyTopRightControl()) trigger.classList.add('site-help-trigger--offset');
     alignTopRightControls(trigger);
     trigger.innerHTML = iconMarkup();
     trigger.setAttribute('aria-haspopup', 'dialog');
@@ -132,7 +146,7 @@ function styleExistingTrigger(trigger) {
             trigger.click();
         });
     }
-    if (trigger.parentElement !== document.documentElement) document.documentElement.append(trigger);
+    if (!trigger.closest('.site-help-actions') && trigger.parentElement !== document.documentElement) document.documentElement.append(trigger);
 }
 
 function createHelpDialog(help) {
@@ -180,7 +194,7 @@ function createHelpTrigger(dialog, help) {
     trigger.innerHTML = iconMarkup();
     trigger.addEventListener('click', () => dialog.showModal());
     alignTopRightControls(trigger);
-    document.documentElement.append(trigger);
+    if (!trigger.closest('.site-help-actions')) document.documentElement.append(trigger);
 }
 
 export function initialiseSiteHelp() {

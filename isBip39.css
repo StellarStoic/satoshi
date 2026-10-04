@@ -161,6 +161,8 @@
     height: 21px;
 }
 
+.wordlist-settings-trigger .lni { display: block; font-size: 24px; line-height: 1; pointer-events: none; }
+
 .wordlist-settings-trigger:hover,
 .wordlist-settings-trigger:focus-visible,
 .wordlist-settings-close:hover,

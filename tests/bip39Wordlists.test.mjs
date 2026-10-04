@@ -12,6 +12,7 @@ import {
   spanishWordlist,
   traditionalChineseWordlist,
 } from '../vendor/bip39.mjs';
+import {readBip39Position, wordAtBip39Position} from '../bip39Lookup.mjs';
 
 const wordlists = {
   czechWordlist,
@@ -37,4 +38,18 @@ test('reports one-based BIP39 word positions', () => {
   assert.equal(englishWordlist.indexOf('abandon') + 1, 1);
   assert.equal(englishWordlist.indexOf('man') + 1, 1079);
   assert.equal(englishWordlist.indexOf('zoo') + 1, 2048);
+});
+
+test('looks up one-based positions in the selected BIP39 wordlist', () => {
+  assert.equal(wordAtBip39Position(englishWordlist, '1').word, 'abandon');
+  assert.equal(wordAtBip39Position(englishWordlist, ' 2048 ').word, 'zoo');
+  assert.equal(wordAtBip39Position(spanishWordlist, '1').word.normalize('NFC'), 'ábaco');
+  assert.equal(wordAtBip39Position(japaneseWordlist, '15').word.normalize('NFC'), 'あずき');
+});
+
+test('distinguishes words from invalid BIP39 positions', () => {
+  assert.deepEqual(readBip39Position('alien'), {isPosition: false, valid: false});
+  assert.equal(readBip39Position('0').isPosition, true);
+  assert.equal(readBip39Position('0').valid, false);
+  assert.equal(readBip39Position('2049').valid, false);
 });

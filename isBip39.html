@@ -121,7 +121,7 @@
       <i class="lni lni-question-mark-circle"></i>
     </button>
     <button type="button" class="wordlist-settings-trigger" id="openWordlistSettings" aria-label="Choose wordlist language" title="Wordlist language">
-      <i data-lucide="settings" aria-hidden="true"></i>
+      <i class="lni lni-gear-1" aria-hidden="true"></i>
     </button>
 
     <main id="bip39-page" class="word-field-page">
@@ -129,8 +129,8 @@
         <div id="suggestions" class="word-field-suggestions" aria-label="Similar BIP39 words"></div>
         <div class="word-field-core">
           <h1 id="word-field-title">Is it a BIP39 word?</h1>
-          <label class="visually-hidden" for="bip39Input">Enter one word</label>
-          <input type="text" id="bip39Input" placeholder="alien" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+          <label class="visually-hidden" for="bip39Input">Enter a word or a position from 1 to 2048</label>
+          <input type="text" id="bip39Input" placeholder="word or 1–2048" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
           <p id="wordValidityInfo" class="word-validity-info" role="status" aria-live="polite"></p>
         </div>
         <noscript><p class="word-field-noscript">JavaScript is required to check the BIP39 list.</p></noscript>
@@ -164,7 +164,7 @@
     <span class="close-icon" id="closeBipModal">&times;</span>
     <h4 style="text-align:center;">BIP39 words</h4>
     <p>This checks the official <a href="https://github.com/bitcoin/bips/tree/master/bip-0039" target="_blank" rel="noopener"><strong>BIP39 wordlists</strong></a> used by many Bitcoin wallets.</p>
-    <p>The surrounding words are valid BIP39 alternatives ranked by spelling and sound, including words with different first letters. Everything runs locally in this browser.</p>
+    <p>Enter a word to check it, or a position from 1 to 2,048 to find the word at that position in the selected language. The surrounding words are valid BIP39 alternatives ranked by spelling and sound, including words with different first letters. Everything runs locally in this browser.</p>
 
   </div>
 </div>

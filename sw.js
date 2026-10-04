@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v138';
+const CACHE = 'satoshi-static-v149';
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md',
@@ -12,7 +12,7 @@ const CORE = [
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js',
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
-    '/isBip39.html', '/isBip39.css', '/isBip39.js', '/vendor/bip39.mjs',
+    '/isBip39.html', '/isBip39.css', '/isBip39.js', '/bip39Lookup.mjs', '/vendor/bip39.mjs',
     '/entropy.html', '/entropy.css', '/entropy.mjs', '/entropyModel.mjs',
     '/21fm.html', '/lofi.css', '/lofi.mjs', '/lofiModel.mjs', '/lofiInstruments.mjs', '/lofiRealSounds.mjs', '/vendor/tone/Tone.js', '/vendor/tone/Tone.js.map',
     '/stego.html', '/stego.css', '/stego/emojiConfetti.css', '/stego/foundSecrets.css',

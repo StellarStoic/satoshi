@@ -40,6 +40,56 @@
     margin: 0 !important;
 }
 
+.site-help-companion.site-help-companion--icon {
+    display: grid !important;
+    place-items: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #888 !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+}
+
+.site-help-companion.site-help-companion--icon .lni {
+    display: block;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    pointer-events: none;
+}
+
+.site-help-companion.site-help-companion--icon:hover,
+.site-help-companion.site-help-companion--icon:focus-visible {
+    color: #f2a900 !important;
+    outline: none !important;
+}
+
+.site-help-actions {
+    position: fixed !important;
+    top: calc(18px + env(safe-area-inset-top)) !important;
+    right: max(16px, env(safe-area-inset-right)) !important;
+    z-index: 2200 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.site-help-actions .site-help-trigger.site-help-trigger--grouped,
+.site-help-actions .site-help-companion.site-help-companion--grouped {
+    position: static !important;
+    inset: auto !important;
+    flex: 0 0 40px !important;
+    margin: 0 !important;
+}
+
 .site-help-trigger:hover,
 .site-help-trigger:focus-visible {
     color: #f2a900 !important;

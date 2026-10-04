@@ -25,8 +25,8 @@
     z-index: 1000;   /* High z-index to ensure it appears above other content */
 }
 
-.satoshis-display {
-    font-family: 'East Sea Dokdo', cursive;
+body:not(:has(#text1)) .satoshis-display {
+    font-family: 'East Sea Dokdo', cursive !important;
     display: inline-block; /* Allows the use of text-align from the container */
     font-size: calc((100vw - 30px) / 3); /* Dynamically adjust font size */
     color: #f2a900; /* Your specified color */
@@ -44,6 +44,4 @@
     color: #888; /* Icon color */
     cursor: pointer;
 }
-
-
 

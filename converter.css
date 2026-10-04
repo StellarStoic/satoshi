@@ -216,13 +216,21 @@ body > #menu,
     position: fixed;
     top: 23px;
     right: 20px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
     background-color: #5c735100;
     color: #888;
     cursor: pointer;
-    font-size: 43px;
-    font-weight: bolder;
+    font-size: 24px;
+    line-height: 1;
     transition: background-color 0.3s ease;
 }
+
+.add-currency-icon .lni { display: block; font-size: 24px; line-height: 1; pointer-events: none; }
 
 .add-currency-icon:hover {
     color: #fefffe;

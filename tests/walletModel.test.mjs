@@ -14,6 +14,7 @@ import {
   normalizeMnemonic,
   parseBolt11AmountSats,
   recommendedOnchainFeeRate,
+  requiredSatsForEstimate,
   receivedMovementAmount,
   selectAuthorizationSeconds,
 } from '../walletModel.mjs';
@@ -50,12 +51,17 @@ test('totals Bark balance buckets and formats sats', () => {
   assert.match(formatSats(1234), /1[,.\s]234 sats/);
 });
 
-test('converts Bark chain fee rates from sat/kwu to whole sat/vB', () => {
-  const rates = {slowSatPerKwu: 251, regularSatPerKwu: 500, fastSatPerKwu: 751};
-  assert.equal(recommendedOnchainFeeRate(rates, 'slow'), 2);
+test('converts Bark chain fee rates from sat/kwu without forcing a 1 sat/vB floor', () => {
+  const rates = {slowSatPerKwu: 125, regularSatPerKwu: 500, fastSatPerKwu: 751};
+  assert.equal(recommendedOnchainFeeRate(rates, 'slow'), 0.5);
   assert.equal(recommendedOnchainFeeRate(rates, 'regular'), 2);
-  assert.equal(recommendedOnchainFeeRate(rates, 'fast'), 4);
+  assert.equal(recommendedOnchainFeeRate(rates, 'fast'), 3.01);
   assert.equal(recommendedOnchainFeeRate({}, 'regular'), 1);
+});
+
+test('uses Bark gross amount without adding the fee twice', () => {
+  assert.equal(requiredSatsForEstimate({grossAmountSats: 1_000, feeSats: 100, netAmountSats: 900}, 900), 1_000);
+  assert.equal(requiredSatsForEstimate({feeSats: 100}, 900), 1_000);
 });
 
 test('rejects Bitcoin addresses from the other network before sending', () => {
