@@ -6,6 +6,7 @@ import {
   describeBackgroundNotificationError,
   formatSats,
   notificationLifetimeLabel,
+  notificationRenewalDue,
   notificationMovement,
   normalizeMnemonic,
   parseBolt11AmountSats,
@@ -110,4 +111,27 @@ test('names the chosen period for the confirmation notice', () => {
   assert.equal(notificationLifetimeLabel(15_552_000), '6 months');
   assert.equal(notificationLifetimeLabel(31_536_000), '1 year');
   assert.equal(notificationLifetimeLabel(172_800), '2 days');
+});
+
+test('renews before a grant can lapse, not only in its final hours', () => {
+  const now = 2_000_000_000;
+  const year = {id: 'x', expiresAt: now + 31_536_000, lifetimeSeconds: 31_536_000};
+  // Freshly granted: an open must not reissue a capability for nothing.
+  assert.equal(notificationRenewalDue(year, now), false);
+  // Just past a tenth of the period: the next open rolls it forward.
+  assert.equal(notificationRenewalDue({...year, expiresAt: now + 31_536_000 - 3_153_601}, now), true);
+  // Under half remaining always qualifies, whatever the throttle says.
+  assert.equal(notificationRenewalDue({id: 'x', expiresAt: now + 15_000_000, lifetimeSeconds: 31_536_000}, now), true);
+  // Expired: an open cannot revive it, only pressing the button can.
+  assert.equal(notificationRenewalDue({id: 'x', expiresAt: now - 1, lifetimeSeconds: 31_536_000}, now), false);
+  assert.equal(notificationRenewalDue(null, now), false);
+});
+
+test('a 24-hour grant renews on the first open after a couple of hours', () => {
+  const now = 2_000_000_000;
+  const day = {id: 'x', expiresAt: now + 86_400, lifetimeSeconds: 86_400};
+  assert.equal(notificationRenewalDue(day, now), false);
+  assert.equal(notificationRenewalDue({...day, expiresAt: now + 86_400 - 9_000}, now), true);
+  // A grant stored before this change has no period recorded: assume a day.
+  assert.equal(notificationRenewalDue({id: 'x', expiresAt: now + 40_000}, now), true);
 });

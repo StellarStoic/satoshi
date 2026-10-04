@@ -73,6 +73,26 @@ export function notificationLifetimeLabel(seconds) {
   return hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hours`;
 }
 
+// Alerts only keep working while the mailbox authorization stays valid, and the
+// wallet is the only place that can re-sign one. Renewing on every unlock would
+// tell the notification service each time the wallet is opened and would reissue
+// a read capability far more often than necessary, so the clock is reset once a
+// tenth of the period has passed, and always once under half of it remains. A
+// lapse then needs the wallet to be ignored for over half the chosen period.
+const RENEWAL_ELAPSED_FRACTION = 10;
+const RENEWAL_REMAINING_FRACTION = 2;
+
+export function notificationRenewalDue(state, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const expiresAt = Number(state?.expiresAt);
+  if (!state?.id || !Number.isFinite(expiresAt) || expiresAt <= 0) return false;
+  const period = Number(state?.lifetimeSeconds) > 0 ? Number(state.lifetimeSeconds) : 86_400;
+  const remaining = expiresAt - nowSeconds;
+  // Expired: renewing cannot revive it, the user has to enable alerts again.
+  if (remaining <= 0) return false;
+  const elapsed = period - remaining;
+  return remaining <= period / RENEWAL_REMAINING_FRACTION || elapsed >= period / RENEWAL_ELAPSED_FRACTION;
+}
+
 const PUSH_UNREACHABLE = /push service error|registration failed/i;
 
 // Turns the browser's opaque "Registration failed - push service error" into

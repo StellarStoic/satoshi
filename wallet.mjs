@@ -5,7 +5,7 @@ import init, {
   validateArkAddress,
   validateMnemonic,
 } from './vendor/bark/bark_ffi_wasm.js';
-import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
+import {balanceTotal, classifyPaymentDestination, describeBackgroundNotificationError, formatSats, normalizeMnemonic, notificationLifetimeLabel, notificationMovement, notificationRenewalDue, parseBolt11AmountSats, receivedMovementAmount, selectAuthorizationSeconds} from './walletModel.mjs';
 import {englishWordlist} from './vendor/bip39.mjs';
 import {
   LEGACY_WALLET_PROFILE_KEY,
@@ -664,8 +664,10 @@ async function disableBackgroundNotifications() {
 }
 
 async function renewBackgroundNotifications() {
+  // Called whenever the wallet is opened, so a grant rolls forward from the last
+  // time it was used instead of expiring silently while nobody was watching.
   const state = readPushState();
-  if (!state || state.expiresAt - Date.now() / 1000 > 6 * 60 * 60) return;
+  if (!notificationRenewalDue(state)) return;
   try { await enableBackgroundNotifications({quiet: true}); } catch { /* Foreground alerts still work. */ }
 }
 
