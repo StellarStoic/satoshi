@@ -65,7 +65,10 @@ const MENU_ITEMS = [
         {label: 'Exchange', href: '/exchange.html'},
         {label: 'P2P Bitcoin Offers', href: '/offers.html'},
     ]},
-    {label: 'Nostr', children: [{label: 'NIP-05', href: '/nip05.html'}]},
+    {label: 'Nostr', children: [
+        {label: 'NIP-05', href: '/nip05.html'},
+        {label: 'NIP-05 name store', href: '/nip05store.html'},
+    ]},
     {label: 'Games', children: [
         {label: 'Game39 Multi Player', href: '/game39.html'},
         {label: 'Game39 Single Player', href: '/game39single.html'},
