@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package bark_server;
+
+service ArkService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse) {}
+}
+
+message HandshakeRequest {
+  optional string bark_version = 1;
+}
+
+message HandshakeResponse {
+  uint64 min_protocol_version = 1;
+  uint64 max_protocol_version = 2;
+  optional string psa = 3;
+}

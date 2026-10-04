@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package mailbox_server;
+
+service MailboxService {
+  rpc SubscribeMailbox(MailboxRequest) returns (stream MailboxMessage);
+}
+
+message MailboxRequest {
+  bytes mailbox_id = 1;
+  optional bytes authorization = 2;
+  uint64 checkpoint = 3;
+}
+
+message MailboxMessage {
+  reserved 3;
+  oneof message {
+    ArkoorMessage arkoor = 1;
+    RoundParticipationCompleted round_participation_completed = 4;
+    IncomingLightningPaymentMessage incoming_lightning_payment = 5;
+    RecoveryVtxoIdsMessage recovery_vtxo_ids = 6;
+    LightningSendFinishedMessage lightning_send_finished = 7;
+  }
+  uint64 checkpoint = 2;
+}
+
+message ArkoorMessage { repeated bytes vtxos = 1; }
+message RoundParticipationCompleted { repeated bytes payment_hashes = 1; bytes unlock_hash = 2; }
+message IncomingLightningPaymentMessage { bytes payment_hash = 1; uint64 amount_msat = 2; }
+message RecoveryVtxoIdsMessage { repeated bytes vtxo_ids = 1; }
+message LightningSendFinishedMessage { bytes payment_hash = 1; optional bytes preimage = 2; }

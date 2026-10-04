@@ -1,0 +1,25 @@
+[Unit]
+Description=Satoshi.si Bark wallet push notifier
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=satoshi-wallet-push
+Group=satoshi-wallet-push
+WorkingDirectory=/opt/satoshi/services/wallet-push
+EnvironmentFile=-/etc/satoshi-wallet-push.env
+Environment=STATE_FILE=/var/lib/satoshi-wallet-push/subscriptions.json
+ExecStart=/usr/bin/node src/server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/satoshi-wallet-push
+StateDirectory=satoshi-wallet-push
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

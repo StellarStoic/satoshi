@@ -1,9 +1,11 @@
-const CACHE = 'satoshi-static-v122';
+const CACHE = 'satoshi-static-v131';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
     '/settings.html', '/settings.css', '/settings.js',
     '/selfCustody.html', '/selfCustody.css', '/selfCustody.js',
+    '/wallet.html', '/wallet.css', '/wallet.mjs', '/walletModel.mjs', '/walletSecurity.mjs', '/qrCodeGenerator_1_4_4.js',
+    '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
@@ -52,7 +54,8 @@ self.addEventListener('fetch', event => {
     const offersData = url.pathname === '/offers-data.json';
     const lofiAudio = url.pathname.startsWith('/audio/lofi/');
     const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
-    if ((!navigation && !asset && !livingData && !newsData && !offersData && !lofiAudio && !scannerAsset) || url.search) return;
+    const walletAsset = url.pathname.startsWith('/vendor/bark/');
+    if ((!navigation && !asset && !livingData && !newsData && !offersData && !lofiAudio && !scannerAsset && !walletAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         // Versioned, self-hosted OCR assets are large and immutable within a release.
@@ -73,4 +76,28 @@ self.addEventListener('fetch', event => {
             return Response.error();
         }
     })());
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    const target = new URL(event.notification.data?.url || '/wallet.html', self.location.origin).href;
+    event.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then(windows => {
+        const walletWindow = windows.find(client => new URL(client.url).pathname.endsWith('/wallet.html'));
+        if (walletWindow) return walletWindow.navigate(target).then(client => client?.focus());
+        return self.clients.openWindow(target);
+    }));
+});
+
+self.addEventListener('push', event => {
+    let message = {};
+    try { message = event.data?.json?.() || {}; } catch { /* Use the private fallback below. */ }
+    const title = message.title || 'Bitcoin received';
+    event.waitUntil(self.registration.showNotification(title, {
+        body: message.body || 'Open your Satoshi.si wallet to view the payment.',
+        icon: '/android-chrome-192x192.png',
+        badge: '/favicon-32x32.png',
+        tag: message.tag || 'bark-mailbox',
+        renotify: true,
+        data: {url: message.url || '/wallet.html'},
+    }));
 });

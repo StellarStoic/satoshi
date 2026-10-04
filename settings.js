@@ -11,6 +11,18 @@
 })();
 
 (() => {
+  const timeout = document.getElementById('walletAutoLockMinutes');
+  const key = 'satoshiBarkAutoLockMinutes';
+  let value = '5';
+  try { value = localStorage.getItem(key) || value; } catch { /* Use secure default. */ }
+  if (![...timeout.options].some(option => option.value === value)) value = '5';
+  timeout.value = value;
+  timeout.addEventListener('change', () => {
+    try { localStorage.setItem(key, timeout.value); } catch { /* Applies after storage is available. */ }
+  });
+})();
+
+(() => {
   const output = document.getElementById('pwaVersion');
   const cachePrefix = 'satoshi-static-v';
   const numericVersion = name => Number.parseInt(name.slice(cachePrefix.length), 10);

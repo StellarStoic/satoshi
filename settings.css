@@ -9,5 +9,6 @@
 .setting-row span { color: #92979a; font-size: 11px; }
 .setting-row input { width: 42px; height: 22px; accent-color: #f2a900; cursor: pointer; }
 .setting-row input:disabled { opacity: .45; cursor: wait; }
+.setting-row select { min-width: 86px; padding: 8px 9px; border: 1px solid #555a5e; border-radius: 6px; color: #e6e6e6; background: #17191a; font: 600 11px/1.2 "Roboto Mono", monospace; }
 .pwa-version { margin: 28px 0 0; color: #686d70; font-size: 10px; text-align: center; }
 .pwa-version strong { color: #92979a; font-weight: 500; }

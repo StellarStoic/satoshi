@@ -7,14 +7,17 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
 }
 
 const SATOSHI_CHAT_SETTING = 'satoshiChatEnabled';
+const SENSITIVE_WALLET_PAGE = location.pathname === '/wallet.html';
 
-if (!document.querySelector('link[href="/analytics.css"]')) {
+if (!SENSITIVE_WALLET_PAGE && !document.querySelector('link[href="/analytics.css"]')) {
     const analyticsStyles = document.createElement('link');
     analyticsStyles.rel = 'stylesheet';
     analyticsStyles.href = '/analytics.css';
     document.head.append(analyticsStyles);
 }
-import('/analytics.mjs').catch(error => console.warn('Analytics consent could not be loaded:', error));
+if (!SENSITIVE_WALLET_PAGE) {
+    import('/analytics.mjs').catch(error => console.warn('Analytics consent could not be loaded:', error));
+}
 import('/seo.mjs').catch(error => console.warn('SEO metadata could not be loaded:', error));
 
 if (!document.querySelector('link[href*="lineicons.com"]')) {
@@ -36,6 +39,7 @@ const menu = document.getElementById('menu');
 const menuToggle = document.getElementById('toggle');
 const MENU_ITEMS = [
     {label: 'Home', href: '/index.html'},
+    {label: 'Wallet ₿', href: '/wallet.html'},
     {label: 'Knowledge', children: [
         {label: 'Bitcoin whitepaper', href: '/whitepaper.html'},
         {label: 'Self-custody', href: '/selfCustody.html'},
@@ -119,7 +123,7 @@ if (document.querySelector('.footer')) {
 let chatEnabled = true;
 try { chatEnabled = localStorage.getItem(SATOSHI_CHAT_SETTING) !== 'false'; } catch { /* Use the default. */ }
 const animatedHome = ['/', '/index.html'].includes(location.pathname);
-if (chatEnabled && !animatedHome) {
+if (chatEnabled && !animatedHome && !SENSITIVE_WALLET_PAGE) {
     if (!document.querySelector('link[href="/satoshiChat.css"]')) {
         const chatStyles = document.createElement('link');
         chatStyles.rel = 'stylesheet';

@@ -13,6 +13,7 @@
 | [Words of Satoshi](https://satoshi.si/quotes.html) | Shuffled quotes, click-to-copy, two-minute rotation, and a subtle desktop control for the next quote. |
 | [Bitcoin whitepaper](https://satoshi.si/whitepaper.html) | A collection of translations, with contributions welcome to make Bitcoin knowledge accessible in more languages. |
 | [Self-custody](https://satoshi.si/selfCustody.html) | A newcomer-friendly guide to mobile, desktop and Lightning wallets, signing devices and full nodes, from BlueWallet and Sparrow through SeedSigner, Cupcake, the BitBox02 Bitcoin-only edition and Bitcoin Core. |
+| [Bark Wallet](https://satoshi.si/wallet.html) | An experimental self-custodial Bark wallet powered by WebAssembly. Learn with free test sats on Bitcoin Signet, then switch to a separate mainnet wallet for Ark, Lightning, Lightning Address, and on-chain payments. Each network keeps its own password-encrypted local profile and wallet database. |
 | [BIP39 word checker](https://satoshi.si/isBip39.html) | Type one word and explore similar words from any of the ten official BIP39 language lists. Validation and suggestions run locally and work offline. |
 | [History chart](https://satoshi.si/chart.html) | Explore currencies and other assets priced in sats, with time ranges, linear/logarithmic scales, historical events, snapshots, and CSV/JSON exports. |
 | [Moscow Time](https://satoshi.si/MoscowTime.html) | A sats-per-dollar view of Bitcoin's price. |
@@ -65,6 +66,7 @@ See [BIP39 implementation notes](docs/bip39-playground.md) for details about the
 - **Frankfurter:** historical fiat conversion rates in the data-generation script, plus exchange rates used by the chart.
 - **Sintra:** live Bitcoin prices used by price-related tools.
 - **mempool.space:** block and fee information.
+- **Bark SDK:** the pinned `@secondts/bark` 0.25.0 WebAssembly release powers the experimental browser wallet, using Second's public Ark and Esplora services on Bitcoin Signet or mainnet. Network wallets are isolated in separate IndexedDB databases and password-encrypted profiles. Recovery profiles use PBKDF2-SHA-256 and AES-256-GCM; passwords are never stored. The page does not operate a custodian or wallet backend.
 - **nostr-tools:** bundled NIP-19, NIP-44, and NIP-46 support for recipient-locked steganography, with a NIP-55 web handoff for Amber and compatible Android signers. Keys and plaintext are processed in the browser or signer.
 - **Tone.js:** the bundled MIT-licensed Web Audio framework used for 21FM scheduling, sampling, synthesis and effects.
 - **tonejs-instruments:** the complete MP3 note set for all 20 upstream instruments, used by 21FM under CC BY 3.0. Only the current block's selected instruments are loaded; the original contributors and sample authors are credited in [`audio/lofi/README.md`](audio/lofi/README.md).

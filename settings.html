@@ -55,6 +55,21 @@
       </label>
       <input type="checkbox" id="analyticsEnabled" role="switch">
     </section>
+    <section class="setting-row" id="walletSecurity">
+      <span class="setting-icon" aria-hidden="true">LOCK</span>
+      <label for="walletAutoLockMinutes">
+        <strong>Bitcoin Wallet auto-lock</strong>
+        <span>Lock after inactivity</span>
+      </label>
+      <select id="walletAutoLockMinutes" aria-label="Wallet inactivity timeout">
+        <option value="1">1 min</option>
+        <option value="5">5 min</option>
+        <option value="15">15 min</option>
+        <option value="30">30 min</option>
+        <option value="60">1 hour</option>
+        <option value="0">Never (not recommended)</option>
+      </select>
+    </section>
     <p class="pwa-version">PWA version <strong id="pwaVersion">checking...</strong></p>
   </main>
 

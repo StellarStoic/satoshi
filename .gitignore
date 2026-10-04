@@ -5,6 +5,9 @@
 !/tools/price-scanner/
 !/tools/lofi/
 /tools/price-scanner/node_modules/
+/services/wallet-push/node_modules/
+/services/wallet-push/data/
+/services/wallet-push/.env
 __pycache__/
 .vscode
 converter copy.html
