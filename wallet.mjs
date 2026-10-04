@@ -85,7 +85,7 @@ let notificationRefreshTimer;
 let paymentToastTimer;
 let pushServiceAvailable = false;
 const seenIncomingMovements = new Set();
-const PUSH_API = 'https://mcp.satoshi.si/wallet-notifications/v1';
+const PUSH_API = 'https://notify.satoshi.si/wallet-notifications/v1';
 const PUSH_STATE_PREFIX = 'satoshiBarkPushV1:';
 
 function readJson(key) {
@@ -583,30 +583,48 @@ async function enableBackgroundNotifications({quiet = false} = {}) {
   const config = await configResponse.json();
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
+  const applicationServerKey = vapidKeyBytes(config.vapidPublicKey);
+  if (subscription?.options?.applicationServerKey) {
+    const existingKey = new Uint8Array(subscription.options.applicationServerKey);
+    const keyMatches = existingKey.length === applicationServerKey.length
+      && existingKey.every((byte, index) => byte === applicationServerKey[index]);
+    if (!keyMatches) {
+      await subscription.unsubscribe();
+      subscription = null;
+    }
+  }
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: vapidKeyBytes(config.vapidPublicKey),
+      applicationServerKey,
     });
   }
 
   const authorizationSeconds = Math.min(86400, Number(config.authorizationSeconds) || 86400);
-  const response = await fetch(`${PUSH_API}/subscriptions`, {
-    method: 'POST',
+  const existing = readPushState();
+  const requestBody = JSON.stringify({
+    network: activeNetwork.id,
+    serverAddress: activeNetwork.serverAddress,
+    mailboxIdentifier: wallet.mailboxIdentifier(),
+    authorization: wallet.mailboxAuthorization(authorizationSeconds),
+    subscription: subscription.toJSON(),
+  });
+  const sendRegistration = (method, url, secret = '') => fetch(url, {
+    method,
     mode: 'cors',
     credentials: 'omit',
-    headers: {'content-type': 'application/json'},
-    body: JSON.stringify({
-      network: activeNetwork.id,
-      serverAddress: activeNetwork.serverAddress,
-      mailboxIdentifier: wallet.mailboxIdentifier(),
-      authorization: wallet.mailboxAuthorization(authorizationSeconds),
-      subscription: subscription.toJSON(),
-    }),
+    headers: {'content-type': 'application/json', ...(secret ? {authorization: `Bearer ${secret}`} : {})},
+    body: requestBody,
   });
+  let response = existing
+    ? await sendRegistration('PUT', `${PUSH_API}/subscriptions/${existing.id}`, existing.secret)
+    : await sendRegistration('POST', `${PUSH_API}/subscriptions`);
+  if (existing && response.status === 404) {
+    response = await sendRegistration('POST', `${PUSH_API}/subscriptions`);
+  }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'Could not register background notifications.');
-  writePushState({id: result.id, secret: result.secret, expiresAt: result.expiresAt});
+  writePushState({id: result.id, secret: result.secret || existing?.secret, expiresAt: result.expiresAt});
   updateNotificationPermissionUi();
   if (!quiet) setNotice('Background payment alerts are active for 24 hours.', 'success');
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorizationExpiry, currentMailboxCheckpoint, validateDelegation} from '../src/validation.mjs';
+import {authorizationExpiry, currentMailboxCheckpoint, redactLogValue, validateDelegation} from '../src/validation.mjs';
 
 function body(now, overrides = {}) {
   const mailbox = Buffer.concat([Buffer.from([2]), Buffer.alloc(32, 7)]);
@@ -38,6 +38,19 @@ test('rejects mismatched networks and arbitrary push destinations', () => {
   const request = body(now);
   request.subscription.endpoint = 'https://127.0.0.1/private';
   assert.throws(() => validateDelegation(request, now), /Unsupported Web Push provider/);
+});
+
+test('refuses sensitive wallet material instead of silently ignoring it', () => {
+  const now = 2_000_000_000;
+  assert.throws(() => validateDelegation({...body(now), mnemonic: 'never accept this'}, now), /forbidden: mnemonic/);
+  assert.throws(() => validateDelegation({...body(now), xprv: 'never accept this'}, now), /forbidden: xprv/);
+  assert.throws(() => validateDelegation({...body(now), extra: {recovery_phrase: 'never accept this'}}, now), /forbidden: recovery_phrase/);
+});
+
+test('redacts capabilities, bearer tokens, and URLs from future log messages', () => {
+  const authorization = 'a'.repeat(210);
+  const output = redactLogValue(`failed ${authorization} Bearer abc_123 https://push.example/private`);
+  assert.equal(output, 'failed [redacted-mailbox-authorization] Bearer [redacted] [redacted-url]');
 });
 
 test('starts a subscription cursor at the current Bark time-based checkpoint', () => {

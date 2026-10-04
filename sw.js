@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v131';
+const CACHE = 'satoshi-static-v132';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',

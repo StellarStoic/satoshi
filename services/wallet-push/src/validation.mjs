@@ -12,6 +12,32 @@ const PUSH_HOST_SUFFIXES = [
   'web.push.apple.com',
   'notify.windows.com',
 ];
+const SENSITIVE_BODY_FIELDS = new Set([
+  'mnemonic', 'seed', 'seedphrase', 'recoveryphrase', 'xprv', 'privatekey', 'nsec',
+]);
+
+export function rejectSensitiveFields(body) {
+  const visit = (value, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 4) return null;
+    for (const [field, nested] of Object.entries(value)) {
+      const normalized = field.replace(/[-_]/g, '').toLowerCase();
+      if (SENSITIVE_BODY_FIELDS.has(normalized)) return field;
+      const found = visit(nested, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  const found = visit(body);
+  if (found) throw new Error(`Sensitive wallet field is forbidden: ${found}`);
+}
+
+export function redactLogValue(value) {
+  return String(value ?? '')
+    .replace(/\b[0-9a-f]{210}\b/gi, '[redacted-mailbox-authorization]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~-]+/gi, 'Bearer [redacted]')
+    .replace(/https:\/\/[^\s)\]}]+/gi, '[redacted-url]')
+    .slice(0, 500);
+}
 
 export function decodeHex(value, expectedBytes, label) {
   if (typeof value !== 'string' || value.length !== expectedBytes * 2 || !/^[0-9a-f]+$/i.test(value)) {
@@ -27,6 +53,7 @@ export function authorizationExpiry(authorization) {
 
 export function validateDelegation(body, nowSeconds = Math.floor(Date.now() / 1000)) {
   if (!body || typeof body !== 'object') throw new Error('Request body is required');
+  rejectSensitiveFields(body);
   if (!ALLOWED_SERVERS.has(body.serverAddress)) throw new Error('Unsupported Ark server');
   if (!['mainnet', 'signet'].includes(body.network)) throw new Error('Unsupported Bitcoin network');
   if ((body.network === 'mainnet') !== (body.serverAddress === 'https://ark.second.tech')) {

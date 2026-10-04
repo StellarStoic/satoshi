@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import webpush from 'web-push';
-import {currentMailboxCheckpoint, publicRecord, validateDelegation} from './validation.mjs';
+import {currentMailboxCheckpoint, publicRecord, redactLogValue, validateDelegation} from './validation.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const protoDirectory = path.resolve(directory, '../proto');
@@ -50,7 +50,7 @@ async function initializeVapid() {
 function corsHeaders(origin) {
   return origin === ALLOWED_ORIGIN ? {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'content-type, authorization',
     'access-control-max-age': '86400',
     vary: 'Origin',
@@ -108,7 +108,7 @@ async function notify(record) {
       await persist();
       return;
     }
-    console.error(`Push failed for ${record.id}:`, error.statusCode || error.message);
+    console.error(`Push failed for ${record.id}: ${redactLogValue(error.statusCode || error.message)}`);
   }
 }
 
@@ -183,7 +183,7 @@ function startWatcher(record) {
 function retryWatcher(record, reason) {
   stopWatcher(record.id);
   if (!records.has(record.id) || record.expiresAt <= Math.floor(Date.now() / 1000)) return;
-  console.warn(`Mailbox watcher ${record.id} reconnecting: ${reason}`);
+  console.warn(`Mailbox watcher ${record.id} reconnecting: ${redactLogValue(reason)}`);
   const retryTimer = setTimeout(() => startWatcher(record), 5000);
   streams.set(record.id, {retryTimer, cancel() { clearTimeout(retryTimer); }});
 }
@@ -198,6 +198,13 @@ async function loadState() {
     if (error.code !== 'ENOENT') throw error;
   }
   for (const record of records.values()) startWatcher(record);
+}
+
+function authorizedRecord(request, record) {
+  const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const supplied = crypto.createHash('sha256').update(token).digest();
+  const expected = Buffer.from(record.secretHash, 'hex');
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
 }
 
 const server = http.createServer(async (request, response) => {
@@ -244,13 +251,31 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
-  const deletion = url.pathname.match(/^\/wallet-notifications\/v1\/subscriptions\/([a-f0-9]{32})$/);
-  if (request.method === 'DELETE' && deletion) {
-    const record = records.get(deletion[1]);
-    const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const supplied = crypto.createHash('sha256').update(token).digest();
-    const expected = Buffer.from(record?.secretHash || ''.padStart(64, '0'), 'hex');
-    if (!record || expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+  const subscriptionRoute = url.pathname.match(/^\/wallet-notifications\/v1\/subscriptions\/([a-f0-9]{32})$/);
+  if (request.method === 'PUT' && subscriptionRoute) {
+    try {
+      const record = records.get(subscriptionRoute[1]);
+      if (!record || !authorizedRecord(request, record)) return json(response, 404, {error: 'Subscription not found'}, origin);
+      const body = await readJson(request);
+      const validated = validateDelegation(body);
+      const expectedId = crypto.createHash('sha256').update(`${validated.subscription.endpoint}:${body.mailboxIdentifier}`).digest('hex').slice(0, 32);
+      if (expectedId !== record.id || body.network !== record.network || body.serverAddress !== record.serverAddress) {
+        return json(response, 400, {error: 'Renewal does not match the existing subscription'}, origin);
+      }
+      record.authorization = body.authorization.toLowerCase();
+      record.expiresAt = validated.expiresAt;
+      record.subscription = validated.subscription;
+      await persist();
+      startWatcher(record);
+      return json(response, 200, publicRecord(record), origin);
+    } catch (error) {
+      return json(response, 400, {error: error.message}, origin);
+    }
+  }
+
+  if (request.method === 'DELETE' && subscriptionRoute) {
+    const record = records.get(subscriptionRoute[1]);
+    if (!record || !authorizedRecord(request, record)) {
       return json(response, 404, {error: 'Subscription not found'}, origin);
     }
     records.delete(record.id);
