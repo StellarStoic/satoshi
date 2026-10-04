@@ -1,6 +1,6 @@
-const CACHE = 'satoshi-static-v132';
+const CACHE = 'satoshi-static-v133';
 const CORE = [
-    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs',
+    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
     '/settings.html', '/settings.css', '/settings.js',
     '/selfCustody.html', '/selfCustody.css', '/selfCustody.js',
@@ -52,10 +52,11 @@ self.addEventListener('fetch', event => {
     const livingData = url.pathname === '/historical_data/generated/living-EU-observed.json';
     const newsData = url.pathname === '/news-data.json';
     const offersData = url.pathname === '/offers-data.json';
+    const aiContext = url.pathname === '/AI_CONTEXT.md';
     const lofiAudio = url.pathname.startsWith('/audio/lofi/');
     const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
     const walletAsset = url.pathname.startsWith('/vendor/bark/');
-    if ((!navigation && !asset && !livingData && !newsData && !offersData && !lofiAudio && !scannerAsset && !walletAsset) || url.search) return;
+    if ((!navigation && !asset && !livingData && !newsData && !offersData && !aiContext && !lofiAudio && !scannerAsset && !walletAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         // Versioned, self-hosted OCR assets are large and immutable within a release.
