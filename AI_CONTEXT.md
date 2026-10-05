@@ -88,6 +88,7 @@ Use the selected page section to answer questions such as "What does this button
     - **Send form (`#sendForm`)**: Pay an Ark address, Lightning invoice, Lightning address, or on-chain Bitcoin address.
     - **Sync (`#syncWallet`) / Lock (`#lockWallet`)**: Manually refresh wallet state or lock the wallet.
     - **Background alerts (`#enableWalletNotifications`)**: Optional generic push notifications for incoming Ark/Lightning payments. A temporary signed mailbox authorization leaves the browser and expires within 24 hours; the recovery phrase, password, private spending keys, addresses, amounts, and transaction contents are not sent to the notification service.
+    - **Fee references**: Second publishes its current Bark fee schedule at `https://second.tech/pricing/`. The site's combined route calculator is `/bitcoinTxCost.html`; the wallet's own review screen is the authoritative quote for an actual payment.
     - **Dialogs**: Network, help/terms, backup words, password, receive payment, notification consent, payment confirmation, and error dialogs.
     - **[Ignore unless specifically asked for]**: Footer content. Analytics and Synthetic Satoshi are disabled on this page.
 
@@ -332,6 +333,19 @@ Use the selected page section to answer questions such as "What does this button
     - **BIP39 anatomy**: Shows entropy + checksum → 11-bit word indexes.
     - **Guess lab (`#guessBits`)**: Slider to see how smaller bit counts collapse under attack.
     - **Warning**: This page is for learning only; never use website-generated entropy for real bitcoin.
+    - **[Ignore unless specifically asked for]**: Footer content.
+
+### Page: [Bitcoin and Ark Transaction Cost]
+- **URL**: /bitcoinTxCost.html
+- **Purpose**: Estimates a route between an Ark balance and ordinary Bitcoin address types. It combines current mining-fee recommendations with Second's published Bark pricing.
+- **Key Elements**:
+    - **From / To (`#sourceType`, `#destinationType`)**: Choose Ark balance, Legacy P2PKH, nested SegWit P2SH-P2WPKH, native SegWit P2WPKH, or Taproot. Lightning is available as a destination.
+    - **Transaction shape (`#inputCount`, `#recipientCount`, `#includeChange`)**: Set how many UTXOs are consumed, how many recipients are paid, and whether the wallet creates change.
+    - **Confirmation target (`#feeSpeed`)**: Shows and selects current mempool.space rates for economy, one hour, 30 minutes, or next block. Typing directly into `#feeRate` switches to a custom user-selected sat/vB rate.
+    - **Route behavior**: On-chain to on-chain estimates normal vsize. On-chain to Ark estimates boarding with mining fee only. Ark to Ark uses the published 0%. Ark to Lightning uses the published percentage/minimum. Ark to on-chain uses the published percentage plus an illustrative mining component. Lightning is available only when the source is Ark; choosing an on-chain source hides it and changes an existing Lightning destination to Ark.
+    - **Current pricing (`#pricingRows`)**: A dated local snapshot fetched from `https://second.tech/pricing/`.
+    - **Limitations**: This is not a wallet quote. ECDSA signature length, mixed inputs, multisig, Taproot script paths, VTXO expiry, server construction, Lightning routing, wallet coin selection, and changing mempool conditions can alter the result.
+    - **Fee-rate source**: `https://mempool.space/docs/api/rest`.
     - **[Ignore unless specifically asked for]**: Footer content.
 
 ### Page: [News]

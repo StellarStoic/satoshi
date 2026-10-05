@@ -4,6 +4,7 @@
 .nip05-container {
     display: flex;
     justify-content: center;
+    padding-top: calc(104px + env(safe-area-inset-top));
 }
 
 /* Style for the image container */
@@ -60,7 +61,7 @@
 }
 
 .price-action {
-    color: #f2a900;
+    color: var(--accent);
     font-size: 16px;
     font-weight: 600;
     overflow-wrap: anywhere;
@@ -72,7 +73,7 @@
 }
 
 .price-card:focus-visible {
-    outline: 2px solid #f2a900;
+    outline: 2px solid var(--accent);
     outline-offset: 3px;
 }
 
@@ -186,6 +187,5 @@ body.modal-active {
     background-color: #69427e; /* Changes color on hover */
     cursor: pointer; /* Changes cursor to pointer on hover */
 }
-
 
 

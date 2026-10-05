@@ -46,6 +46,16 @@ jobs:
         if: github.event_name != 'push'
         continue-on-error: true
         run: python tools/news/collect.py
+      - name: Refresh official Bark pricing
+        id: bark_pricing
+        if: github.event_name != 'push'
+        continue-on-error: true
+        run: |
+          python -m unittest discover -s tools/bark-pricing -p 'test_*.py'
+          python tools/bark-pricing/collect.py
+      - name: Report Bark pricing failure
+        if: steps.bark_pricing.outcome == 'failure'
+        run: echo 'Bark pricing refresh failed. The previous verified snapshot was retained.' >> "$GITHUB_STEP_SUMMARY"
       - name: Report news failure
         if: steps.news.outcome == 'failure'
         run: echo 'Bitcoin news refresh failed. The previous snapshot was retained.' >> "$GITHUB_STEP_SUMMARY"
@@ -60,7 +70,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add historical_data/generated news-data.json
+          git add historical_data/generated news-data.json bark-pricing.json
           if ! git diff --cached --quiet; then
             git commit -m 'data: refresh site datasets'
             git push origin HEAD:${{ github.ref_name }}

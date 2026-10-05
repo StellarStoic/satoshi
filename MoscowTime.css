@@ -25,15 +25,106 @@
     z-index: 1000;   /* High z-index to ensure it appears above other content */
 }
 
-body:not(:has(#text1)) .satoshis-display {
+#satoshisValue {
     font-family: 'East Sea Dokdo', cursive !important;
+}
+
+.satoshis-display {
     display: inline-block; /* Allows the use of text-align from the container */
     font-size: calc((100vw - 30px) / 3); /* Dynamically adjust font size */
-    color: #f2a900; /* Your specified color */
+    color: var(--accent); /* Your specified color */
     white-space: nowrap; /* Prevents the text from wrapping */
     overflow: hidden; /* Keeps the content contained within the element bounds */
     text-overflow: ellipsis; /* Adds an ellipsis if the text overflows */
     font-feature-settings: "tnum";
+}
+
+.moscow-settings-trigger {
+    border: 0;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+}
+
+.moscow-settings {
+    width: min(480px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .56);
+}
+
+.moscow-settings::backdrop {
+    background: rgba(4, 5, 6, .78);
+    backdrop-filter: blur(3px);
+}
+
+.moscow-settings-inner {
+    padding: 24px;
+    font-family: var(--site-font);
+}
+
+.moscow-settings header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.moscow-settings h2 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 17px;
+    letter-spacing: 0;
+}
+
+.moscow-settings-close {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-raised);
+    color: var(--text-muted);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.moscow-settings label {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.moscow-settings select {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-raised);
+    color: var(--text);
+    font: 600 12px/1.3 var(--site-font);
+}
+
+.moscow-settings p {
+    margin: 18px 0 0;
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.55;
+}
+
+.moscow-settings .moscow-settings-storage {
+    margin-top: 8px;
+    opacity: .72;
 }
 
 .info-modal-trigger {
@@ -44,4 +135,3 @@ body:not(:has(#text1)) .satoshis-display {
     color: #888; /* Icon color */
     cursor: pointer;
 }
-

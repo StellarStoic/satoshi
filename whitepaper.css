@@ -138,7 +138,7 @@ html, body {
 }
 
 .translator-info a:hover {
-    color: #f2a900;
+    color: var(--accent);
 }
 
 /* Style for the upload image to make it circular */

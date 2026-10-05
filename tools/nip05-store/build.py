@@ -10,7 +10,7 @@ build loudly rather than silently producing a broken page.
 
 from pathlib import Path
 
-REPO = Path('/opt/data/repos/satoshi')
+REPO = Path(__file__).resolve().parents[2]
 SOURCE = REPO / 'nip05.html'
 CONTENT = Path(__file__).with_name('content.html')
 TARGET = REPO / 'nip05store.html'
@@ -75,7 +75,8 @@ if not any('name="description"' in line for line in head):
 # The store page needs no page-specific stylesheet of its own beyond the block in
 # its content, and does need the local QR generator available early.
 head = [line for line in head if 'nip05.css' not in line]
-head.append('    <script src="/qrCodeGenerator_1_4_4.js" defer></script>')
+head_close = next(i for i, line in enumerate(head) if line.strip() == '</head>')
+head.insert(head_close, '    <script src="/qrCodeGenerator_1_4_4.js" defer></script>')
 
 # --- tail edit: the page's own script becomes the store module ---
 new_tail = []

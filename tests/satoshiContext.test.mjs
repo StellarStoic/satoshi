@@ -13,9 +13,10 @@ test('AI context has no unresolved runtime placeholder', () => {
 test('AI context maps every documented page to one URL', () => {
   assert.ok(parsed.introduction.includes('Synthetic Satoshi'));
   assert.ok(parsed.rules.includes('Protect secrets'));
-  assert.equal(parsed.pages.size, 29);
+  assert.equal(parsed.pages.size, 30);
   assert.equal(parsed.pages.get('/converter.html')?.name, 'Converter');
   assert.equal(parsed.pages.get('/nip05store.html')?.name, 'NIP-05 name store');
+  assert.equal(parsed.pages.get('/bitcoinTxCost.html')?.name, 'Bitcoin and Ark Transaction Cost');
 });
 
 test('every documented page exists in the site root', async () => {

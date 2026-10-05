@@ -1,16 +1,18 @@
-const CACHE = 'satoshi-static-v161';
+const CACHE = 'satoshi-static-v176';
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
     '/settings.html', '/settings.css', '/settings.js',
     '/selfCustody.html', '/selfCustody.css', '/selfCustody.js',
+    '/barkTxCost.html', '/barkTxCostModel.mjs', '/bark-pricing.json',
+    '/bitcoinTxCost.html', '/bitcoinTxCost.css', '/bitcoinTxCost.mjs', '/bitcoinTxCostModel.mjs', '/txCostRouteModel.mjs',
     '/wallet.html', '/wallet.css', '/wallet.mjs', '/walletModel.mjs', '/walletSecurity.mjs', '/qrCodeGenerator_1_4_4.js', '/vendor/jsqr/jsQR.js',
     '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
-    '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js',
+    '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js', '/MoscowTime.js', '/MoscowTimeModel.mjs',
     '/android-chrome-192x192.png', '/android-chrome-512x512.png',
     '/isBip39.html', '/isBip39.css', '/isBip39.js', '/bip39Lookup.mjs', '/vendor/bip39.mjs',
     '/entropy.html', '/entropy.css', '/entropy.mjs', '/entropyModel.mjs',
@@ -58,10 +60,11 @@ self.addEventListener('fetch', event => {
     const newsData = url.pathname === '/news-data.json';
     const offersData = url.pathname === '/offers-data.json';
     const aiContext = url.pathname === '/AI_CONTEXT.md';
+    const barkPricing = url.pathname === '/bark-pricing.json';
     const lofiAudio = url.pathname.startsWith('/audio/lofi/');
     const scannerAsset = url.pathname === '/currencies.json' || url.pathname.startsWith('/vendor/paddle/');
     const walletAsset = url.pathname.startsWith('/vendor/bark/');
-    if ((!navigation && !asset && !livingData && !newsData && !offersData && !aiContext && !lofiAudio && !scannerAsset && !walletAsset) || url.search) return;
+    if ((!navigation && !asset && !livingData && !newsData && !offersData && !aiContext && !barkPricing && !lofiAudio && !scannerAsset && !walletAsset) || url.search) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         // Versioned, self-hosted OCR assets are large and immutable within a release.

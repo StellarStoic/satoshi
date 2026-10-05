@@ -1,4 +1,35 @@
 (() => {
+  const select = document.getElementById('siteTheme');
+  const key = 'satoshiSiteTheme';
+  const validThemes = ['legacy', 'coffee', 'forest', 'ocean', 'space', 'electric', 'ice'];
+
+  function currentTheme() {
+    if (window.satoshiTheme) return window.satoshiTheme.get();
+    try {
+      const stored = localStorage.getItem(key);
+      return validThemes.includes(stored) ? stored : 'legacy';
+    } catch {
+      return 'legacy';
+    }
+  }
+
+  function sync() {
+    select.value = currentTheme();
+  }
+
+  select.addEventListener('change', () => {
+    if (window.satoshiTheme) {
+      window.satoshiTheme.set(select.value);
+      return;
+    }
+    document.documentElement.dataset.theme = select.value;
+    try { localStorage.setItem(key, select.value); } catch { /* Keep this session's theme. */ }
+  });
+  document.addEventListener('DOMContentLoaded', sync, {once: true});
+  window.addEventListener('satoshi-theme-change', sync);
+})();
+
+(() => {
   const settingKey = 'satoshiChatEnabled';
   const chatToggle = document.getElementById('syntheticSatoshiEnabled');
   let enabled = true;
@@ -89,4 +120,16 @@
     window.satoshiAnalytics?.setConsent(analyticsToggle.checked);
     if (!analyticsToggle.checked) location.reload();
   });
+})();
+
+(() => {
+  const button = document.getElementById('installSatoshiApp');
+  const sync = () => {
+    const installed = window.satoshiPwa?.installed === true;
+    button.disabled = installed;
+    button.textContent = installed ? 'Installed' : 'Install';
+  };
+  button.addEventListener('click', () => window.satoshiPwa?.install());
+  document.addEventListener('DOMContentLoaded', sync, {once: true});
+  window.addEventListener('satoshi-pwa-install-state', sync);
 })();

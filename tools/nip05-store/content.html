@@ -5,7 +5,11 @@
      Prices come from that service's config, which is also what the worker bills
      from, so what you see here cannot disagree with the invoice. -->
 <style>
-    .store-wrap { max-width: 820px; margin: 0 auto; padding: 26px 18px 70px; }
+    .store-wrap {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: calc(104px + env(safe-area-inset-top)) 18px 70px;
+    }
     .store-wrap h1 { margin-bottom: 6px; }
     .store-wrap h2 { font-size: 1.15rem; margin: 0 0 12px; }
     .store-intro { opacity: .88; line-height: 1.5; }

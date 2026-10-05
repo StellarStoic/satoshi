@@ -1,4 +1,5 @@
 var theToggle = document.getElementById('toggle');
+var theMenu = document.getElementById('menu');
 
 // based on Todd Motto functions
 // https://toddmotto.com/labs/reusable-js/
@@ -36,9 +37,23 @@ function toggleClass(elem, className) {
     }
 }
 
-theToggle.onclick = function() {
-   toggleClass(this, 'on');
-   return false;
+function closeBurgerMenu() {
+    if (theToggle) {
+        removeClass(theToggle, 'on');
+        theToggle.setAttribute('aria-expanded', 'false');
+    }
+    document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
+        removeClass(activeItem, 'active');
+    });
+}
+
+if (theToggle) {
+    theToggle.setAttribute('aria-expanded', hasClass(theToggle, 'on') ? 'true' : 'false');
+    theToggle.onclick = function() {
+        toggleClass(this, 'on');
+        this.setAttribute('aria-expanded', hasClass(this, 'on') ? 'true' : 'false');
+        return false;
+    };
 }
 
 // NEW CODE: Submenu functionality
@@ -80,13 +95,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Optional: Close submenus when clicking outside
+    // Close the complete navigation when the user clicks beyond it.
     document.addEventListener('click', function(e) {
-        if (!e.target.closest('#menu')) {
-            // Click was outside the menu, close all submenus
-            document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
-                removeClass(activeItem, 'active');
-            });
+        if (!theMenu?.contains(e.target) && !theToggle?.contains(e.target)) closeBurgerMenu();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && theToggle && hasClass(theToggle, 'on')) {
+            closeBurgerMenu();
+            theToggle.focus();
         }
     });
 });

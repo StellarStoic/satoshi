@@ -1,4 +1,4 @@
-:root { --orange: #f2a900; --ink: #e7e9e8; --muted: #939a98; --panel: #151817; --line: #303633; }
+:root { --orange: var(--accent); --ink: #e7e9e8; --muted: #939a98; --panel: #151817; --line: #303633; }
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--ink); font-family: "Roboto Mono", monospace; background-color: #0d0f0e; }
 main { min-height: 100vh; }

@@ -55,7 +55,7 @@ body.currency-delete-mode #toggle-btn-space {
 
 body > #toggle,
 body > #menu {
-    position: fixed;
+    position: absolute;
 }
 
 body > #toggle,
@@ -168,7 +168,7 @@ body > #menu,
     font-family: "Roboto Mono", monospace;
     border: none;
     background: none;
-    color: #f2a900;
+    color: var(--accent);
     text-align: right;
     outline: none;
     overflow: hidden;
@@ -194,7 +194,7 @@ body > #menu,
 .currency-symbol {
     padding: 5px;
     font-size: 16px;
-    color: #f2a900;
+    color: var(--accent);
     background: transparent;
     min-width: 30px;
     text-align: left;
@@ -213,9 +213,9 @@ body > #menu,
 
 /* Plus button icon */
 .add-currency-icon {
-    position: fixed;
-    top: 23px;
-    right: 20px;
+    position: absolute;
+    top: calc(19px + env(safe-area-inset-top));
+    right: max(24px, env(safe-area-inset-right));
     display: grid;
     place-items: center;
     width: 40px;
@@ -260,13 +260,13 @@ body > #menu,
 }
 
 .currency-item:not(:has(input:disabled)):hover {
-    background-color: #f2a900; /* Highlight background color on hover */
+    background-color: var(--accent); /* Highlight background color on hover */
     color: #000; /* Text color on hover for better visibility */
 }
 
 .currency-item:has(input:checked) {
     border-color: rgba(242, 169, 0, .55);
-    color: #f2a900;
+    color: var(--accent);
 }
 
 .currency-item:has(input:disabled) {
@@ -279,7 +279,7 @@ body > #menu,
     height: 16px;
     flex: 0 0 auto;
     margin: 0;
-    accent-color: #f2a900;
+    accent-color: var(--accent);
 }
 
 .currency-protected-note {
@@ -314,7 +314,7 @@ body > #menu,
 }
 
 #currencySearch:focus {
-    border-color: #f2a900;
+    border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(242, 169, 0, .14);
 }
 
@@ -348,7 +348,7 @@ body > #menu,
 }
 
 .description-modal a:hover {
-    color: #f2a900; /* Even brighter on hover for emphasis */
+    color: var(--accent); /* Even brighter on hover for emphasis */
 }
 
 #toggle-btn-space {
@@ -399,7 +399,7 @@ body > #menu,
   #toggle-button.moveup:before {
     top: 2px;
     bottom: 18px;
-    background-color: #f2a900;
+    background-color: var(--accent);
     animation: moveup-1 0.3s linear forwards, moveup-2 0.3s linear 0.6s forwards,
       blink 1s ease-in-out 0.9s infinite;
   }

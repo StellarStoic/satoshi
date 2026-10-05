@@ -45,11 +45,11 @@ select, input, button {
 
 select:focus, input:focus {
     outline: none;
-    border-color: #f2a900;
+    border-color: var(--accent);
 }
 
 button {
-    background: linear-gradient(135deg, #f2a900, #ff9900);
+    background: linear-gradient(135deg, var(--accent), #ff9900);
     color: #000;
     border: none;
     cursor: pointer;
@@ -94,13 +94,13 @@ button:disabled {
 
 /* Sats display loading state */
 #currentSats.loading {
-    color: #f2a900;
+    color: var(--accent);
     font-style: italic;
 }
 
 #currentSats .lni-spinner-solid {
     margin-right: 8px;
-    color: #f2a900;
+    color: var(--accent);
 }
 
 /* Snapshot button styles */
@@ -122,7 +122,7 @@ button:disabled {
     background: rgba(0, 0, 0, 0.7);
     padding: 5px 10px;
     border-radius: 4px;
-    color: #f2a900;
+    color: var(--accent);
     font-family: Arial, sans-serif;
     font-size: 14px;
     font-weight: bold;
@@ -155,7 +155,7 @@ optgroup option {
 /* Style for selected option */
 option:checked {
     font-weight: bold;
-    color: #f2a900;
+    color: var(--accent);
 }
 
 /* Loading indicator for auto-load */
@@ -167,7 +167,7 @@ option:checked {
     background: rgba(0, 0, 0, 0.8);
     padding: 10px 20px;
     border-radius: 5px;
-    color: #f2a900;
+    color: var(--accent);
     font-size: 14px;
     z-index: 1000;
 }
@@ -208,7 +208,7 @@ option:checked {
 
 /* 🆕 Updated Sats Display */
 .sats-display {
-    background: #f2a900;
+    background: var(--accent);
     color: #000;
     padding: 12px 24px;
     border-radius: 25px;
@@ -226,8 +226,8 @@ option:checked {
 /* Sats display loading state */
 .sats-display.loading {
     background: rgba(242, 169, 0, 0.2);
-    color: #f2a900;
-    border: 1px solid #f2a900;
+    color: var(--accent);
+    border: 1px solid var(--accent);
 }
 
 .sats-display .lni-spinner-solid {
@@ -266,7 +266,7 @@ option:checked {
 }
 
 .events-section h3 {
-    color: #f2a900;
+    color: var(--accent);
     margin-bottom: 15px;
     text-align: center;
 }
@@ -283,7 +283,7 @@ option:checked {
     background: #1a1a1a;
     padding: 15px;
     border-radius: 6px;
-    border-left: 4px solid #f2a900;
+    border-left: 4px solid var(--accent);
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -300,7 +300,7 @@ option:checked {
 }
 
 .event-date {
-    color: #f2a900;
+    color: var(--accent);
     font-size: 12px;
     margin-bottom: 8px;
 }
@@ -372,7 +372,7 @@ option:checked {
 }
 
 #eventTitle {
-    color: #f2a900;
+    color: var(--accent);
 }
 
 
@@ -499,7 +499,7 @@ option:checked {
 
 .satoshi-quote {
     background: rgba(242, 169, 0, 0.1);
-    border-left: 4px solid #f2a900;
+    border-left: 4px solid var(--accent);
     padding: 20px;
     margin: 20px 0;
     border-radius: 4px;
@@ -509,7 +509,7 @@ option:checked {
 .quote-text {
     font-size: 16px;
     line-height: 1.5;
-    color: #f2a900;
+    color: var(--accent);
     margin-bottom: 15px;
     font-style: italic;
     text-align: center;
@@ -535,7 +535,7 @@ option:checked {
     top: 10px;
     right: 10px;
     background: rgba(242, 169, 0, 0.472);
-    border: 1px solid #f2a900;
+    border: 1px solid var(--accent);
     color: #000;
     border-radius: 4px;
     padding: 8px 12px;
@@ -558,7 +558,7 @@ option:checked {
 }
 
 .zoom-reset-btn:hover {
-    background: #f2a900;
+    background: var(--accent);
     box-shadow: 0 4px 12px rgba(242, 169, 0, 0.4);
 }
 
@@ -624,7 +624,7 @@ option:checked {
     padding: 15px;
     background: linear-gradient(135deg, rgba(242, 169, 0, 0.1), rgba(242, 169, 0, 0.05));
     border-radius: 8px;
-    border-left: 4px solid #f2a900;
+    border-left: 4px solid var(--accent);
     text-align: center;
 }
 
@@ -635,7 +635,7 @@ option:checked {
 }
 
 .v4v-message p:first-child {
-    color: #f2a900;
+    color: var(--accent);
     font-weight: bold;
 }
 

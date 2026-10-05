@@ -63,7 +63,7 @@
 }
 
 #helpIcon {
-  position: fixed;
+  position: absolute;
   top: max(22px, env(safe-area-inset-top));
   right: 22px;
   z-index: 2100;

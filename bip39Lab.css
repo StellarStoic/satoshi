@@ -1,6 +1,6 @@
 #bip39-page {
     --lab-entropy: #72d5c4;
-    --lab-checksum: #f2a900;
+    --lab-checksum: var(--accent);
     max-width: 1040px;
     margin: 96px auto 40px;
     padding: 0 24px;

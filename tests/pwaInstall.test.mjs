@@ -14,14 +14,19 @@ test('every regular page that loads the PWA controller also links the manifest',
   }
 });
 
-test('the manifest covers every page and the shared menu exposes installation', async () => {
+test('the manifest covers every page and Settings exposes installation', async () => {
   const manifest = JSON.parse(await read('site.webmanifest'));
   const controller = await read('pwa.js');
+  const settings = await read('settings.html');
+  const settingsScript = await read('settings.js');
 
   assert.equal(manifest.id, '/');
   assert.equal(manifest.start_url, '/');
   assert.equal(manifest.scope, '/');
   assert.match(controller, /beforeinstallprompt/);
-  assert.match(controller, /label: 'Install Satoshi\.si', action: 'install'/);
+  assert.doesNotMatch(controller, /label: 'Install Satoshi\.si'/);
   assert.match(controller, /await prompt\.prompt\(\)/);
+  assert.match(controller, /window\.satoshiPwa = Object\.freeze/);
+  assert.match(settings, /id="installSatoshiApp"/);
+  assert.match(settingsScript, /window\.satoshiPwa\?\.install\(\)/);
 });

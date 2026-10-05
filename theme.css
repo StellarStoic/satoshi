@@ -11,13 +11,125 @@
     --border: #414448;
     --text: #e6e6e6;
     --text-muted: #b5b5b5;
+    --accent: #f2a900;
+    --accent-contrast: #111;
+}
+
+html[data-theme="coffee"] {
+    color-scheme: dark;
+    --page-bg: #15110f;
+    --grain-opacity: .44;
+    --surface: #211a17;
+    --surface-raised: #302520;
+    --border: #59473c;
+    --text: #f0e7e1;
+    --text-muted: #bba9a0;
+    --accent: #db9853;
+    --accent-contrast: #1a100b;
+}
+html[data-theme="forest"] {
+    color-scheme: dark;
+    --page-bg: #0c1410;
+    --grain-opacity: .46;
+    --surface: #142019;
+    --surface-raised: #1e3025;
+    --border: #3b5846;
+    --text: #e5eee8;
+    --text-muted: #9fb2a5;
+    --accent: #62c986;
+    --accent-contrast: #07110a;
+}
+html[data-theme="ocean"] {
+    color-scheme: dark;
+    --page-bg: #07151b;
+    --grain-opacity: .45;
+    --surface: #10242c;
+    --surface-raised: #18343e;
+    --border: #315c6a;
+    --text: #e3f0f3;
+    --text-muted: #9bb7bf;
+    --accent: #4bc1df;
+    --accent-contrast: #041215;
+}
+html[data-theme="space"] {
+    color-scheme: dark;
+    --page-bg: #090b14;
+    --grain-opacity: .5;
+    --surface: #151827;
+    --surface-raised: #22263a;
+    --border: #474d6d;
+    --text: #ededf5;
+    --text-muted: #acaec5;
+    --accent: #b58cff;
+    --accent-contrast: #0e0918;
+}
+html[data-theme="electric"] {
+    color-scheme: dark;
+    --page-bg: #06110f;
+    --grain-opacity: .48;
+    --surface: #0d201d;
+    --surface-raised: #15322c;
+    --border: #2c6659;
+    --text: #e7fff8;
+    --text-muted: #99c4b8;
+    --accent: #19e5ad;
+    --accent-contrast: #03120e;
+}
+html[data-theme="ice"] {
+    color-scheme: light;
+    --page-bg: #f4f8fb;
+    --grain-opacity: .15;
+    --surface: #ffffff;
+    --surface-raised: #e7f0f5;
+    --border: #a9bac5;
+    --text: #111820;
+    --text-muted: #53636d;
+    --accent: #087fa5;
+    --accent-contrast: #fff;
+}
+
+html[data-theme]:not([data-theme="legacy"]) {
+    --wallet-bg: var(--page-bg);
+    --wallet-panel: var(--surface);
+    --wallet-panel-strong: var(--surface-raised);
+    --wallet-line: var(--border);
+    --wallet-muted: var(--text-muted);
+    --wallet-orange: var(--accent);
+    --orange: var(--accent);
+    --ink: var(--text);
+    --muted: var(--text-muted);
+    --panel: var(--surface);
+    --line: var(--border);
+}
+html[data-theme]:not([data-theme="legacy"]) body {
+    background-color: var(--page-bg) !important;
+    color: var(--text);
+}
+html[data-theme]:not([data-theme="legacy"]) :where(#menu, dialog, .modal-content, .footer-modal-content, .site-help-dialog, .pwa-install-dialog) {
+    color: var(--text);
+    background-color: var(--surface);
+    border-color: var(--border);
+}
+html[data-theme]:not([data-theme="legacy"]) :where(input, textarea, select) {
+    color: var(--text);
+    background-color: var(--surface-raised);
+    border-color: var(--border);
+}
+html[data-theme="ice"] body::before { mix-blend-mode: multiply; }
+html[data-theme="ice"] :where(main, article, section, dialog, nav, footer) { color: var(--text); }
+html[data-theme="ice"] :where(h1, h2, h3, h4, h5, h6, p, li, dt, dd, label, summary, code, small) {
+    color: inherit;
+}
+html[data-theme="ice"] :where(.footer-modal-content, .mempool-pool, .mempool-metric, .fee-lane, .qr-code-wrapper) {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html { min-height: 100%; }
 
 /* Keep the hand-drawn home animation intact; use the quote face everywhere else. */
 body:not(:has(#text1)),
-body:not(:has(#text1)) :where(*:not(i):not([class^="lni"]):not([class*=" lni"])) {
+body:not(:has(#text1)) :where(*:not(i):not(#satoshisValue):not([class^="lni"]):not([class*=" lni"])) {
     font-family: var(--site-font) !important;
 }
 
@@ -53,7 +165,7 @@ iframe[src^="https://playtdt.com/widget/"],
 iframe[src^="https://changenow.io/embeds/"] { color-scheme: normal; }
 input, textarea, select { max-width: 100%; }
 button, a, input, select, textarea { touch-action: manipulation; }
-:focus-visible { outline: 2px solid #f2a900; outline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 p, h1, h2, h3, h4, a, code { overflow-wrap: anywhere; }
 #menu { max-width: calc(100vw - 32px); }
 #menu { max-height: calc(100dvh - 110px); overflow-y: auto; }

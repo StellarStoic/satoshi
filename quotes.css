@@ -30,7 +30,7 @@
 #next-quote {
     display: grid;
     place-items: center;
-    position: fixed;
+    position: absolute;
     top: calc(16px + env(safe-area-inset-top));
     right: 16px;
     z-index: 900;
@@ -58,8 +58,8 @@
 
 @media (min-width: 1024px) {
     #next-quote {
-        top: 40px;
-        right: 24px;
+        top: calc(19px + env(safe-area-inset-top));
+        right: max(24px, env(safe-area-inset-right));
         width: 40px;
         height: 40px;
         opacity: .35;
@@ -70,5 +70,5 @@
 #next-quote:hover,
 #next-quote:focus-visible {
     opacity: 1;
-    color: #f2a900;
+    color: var(--accent);
 }

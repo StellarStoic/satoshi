@@ -70,6 +70,30 @@
         <option value="0">Never (not recommended)</option>
       </select>
     </section>
+    <section class="setting-row" id="themeSetting">
+      <span class="setting-icon theme-swatch" aria-hidden="true"></span>
+      <label for="siteTheme">
+        <strong>Theme</strong>
+        <span>Appearance across Satoshi.si</span>
+      </label>
+      <select id="siteTheme" aria-label="Website theme">
+        <option value="legacy">Legacy</option>
+        <option value="coffee">Coffee</option>
+        <option value="forest">Forest</option>
+        <option value="ocean">Ocean</option>
+        <option value="space">Space</option>
+        <option value="electric">Electric</option>
+        <option value="ice">Ice</option>
+      </select>
+    </section>
+    <section class="setting-row setting-action-row" id="installAppSetting">
+      <span class="setting-icon" aria-hidden="true"><i class="lni lni-download-1"></i></span>
+      <div class="setting-copy">
+        <strong>Install Satoshi.si</strong>
+        <span>Add the app to this device</span>
+      </div>
+      <button type="button" class="setting-action" id="installSatoshiApp">Install</button>
+    </section>
     <p class="pwa-version">PWA version <strong id="pwaVersion">checking...</strong></p>
   </main>
 

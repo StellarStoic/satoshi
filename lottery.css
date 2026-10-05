@@ -1,5 +1,5 @@
 .info-modal-trigger {
-    position: fixed; /* Positioned absolutely relative to the nearest positioned ancestor */
+    position: absolute;
     top: 17px; /* 25px from the top of the nearest positioned ancestor */
     right: 25px; /* 25px from the left of the nearest positioned ancestor */
     font-size: 24px;
@@ -39,4 +39,3 @@
 .yellow {
     color: yellow;
 }
-

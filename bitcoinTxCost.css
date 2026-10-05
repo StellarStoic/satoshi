@@ -1,0 +1,68 @@
+* { box-sizing: border-box; }
+body.bitcoin-cost-page { min-height: 100svh; margin: 0; color: var(--text); }
+.bitcoin-cost-main { width: min(840px, calc(100% - 32px)); margin: 0 auto; padding: 106px 0 104px; }
+.bitcoin-cost-heading { max-width: 680px; margin-bottom: 30px; }
+.bitcoin-cost-heading p { margin: 0 0 8px; color: var(--accent); font-size: 11px; text-transform: uppercase; }
+.bitcoin-cost-heading h1 { margin: 0; font-size: clamp(30px, 6vw, 52px); font-weight: 500; line-height: 1.08; }
+.bitcoin-cost-heading span { display: block; margin-top: 13px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.tx-calculator { padding: 26px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--surface) 92%, transparent); }
+.tx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.route-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tx-field label, .change-control > span { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 10px; }
+.tx-field input, .tx-field select { width: 100%; height: 50px; padding: 0 13px; border: 1px solid var(--border); border-radius: 6px; outline: 0; background: var(--surface-raised); color: var(--text); font: inherit; font-size: 14px; }
+.tx-field input:focus, .tx-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.count-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 15px; }
+.change-control { min-width: 0; }
+.change-control label { display: flex; align-items: center; height: 50px; gap: 10px; padding: 0 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); cursor: pointer; font-size: 12px; }
+.change-control input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); }
+.fee-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .42fr); align-items: end; gap: 15px; margin-top: 15px; padding-top: 20px; border-top: 1px solid var(--border); }
+.fee-target-field > span { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 10px; }
+.fee-speed-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.fee-speed-options button { min-width: 0; min-height: 50px; padding: 7px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text-muted); cursor: pointer; font: inherit; text-align: center; }
+.fee-speed-options button:hover, .fee-speed-options button:focus-visible { border-color: var(--accent); color: var(--text); }
+.fee-speed-options button.active { border-color: var(--accent); color: var(--text); box-shadow: inset 0 0 16px color-mix(in srgb, var(--accent) 10%, transparent); }
+.fee-speed-options span { display: block; font-size: 9px; }
+.fee-speed-options strong { display: block; margin-top: 5px; color: var(--accent); font-size: 9px; font-weight: 500; overflow-wrap: anywhere; }
+.fee-rate-field { position: relative; }
+.fee-rate-field::after { content: 'sat/vB'; position: absolute; top: 39px; right: 12px; color: var(--text-muted); font-size: 9px; pointer-events: none; }
+.fee-rate-field input { padding-right: 62px; }
+.fee-rate-field > small { display: block; min-height: 13px; margin-top: 5px; color: var(--text-muted); font-size: 8px; }
+.fee-rate-field.is-custom input { border-color: var(--accent); }
+.tx-result { display: grid; grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(0, .75fr)); gap: 1px; margin-top: 24px; overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--border); }
+.tx-result > div { min-width: 0; padding: 18px; background: var(--surface); }
+.tx-result span, .tx-facts dt { display: block; color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+.tx-result strong { display: block; margin-top: 8px; color: var(--text); font-size: 17px; font-weight: 500; overflow-wrap: anywhere; }
+.tx-result > div:first-child strong { color: var(--accent); font-size: clamp(25px, 5vw, 36px); }
+.route-explanation { margin-top: 18px; padding: 15px 0; border-block: 1px solid var(--border); }
+.route-explanation p { margin: 0; color: var(--text); font-size: 11px; line-height: 1.55; }
+.route-explanation small { display: block; margin-top: 7px; color: var(--text-muted); font-size: 9px; line-height: 1.55; }
+.tx-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 28px; margin: 18px 0 0; }
+.tx-facts div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+.tx-facts dd { margin: 0; color: var(--text); font-size: 11px; text-align: right; }
+.fee-source { margin: 15px 0 0; color: var(--text-muted); font-size: 9px; }
+.fee-source::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #66c58b; }
+.fee-source.offline::before { background: #d89d4c; }
+.tx-caveat { margin: 18px 2px 0; color: var(--text-muted); font-size: 10px; line-height: 1.6; }
+.tx-caveat a { color: var(--accent); }
+.published-pricing { margin-top: 18px; padding: 22px 26px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--surface) 76%, transparent); }
+.pricing-header { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 13px; }
+.pricing-header h2 { margin: 0; font-size: 15px; font-weight: 500; }
+.pricing-header a { color: var(--accent); font-size: 9px; text-decoration: none; }
+.pricing-rows { display: grid; }
+.pricing-rows > div { display: flex; justify-content: space-between; gap: 20px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 10px; }
+.pricing-rows span, #pricingStatus { color: var(--text-muted); }
+.pricing-rows strong { font-weight: 500; text-align: right; }
+.pricing-rows small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 8px; font-weight: 400; }
+#pricingStatus { margin: 11px 0 0; font-size: 8px; }
+[hidden] { display: none !important; }
+@media (max-width: 620px) {
+  .bitcoin-cost-main { width: calc(100% - 24px); padding-top: 94px; }
+  .tx-calculator { padding: 19px; }
+  .tx-grid, .route-grid, .fee-row { grid-template-columns: 1fr; }
+  .fee-speed-options { grid-template-columns: 1fr 1fr; }
+  .count-grid { grid-template-columns: 1fr 1fr; }
+  .change-control { grid-column: 1 / -1; }
+  .tx-result { grid-template-columns: 1fr 1fr; }
+  .tx-result > div:first-child { grid-column: 1 / -1; }
+  .published-pricing { padding: 19px; }
+}

@@ -1,8 +1,8 @@
 .site-help-trigger {
-    position: fixed !important;
-    top: calc(18px + env(safe-area-inset-top)) !important;
-    right: max(16px, env(safe-area-inset-right)) !important;
-    z-index: 900 !important;
+    position: absolute !important;
+    top: calc(19px + env(safe-area-inset-top)) !important;
+    right: max(24px, env(safe-area-inset-right)) !important;
+    z-index: 2200 !important;
     display: grid !important;
     place-items: center !important;
     width: 40px !important;
@@ -25,18 +25,18 @@
 }
 
 .site-help-trigger.site-help-trigger--offset {
-    right: max(66px, calc(50px + env(safe-area-inset-right))) !important;
+    right: max(74px, calc(58px + env(safe-area-inset-right))) !important;
 }
 
 .site-help-trigger.site-help-trigger--wide-offset {
-    right: max(120px, calc(104px + env(safe-area-inset-right))) !important;
+    right: max(128px, calc(112px + env(safe-area-inset-right))) !important;
 }
 
 .site-help-companion {
-    position: fixed !important;
-    top: calc(18px + env(safe-area-inset-top)) !important;
-    right: max(16px, env(safe-area-inset-right)) !important;
-    z-index: 900 !important;
+    position: absolute !important;
+    top: calc(19px + env(safe-area-inset-top)) !important;
+    right: max(24px, env(safe-area-inset-right)) !important;
+    z-index: 2200 !important;
     margin: 0 !important;
 }
 
@@ -65,25 +65,25 @@
 
 .site-help-companion.site-help-companion--icon:hover,
 .site-help-companion.site-help-companion--icon:focus-visible {
-    color: #f2a900 !important;
+    color: var(--accent) !important;
     outline: none !important;
 }
 
 .site-help-trigger.site-help-trigger--grouped {
-    position: fixed !important;
-    inset: calc(18px + env(safe-area-inset-top)) max(66px, calc(50px + env(safe-area-inset-right))) auto auto !important;
+    position: absolute !important;
+    inset: calc(19px + env(safe-area-inset-top)) max(74px, calc(58px + env(safe-area-inset-right))) auto auto !important;
 }
 
 .site-help-companion.site-help-companion--grouped {
-    position: fixed !important;
-    inset: calc(18px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) auto auto !important;
+    position: absolute !important;
+    inset: calc(19px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) auto auto !important;
     z-index: 2200 !important;
     margin: 0 !important;
 }
 
 .site-help-trigger:hover,
 .site-help-trigger:focus-visible {
-    color: #f2a900 !important;
+    color: var(--accent) !important;
     outline: none !important;
     transform: scale(1.06);
 }
@@ -121,7 +121,7 @@
 
 .site-help-dialog h2 {
     margin: 0 0 12px;
-    color: #f2a900;
+    color: var(--accent);
     font-size: clamp(1.25rem, 4vw, 1.6rem);
     letter-spacing: 0;
 }
@@ -152,23 +152,23 @@
 
 .site-help-dialog__close:hover,
 .site-help-dialog__close:focus-visible {
-    color: #f2a900;
-    outline: 1px solid #f2a900;
+    color: var(--accent);
+    outline: 1px solid var(--accent);
     outline-offset: 2px;
 }
 
 @media (max-width: 600px) {
     .site-help-trigger {
-        top: calc(18px + env(safe-area-inset-top)) !important;
-        right: max(16px, env(safe-area-inset-right)) !important;
+        top: calc(19px + env(safe-area-inset-top)) !important;
+        right: max(24px, env(safe-area-inset-right)) !important;
     }
 
     .site-help-trigger.site-help-trigger--offset {
-        right: max(66px, calc(50px + env(safe-area-inset-right))) !important;
+        right: max(74px, calc(58px + env(safe-area-inset-right))) !important;
     }
 
     .site-help-trigger.site-help-trigger--wide-offset {
-        right: max(120px, calc(104px + env(safe-area-inset-right))) !important;
+        right: max(128px, calc(112px + env(safe-area-inset-right))) !important;
     }
 
     .site-help-dialog__content {

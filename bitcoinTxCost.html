@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Estimate transaction costs between Ark, Lightning, Legacy, nested SegWit, native SegWit, and Taproot using current fees and Second's pricing.">
+  <title>Bitcoin and Ark Transaction Cost | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/bitcoinTxCost.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="bitcoin-cost-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main class="bitcoin-cost-main">
+    <header class="bitcoin-cost-heading">
+      <p>Bitcoin route estimator</p>
+      <h1>From here, to there</h1>
+      <span>Choose where the bitcoin starts and where it is going. The calculator applies ordinary mining fees, Bark pricing, or both.</span>
+    </header>
+
+    <section class="tx-calculator" aria-label="Bitcoin transaction cost calculator">
+      <div class="tx-grid route-grid">
+        <div class="tx-field"><label for="sourceType">From</label><select id="sourceType"></select></div>
+        <div class="tx-field"><label for="destinationType">To</label><select id="destinationType"></select></div>
+        <div class="tx-field"><label for="paymentAmount">Amount in sats</label><input id="paymentAmount" type="number" min="1" step="1" value="20000" inputmode="numeric"></div>
+      </div>
+      <div class="count-grid" id="onchainShape">
+        <div class="tx-field"><label for="inputCount">UTXOs spent</label><input id="inputCount" type="number" min="1" max="100" step="1" value="1" inputmode="numeric"></div>
+        <div class="tx-field"><label for="recipientCount">Recipients</label><input id="recipientCount" type="number" min="1" max="100" step="1" value="1" inputmode="numeric"></div>
+        <div class="change-control"><span>Wallet change</span><label><input id="includeChange" type="checkbox" checked><span>Include one change output</span></label></div>
+      </div>
+      <div class="fee-row" id="feeControls">
+        <div class="fee-target-field">
+          <span id="feeSpeedLabel">Confirmation target</span>
+          <div id="feeSpeed" class="fee-speed-options" role="radiogroup" aria-labelledby="feeSpeedLabel">
+            <button type="button" role="radio" aria-checked="false" data-fee-speed="economyFee"><span>Economy</span><strong>-- sat/vB</strong></button>
+            <button type="button" role="radio" aria-checked="false" data-fee-speed="hourFee"><span>About 1 hour</span><strong>-- sat/vB</strong></button>
+            <button type="button" role="radio" aria-checked="true" data-fee-speed="halfHourFee"><span>About 30 min</span><strong>-- sat/vB</strong></button>
+            <button type="button" role="radio" aria-checked="false" data-fee-speed="fastestFee"><span>Next block</span><strong>-- sat/vB</strong></button>
+          </div>
+        </div>
+        <div class="tx-field fee-rate-field"><label for="feeRate">Custom or selected fee rate</label><input id="feeRate" type="number" min="0.01" step="0.01" value="3" inputmode="decimal"><small>Type any rate to use Custom.</small></div>
+      </div>
+
+      <div class="tx-result" aria-live="polite">
+        <div><span id="resultLabel">Estimated cost</span><strong id="estimatedFee">0 sats</strong></div>
+        <div><span>Transaction size</span><strong id="estimatedSize">0 vB</strong></div>
+        <div><span>Fee rate</span><strong id="usedFeeRate">0 sat/vB</strong></div>
+      </div>
+      <div class="route-explanation"><p id="routeBreakdown"></p><small id="routeNote"></small></div>
+      <dl class="tx-facts">
+        <div><dt>Amount + fee</dt><dd id="estimatedTotal">Add an amount</dd></div>
+        <div><dt>Fee vs payment</dt><dd id="feeShare">Add an amount</dd></div>
+      </dl>
+      <p class="fee-source" id="feeSource">Loading current fee rates...</p>
+      <p class="tx-caveat">This is a planning estimate, not a wallet quote. Signature size, mixed inputs, VTXO expiry, server construction, Lightning routing, wallet coin selection, and a changing mempool can alter the final fee. Mining recommendations come from <a href="https://mempool.space/docs/api/rest" target="_blank" rel="noopener noreferrer">mempool.space</a>.</p>
+    </section>
+
+    <section class="published-pricing" aria-labelledby="pricingTitle">
+      <div class="pricing-header"><h2 id="pricingTitle">Current Bark pricing</h2><a href="https://second.tech/pricing/" target="_blank" rel="noopener noreferrer">Official Second pricing</a></div>
+      <div class="pricing-rows" id="pricingRows"></div>
+      <p id="pricingStatus">Loading published pricing...</p>
+    </section>
+  </main>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+    <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+  <script type="module" src="/bitcoinTxCost.mjs"></script>
+</body>
+</html>

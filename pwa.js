@@ -1,3 +1,36 @@
+const SATOSHI_THEME_SETTING = 'satoshiSiteTheme';
+const SATOSHI_THEMES = Object.freeze(['legacy', 'coffee', 'forest', 'ocean', 'space', 'electric', 'ice']);
+
+function normaliseSatoshiTheme(theme) {
+    return SATOSHI_THEMES.includes(theme) ? theme : 'legacy';
+}
+
+function applySatoshiTheme(theme, persist = false) {
+    const selectedTheme = normaliseSatoshiTheme(theme);
+    document.documentElement.dataset.theme = selectedTheme;
+    if (persist) {
+        try { localStorage.setItem(SATOSHI_THEME_SETTING, selectedTheme); } catch { /* Keep this session's theme. */ }
+    }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+        'content',
+        selectedTheme === 'ice' ? '#f4f8fb' : getComputedStyle(document.documentElement).getPropertyValue('--page-bg').trim() || '#101112'
+    );
+    window.dispatchEvent(new CustomEvent('satoshi-theme-change', {detail: {theme: selectedTheme}}));
+    return selectedTheme;
+}
+
+let initialSatoshiTheme = 'legacy';
+try { initialSatoshiTheme = localStorage.getItem(SATOSHI_THEME_SETTING) || 'legacy'; } catch { /* Use Legacy. */ }
+applySatoshiTheme(initialSatoshiTheme);
+window.satoshiTheme = Object.freeze({
+    themes: SATOSHI_THEMES,
+    get: () => normaliseSatoshiTheme(document.documentElement.dataset.theme),
+    set: theme => applySatoshiTheme(theme, true),
+});
+window.addEventListener('storage', event => {
+    if (event.key === SATOSHI_THEME_SETTING) applySatoshiTheme(event.newValue || 'legacy');
+});
+
 if ('serviceWorker' in navigator && window.isSecureContext) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(error => {
@@ -11,10 +44,12 @@ const SENSITIVE_WALLET_PAGE = location.pathname === '/wallet.html';
 const RUNNING_AS_APP = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 let deferredInstallPrompt = null;
+let appInstalled = RUNNING_AS_APP;
 
 window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
+    window.dispatchEvent(new CustomEvent('satoshi-pwa-install-state'));
 });
 
 if (!SENSITIVE_WALLET_PAGE && !document.querySelector('link[href="/analytics.css"]')) {
@@ -82,13 +117,13 @@ const MENU_ITEMS = [
         {label: 'Game39 Single Player', href: '/game39single.html'},
     ]},
     {label: 'Tools', children: [
+        {label: 'Bitcoin & Ark TX cost', href: '/bitcoinTxCost.html'},
         {label: 'Entropy Lab', href: '/entropy.html'},
         {label: '21FM', href: '/21fm.html'},
         {label: 'Steganography & Ciphers', href: '/stego.html'},
         {label: 'GhostQR', href: '/ghostQR.html'},
     ]},
     {label: 'News', href: '/news.html'},
-    {label: 'Install Satoshi.si', action: 'install'},
     {label: 'Settings', href: '/settings.html'},
 ];
 
@@ -141,17 +176,15 @@ async function installPwa() {
     }
 }
 
+window.satoshiPwa = Object.freeze({
+    install: installPwa,
+    get installed() { return appInstalled; },
+});
+
 function createMenuLink(item) {
     const link = document.createElement('a');
-    link.href = item.href || '#';
+    link.href = item.href;
     link.textContent = item.label;
-    if (item.action === 'install') {
-        link.className = 'pwa-install-link';
-        link.addEventListener('click', event => {
-            event.preventDefault();
-            installPwa();
-        });
-    }
     if (item.external) {
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
@@ -163,7 +196,7 @@ if (menuList) {
     menu?.setAttribute('role', 'navigation');
     menu?.setAttribute('aria-label', 'Main navigation');
     menuToggle?.setAttribute('aria-label', 'Navigation');
-    menuList.replaceChildren(...MENU_ITEMS.filter(item => item.action !== 'install' || !RUNNING_AS_APP).map(item => {
+    menuList.replaceChildren(...MENU_ITEMS.map(item => {
         const listItem = document.createElement('li');
         if (!item.children) {
             listItem.append(createMenuLink(item));
@@ -186,7 +219,8 @@ if (menuList) {
 
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    document.querySelector('.pwa-install-link')?.closest('li')?.remove();
+    appInstalled = true;
+    window.dispatchEvent(new CustomEvent('satoshi-pwa-install-state'));
 });
 
 if (document.querySelector('.footer')) {

@@ -57,7 +57,7 @@
 
 #bip39Input::placeholder { color: #555b60; opacity: 1; }
 #bip39Input:hover { border-color: #686e73; }
-#bip39Input:focus-visible { border-color: #f2a900; box-shadow: 0 0 0 3px rgba(242, 169, 0, .16), 0 12px 30px rgba(0, 0, 0, .3); }
+#bip39Input:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242, 169, 0, .16), 0 12px 30px rgba(0, 0, 0, .3); }
 #bip39Input.valid { color: #4ade80; border-color: #268f4c; box-shadow: 0 0 0 3px rgba(74, 222, 128, .12), 0 12px 30px rgba(0, 0, 0, .3); }
 #bip39Input.invalid { color: #ff6464; border-color: #9f3f49; box-shadow: 0 0 0 3px rgba(255, 100, 100, .1), 0 12px 30px rgba(0, 0, 0, .3); }
 
@@ -112,15 +112,15 @@
     font-weight: 300;
 }
 
-.word-suggestion[data-rank="0"] { color: #f2a900; font-weight: 500; }
+.word-suggestion[data-rank="0"] { color: var(--accent); font-weight: 500; }
 .word-suggestion[data-rank="1"],
 .word-suggestion[data-rank="2"] { color: #c9c1ad; }
 .word-suggestion:hover,
-.word-suggestion:focus-visible { z-index: 3; color: #f2a900; opacity: 1; outline: none; }
+.word-suggestion:focus-visible { z-index: 3; color: var(--accent); opacity: 1; outline: none; }
 .word-suggestion:focus-visible { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
 
 .info-modal-trigger {
-    position: fixed;
+    position: absolute;
     z-index: 900;
     top: calc(24px + env(safe-area-inset-top));
     right: 76px;
@@ -137,10 +137,10 @@
 }
 
 .info-modal-trigger:hover,
-.info-modal-trigger:focus-visible { color: #f2a900; outline: none; }
+.info-modal-trigger:focus-visible { color: var(--accent); outline: none; }
 
 .wordlist-settings-trigger {
-    position: fixed;
+    position: absolute;
     z-index: 900;
     top: calc(24px + env(safe-area-inset-top));
     right: 24px;
@@ -167,7 +167,7 @@
 .wordlist-settings-trigger:focus-visible,
 .wordlist-settings-close:hover,
 .wordlist-settings-close:focus-visible {
-    color: #f2a900;
+    color: var(--accent);
     outline: none;
 }
 
@@ -235,7 +235,7 @@
 }
 
 .wordlist-settings select:focus-visible {
-    border-color: #f2a900;
+    border-color: var(--accent);
     outline: 3px solid rgba(242, 169, 0, .16);
 }
 
@@ -255,14 +255,14 @@
 }
 
 .suggestion-density-label output {
-    color: #f2a900;
+    color: var(--accent);
     font-size: 12px;
 }
 
 .wordlist-settings input[type="range"] {
     width: 100%;
     margin: 4px 0 0;
-    accent-color: #f2a900;
+    accent-color: var(--accent);
     cursor: pointer;
 }
 

@@ -6,6 +6,7 @@ const pages = {
   '/whitepaper.html': ['Bitcoin Whitepaper Translations | Satoshi.si', 'Read the original Bitcoin whitepaper and explore translations that make Satoshi Nakamoto’s peer-to-peer electronic cash proposal accessible worldwide.'],
   '/selfCustody.html': ['Bitcoin Wallets, Self-Custody, Signing Devices and Nodes | Satoshi.si', 'Compare trusted Bitcoin wallets for iOS, Android and desktop, then learn about offline signing devices, multisig, Lightning wallets and running your own node.'],
   '/wallet.html': ['Bark Bitcoin Wallet | Satoshi.si', 'Learn Ark with free Bitcoin Signet sats or use a separate self-custodial mainnet wallet for Ark, Lightning and on-chain payments, powered locally by Bark WebAssembly.'],
+  '/bitcoinTxCost.html': ['Bitcoin and Ark Transaction Cost Calculator | Satoshi.si', 'Estimate costs between Ark, Lightning, Legacy, nested SegWit, native SegWit and Taproot using current fees and Second\'s Bark pricing.'],
   '/quotes.html': ['Satoshi Nakamoto Quotes | Satoshi.si', 'Discover carefully presented quotes from Satoshi Nakamoto, with quick copying and a new quotation every two minutes.'],
   '/isBip39.html': ['BIP39 Word Checker and Similar Words | Satoshi.si', 'Check whether a word belongs to an official BIP39 wordlist, find its position and explore visually and phonetically similar recovery words.'],
   '/converter.html': ['Bitcoin, Satoshi and Currency Converter | Satoshi.si', 'Convert Bitcoin, satoshis and fiat currencies in a draggable multi-currency converter using current exchange rates.'],

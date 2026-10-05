@@ -1234,12 +1234,14 @@ function shuffledWordPositions(length) {
 
 function createBackupChallenge(mnemonic) {
   const words = mnemonic.split(' ');
+  const requiresVerification = activeNetwork.id === 'mainnet';
   elements.backupDialog.querySelector('header span').textContent = 'One-time backup';
   elements.backupDialog.querySelector('header h2').textContent = 'Write down these recovery words';
   renderMnemonicWords(mnemonic);
   elements.backupWordsStep.hidden = false;
   elements.backupVerifyStep.hidden = true;
-  elements.backupCheck.replaceChildren(...shuffledWordPositions(words.length).map(index => {
+  elements.startBackupVerification.textContent = requiresVerification ? 'I wrote all 12 words' : 'Continue';
+  elements.backupCheck.replaceChildren(...(requiresVerification ? shuffledWordPositions(words.length) : []).map(index => {
     const label = document.createElement('label');
     const prompt = document.createElement('span');
     prompt.textContent = `Word ${index + 1}`;
@@ -1255,6 +1257,17 @@ function createBackupChallenge(mnemonic) {
     attachWordAssistant(input);
     return label;
   }));
+}
+
+function finishNewWalletBackup({protectWithPassword = true} = {}) {
+  const mnemonic = pendingMnemonic;
+  closeDialog(elements.backupDialog);
+  resetBackupFlow();
+  if (protectWithPassword) {
+    showPasswordSetup(mnemonic);
+    return;
+  }
+  void openWalletWithMnemonic(mnemonic);
 }
 
 function destinationTypeLabel(type) {
@@ -1835,6 +1848,10 @@ elements.backupDialog.addEventListener('cancel', event => {
 
 elements.startBackupVerification.addEventListener('click', () => {
   if (!pendingMnemonic) return;
+  if (activeNetwork.id === 'signet') {
+    finishNewWalletBackup({protectWithPassword: false});
+    return;
+  }
   elements.mnemonicWords.replaceChildren();
   elements.backupWordsStep.hidden = true;
   elements.backupVerifyStep.hidden = false;
@@ -1854,13 +1871,7 @@ elements.backupForm.addEventListener('submit', event => {
     mismatch.focus();
     return;
   }
-  const mnemonic = pendingMnemonic;
-  closeDialog(elements.backupDialog);
-  elements.mnemonicWords.replaceChildren();
-  elements.backupCheck.replaceChildren();
-  elements.backupDialog.querySelector('header span').textContent = 'One-time backup';
-  elements.backupDialog.querySelector('header h2').textContent = 'Write down these recovery words';
-  showPasswordSetup(mnemonic);
+  finishNewWalletBackup();
 });
 
 elements.restoreForm.addEventListener('submit', async event => {

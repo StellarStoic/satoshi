@@ -7,15 +7,15 @@
 .scanner-units label { position: relative; }
 .scanner-units input { position: absolute; opacity: 0; }
 .scanner-units span { display: grid; place-items: center; height: 44px; width: 60px; border: 1px solid var(--border); cursor: pointer; }
-.scanner-units input:checked + span { background: #f2a900; color: #101112; border-color: #f2a900; }
-.scanner-units input:focus-visible + span { outline: 2px solid #f2a900; outline-offset: 3px; }
+.scanner-units input:checked + span { background: var(--accent); color: #101112; border-color: var(--accent); }
+.scanner-units input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
 .scanner-main button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
 .scanner-main button:hover:enabled { background: var(--surface-raised); }
 .scanner-main button:disabled { opacity: .4; cursor: default; }
-.scanner-main button[aria-pressed=true] { color: #f2a900; border-color: #f2a900; }
+.scanner-main button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
 .scanner-main button svg { width: 20px; height: 20px; flex: 0 0 20px; }
 .scanner-main .scanner-icon { width: 44px; min-width: 44px; padding: 0; }
-#scanner-start { min-width: 144px; color: #f2a900; }
+#scanner-start { min-width: 144px; color: var(--accent); }
 .scanner-stage { background: transparent; overflow: hidden; touch-action: pan-y; }
 .scanner-stage.is-running { background: #080909; touch-action: none; }
 #scanner-video { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -23,9 +23,9 @@
 .scanner-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #53585d; }
 .scanner-idle svg { width: 80px; height: 80px; stroke-width: 1; }
 #scanner-overlays { position: absolute; inset: 0; pointer-events: none; }
-#scanner-target { position: absolute; box-sizing: border-box; border: 1px solid #f2a90080; border-radius: 4px; pointer-events: none; }
+#scanner-target { position: absolute; box-sizing: border-box; border: 1px solid var(--accent)80; border-radius: 4px; pointer-events: none; }
 .scanner-stage:not(.is-running) #scanner-target { display: none; }
-.scanner-price { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px; background: #101112; border: 1px solid #f2a900; border-radius: 4px; color: #f2a900; overflow: hidden; }
+.scanner-price { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px; background: #101112; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); overflow: hidden; }
 .scanner-price strong { font-size: 16px; line-height: 1.25; white-space: nowrap; }
 .scanner-price small { color: #d0d3d5; font-size: 11px; white-space: nowrap; }
 .scanner-rates { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
@@ -47,13 +47,13 @@
 .scanner-camera-controls { display: grid; grid-template-columns: 64px 80px 64px; justify-content: center; align-items: center; gap: 36px; margin: 0; pointer-events: auto; }
 .scanner-main #scanner-capture { width: 80px; height: 80px; border: 4px solid #fff; border-radius: 50%; background: #f2f3f4; color: #101112; box-shadow: inset 0 0 0 4px #101112; padding: 0; }
 .scanner-main #scanner-capture svg { width: 28px; height: 28px; }
-#scanner-zoom-reset { color: #f2a900; padding: 0; }
+#scanner-zoom-reset { color: var(--accent); padding: 0; }
 .scanner-camera-controls #scanner-settings-open { justify-self: end; }
 .scanner-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 24px)); max-height: calc(var(--scanner-viewport-height, 100dvh) - 32px - env(safe-area-inset-top) - var(--scanner-safe-bottom)); margin: auto; padding: 20px; border: 1px solid #4a5056; border-radius: 8px; background: #101214; color: #f2f3f4; overflow: auto; }
 .scanner-dialog::backdrop { background: #000a; }
 .scanner-dialog form { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 20px; }
 .scanner-dialog h2 { font-size: 20px; margin: 0; }
-#scanner-settings-notice { color: #f2a900; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+#scanner-settings-notice { color: var(--accent); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
 .scanner-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 20px 12px; padding: 0; border: 0; }
 .scanner-currency { width: 100%; }
 .scanner-currency select { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; font: inherit; font-size: 16px; }
@@ -63,13 +63,13 @@
 #scanner-error { position: absolute; z-index: 3; top: calc(126px + env(safe-area-inset-top)); left: 12px; right: 12px; padding: 12px; background: #2a1c1cf0; }
 .scanner-photo { width: min(620px, calc(100vw - 24px)); }
 #scanner-photo-image { display: block; width: 100%; max-height: 65dvh; object-fit: contain; background: #080909; }
-.scanner-download { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin-top: 16px; border: 1px solid var(--border); border-radius: 4px; color: #f2a900; text-decoration: none; }
+.scanner-download { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; margin-top: 16px; border: 1px solid var(--border); border-radius: 4px; color: var(--accent); text-decoration: none; }
 .scanner-download svg { width: 20px; height: 20px; }
 .scanner-photo-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
 .scanner-photo-actions .scanner-download { margin: 0; }
 #scanner-share-status { font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 12px 0 0; }
 #scanner-share-status:empty { display: none; }
-.scanner-main :focus-visible { outline: 2px solid #f2a900; outline-offset: 3px; }
+.scanner-main :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 480px) {
     .scanner-camera-controls { gap: 24px; }
 }

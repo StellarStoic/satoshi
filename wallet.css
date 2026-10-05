@@ -4,7 +4,7 @@
   --wallet-panel-strong: #1b1f20;
   --wallet-line: rgba(255, 255, 255, 0.12);
   --wallet-muted: #a9afb0;
-  --wallet-orange: #f2a900;
+  --wallet-orange: var(--accent);
   --wallet-green: #6acb85;
   --wallet-red: #ff6b62;
 }

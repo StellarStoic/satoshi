@@ -54,6 +54,14 @@ test('mainnet and signet profiles are isolated', async () => {
   await assert.rejects(() => decryptWalletSecret(mainnet, 'a strong test password', {network: 'signet'}), /different Bitcoin network/);
 });
 
+test('new Signet wallets skip phrase re-entry and password while Mainnet keeps both', () => {
+  assert.match(walletSource, /requiresVerification = activeNetwork\.id === 'mainnet'/);
+  assert.match(walletSource, /activeNetwork\.id === 'signet'[\s\S]*?finishNewWalletBackup\(\{protectWithPassword: false\}\)/);
+  assert.match(walletSource, /requiresVerification \? shuffledWordPositions\(words\.length\) : \[\]/);
+  assert.match(walletSource, /if \(protectWithPassword\)[\s\S]*?showPasswordSetup\(mnemonic\)[\s\S]*?openWalletWithMnemonic\(mnemonic\)/);
+  assert.match(walletSource, /Verify every recovery word/);
+});
+
 test('wallet database deletion remains isolated to the selected network', () => {
   assert.equal(walletDatabaseBelongsToNetwork('satoshi-bark-signet-0123456789abcdef0123', 'signet'), true);
   assert.equal(walletDatabaseBelongsToNetwork('satoshi-bark-chain-signet-0123456789abcdef0123', 'signet'), true);

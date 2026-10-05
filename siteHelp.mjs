@@ -15,6 +15,10 @@ export const PAGE_HELP = Object.freeze({
         title: 'About the converter',
         description: 'Convert Bitcoin, sats, currencies, and other assets together. Drag a currency to the first position to make it the amount that drives every conversion below it.'
     },
+    '/bitcoinTxCost.html': {
+        title: 'About Bitcoin and Ark transaction costs',
+        description: 'Choose where bitcoin starts and ends to estimate ordinary on-chain mining fees, Ark and Lightning service fees, boarding, or offboarding. The final wallet quote may differ.'
+    },
     '/entropy.html': {
         title: 'About the entropy lab',
         description: 'Explore how unpredictable input becomes wallet entropy, why strong randomness matters, and why guessing a properly generated Bitcoin wallet is effectively impossible.'
@@ -101,15 +105,14 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
     '/news.html': {selector: '#openNewsSettings', group: true, icon: true},
     '/priceScanner.html': {selector: '.scanner-top-controls', wide: true},
     '/isBip39.html': {selector: '#openWordlistSettings', group: true, icon: true},
-    '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true}
+    '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true},
+    '/MoscowTime.html': {selector: '#openMoscowSettings', group: true, icon: true}
 });
 
 function groupTopRightControls(trigger, companion) {
     trigger.classList.add('site-help-trigger--grouped');
     companion.classList.add('site-help-companion--grouped');
-    // Each control is independently viewport-fixed. A fixed wrapper with static
-    // children proved inconsistent in installed PWAs and pages with custom
-    // scrolling containers.
+    // Keep both controls at the document root so one shared rule aligns them.
     document.body.append(trigger, companion);
     document.querySelector('.site-help-actions')?.remove();
 }

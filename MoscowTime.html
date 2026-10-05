@@ -120,14 +120,36 @@
 <div class="moscow-time-container">
     <div class="moscow-time" title="Click the '?' to learn why it's called Moscow Time!">Moscow Time</div>
     <div class="info-modal-trigger"><i class="lni lni-question-mark-circle"></i></div>
+    <button type="button" id="openMoscowSettings" class="moscow-settings-trigger" aria-label="Moscow Time settings" title="Moscow Time settings"><i class="lni lni-gear-1" aria-hidden="true"></i></button>
 </div>
 
 <!-- Center Container for Satoshis Display -->
 <div class="center-container">
     <div class="satoshis-display">
-        <span id="satoshisValue">Syncing</span> <!-- Satoshis per Dollar: injected by JS with the help of Sintra API -->
+        <span id="satoshisValue" aria-live="polite">Syncing</span>
     </div>
 </div>
+
+<dialog id="moscowSettings" class="moscow-settings" aria-labelledby="moscowSettingsTitle">
+    <form method="dialog" class="moscow-settings-inner">
+        <header>
+            <h2 id="moscowSettingsTitle">Moscow Time settings</h2>
+            <button value="close" class="moscow-settings-close" aria-label="Close settings" title="Close">&times;</button>
+        </header>
+        <label for="moscowCurrency">Currency</label>
+        <select id="moscowCurrency">
+            <optgroup label="Provided by Sintra">
+                <option value="USD">USD · United States Dollar</option>
+                <option value="EUR">EUR · Euro</option>
+                <option value="GBP">GBP · British Pound</option>
+                <option value="CAD">CAD · Canadian Dollar</option>
+                <option value="AUD">AUD · Australian Dollar</option>
+            </optgroup>
+        </select>
+        <p>Sintra supplies direct Bitcoin prices for USD, EUR, GBP, CAD, and AUD. Other currencies combine Sintra's BTC/USD price with Frankfurter reference rates from central banks and official sources.</p>
+        <p class="moscow-settings-storage">Your choice is stored only in this browser.</p>
+    </form>
+</dialog>
 
 
 <!-- Contact modal -->
@@ -231,7 +253,7 @@
     <div class="modal-content">
         <h4>What is Moscow Time</h4>
         <h5>Short answer</h5>
-        <p>The number represents how much Satoshis you can get for $1 USD.</p>
+        <p>The number traditionally represents how many satoshis you can get for $1 USD. You can now choose another currency in the gear menu.</p>
         <h5>Long answer</h5>
         <p>
             In March 2021, Twitter's CEO at the time,</a> Jack Dorsey, joined a <a href="https://youtu.be/cTQTnc8gFDU" target="_blank" rel="noopener"></a>video call</a> with the 
