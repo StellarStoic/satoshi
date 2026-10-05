@@ -472,6 +472,16 @@ async function createOrder() {
   }
 }
 
+// A rejected origin and a service that is down both look like "nothing happened" to
+// a browser. Say which one it is: the desk only answers satoshi.si pages in a browser,
+// so a 403 means the page is being viewed from somewhere else.
+function describeFailure(response) {
+  if (response.status === 403) {
+    return 'This page is not being served from satoshi.si, and the name service only answers satoshi.si in a browser. Open https://satoshi.si/nip05store.html and try again.';
+  }
+  return `The name service answered with an error (${response.status}). Try again in a moment.`;
+}
+
 async function start() {
   els.name.addEventListener('input', onNameInput);
   els.pubkey.addEventListener('input', onKeyInput);
@@ -479,6 +489,11 @@ async function start() {
 
   try {
     const response = await fetch(`${API}/nip05/v1/config`);
+    if (!response.ok) {
+      setVerdict(els.verdict, describeFailure(response), 'bad');
+      statusLine(describeFailure(response), 'bad');
+      return;
+    }
     config = await response.json();
   } catch (error) {
     setVerdict(els.verdict, 'The name service is unreachable right now. Try again in a moment.', 'bad');
