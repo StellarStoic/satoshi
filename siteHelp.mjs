@@ -41,7 +41,7 @@ export const PAGE_HELP = Object.freeze({
     },
     '/nip05store.html': {
         title: 'About the NIP-05 name store',
-        description: 'Buy a name like yourname@satoshi.si: pick it, see its price by length, pay in sats over Lightning, on-chain or Ark, and it goes live in the public nostr.json the moment the payment settles. One-off payment with no renewal, one name per public key, and the same key may then write to wss://nostr.satoshi.si.'
+        description: 'Buy a name like yourname@satoshi.si with Lightning, on-chain bitcoin, or Ark. It goes live after payment, has no renewal fee, allows one name per public key, and can be used with the satoshi.si Nostr relay.'
     },
     '/offers.html': {
         title: 'About the P2P order book',
@@ -105,16 +105,13 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
 });
 
 function groupTopRightControls(trigger, companion) {
-    let group = document.querySelector('.site-help-actions');
-    if (!group) {
-        group = document.createElement('div');
-        group.className = 'site-help-actions';
-        group.setAttribute('aria-label', 'Page controls');
-        document.body.append(group);
-    }
     trigger.classList.add('site-help-trigger--grouped');
     companion.classList.add('site-help-companion--grouped');
-    group.append(trigger, companion);
+    // Each control is independently viewport-fixed. A fixed wrapper with static
+    // children proved inconsistent in installed PWAs and pages with custom
+    // scrolling containers.
+    document.body.append(trigger, companion);
+    document.querySelector('.site-help-actions')?.remove();
 }
 
 function alignTopRightControls(trigger) {
@@ -128,7 +125,7 @@ function alignTopRightControls(trigger) {
         groupTopRightControls(trigger, companion);
         return;
     }
-    if (config.reparent) document.documentElement.append(companion);
+    if (companion.parentElement !== document.body) document.body.append(companion);
     trigger.classList.add(config.wide ? 'site-help-trigger--wide-offset' : 'site-help-trigger--offset');
 }
 
@@ -150,7 +147,7 @@ function styleExistingTrigger(trigger) {
             trigger.click();
         });
     }
-    if (!trigger.closest('.site-help-actions') && trigger.parentElement !== document.documentElement) document.documentElement.append(trigger);
+    if (trigger.parentElement !== document.body) document.body.append(trigger);
 }
 
 function createHelpDialog(help) {
@@ -198,7 +195,7 @@ function createHelpTrigger(dialog, help) {
     trigger.innerHTML = iconMarkup();
     trigger.addEventListener('click', () => dialog.showModal());
     alignTopRightControls(trigger);
-    if (!trigger.closest('.site-help-actions')) document.documentElement.append(trigger);
+    if (trigger.parentElement !== document.body) document.body.append(trigger);
 }
 
 export function initialiseSiteHelp() {

@@ -47,6 +47,13 @@ export function requiredSatsForEstimate(estimate = {}, fallbackAmount = 0) {
   return (Number(fallbackAmount) || 0) + (Number(estimate.feeSats) || 0);
 }
 
+export function spentVtxoIdsFromError(error) {
+  const message = error instanceof Error ? `${error.message}\n${error.cause || ''}` : String(error || '');
+  const ids = [...message.matchAll(/vtxo\s+([0-9a-f]{64}:\d+)\s+is not spendable\s+\(state:\s*spent\)/gi)]
+    .map(match => match[1].toLowerCase());
+  return [...new Set(ids)];
+}
+
 export function bitcoinAddressMatchesNetwork(address, network = 'mainnet') {
   const value = String(address || '').trim().toLowerCase();
   if (!/^(?:bc1|tb1|bcrt1|[123mn])[a-z0-9]{20,}$/i.test(value)) return false;

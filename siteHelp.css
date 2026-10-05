@@ -69,24 +69,15 @@
     outline: none !important;
 }
 
-.site-help-actions {
+.site-help-trigger.site-help-trigger--grouped {
     position: fixed !important;
-    top: calc(18px + env(safe-area-inset-top)) !important;
-    right: max(16px, env(safe-area-inset-right)) !important;
-    z-index: 2200 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    height: 40px !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    inset: calc(18px + env(safe-area-inset-top)) max(66px, calc(50px + env(safe-area-inset-right))) auto auto !important;
 }
 
-.site-help-actions .site-help-trigger.site-help-trigger--grouped,
-.site-help-actions .site-help-companion.site-help-companion--grouped {
-    position: static !important;
-    inset: auto !important;
-    flex: 0 0 40px !important;
+.site-help-companion.site-help-companion--grouped {
+    position: fixed !important;
+    inset: calc(18px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) auto auto !important;
+    z-index: 2200 !important;
     margin: 0 !important;
 }
 

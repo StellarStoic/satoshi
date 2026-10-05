@@ -39,7 +39,7 @@ const menu = document.getElementById('menu');
 const menuToggle = document.getElementById('toggle');
 const MENU_ITEMS = [
     {label: 'Home', href: '/index.html'},
-    // {label: 'Wallet ₿', href: '/wallet.html'}, // Disabled temporarily.
+    {label: 'Wallet ₿', href: '/wallet.html'},
     {label: 'Knowledge', children: [
         {label: 'Bitcoin whitepaper', href: '/whitepaper.html'},
         {label: 'Self-custody', href: '/selfCustody.html'},

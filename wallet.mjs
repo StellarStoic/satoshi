@@ -22,6 +22,7 @@ import {
   requiredSatsForEstimate,
   receivedMovementAmount,
   selectAuthorizationSeconds,
+  spentVtxoIdsFromError,
 } from './walletModel.mjs';
 import {englishWordlist} from './vendor/bip39.mjs';
 import {
@@ -61,13 +62,14 @@ const elements = Object.fromEntries([
   'unlockForm', 'unlockPassword', 'recoverInstead', 'newWalletActions',
   'openTermsInline', 'barkHelpDialog', 'backupDialog', 'backupForm', 'cancelBackup', 'mnemonicWords',
   'backupCheck', 'backupWordsStep', 'backupVerifyStep', 'startBackupVerification', 'spendableBalance', 'btcBalance', 'walletFingerprint', 'lastSync', 'syncWallet',
-  'lockWallet', 'receiveView', 'sendView', 'activityView', 'arkReceivePanel', 'lightningReceivePanel', 'newArkAddress',
+  'walletFeeSlow', 'walletFeeRegular', 'walletFeeFast', 'walletArkFeePolicy', 'walletArkFeeQuote', 'walletFeesUpdated',
+  'lockWallet', 'receiveView', 'sendView', 'activityView', 'activityDialog', 'openWalletActivity', 'arkReceivePanel', 'lightningReceivePanel', 'newArkAddress',
   'openWalletSettings', 'onchainBalance', 'onchainPending', 'moveView', 'onchainReceivePanel', 'newOnchainAddress',
   'invoiceAmount', 'invoiceDescription', 'sendForm', 'onchainSendForm', 'onchainSendDestination', 'onchainSendAmount',
   'onchainFeeRate', 'onchainFeeHint', 'useSuggestedOnchainFee', 'arkSendMaxOption', 'arkSendMax',
-  'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount',
+  'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount', 'offboardAll',
   'sendDestination', 'sendAmount', 'destinationHint', 'walletHistory', 'confirmPaymentDialog',
-  'onchainHistory', 'walletSettingsDialog', 'walletAutoLockSetting', 'walletRefreshThreshold', 'walletPrivacyMode', 'openRevealSeed', 'revealSeedDialog',
+  'onchainHistory', 'walletSettingsDialog', 'walletSettingActions', 'openMoveBalances', 'walletAutoLockSetting', 'walletRefreshThreshold', 'walletPrivacyMode', 'openRevealSeed', 'revealSeedDialog',
   'walletDangerZone', 'openDeleteWallet', 'deleteWalletDialog', 'deleteWalletStep', 'deleteWalletTitle',
   'deleteWalletPrompt', 'cancelDeleteWallet', 'confirmDeleteWallet',
   'openEmergencyExit', 'emergencyExitDialog', 'emergencyExitStatus', 'emergencyExitFees',
@@ -75,6 +77,7 @@ const elements = Object.fromEntries([
   'progressEmergencyExit', 'claimEmergencyExit', 'confirmEmergencyExit',
   'revealSeedForm', 'revealSeedPassword', 'revealedMnemonicWords', 'cancelRevealSeed', 'closeRevealedSeed', 'confirmRevealSeed',
   'paymentSummary', 'confirmPayment',
+  'paymentResultDialog', 'paymentResultTitle', 'paymentResultDetails', 'copyPaymentResult', 'openPaymentResultExplorer',
   'arkRoundInterval', 'arkVtxoLifetime', 'arkExitDelay',
   'walletTermsAgreement', 'acceptWalletTerms', 'termsAccepted', 'termsAgreementLabel',
   'passwordDialog', 'passwordForm', 'passwordTitle', 'newWalletPassword', 'confirmWalletPassword', 'cancelPasswordSetup',
@@ -89,6 +92,7 @@ const elements = Object.fromEntries([
   'paymentAlertExpiry', 'closePaymentAlert', 'dismissPaymentAlert',
   'notificationConsentDialog', 'notificationConsentForm', 'notificationConsentCheck', 'confirmNotificationConsent',
   'cancelNotificationConsent', 'cancelNotificationConsentFooter',
+  'nextRoundCountdown', 'qrScannerDialog', 'qrScannerVideo', 'qrScannerStatus', 'closeQrScanner',
 ].map(id => [id, document.getElementById(id)]));
 
 let sdkPromise;
@@ -98,6 +102,8 @@ let pendingMnemonic = '';
 let pendingPayment;
 let currentArkAddress = '';
 let currentInvoice = '';
+let currentArkInfo;
+let paymentResultCopyValue = '';
 let operationRunning = false;
 let pendingPasswordMnemonic = '';
 let errorTimer;
@@ -114,10 +120,19 @@ let notificationHolder;
 let notificationGeneration = 0;
 let notificationRestartTimer;
 let notificationRefreshTimer;
+let roundCountdownTimer;
+let roundCountdownTarget = 0;
+let roundCountdownRetryAt = 0;
+let qrScannerStream;
+let qrScannerTimer;
+let qrScannerTarget = 'ark';
+let jsQrPromise;
+const qrScannerCanvas = document.createElement('canvas');
 let pushServiceAvailable = false;
 const seenIncomingMovements = new Set();
 const PUSH_API = 'https://notify.satoshi.si/wallet-notifications/v1';
 const PUSH_STATE_PREFIX = 'satoshiBarkPushV1:';
+const MAX_ACTIVITY_ITEMS = 50;
 
 function readJson(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
@@ -259,6 +274,13 @@ function closeDialog(dialog) {
   if (dialog.open) dialog.close();
 }
 
+function showWalletView(view = 'home', {focus = true} = {}) {
+  const views = {receive: elements.receiveView, send: elements.sendView, move: elements.moveView};
+  Object.entries(views).forEach(([name, section]) => { section.hidden = name !== view; });
+  document.querySelectorAll('[data-wallet-view]').forEach(button => button.classList.toggle('active', button.dataset.walletView === view));
+  if (view !== 'home' && focus) views[view]?.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
 function updateNetworkProfileStatuses() {
   [['signet', elements.signetProfileStatus], ['mainnet', elements.mainnetProfileStatus]].forEach(([networkId, output]) => {
     const saved = Boolean(readWalletProfile(networkId));
@@ -268,6 +290,7 @@ function updateNetworkProfileStatuses() {
 }
 
 function applyNetworkUi() {
+  currentArkInfo = undefined;
   document.body.dataset.walletNetwork = activeNetwork.id;
   elements.currentNetworkLabel.textContent = activeNetwork.label;
   elements.signetFaucet.hidden = activeNetwork.id !== 'signet';
@@ -283,6 +306,14 @@ function applyNetworkUi() {
   elements.arkRoundInterval.textContent = 'Available after wallet opens';
   elements.arkVtxoLifetime.textContent = 'Available after wallet opens';
   elements.arkExitDelay.textContent = 'Available after wallet opens';
+  elements.walletFeeSlow.textContent = '-- sat/vB';
+  elements.walletFeeRegular.textContent = '-- sat/vB';
+  elements.walletFeeFast.textContent = '-- sat/vB';
+  elements.walletArkFeePolicy.textContent = 'Quoted during review';
+  elements.walletArkFeeQuote.textContent = 'Separate server rate and VTXO age apply';
+  elements.walletArkFeeQuote.dataset.warning = 'false';
+  elements.walletArkFeeQuote.dataset.quoted = 'false';
+  elements.walletFeesUpdated.textContent = 'Available after sync';
   updateNetworkProfileStatuses();
   globalThis.lucide?.createIcons?.();
 }
@@ -465,10 +496,13 @@ function showPasswordSetup(mnemonic, {scanOnchain = false} = {}) {
   elements.newWalletPassword.focus();
 }
 
-function showReceivePayment({title, method, value, details}) {
+function showReceivePayment({title, method, value, details, copyLabel = 'Payment request'}) {
   elements.receivePaymentTitle.textContent = title;
   elements.receivePaymentMethod.textContent = method;
   elements.receivePaymentValue.textContent = value;
+  elements.copyReceivePayment.dataset.copyLabel = copyLabel;
+  elements.copyReceivePayment.setAttribute('aria-label', `Copy ${copyLabel.toLowerCase()}`);
+  elements.copyReceivePayment.title = `Copy ${copyLabel.toLowerCase()}`;
   elements.receivePaymentDetails.replaceChildren();
   Object.entries(details).forEach(([label, detail]) => {
     const dt = document.createElement('dt');
@@ -509,6 +543,61 @@ async function copyText(value, label) {
   }
 }
 
+function shortReference(value) {
+  const text = String(value || '');
+  return text.length > 24 ? `${text.slice(0, 12)}...${text.slice(-10)}` : text;
+}
+
+function transactionExplorerUrl(txid) {
+  if (!txid) return '';
+  return activeNetwork.id === 'mainnet'
+    ? `https://mempool.space/tx/${encodeURIComponent(txid)}`
+    : `https://mempool.space/signet/tx/${encodeURIComponent(txid)}`;
+}
+
+function movementMetadata(movement) {
+  try { return JSON.parse(movement.metadataJson || '{}'); } catch { return {}; }
+}
+
+function appendHistoryDetails(item, rows) {
+  const available = rows.filter(row => row.value !== undefined && row.value !== null && String(row.value) !== '');
+  if (!available.length) return;
+  const details = document.createElement('details');
+  details.className = 'history-details';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Details and IDs';
+  const list = document.createElement('dl');
+  available.forEach(row => {
+    const dt = document.createElement('dt');
+    const dd = document.createElement('dd');
+    const value = String(row.value);
+    dt.textContent = row.label;
+    const code = document.createElement('code');
+    code.textContent = row.shorten === false ? value : shortReference(value);
+    code.title = value;
+    dd.append(code);
+    if (row.copy !== false) {
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'history-copy';
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', () => copyText(value, row.label));
+      dd.append(copy);
+    }
+    if (row.txid) {
+      const link = document.createElement('a');
+      link.href = transactionExplorerUrl(value);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Explorer';
+      dd.append(link);
+    }
+    list.append(dt, dd);
+  });
+  details.append(summary, list);
+  item.append(details);
+}
+
 function renderHistory(movements) {
   elements.walletHistory.replaceChildren();
   if (!Array.isArray(movements) || !movements.length) {
@@ -518,15 +607,14 @@ function renderHistory(movements) {
     return;
   }
 
-  movements.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5).forEach(movement => {
+  movements.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, MAX_ACTIVITY_ITEMS).forEach(movement => {
     const item = document.createElement('article');
     item.className = 'history-item';
     const title = document.createElement('strong');
     title.textContent = movement.subsystemName || movement.subsystemKind || 'Bark movement';
     const amountValue = Number(movement.effectiveBalanceSats || movement.intendedBalanceSats || 0);
     const amount = document.createElement('strong');
-    amount.classList.add('wallet-private-value');
-    amount.className = amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : '';
+    amount.className = `wallet-private-value ${amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : ''}`;
     amount.textContent = `${amountValue > 0 ? '+' : ''}${formatSats(amountValue)}`;
     const status = document.createElement('span');
     status.textContent = movement.status || 'Recorded';
@@ -535,6 +623,20 @@ function renderHistory(movements) {
     time.dateTime = Number.isNaN(date.valueOf()) ? '' : date.toISOString();
     time.textContent = Number.isNaN(date.valueOf()) ? '' : date.toLocaleString();
     item.append(title, amount, status, time);
+    const metadata = movementMetadata(movement);
+    const chainAnchor = metadata.chain_anchor && typeof metadata.chain_anchor === 'object' ? metadata.chain_anchor : {};
+    const txid = metadata.offboard_txid || metadata.funding_txid || chainAnchor.txid;
+    appendHistoryDetails(item, [
+      {label: 'Movement ID', value: movement.id, shorten: false},
+      {label: 'Bitcoin txid', value: txid, txid: true},
+      {label: 'Lightning payment hash', value: movement.paymentHash || metadata.payment_hash},
+      {label: 'Ark fee', value: Number(movement.offchainFeeSats) ? formatSats(movement.offchainFeeSats) : '', copy: false, shorten: false},
+      {label: 'Sent to', value: movement.sentToAddresses?.join('\n')},
+      {label: 'Received on', value: movement.receivedOnAddresses?.join('\n')},
+      {label: 'Input VTXO IDs', value: movement.inputVtxoIds?.join('\n')},
+      {label: 'Output VTXO IDs', value: movement.outputVtxoIds?.join('\n')},
+      {label: 'Exited VTXO IDs', value: movement.exitedVtxoIds?.join('\n')},
+    ]);
     elements.walletHistory.append(item);
   });
 }
@@ -548,22 +650,27 @@ function renderOnchainHistory(transactions) {
     return;
   }
 
-  transactions.slice().sort((a, b) => Number(b.confirmation?.height || 0) - Number(a.confirmation?.height || 0)).slice(0, 5).forEach(transaction => {
+  transactions.slice().sort((a, b) => Number(b.confirmation?.height || 0) - Number(a.confirmation?.height || 0)).slice(0, MAX_ACTIVITY_ITEMS).forEach(transaction => {
     const item = document.createElement('article');
     item.className = 'history-item';
     const title = document.createElement('strong');
     title.textContent = Number(transaction.balanceChangeSats) >= 0 ? 'Received on-chain' : 'Sent on-chain';
     const amountValue = Number(transaction.balanceChangeSats) || 0;
     const amount = document.createElement('strong');
-    amount.classList.add('wallet-private-value');
-    amount.className = amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : '';
+    amount.className = `wallet-private-value ${amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : ''}`;
     amount.textContent = `${amountValue > 0 ? '+' : ''}${formatSats(amountValue)}`;
     const status = document.createElement('span');
     status.textContent = transaction.confirmation ? `Confirmed in block ${Number(transaction.confirmation.height).toLocaleString()}` : 'Unconfirmed';
     const reference = document.createElement('code');
     reference.title = transaction.txid || '';
-    reference.textContent = transaction.txid ? `${transaction.txid.slice(0, 10)}...${transaction.txid.slice(-8)}` : '';
+    reference.textContent = shortReference(transaction.txid);
     item.append(title, amount, status, reference);
+    appendHistoryDetails(item, [
+      {label: 'Bitcoin txid', value: transaction.txid, txid: true},
+      {label: 'Mining fee', value: transaction.onchainFeeSats === undefined ? 'Unavailable for this transaction' : formatSats(transaction.onchainFeeSats), copy: false, shorten: false},
+      {label: 'Block', value: transaction.confirmation?.height, copy: false, shorten: false},
+      {label: 'CPFP fee transaction', value: transaction.isCpfp ? 'Yes' : 'No', copy: false, shorten: false},
+    ]);
     elements.onchainHistory.append(item);
   });
 }
@@ -601,7 +708,14 @@ function showPaymentAlert(movement, amount) {
   });
   elements.paymentAlertTitle.textContent = content.title;
   elements.paymentAlertBody.textContent = 'Payment received while the wallet was open.';
-  elements.paymentAlertMeta.replaceChildren(...content.details.map(([label, value]) => {
+  const metadata = movementMetadata(movement);
+  const alertDetails = [
+    ...content.details,
+    ['Movement ID', String(movement.id ?? 'Unavailable')],
+    ...(movement.paymentHash || metadata.payment_hash ? [['Payment hash', shortReference(movement.paymentHash || metadata.payment_hash)]] : []),
+    ...(metadata.offboard_txid ? [['Bitcoin txid', shortReference(metadata.offboard_txid)]] : []),
+  ];
+  elements.paymentAlertMeta.replaceChildren(...alertDetails.map(([label, value]) => {
     const row = document.createElement('div');
     const term = document.createElement('dt');
     term.textContent = label;
@@ -860,10 +974,83 @@ function formatBlocksAsTime(blocks) {
   return `${value.toLocaleString()} blocks (about ${duration})`;
 }
 
+function feeRateLabel(satsPerKwu) {
+  const rate = Number(satsPerKwu) / 250;
+  if (!Number.isFinite(rate) || rate <= 0) return '-- sat/vB';
+  return `${rate.toLocaleString(undefined, {maximumFractionDigits: 2})} sat/vB`;
+}
+
+function renderCurrentFees(rates) {
+  elements.walletFeeSlow.textContent = feeRateLabel(rates?.slowSatPerKwu);
+  elements.walletFeeRegular.textContent = feeRateLabel(rates?.regularSatPerKwu);
+  elements.walletFeeFast.textContent = feeRateLabel(rates?.fastSatPerKwu);
+  const schedule = currentArkInfo?.feeSchedule?.offboard;
+  const ppm = Array.isArray(schedule?.ppmExpiryTable) ? schedule.ppmExpiryTable.map(entry => Number(entry.ppm)).filter(Number.isFinite) : [];
+  if (schedule) {
+    const minimum = ppm.length ? Math.min(...ppm) / 10_000 : 0;
+    const maximum = ppm.length ? Math.max(...ppm) / 10_000 : 0;
+    const percentage = minimum === maximum ? `${minimum.toLocaleString()}%` : `${minimum.toLocaleString()}-${maximum.toLocaleString()}%`;
+    elements.walletArkFeePolicy.textContent = `${percentage} + mining fee`;
+    if (elements.walletArkFeeQuote.dataset.quoted !== 'true') {
+      elements.walletArkFeeQuote.textContent = `${Number(schedule.fixedAdditionalVb).toLocaleString()} vB overhead; exact quote appears during review`;
+    }
+  } else {
+    elements.walletArkFeePolicy.textContent = 'Quoted during review';
+  }
+  elements.walletFeesUpdated.textContent = rates
+    ? `Updated ${new Date().toLocaleTimeString()}`
+    : 'Mining rates temporarily unavailable';
+}
+
+function showArkWithdrawalQuote(amount, estimate) {
+  const fee = Number(estimate?.feeSats) || 0;
+  const gross = Number(estimate?.grossAmountSats) || amount + fee;
+  elements.walletArkFeeQuote.textContent = `${formatSats(fee)} fee for ${formatSats(amount)} received; ${formatSats(gross)} total`;
+  elements.walletArkFeeQuote.dataset.warning = String(fee >= amount);
+  elements.walletArkFeeQuote.dataset.quoted = 'true';
+}
+
+function stopRoundCountdown() {
+  clearInterval(roundCountdownTimer);
+  roundCountdownTimer = undefined;
+  roundCountdownTarget = 0;
+  roundCountdownRetryAt = 0;
+}
+
+function renderRoundCountdown() {
+  const seconds = Math.max(0, Math.ceil((roundCountdownTarget - Date.now()) / 1000));
+  elements.nextRoundCountdown.textContent = seconds > 0 ? `${seconds}s` : 'Starting...';
+}
+
+async function refreshRoundCountdown() {
+  if (!wallet) return;
+  roundCountdownRetryAt = Date.now() + 5000;
+  try {
+    const value = Number(await wallet.nextRoundStartTime());
+    const timestamp = value > 1e12 ? value : value > 1e9 ? value * 1000 : Date.now() + value * 1000;
+    if (!Number.isFinite(timestamp) || timestamp <= Date.now()) throw new Error('No future round reported');
+    roundCountdownTarget = timestamp;
+    renderRoundCountdown();
+  } catch {
+    const cadence = Number(currentArkInfo?.roundIntervalSecs);
+    elements.nextRoundCountdown.textContent = Number.isFinite(cadence) && cadence > 0 ? `Every ${cadence}s` : 'Unavailable';
+  }
+}
+
+function startRoundCountdown() {
+  stopRoundCountdown();
+  void refreshRoundCountdown();
+  roundCountdownTimer = setInterval(() => {
+    if (roundCountdownTarget > Date.now()) renderRoundCountdown();
+    else if (Date.now() >= roundCountdownRetryAt) void refreshRoundCountdown();
+  }, 1000);
+}
+
 async function renderArkServerInfo() {
   try {
     const info = await wallet.arkInfo();
     if (!info) return;
+    currentArkInfo = info;
     const roundSeconds = Number(info.roundIntervalSecs);
     elements.arkRoundInterval.textContent = Number.isFinite(roundSeconds) && roundSeconds > 0
       ? `${roundSeconds.toLocaleString()} seconds`
@@ -871,6 +1058,7 @@ async function renderArkServerInfo() {
     elements.arkVtxoLifetime.textContent = formatBlocksAsTime(info.vtxoLifetime || info.vtxoExpiryDelta);
     elements.arkExitDelay.textContent = formatBlocksAsTime(info.vtxoExitDelta);
   } catch {
+    currentArkInfo = undefined;
     elements.arkRoundInterval.textContent = 'Could not read server policy';
     elements.arkVtxoLifetime.textContent = 'Could not read server policy';
     elements.arkExitDelay.textContent = 'Could not read server policy';
@@ -883,8 +1071,8 @@ async function refreshWallet({announce = true, seedIncoming = false} = {}) {
   try {
     await wallet.sync();
     await onchain.sync();
-    const [balance, history, chainBalance, chainHistory] = await Promise.all([
-      wallet.balance(), wallet.history(), onchain.balance(), onchain.transactions(),
+    const [balance, history, chainBalance, chainHistory, feeRates] = await Promise.all([
+      wallet.balance(), wallet.history(), onchain.balance(), onchain.transactions(), onchain.feeRates().catch(() => null),
     ]);
     const spendable = Number(balance.spendableSats) || 0;
     const total = balanceTotal(balance);
@@ -897,6 +1085,7 @@ async function refreshWallet({announce = true, seedIncoming = false} = {}) {
     elements.lastSync.textContent = `Synced ${new Date().toLocaleTimeString()}`;
     renderHistory(history);
     renderOnchainHistory(chainHistory);
+    renderCurrentFees(feeRates);
     if (seedIncoming) rememberExistingIncoming(history);
     if (announce) {
       const pending = total - spendable;
@@ -912,6 +1101,8 @@ async function refreshWallet({announce = true, seedIncoming = false} = {}) {
 
 async function disposeWallet({announce = true, message = `${activeNetwork.shortLabel} wallet locked. Enter its password to reopen it.`} = {}) {
   clearTimeout(inactivityTimer);
+  stopRoundCountdown();
+  stopQrScanner();
   stopWalletNotifications();
   if (elements.revealSeedDialog.open) closeDialog(elements.revealSeedDialog);
   clearRevealedSeed();
@@ -983,6 +1174,7 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = '', scanOnchai
     elements.walletFingerprint.textContent = `Wallet ${wallet.fingerprint()}`;
     elements.walletOnboarding.hidden = true;
     elements.walletDashboard.hidden = false;
+    showWalletView('home', {focus: false});
     updateNetworkProfileStatuses();
     resetInactivityTimer();
     renderRecoveryStatus();
@@ -1003,6 +1195,7 @@ async function openWalletWithMnemonic(mnemonic, {passwordToSave = '', scanOnchai
     setOperationState(false);
   }
   await refreshWallet({announce: true, seedIncoming: true});
+  startRoundCountdown();
   startWalletNotifications();
   void renewBackgroundNotifications();
 }
@@ -1116,12 +1309,20 @@ function renderPaymentSummary(payment) {
   elements.confirmPayment.textContent = payment.source === 'move' ? 'Confirm move' : 'Send bitcoin';
   const list = document.createElement('dl');
   list.className = 'payment-summary-list';
-  const feeDetail = payment.feeRate
-    ? ['Fee rate', `${payment.feeRate} sat/vB`]
-    : ['Estimated fee', formatSats(payment.fee)];
   const rows = [['Method', destinationTypeLabel(payment.type)]];
   if (payment.grossAmount) rows.push(['Ark balance spent', formatSats(payment.grossAmount)]);
-  rows.push([payment.type === 'offboard-all' ? 'Address receives' : 'Amount', formatSats(payment.amount, {fractional: true})], feeDetail, ['Destination', payment.destination]);
+  rows.push([payment.type === 'offboard-all' ? 'On-chain balance receives' : 'Amount', formatSats(payment.amount, {fractional: true})]);
+  if (payment.feeRate) {
+    rows.push(['Fee rate', `${payment.feeRate} sat/vB`]);
+  } else if (payment.type === 'board') {
+    rows.push(
+      ['Ark service fee', payment.fee ? formatSats(payment.fee) : 'None'],
+      ['Bitcoin mining fee', 'Calculated by the on-chain wallet when submitted'],
+    );
+  } else {
+    rows.push(['Estimated fee', formatSats(payment.fee)]);
+  }
+  rows.push(['Destination', payment.destination]);
   rows
     .forEach(([term, value]) => {
       const dt = document.createElement('dt');
@@ -1131,8 +1332,44 @@ function renderPaymentSummary(payment) {
       list.append(dt, dd);
     });
   const warning = document.createElement('p');
-  warning.textContent = 'Bitcoin payments cannot be reversed. Check the destination and amount before sending.';
+  warning.className = payment.fee >= payment.amount ? 'payment-fee-warning' : '';
+  warning.textContent = payment.fee >= payment.amount
+    ? 'The quoted fee is at least as large as the payment. This comes from the current Ark server withdrawal quote. Consider waiting for lower fees.'
+    : payment.type === 'board'
+      ? 'Boarding has no separate Ark service fee, but it still creates an irreversible Bitcoin transaction and pays its mining fee.'
+      : payment.type === 'offboard-self' || payment.type === 'offboard-all'
+        ? 'This is a normal cooperative withdrawal, not an emergency exit. The Ark server sets the quoted fee.'
+        : 'Bitcoin payments cannot be reversed. Check the destination and amount before sending.';
   elements.paymentSummary.replaceChildren(list, warning);
+}
+
+function showPaymentResult(payment, result) {
+  const txid = typeof result === 'string' ? result : result?.txid;
+  const paymentHash = result?.payment_hash || result?.paymentHash;
+  const vtxoId = result?.vtxoId;
+  const rows = [
+    ['Method', destinationTypeLabel(payment.type)],
+    ['Amount', formatSats(payment.amount, {fractional: true})],
+    ...(payment.fee ? [['Fee', formatSats(payment.fee)]] : []),
+    ...(txid ? [['Bitcoin txid', txid]] : []),
+    ...(paymentHash ? [['Lightning payment hash', paymentHash]] : []),
+    ...(vtxoId ? [['VTXO ID', vtxoId]] : []),
+    ['Destination', payment.destination],
+  ];
+  elements.paymentResultTitle.textContent = txid ? 'Transaction submitted' : 'Payment submitted';
+  elements.paymentResultDetails.replaceChildren();
+  rows.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    const dd = document.createElement('dd');
+    dt.textContent = label;
+    dd.textContent = value;
+    elements.paymentResultDetails.append(dt, dd);
+  });
+  paymentResultCopyValue = txid || paymentHash || vtxoId || payment.destination || '';
+  elements.copyPaymentResult.hidden = !paymentResultCopyValue;
+  elements.openPaymentResultExplorer.hidden = !txid;
+  if (txid) elements.openPaymentResultExplorer.href = transactionExplorerUrl(txid);
+  showDialog(elements.paymentResultDialog);
 }
 
 async function estimatePayment(destination, type, amount) {
@@ -1168,8 +1405,15 @@ elements.openWalletSettings.addEventListener('click', () => {
   elements.walletDangerZone.hidden = !hasProfile;
   elements.openEmergencyExit.disabled = !wallet;
   elements.openEmergencyExit.title = wallet ? '' : 'Unlock this wallet to use an emergency exit.';
+  elements.walletSettingActions.hidden = !wallet;
   elements.openDeleteWallet.textContent = `Delete ${activeNetwork.shortLabel} wallet`;
   showDialog(elements.walletSettingsDialog);
+});
+
+elements.openMoveBalances.addEventListener('click', () => {
+  if (!wallet) return;
+  closeDialog(elements.walletSettingsDialog);
+  showWalletView('move');
 });
 elements.walletAutoLockSetting.addEventListener('change', () => {
   try {
@@ -1677,14 +1921,110 @@ elements.unlockForm.addEventListener('submit', async event => {
   }
 });
 
-document.querySelectorAll('[data-wallet-view]').forEach(button => button.addEventListener('click', () => {
-  const view = button.dataset.walletView;
-  elements.receiveView.hidden = view !== 'receive';
-  elements.sendView.hidden = view !== 'send';
-  elements.moveView.hidden = view !== 'move';
-  elements.activityView.hidden = view !== 'activity';
-  document.querySelectorAll('[data-wallet-view]').forEach(candidate => candidate.classList.toggle('active', candidate === button));
-}));
+function parsedQrPayment(value) {
+  let destination = String(value || '').trim();
+  let amountSats;
+  if (/^bitcoin:/i.test(destination)) {
+    const request = destination.slice(destination.indexOf(':') + 1);
+    const [address, query = ''] = request.split('?');
+    destination = decodeURIComponent(address);
+    const btcAmount = Number(new URLSearchParams(query).get('amount'));
+    if (Number.isFinite(btcAmount) && btcAmount > 0) amountSats = Math.round(btcAmount * 100_000_000);
+  } else {
+    destination = destination.replace(/^(lightning|ark):/i, '');
+  }
+  return {destination, amountSats};
+}
+
+function stopQrScanner() {
+  clearTimeout(qrScannerTimer);
+  qrScannerTimer = undefined;
+  qrScannerStream?.getTracks().forEach(track => track.stop());
+  qrScannerStream = undefined;
+  elements.qrScannerVideo.srcObject = null;
+}
+
+function acceptScannedPayment(rawValue) {
+  const {destination, amountSats} = parsedQrPayment(rawValue);
+  if (!destination) return;
+  if (qrScannerTarget === 'onchain') {
+    elements.onchainSendDestination.value = destination;
+    if (amountSats) elements.onchainSendAmount.value = String(amountSats);
+  } else {
+    elements.sendDestination.value = destination;
+    if (amountSats) elements.sendAmount.value = String(amountSats);
+    updateDestinationHint();
+  }
+  stopQrScanner();
+  closeDialog(elements.qrScannerDialog);
+  setNotice('Payment QR scanned. Check every detail before sending.', 'success');
+}
+
+async function scanQrFrame(detector) {
+  if (!qrScannerStream || elements.qrScannerVideo.readyState < 2) {
+    qrScannerTimer = setTimeout(() => scanQrFrame(detector), 250);
+    return;
+  }
+  try {
+    if (detector) {
+      const codes = await detector.detect(elements.qrScannerVideo);
+      if (codes[0]?.rawValue) return acceptScannedPayment(codes[0].rawValue);
+    } else {
+      const video = elements.qrScannerVideo;
+      const scale = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight));
+      qrScannerCanvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      qrScannerCanvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = qrScannerCanvas.getContext('2d', {willReadFrequently: true});
+      context.drawImage(video, 0, 0, qrScannerCanvas.width, qrScannerCanvas.height);
+      const pixels = context.getImageData(0, 0, qrScannerCanvas.width, qrScannerCanvas.height);
+      const code = globalThis.jsQR(pixels.data, pixels.width, pixels.height, {inversionAttempts: 'attemptBoth'});
+      if (code?.data) return acceptScannedPayment(code.data);
+    }
+  } catch (error) {
+    console.warn('QR frame could not be read:', error);
+  }
+  qrScannerTimer = setTimeout(() => scanQrFrame(detector), detector ? 250 : 350);
+}
+
+function loadJsQr() {
+  if (typeof globalThis.jsQR === 'function') return Promise.resolve();
+  if (!jsQrPromise) jsQrPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/vendor/jsqr/jsQR.js';
+    script.onload = () => typeof globalThis.jsQR === 'function' ? resolve() : reject(new Error('QR reader did not initialize'));
+    script.onerror = () => reject(new Error('QR reader could not load'));
+    document.head.append(script);
+  });
+  return jsQrPromise;
+}
+
+async function openQrScanner(target) {
+  qrScannerTarget = target;
+  try {
+    let detector;
+    if ('BarcodeDetector' in globalThis) {
+      const formats = await globalThis.BarcodeDetector.getSupportedFormats?.();
+      if (!Array.isArray(formats) || formats.includes('qr_code')) detector = new globalThis.BarcodeDetector({formats: ['qr_code']});
+    }
+    if (!detector) await loadJsQr();
+    qrScannerStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}}, audio: false});
+    elements.qrScannerVideo.srcObject = qrScannerStream;
+    elements.qrScannerStatus.textContent = 'Center the payment QR inside the frame.';
+    showDialog(elements.qrScannerDialog);
+    await elements.qrScannerVideo.play();
+    void scanQrFrame(detector);
+  } catch (error) {
+    stopQrScanner();
+    setNotice(`Camera could not scan the QR code: ${errorMessage(error)}`, 'error');
+  }
+}
+
+document.querySelectorAll('[data-wallet-view]').forEach(button => button.addEventListener('click', () => showWalletView(button.dataset.walletView)));
+document.querySelectorAll('[data-wallet-home]').forEach(button => button.addEventListener('click', () => showWalletView('home')));
+elements.openWalletActivity.addEventListener('click', () => showDialog(elements.activityDialog));
+document.querySelectorAll('[data-scan-target]').forEach(button => button.addEventListener('click', () => void openQrScanner(button.dataset.scanTarget)));
+elements.closeQrScanner.addEventListener('click', () => closeDialog(elements.qrScannerDialog));
+elements.qrScannerDialog.addEventListener('close', stopQrScanner);
 
 document.querySelectorAll('[data-receive-mode]').forEach(button => button.addEventListener('click', () => {
   const mode = button.dataset.receiveMode;
@@ -1725,10 +2065,11 @@ elements.newArkAddress.addEventListener('click', async () => {
   try {
     currentArkAddress = await wallet.newAddress();
     showReceivePayment({
-      title: 'Ark receive address',
+      title: `${activeNetwork.shortLabel} Ark receive address`,
       method: 'Ark payment',
       value: currentArkAddress,
       details: {Network: activeNetwork.label, Amount: 'Any amount'},
+      copyLabel: `${activeNetwork.shortLabel} Ark address`,
     });
     setNotice('Fresh Ark address ready.', 'success');
   } catch (error) {
@@ -1744,10 +2085,11 @@ elements.newOnchainAddress.addEventListener('click', async () => {
   try {
     const address = await onchain.newAddress();
     showReceivePayment({
-      title: 'Bitcoin receive address',
+      title: `${activeNetwork.shortLabel} Bitcoin receive address`,
       method: 'On-chain Bitcoin',
       value: address,
       details: {Network: activeNetwork.label, Amount: 'Any amount'},
+      copyLabel: `${activeNetwork.shortLabel} Bitcoin address`,
     });
     setNotice('Fresh on-chain address ready.', 'success');
   } catch (error) {
@@ -1757,7 +2099,10 @@ elements.newOnchainAddress.addEventListener('click', async () => {
   }
 });
 
-elements.copyReceivePayment.addEventListener('click', () => copyText(elements.receivePaymentValue.textContent, 'Payment request'));
+elements.copyReceivePayment.addEventListener('click', () => copyText(
+  elements.receivePaymentValue.textContent,
+  elements.copyReceivePayment.dataset.copyLabel || 'Payment request',
+));
 
 elements.lightningReceivePanel.addEventListener('submit', async event => {
   event.preventDefault();
@@ -1775,10 +2120,11 @@ elements.lightningReceivePanel.addEventListener('submit', async event => {
     ]);
     currentInvoice = invoice.invoice;
     showReceivePayment({
-      title: 'Lightning invoice',
+      title: `${activeNetwork.shortLabel} Lightning invoice`,
       method: 'Lightning invoice',
       value: currentInvoice,
-      details: {Amount: formatSats(amount), 'Estimated fee': formatSats(estimate.feeSats), Status: 'Keep this wallet open until it settles'},
+      details: {Amount: formatSats(amount), 'Payment hash': invoice.paymentHash, 'Estimated fee': formatSats(estimate.feeSats), Status: 'Keep this wallet open until it settles'},
+      copyLabel: `${activeNetwork.shortLabel} Lightning invoice`,
     });
     setNotice('Lightning invoice ready. Keep this wallet open until it settles.', 'success');
   } catch (error) {
@@ -1819,6 +2165,7 @@ elements.sendForm.addEventListener('submit', async event => {
       const grossAmount = Number(estimate.grossAmountSats) || Number(balance.spendableSats) || 0;
       const fee = Number(estimate.feeSats) || 0;
       const netAmount = Number(estimate.netAmountSats) || grossAmount - fee;
+      showArkWithdrawalQuote(netAmount, estimate);
       if (grossAmount <= 0 || netAmount <= 0) throw new Error('The Ark balance is too small to cover the server-set withdrawal fee.');
       pendingPayment = {source: 'ark', destination, type: 'offboard-all', amount: netAmount, grossAmount, fee};
       renderPaymentSummary(pendingPayment);
@@ -1830,6 +2177,7 @@ elements.sendForm.addEventListener('submit', async event => {
     const fee = Number(estimate.feeSats) || 0;
     const spendable = Number(balance.spendableSats) || 0;
     const required = requiredSatsForEstimate(estimate, amount);
+    if (type === 'on-chain') showArkWithdrawalQuote(amount, estimate);
     if (spendable < required) {
       throw new Error(`This payment needs ${formatSats(required)}, including the fee, but only ${formatSats(spendable)} is spendable. Reduce the amount or select "Send entire Ark balance" for an on-chain withdrawal.`);
     }
@@ -1916,7 +2264,8 @@ elements.boardForm.addEventListener('submit', async event => {
     const [balance, estimate] = await Promise.all([onchain.balance(), wallet.estimateBoardFee(amount)]);
     const fee = Number(estimate.feeSats) || 0;
     const required = requiredSatsForEstimate(estimate, amount);
-    if ((Number(balance.confirmedSats) || 0) < required) throw new Error('Confirmed on-chain funds are lower than the amount plus estimated fee.');
+    const available = Number(balance.confirmedSats) || 0;
+    if (available < required) throw new Error(`This move needs at least ${formatSats(required)}, but only ${formatSats(available)} is confirmed on-chain. A Bitcoin mining fee is also calculated when the boarding transaction is submitted.`);
     pendingPayment = {source: 'move', type: 'board', amount, fee, destination: 'Your Ark balance'};
     renderPaymentSummary(pendingPayment);
     showDialog(elements.confirmPaymentDialog);
@@ -1927,20 +2276,42 @@ elements.boardForm.addEventListener('submit', async event => {
   }
 });
 
+function updateOffboardAllState() {
+  const moveAll = elements.offboardAll.checked;
+  elements.offboardAmount.disabled = moveAll;
+  elements.offboardAmount.required = !moveAll;
+  if (moveAll) elements.offboardAmount.value = '';
+}
+
+elements.offboardAll.addEventListener('change', updateOffboardAllState);
+
 elements.offboardForm.addEventListener('submit', async event => {
   event.preventDefault();
   if (!wallet || !onchain || operationRunning) return;
+  const moveAll = elements.offboardAll.checked;
   const amount = Number(elements.offboardAmount.value);
-  if (!Number.isSafeInteger(amount) || amount <= 0) return setNotice('Enter a positive whole-satoshi amount to move.', 'error');
+  if (!moveAll && (!Number.isSafeInteger(amount) || amount <= 0)) return setNotice('Enter a positive whole-satoshi amount to receive.', 'error');
   setOperationState(true, 'Estimating the move back on-chain...');
   try {
     await wallet.sync();
     const destination = await onchain.newAddress();
-    const [balance, estimate] = await Promise.all([wallet.balance(), wallet.estimateSendOnchainFee(destination, amount)]);
+    const [balance, estimate] = await Promise.all([
+      wallet.balance(),
+      moveAll ? wallet.estimateOffboardAllFee(destination) : wallet.estimateSendOnchainFee(destination, amount),
+    ]);
     const fee = Number(estimate.feeSats) || 0;
-    const required = requiredSatsForEstimate(estimate, amount);
-    if ((Number(balance.spendableSats) || 0) < required) throw new Error('The Ark balance is lower than the amount plus estimated fee.');
-    pendingPayment = {source: 'move', type: 'offboard-self', amount, fee, destination};
+    const available = Number(balance.spendableSats) || 0;
+    const grossAmount = Number(estimate.grossAmountSats) || available;
+    const receivedAmount = moveAll ? Number(estimate.netAmountSats) || grossAmount - fee : amount;
+    showArkWithdrawalQuote(receivedAmount, estimate);
+    if (moveAll) {
+      if (grossAmount <= 0 || receivedAmount <= 0) throw new Error(`The ${formatSats(available)} Ark balance is too small to cover the ${formatSats(fee)} withdrawal fee.`);
+      pendingPayment = {source: 'move', type: 'offboard-all', amount: receivedAmount, grossAmount, fee, destination};
+    } else {
+      const required = requiredSatsForEstimate(estimate, amount);
+      if (available < required) throw new Error(`To receive ${formatSats(amount)} on-chain, this move needs ${formatSats(required)} from Ark: ${formatSats(amount)} plus a ${formatSats(fee)} fee. Only ${formatSats(available)} is spendable. Choose “Move my entire Ark balance” to deduct the fee instead.`);
+      pendingPayment = {source: 'move', type: 'offboard-self', amount, fee, destination};
+    }
     renderPaymentSummary(pendingPayment);
     showDialog(elements.confirmPaymentDialog);
   } catch (error) {
@@ -1962,14 +2333,32 @@ elements.confirmPayment.addEventListener('click', async () => {
     else if (payment.source === 'move') {
       elements.boardForm.reset();
       elements.offboardForm.reset();
+      updateOffboardAllState();
     } else {
       elements.sendForm.reset();
       updateDestinationHint();
     }
-    const txid = typeof result === 'string' ? ` Transaction: ${result}` : '';
-    setNotice(`Payment submitted.${txid}`, 'success');
+    showPaymentResult(payment, result);
+    setNotice('Payment submitted. Its available identifiers are shown in the payment record.', 'success');
   } catch (error) {
-    setNotice(`Payment failed: ${errorMessage(error)}`, 'error');
+    const message = errorMessage(error);
+    const spentVtxoIds = spentVtxoIdsFromError(error);
+    if (spentVtxoIds.length) {
+      try {
+        await wallet.recoverVtxos(spentVtxoIds, null);
+        await wallet.sync();
+        setNotice('This attempt was rejected because an earlier wallet action had already spent part of the Ark balance. The local balance has been repaired. Review the activity and balance before trying again.');
+      } catch (recoveryError) {
+        const recoveryMessage = errorMessage(recoveryError);
+        setNotice(
+          'The Ark server says part of this balance was already spent, but the wallet could not repair its local record. Lock and reopen the wallet before trying again.',
+          'error',
+          `Original payment error:\n${message}\n\nState repair error:\n${recoveryMessage}`,
+        );
+      }
+    } else {
+      setNotice(`Payment failed: ${message}`, 'error');
+    }
   } finally {
     setOperationState(false);
   }
@@ -1977,6 +2366,7 @@ elements.confirmPayment.addEventListener('click', async () => {
 });
 
 elements.syncWallet.addEventListener('click', () => refreshWallet({announce: true}));
+elements.copyPaymentResult.addEventListener('click', () => copyText(paymentResultCopyValue, 'Payment ID'));
 elements.lockWallet.addEventListener('click', () => disposeWallet());
 elements.enableWalletNotifications.addEventListener('click', async () => {
   if (readPushState()) {
@@ -2088,6 +2478,8 @@ elements.retryWalletConnection.addEventListener('click', async () => {
 });
 
 window.addEventListener('pagehide', () => {
+  stopRoundCountdown();
+  stopQrScanner();
   stopWalletNotifications();
   try { wallet?.stopDaemon(); } catch { /* Page is unloading. */ }
   try { wallet?.free(); } catch { /* Page is unloading. */ }

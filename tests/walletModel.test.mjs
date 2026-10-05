@@ -17,6 +17,7 @@ import {
   requiredSatsForEstimate,
   receivedMovementAmount,
   selectAuthorizationSeconds,
+  spentVtxoIdsFromError,
 } from '../walletModel.mjs';
 
 test('normalizes mnemonic whitespace and case', () => {
@@ -62,6 +63,14 @@ test('converts Bark chain fee rates from sat/kwu without forcing a 1 sat/vB floo
 test('uses Bark gross amount without adding the fee twice', () => {
   assert.equal(requiredSatsForEstimate({grossAmountSats: 1_000, feeSats: 100, netAmountSats: 900}, 900), 1_000);
   assert.equal(requiredSatsForEstimate({feeSats: 100}, 900), 1_000);
+});
+
+test('extracts unique spent VTXO ids only from the authoritative server error', () => {
+  const id = `${'cf7cc32f7113278711fe258ed4f818ecd593661620a08caa31f5364941e24bd9'}:0`;
+  const error = new Error(`bad user input: vtxo ${id} is not spendable (state: spent); vtxo ${id} is not spendable (state: spent)`);
+  assert.deepEqual(spentVtxoIdsFromError(error), [id]);
+  assert.deepEqual(spentVtxoIdsFromError(`vtxo ${id} is locked`), []);
+  assert.deepEqual(spentVtxoIdsFromError('state: spent'), []);
 });
 
 test('rejects Bitcoin addresses from the other network before sending', () => {

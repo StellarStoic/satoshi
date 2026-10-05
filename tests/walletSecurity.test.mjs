@@ -14,6 +14,7 @@ import {
 
 const walletSource = readFileSync(new URL('../wallet.mjs', import.meta.url), 'utf8');
 const walletHtml = readFileSync(new URL('../wallet.html', import.meta.url), 'utf8');
+const walletCss = readFileSync(new URL('../wallet.css', import.meta.url), 'utf8');
 
 test('wallet secret round-trips through password encryption', async () => {
   const phrase = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -68,13 +69,19 @@ test('does not reveal legacy wallet databases before password unlock is configur
   assert.match(walletSource, /async function removeWalletDatabases/);
 });
 
-test('warns about Ark expiry and recovery before wallet onboarding', () => {
+test('keeps onboarding simple and puts Ark expiry and recovery in the required explainer', () => {
   const onboarding = walletHtml.slice(walletHtml.indexOf('<section class="wallet-onboarding"'), walletHtml.indexOf('<section class="wallet-dashboard"'));
-  assert.match(onboarding, /Ark is for active spending, not set-and-forget savings/);
-  assert.match(onboarding, /Funds that have expired and been swept are not guaranteed to be recoverable/);
-  assert.match(onboarding, /https:\/\/second\.tech\/blog\/ark-liquidity-research-01\//);
-  assert.match(onboarding, /https:\/\/second\.tech\/blog\/hark-explained\//);
-  assert.match(onboarding, /https:\/\/second\.tech\/terms/);
+  const explainer = walletHtml.slice(walletHtml.indexOf('id="barkHelpDialog"'), walletHtml.indexOf('id="backupDialog"'));
+  assert.match(onboarding, /Bitcoin wallet built with Bark/);
+  assert.match(onboarding, /Signet.*free test sats/);
+  assert.match(onboarding, /Mainnet.*real Bitcoin payments over the Ark Layer 2 network/);
+  assert.doesNotMatch(onboarding, /VTXOs expire/);
+  assert.match(explainer, /ELI5: what is Bark/);
+  assert.match(explainer, /Technical details/);
+  assert.match(explainer, /VTXOs expire/);
+  assert.match(explainer, /https:\/\/second\.tech\/blog\/ark-liquidity-research-01\//);
+  assert.match(explainer, /https:\/\/second\.tech\/blog\/hark-explained\//);
+  assert.match(explainer, /https:\/\/second\.tech\/terms/);
 });
 
 test('refresh thresholds are network-specific and reject unknown values', () => {
@@ -92,6 +99,39 @@ test('privacy mode is enabled only by its explicit stored value', () => {
   assert.equal(readPrivacyMode({getItem: () => 'true'}), true);
   assert.equal(readPrivacyMode({getItem: () => 'false'}), false);
   assert.equal(readPrivacyMode({getItem: () => null}), false);
+  assert.match(walletCss, /\.wallet-privacy[\s\S]*filter:\s*blur\(14px\)/);
+  assert.match(walletCss, /\.wallet-privacy[\s\S]*opacity:\s*\.42/);
+});
+
+test('receive requests identify their network and copy the specific payment item', () => {
+  assert.match(walletSource, /copyLabel:\s*`\$\{activeNetwork\.shortLabel\} Ark address`/);
+  assert.match(walletSource, /copyLabel:\s*`\$\{activeNetwork\.shortLabel\} Bitcoin address`/);
+  assert.match(walletSource, /copyLabel:\s*`\$\{activeNetwork\.shortLabel\} Lightning invoice`/);
+  assert.match(walletSource, /dataset\.copyLabel \|\| 'Payment request'/);
+});
+
+test('balance moves explain costs and distinguish a cooperative withdrawal from an emergency exit', () => {
+  assert.match(walletHtml, /Cooperative withdrawal and emergency exit/);
+  assert.match(walletHtml, /Use an ordinary on-chain payment whenever the server is cooperating/);
+  assert.match(walletHtml, /Cost: the Bitcoin mining fee/);
+  assert.match(walletHtml, /server's withdrawal quote/);
+  assert.match(walletSource, /normal cooperative withdrawal, not an emergency exit/);
+  assert.match(walletHtml, /id="offboardAll"/);
+  assert.match(walletSource, /estimateOffboardAllFee\(destination\)/);
+  assert.match(walletSource, /Choose “Move my entire Ark balance” to deduct the fee instead/);
+  assert.match(walletSource, /\['Ark service fee', payment\.fee \? formatSats\(payment\.fee\) : 'None'\]/);
+  assert.match(walletSource, /\['Bitcoin mining fee', 'Calculated by the on-chain wallet when submitted'\]/);
+});
+
+test('unlocked wallet home keeps only primary actions and moves history into a bottom sheet', () => {
+  assert.match(walletHtml, /class="wallet-actions"[\s\S]*data-wallet-view="send"[\s\S]*data-wallet-view="receive"/);
+  assert.doesNotMatch(walletHtml, /data-wallet-view="(?:move|activity)"/);
+  assert.match(walletHtml, /id="openWalletActivity"/);
+  assert.match(walletHtml, /id="activityDialog"/);
+  assert.match(walletHtml, /id="nextRoundCountdown"/);
+  assert.match(walletSource, /wallet\.nextRoundStartTime\(\)/);
+  assert.match(walletHtml, /data-scan-target="ark"/);
+  assert.match(walletHtml, /data-scan-target="onchain"/);
 });
 
 test('wallet settings use Bark refresh and complete emergency-exit APIs', () => {
@@ -101,4 +141,24 @@ test('wallet settings use Bark refresh and complete emergency-exit APIs', () => 
   assert.match(walletSource, /progressExits\(\{\}\)/);
   assert.match(walletSource, /drainExits\(\{vtxoIds: \[\], drainAll: true, address\}\)/);
   assert.match(walletSource, /extractTxFromPsbt\(claim\.psbtBase64\)/);
+});
+
+test('wallet exposes live fees and persistent transaction references', () => {
+  assert.match(walletHtml, /id="walletFeeSlow"/);
+  assert.match(walletHtml, /id="walletFeeRegular"/);
+  assert.match(walletHtml, /id="walletFeeFast"/);
+  assert.match(walletSource, /onchain\.feeRates\(\)/);
+  assert.match(walletSource, /metadata\.offboard_txid/);
+  assert.match(walletSource, /movement\.paymentHash/);
+  assert.match(walletSource, /movement\.inputVtxoIds/);
+  assert.match(walletSource, /transaction\.onchainFeeSats/);
+  assert.match(walletSource, /transactionExplorerUrl\(txid\)/);
+  assert.match(walletHtml, /id="paymentResultDialog"/);
+});
+
+test('wallet reconciles an explicitly spent VTXO without repeating the payment', () => {
+  assert.match(walletSource, /spentVtxoIdsFromError\(error\)/);
+  assert.match(walletSource, /await wallet\.recoverVtxos\(spentVtxoIds, null\)/);
+  assert.match(walletSource, /local balance has been repaired/);
+  assert.doesNotMatch(walletSource, /recoverVtxos\(spentVtxoIds, null\)[\s\S]{0,200}executePayment\(payment\)/);
 });
