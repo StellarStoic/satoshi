@@ -228,7 +228,7 @@ function setOperationState(running, message) {
 
 async function ensureSdk() {
   if (!window.isSecureContext || !globalThis.crypto?.subtle || !globalThis.indexedDB) {
-    throw new Error('Bark requires HTTPS or localhost with WebAssembly, Web Crypto, and IndexedDB enabled.');
+    throw new Error('This Ark wallet requires HTTPS or localhost with WebAssembly, Web Crypto, and IndexedDB enabled.');
   }
   if (!sdkPromise) sdkPromise = init({module_or_path: WASM_URL});
   await sdkPromise;
@@ -611,7 +611,7 @@ function renderHistory(movements) {
     const item = document.createElement('article');
     item.className = 'history-item';
     const title = document.createElement('strong');
-    title.textContent = movement.subsystemName || movement.subsystemKind || 'Bark movement';
+    title.textContent = movement.subsystemName || movement.subsystemKind || 'Ark activity';
     const amountValue = Number(movement.effectiveBalanceSats || movement.intendedBalanceSats || 0);
     const amount = document.createElement('strong');
     amount.className = `wallet-private-value ${amountValue > 0 ? 'positive' : amountValue < 0 ? 'negative' : ''}`;
@@ -1067,7 +1067,7 @@ async function renderArkServerInfo() {
 
 async function refreshWallet({announce = true, seedIncoming = false} = {}) {
   if (!wallet || !onchain || operationRunning) return;
-  setOperationState(true, 'Synchronizing Bark wallet...');
+  setOperationState(true, 'Synchronizing Ark wallet...');
   try {
     await wallet.sync();
     await onchain.sync();

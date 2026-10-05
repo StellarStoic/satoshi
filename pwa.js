@@ -8,6 +8,14 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
 
 const SATOSHI_CHAT_SETTING = 'satoshiChatEnabled';
 const SENSITIVE_WALLET_PAGE = location.pathname === '/wallet.html';
+const RUNNING_AS_APP = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+});
 
 if (!SENSITIVE_WALLET_PAGE && !document.querySelector('link[href="/analytics.css"]')) {
     const analyticsStyles = document.createElement('link');
@@ -80,13 +88,70 @@ const MENU_ITEMS = [
         {label: 'GhostQR', href: '/ghostQR.html'},
     ]},
     {label: 'News', href: '/news.html'},
+    {label: 'Install Satoshi.si', action: 'install'},
     {label: 'Settings', href: '/settings.html'},
 ];
 
+function showInstallHelp() {
+    let dialog = document.getElementById('pwaInstallDialog');
+    if (!dialog) {
+        dialog = document.createElement('dialog');
+        dialog.id = 'pwaInstallDialog';
+        dialog.className = 'pwa-install-dialog';
+        const content = document.createElement('div');
+        content.className = 'pwa-install-content';
+        const title = document.createElement('h2');
+        title.textContent = 'Install Satoshi.si';
+        const message = document.createElement('p');
+        message.className = 'pwa-install-message';
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'pwa-install-close';
+        close.setAttribute('aria-label', 'Close');
+        close.innerHTML = '<i class="lni lni-xmark" aria-hidden="true"></i>';
+        close.addEventListener('click', () => dialog.close());
+        content.append(close, title, message);
+        dialog.appendChild(content);
+        dialog.addEventListener('click', event => {
+            if (event.target === dialog) dialog.close();
+        });
+        document.body.appendChild(dialog);
+    }
+
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    dialog.querySelector('.pwa-install-message').textContent = isiOS
+        ? 'In Safari, tap Share, then Add to Home Screen.'
+        : 'Open the browser menu and choose Install app or Add to Home screen.';
+    dialog.showModal();
+}
+
+async function installPwa() {
+    if (!deferredInstallPrompt) {
+        showInstallHelp();
+        return;
+    }
+    const prompt = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    try {
+        await prompt.prompt();
+        await prompt.userChoice.catch(() => null);
+    } catch {
+        showInstallHelp();
+    }
+}
+
 function createMenuLink(item) {
     const link = document.createElement('a');
-    link.href = item.href;
+    link.href = item.href || '#';
     link.textContent = item.label;
+    if (item.action === 'install') {
+        link.className = 'pwa-install-link';
+        link.addEventListener('click', event => {
+            event.preventDefault();
+            installPwa();
+        });
+    }
     if (item.external) {
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
@@ -98,7 +163,7 @@ if (menuList) {
     menu?.setAttribute('role', 'navigation');
     menu?.setAttribute('aria-label', 'Main navigation');
     menuToggle?.setAttribute('aria-label', 'Navigation');
-    menuList.replaceChildren(...MENU_ITEMS.map(item => {
+    menuList.replaceChildren(...MENU_ITEMS.filter(item => item.action !== 'install' || !RUNNING_AS_APP).map(item => {
         const listItem = document.createElement('li');
         if (!item.children) {
             listItem.append(createMenuLink(item));
@@ -118,6 +183,11 @@ if (menuList) {
         return listItem;
     }));
 }
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    document.querySelector('.pwa-install-link')?.closest('li')?.remove();
+});
 
 if (document.querySelector('.footer')) {
     import('/siteFooter.mjs').catch(error => console.warn('Live footer data could not be loaded:', error));

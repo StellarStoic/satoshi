@@ -72,11 +72,12 @@ test('does not reveal legacy wallet databases before password unlock is configur
 test('keeps onboarding simple and puts Ark expiry and recovery in the required explainer', () => {
   const onboarding = walletHtml.slice(walletHtml.indexOf('<section class="wallet-onboarding"'), walletHtml.indexOf('<section class="wallet-dashboard"'));
   const explainer = walletHtml.slice(walletHtml.indexOf('id="barkHelpDialog"'), walletHtml.indexOf('id="backupDialog"'));
-  assert.match(onboarding, /Bitcoin wallet built with Bark/);
+  assert.match(onboarding, /Bitcoin wallet using Ark/);
   assert.match(onboarding, /Signet.*free test sats/);
   assert.match(onboarding, /Mainnet.*real Bitcoin payments over the Ark Layer 2 network/);
   assert.doesNotMatch(onboarding, /VTXOs expire/);
-  assert.match(explainer, /ELI5: what is Bark/);
+  assert.match(explainer, /ELI5: what is Ark/);
+  assert.match(explainer, /Bark.*Second's open-source implementation and wallet SDK for Ark/);
   assert.match(explainer, /Technical details/);
   assert.match(explainer, /VTXOs expire/);
   assert.match(explainer, /https:\/\/second\.tech\/blog\/ark-liquidity-research-01\//);

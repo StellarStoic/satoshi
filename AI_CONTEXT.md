@@ -75,7 +75,7 @@ Use the selected page section to answer questions such as "What does this button
 
 ### Page: [Wallet]
 - **URL**: /wallet.html
-- **Purpose**: An experimental self-custodial Bitcoin wallet using the Ark Layer 2 protocol (via Bark). Supports both Bitcoin Signet (free test coins) and mainnet (real bitcoin). Runs entirely in the browser with WebAssembly.
+- **Purpose**: An experimental self-custodial Bitcoin wallet using the Ark Layer 2 protocol, implemented with Second's Bark Web SDK. Supports both Bitcoin Signet (free test coins) and mainnet (real bitcoin). Runs entirely in the browser with WebAssembly.
 - **Key Elements**:
     - **Network selector (`#openNetworkDialog` / `#networkDialog`)**: Switches between Bitcoin Signet (recommended for learning) and Bitcoin mainnet (real funds). Separate wallets/balances per network.
     - **Terms dialog (`#barkHelpDialog`) / terms checkbox (`#walletTermsAgreement`)**: User must read and accept experimental wallet terms before creating or restoring a wallet.
