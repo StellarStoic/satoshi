@@ -39,6 +39,13 @@ const SESSIONS = [
   {name: 'Disco floor', family: 'disco', steps: 16, bpm: [112, 128], swing: [50, 54], kit: 7, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14], chord: [0, 6, 10, 14], bass: [0, 3, 4, 7, 8, 11, 12, 15], melody: [2, 5, 9, 13], chordDuration: '8n'},
   {name: 'UK garage', family: 'garage', steps: 16, bpm: [126, 140], swing: [55, 63], kit: 7, kick: [0, 6, 8, 14], snare: [4, 12], hat: [0, 2, 5, 7, 10, 13, 15], chord: [0, 7, 11], bass: [0, 3, 7, 10, 14], melody: [1, 5, 9, 13], chordDuration: '8n.'},
   {name: 'Latin clave', family: 'latin', steps: 16, bpm: [94, 122], swing: [50, 55], kit: 5, kick: [0, 6, 10], snare: [3, 6, 10, 14], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 6, 10], bass: [0, 3, 8, 11, 14], melody: [2, 5, 7, 10, 13, 15], chordDuration: '4n'},
+  {name: 'Blues shuffle', family: 'blues', steps: 16, bpm: [68, 104], swing: [62, 68], kit: 3, kick: [0, 6, 10], snare: [4, 12], hat: [0, 3, 6, 9, 12, 15], chord: [0, 6, 10], bass: [0, 3, 6, 10, 13], melody: [1, 4, 7, 10, 13], chordDuration: '4n.'},
+  {name: 'Acid pulse', family: 'acid', steps: 16, bpm: [118, 138], swing: [50, 54], kit: 8, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14, 15], chord: [0, 8], bass: [0, 3, 4, 7, 10, 11, 14], melody: [1, 5, 9, 13], chordDuration: '8n'},
+  {name: 'Dub techno', family: 'dub techno', steps: 16, bpm: [108, 126], swing: [51, 57], kit: 4, kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 11, 14], chord: [3, 10], bass: [0, 7, 11], melody: [5, 13], chordDuration: '8n.'},
+  {name: 'Electro break', family: 'electro', steps: 16, bpm: [108, 132], swing: [50, 57], kit: 7, kick: [0, 3, 8, 11, 14], snare: [4, 12], hat: [0, 2, 5, 7, 10, 13, 15], chord: [0, 7, 11], bass: [0, 3, 7, 10, 14], melody: [1, 4, 9, 12, 15], chordDuration: '8n'},
+  {name: 'Cinematic pulse', family: 'cinematic', steps: 16, bpm: [56, 86], swing: [50, 53], kit: 9, kick: [0, 8, 11], snare: [12], hat: [2, 6, 10, 14], chord: [0, 8], bass: [0, 8], melody: [3, 7, 11, 15], chordDuration: '1m'},
+  {name: 'Vapor drift', family: 'vaporwave', steps: 16, bpm: [58, 82], swing: [52, 60], kit: 0, kick: [0, 10], snare: [4, 12], hat: [2, 6, 10, 14], chord: [0, 6, 12], bass: [0, 7, 11], melody: [1, 5, 9, 14], chordDuration: '2n.'},
+  {name: 'Samba motion', family: 'samba', steps: 16, bpm: [96, 126], swing: [50, 55], kit: 5, kick: [0, 3, 8, 11], snare: [3, 6, 10, 14], hat: [0, 2, 4, 6, 8, 10, 12, 14], chord: [0, 5, 10, 13], bass: [0, 3, 7, 8, 11, 14], melody: [1, 4, 6, 9, 12, 15], chordDuration: '4n'},
 ];
 const PROGRESSIONS = [
   [0, 5, 3, 6],
@@ -190,7 +197,7 @@ export function trackTitleFromBlock(hash, height = 0) {
     .join(' ');
 }
 
-export const REPLAY_ENGINE_VERSION = 'v4';
+export const REPLAY_ENGINE_VERSION = 'v5';
 export const REPLAY_HASH_ROLES = [
   {name: 'Harmony', start: 24, end: 32, color: '#f2a900'},
   {name: 'Groove', start: 32, end: 40, color: '#32d583'},
@@ -211,7 +218,7 @@ export function normalizeReplayHeight(value) {
 }
 
 export function normalizeReplayEngine(value) {
-  return value === 'v1' ? 'v1' : REPLAY_ENGINE_VERSION;
+  return ['v1', 'v4', REPLAY_ENGINE_VERSION].includes(value) ? value : REPLAY_ENGINE_VERSION;
 }
 
 export function replayHashRoleAt(characterIndex) {
@@ -221,7 +228,7 @@ export function replayHashRoleAt(characterIndex) {
 export function replaySoundStateFromHash(value) {
   const hash = normalizeReplayHash(value);
   if (!hash) throw new TypeError('A replay requires a 64-character hexadecimal block hash');
-  const random = seededRandom(`${hash}:replay-sound:${REPLAY_ENGINE_VERSION}`);
+  const random = seededRandom(hash, `replay-sound:${REPLAY_ENGINE_VERSION}`);
   const bytes = Array.from({length: 6}, () => Math.floor(random() * 256));
   return {
     hash,
@@ -234,7 +241,7 @@ export function replaySoundStateFromHash(value) {
   };
 }
 
-export function seededRandom(seed) {
+function legacySeededRandom(seed) {
   let state = hashBytes(seed).reduce((total, value, index) => (total ^ (value << (index % 24))) >>> 0, 0x9e3779b9);
   return () => {
     state += 0x6d2b79f5;
@@ -242,6 +249,48 @@ export function seededRandom(seed) {
     next = Math.imul(next ^ (next >>> 15), next | 1);
     next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
     return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function rotateLeft(value, bits) {
+  return ((value << bits) | (value >>> (32 - bits))) >>> 0;
+}
+
+function seedWords(seed, domain) {
+  const input = `${domain}\u0000${seed}`;
+  const words = [0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344];
+  for (let index = 0; index < input.length; index += 1) {
+    const slot = index & 3;
+    words[slot] ^= input.charCodeAt(index) + Math.imul(index + 1, 0x9e3779b1);
+    words[slot] = Math.imul(words[slot] ^ (words[slot] >>> 16), 0x85ebca6b) >>> 0;
+    words[slot] = rotateLeft(words[slot], 13);
+    words[(slot + 1) & 3] ^= words[slot];
+  }
+  for (let round = 0; round < 8; round += 1) {
+    const slot = round & 3;
+    words[slot] = Math.imul(words[slot] ^ (words[slot] >>> 16), 0x7feb352d) >>> 0;
+    words[slot] = Math.imul(words[slot] ^ (words[slot] >>> 15), 0x846ca68b) >>> 0;
+    words[slot] ^= words[slot] >>> 16;
+    words[(slot + 1) & 3] ^= rotateLeft(words[slot], 7 + slot);
+  }
+  if (words.every(value => value === 0)) words[0] = 1;
+  return words;
+}
+
+// xoshiro128** keeps four independent 32-bit words. V4 used one 32-bit word;
+// retaining that generator separately keeps old replay URLs reproducible.
+export function seededRandom(seed, domain = '21fm:v5') {
+  const state = seedWords(String(seed), String(domain));
+  return () => {
+    const result = Math.imul(rotateLeft(Math.imul(state[1], 5) >>> 0, 7), 9) >>> 0;
+    const t = (state[1] << 9) >>> 0;
+    state[2] ^= state[0];
+    state[3] ^= state[1];
+    state[1] ^= state[2];
+    state[0] ^= state[3];
+    state[2] ^= t;
+    state[3] = rotateLeft(state[3], 11);
+    return result / 4294967296;
   };
 }
 
@@ -329,20 +378,24 @@ function scaleLeadSlots(slots, stepsPerBar) {
   return [...new Set(slots.map(slot => Math.min(stepsPerBar - 1, Math.round(slot / 16 * stepsPerBar))))];
 }
 
-function buildLeadPattern(formIndex, rhythmIndex, stepsPerBar, bytes, random) {
-  const totalSteps = stepsPerBar * 4;
+function buildLeadPattern(formIndex, rhythmIndex, alternateRhythmIndex, stepsPerBar, barCount, bytes, random, legacy = false) {
+  const totalSteps = stepsPerBar * barCount;
   const pattern = Array(totalSteps).fill(false);
   const economyPattern = Array(totalSteps).fill(false);
-  const baseSlots = LEAD_RHYTHMS[rhythmIndex].slots;
 
-  for (let bar = 0; bar < 4; bar += 1) {
+  for (let bar = 0; bar < barCount; bar += 1) {
+    const section = Math.floor(bar / 4);
+    const selectedRhythm = section % 3 === 1 ? alternateRhythmIndex : rhythmIndex;
+    const baseSlots = LEAD_RHYTHMS[selectedRhythm].slots;
     const responseShift = bar % 2 ? 1 + (bytes[(18 + bar) % 32] % 3) : 0;
-    const phraseShift = ((formIndex + bar + bytes[(21 + bar) % 32]) % 3) - 1;
+    const phraseShift = legacy
+      ? ((formIndex + bar + bytes[(21 + bar) % 32]) % 3) - 1
+      : ((formIndex + bar + section + bytes[(21 + bar) % 32]) % 5) - 2;
     const positions = scaleLeadSlots(baseSlots, stepsPerBar)
       .map(position => Math.max(0, Math.min(stepsPerBar - 1, position + phraseShift + responseShift)))
       .filter((position, index, all) => all.indexOf(position) === index)
       .filter((position, index) => index === 0 || random() > .12);
-    if (bar === 2 && bytes[14] % 4 === 0) positions.splice(1);
+    if (bar % 4 === 2 && (bytes[(14 + section) % 32] + section) % 4 === 0) positions.splice(1);
     if (!positions.length) positions.push(bytes[(8 + bar) % 32] % stepsPerBar);
     positions.forEach(position => { pattern[bar * stepsPerBar + position] = true; });
 
@@ -361,18 +414,26 @@ function chordForDegree(mood, root, degree, voicing) {
   return voicing.steps.map(step => midiToNote(scaleMidi(mood, root, degree + step, 1)));
 }
 
-function expandPattern(base, random, stepsPerBar, addChance = .08) {
-  return Array.from({length: stepsPerBar * 4}, (_, step) => {
+function expandPattern(base, random, stepsPerBar, barCount, addChance = .08) {
+  return Array.from({length: stepsPerBar * barCount}, (_, step) => {
     const position = step % stepsPerBar;
     const bar = Math.floor(step / stepsPerBar);
-    if (base.includes(position)) return true;
-    const fillZone = bar === 3 && position >= stepsPerBar - 3;
-    return (fillZone || position % 4 !== 0) && random() < addChance;
+    const section = Math.floor(bar / 4);
+    const shifted = section % 3 === 2 && position > 0 ? position - 1 : position;
+    if (base.includes(shifted)) return true;
+    const fillZone = bar % 4 === 3 && position >= stepsPerBar - 3;
+    const sectionEnergy = section % 4 === 1 ? 1.35 : section % 4 === 3 ? .7 : 1;
+    return (fillZone || position % 4 !== 0) && random() < addChance * sectionEnergy;
   });
 }
 
-export function compositionFromBlock(hash, height = 0, previousComposition = null, decisionOverrides = null) {
-  const random = seededRandom(`${cleanHash(hash)}${Number(height).toString(16)}`);
+export function compositionFromBlock(hash, height = 0, previousComposition = null, decisionOverrides = null, engine = REPLAY_ENGINE_VERSION) {
+  const normalizedEngine = normalizeReplayEngine(engine);
+  const legacy = normalizedEngine === 'v1' || normalizedEngine === 'v4';
+  const normalizedHash = cleanHash(hash);
+  const random = legacy
+    ? legacySeededRandom(`${normalizedHash}${Number(height).toString(16)}`)
+    : seededRandom(normalizedHash, `composition:${normalizedEngine}`);
   const bytes = Array.from({length: 32}, () => Math.floor(random() * 256));
   if (decisionOverrides) {
     Object.entries(decisionOverrides).forEach(([index, value]) => {
@@ -382,18 +443,29 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
   const moodIndex = bytes[0] % MOODS.length;
   const mood = MOODS[moodIndex];
   let sceneIndex = bytes[27] % PRODUCTION_SCENES.length;
-  if (previousComposition && sceneIndex === previousComposition.sceneIndex) {
+  if (legacy && previousComposition && sceneIndex === previousComposition.sceneIndex) {
     sceneIndex = (sceneIndex + 1 + (bytes[28] % (PRODUCTION_SCENES.length - 1))) % PRODUCTION_SCENES.length;
   }
   const scene = PRODUCTION_SCENES[sceneIndex];
-  const session = SESSIONS[bytes[28] % SESSIONS.length];
+  const session = SESSIONS[bytes[28] % (legacy ? 25 : SESSIONS.length)];
   const stepsPerBar = session.steps || 16;
-  const totalSteps = stepsPerBar * 4;
+  const barCount = legacy ? 4 : [16, 24, 32, 48, 64][bytes[8] % 5];
+  const sectionCount = Math.ceil(barCount / 4);
+  const totalSteps = stepsPerBar * barCount;
   const meter = stepsPerBar === 20 ? '5/4' : stepsPerBar === 14 ? '7/8' : stepsPerBar === 12 && session.family === 'waltz' ? '3/4' : stepsPerBar === 12 ? '6/8' : '4/4';
   const voicing = VOICINGS[bytes[19] % VOICINGS.length];
   const texture = TEXTURES[bytes[18] % TEXTURES.length];
   const root = bytes[1] % 12;
-  const progression = PROGRESSIONS[bytes[2] % PROGRESSIONS.length];
+  const baseProgression = PROGRESSIONS[bytes[2] % PROGRESSIONS.length];
+  const progression = Array.from({length: barCount}, (_, bar) => {
+    const section = Math.floor(bar / 4);
+    const baseDegree = baseProgression[bar % baseProgression.length];
+    if (legacy || section === 0) return baseDegree;
+    const movement = ((bytes[(22 + section) % 32] + section) % 5) - 2;
+    if (bar % 4 === 3) return baseDegree + movement;
+    if (section % 4 === 2 && bar % 4 === 1) return baseDegree + Math.sign(movement || 1);
+    return baseDegree;
+  });
   const chords = progression.map(degree => chordForDegree(mood, root, degree, voicing));
   const bass = progression.map(degree => midiToNote(scaleMidi(mood, root, degree, -1)));
   const melodyRegister = bytes[17] % 3 === 0 ? 1 : 0;
@@ -401,16 +473,20 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
   const melodicFormIndex = bytes[5] % MELODIC_FORMS.length;
   const melodicForm = MELODIC_FORMS[melodicFormIndex];
   const leadRhythmIndex = bytes[6] % LEAD_RHYTHMS.length;
+  const alternateFormIndex = legacy ? melodicFormIndex : (melodicFormIndex + 1 + bytes[21] % (MELODIC_FORMS.length - 1)) % MELODIC_FORMS.length;
+  const alternateRhythmIndex = legacy ? leadRhythmIndex : (leadRhythmIndex + 1 + bytes[22] % (LEAD_RHYTHMS.length - 1)) % LEAD_RHYTHMS.length;
   const leadRhythm = LEAD_RHYTHMS[leadRhythmIndex];
-  const {pattern: melodyPattern, economyPattern: economyMelodyPattern} = buildLeadPattern(melodicFormIndex, leadRhythmIndex, stepsPerBar, bytes, random);
+  const {pattern: melodyPattern, economyPattern: economyMelodyPattern} = buildLeadPattern(melodicFormIndex, leadRhythmIndex, alternateRhythmIndex, stepsPerBar, barCount, bytes, random, legacy);
   const melody = Array.from({length: totalSteps}, (_, step) => {
     const bar = Math.floor(step / stepsPerBar);
     const position = step % stepsPerBar;
-    const contour = bar % 2 ? melodicForm.answer : melodicForm.question;
+    const section = Math.floor(bar / 4);
+    const activeForm = !legacy && section % 3 === 1 ? MELODIC_FORMS[alternateFormIndex] : melodicForm;
+    const contour = bar % 2 ? activeForm.answer : activeForm.question;
     const contourIndex = Math.min(contour.length - 1, Math.floor(position / stepsPerBar * contour.length));
-    const cadence = bar === 3 && position > stepsPerBar * .7 ? -1 : 0;
+    const cadence = bar % 4 === 3 && position > stepsPerBar * .7 ? -1 : 0;
     const variation = (bytes[(step + 7) % 32] + step) % 11 === 0 ? (bar % 2 ? -1 : 1) : 0;
-    const registerTurn = bar === 2 && bytes[16] % 3 === 0 ? -mood.scale.length : 0;
+    const registerTurn = bar % 4 === 2 && (bytes[16] + section) % 3 === 0 ? -mood.scale.length : 0;
     const degree = progression[bar] + contour[contourIndex] + cadence + variation + registerTurn;
     return midiToNote(scaleMidi(mood, root, degree, melodyRegister));
   });
@@ -420,25 +496,35 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     return ['16n', '8n', '8n', '8n.', '4n'][choice];
   });
   const leadVelocities = Array.from({length: totalSteps}, (_, step) => .16 + ((bytes[(step + 15) % 32] + step * 7) % 21) / 100);
-  const kickPattern = expandPattern(session.kick, random, stepsPerBar, .025);
-  const snarePattern = expandPattern(session.snare, random, stepsPerBar, .018);
-  const hatPattern = expandPattern(session.hat, random, stepsPerBar, .07);
-  const chordPattern = expandPattern(session.chord, random, stepsPerBar, .015);
-  const bassPattern = expandPattern(session.bass, random, stepsPerBar, .045);
+  const kickPattern = expandPattern(session.kick, random, stepsPerBar, barCount, .025);
+  const snarePattern = expandPattern(session.snare, random, stepsPerBar, barCount, .018);
+  const hatPattern = expandPattern(session.hat, random, stepsPerBar, barCount, .07);
+  const chordPattern = expandPattern(session.chord, random, stepsPerBar, barCount, .015);
+  const bassPattern = expandPattern(session.bass, random, stepsPerBar, barCount, .045);
   const breakBar = 1 + (bytes[14] % 3);
   const breakMode = bytes[15] % 3;
   const arrangementMode = bytes[13] % 5;
   const arrangementNames = ['drop and return', 'slow build', 'call and response', 'rhythm first', 'full ensemble'];
-  const arrangement = Array.from({length: 4}, (_, bar) => {
-    if (arrangementMode === 1) return {harmony: true, bass: bar > 0, drums: bar > 0, melody: bar >= 2};
-    if (arrangementMode === 2) return {harmony: bar % 2 === 0, bass: true, drums: true, melody: bar % 2 === 1};
-    if (arrangementMode === 3) return {harmony: bar !== 2, bass: true, drums: true, melody: bar === 3};
-    if (arrangementMode === 4) return {harmony: true, bass: true, drums: true, melody: Boolean(bytes[17] & (1 << bar)) || bar === 0};
+  const formLabels = ['intro', 'A', 'A variation', 'B', 'break', 'A return', 'C', 'outro'];
+  const songForm = Array.from({length: sectionCount}, (_, section) => section === sectionCount - 1 ? 'outro' : formLabels[section % (formLabels.length - 1)]);
+  const arrangement = Array.from({length: barCount}, (_, bar) => {
+    const localBar = bar % 4;
+    const section = Math.floor(bar / 4);
+    const isIntro = !legacy && section === 0;
+    const isBreak = !legacy && (songForm[section] === 'break' || (section + bytes[23]) % 7 === 5);
+    const isOutro = !legacy && section === sectionCount - 1;
+    if (isIntro) return {harmony: true, bass: localBar > 0, drums: localBar > 1, melody: localBar >= 2};
+    if (isBreak) return {harmony: localBar !== 2, bass: localBar < 2, drums: localBar === 3, melody: true};
+    if (isOutro) return {harmony: true, bass: localBar < 3, drums: localBar < 2, melody: localBar === 0 || localBar === 2};
+    if (arrangementMode === 1) return {harmony: true, bass: localBar > 0, drums: localBar > 0, melody: localBar >= 2};
+    if (arrangementMode === 2) return {harmony: localBar % 2 === 0, bass: true, drums: true, melody: localBar % 2 === 1};
+    if (arrangementMode === 3) return {harmony: localBar !== 2, bass: true, drums: true, melody: localBar === 3};
+    if (arrangementMode === 4) return {harmony: true, bass: true, drums: true, melody: Boolean(bytes[17] & (1 << localBar)) || localBar === 0};
     return {
-      harmony: !(bar === breakBar && breakMode === 0),
-      bass: !(bar === breakBar && breakMode === 1),
-      drums: !(bar === breakBar && breakMode === 2),
-      melody: bar === 0 || Boolean(bytes[13] & (1 << bar)),
+      harmony: !(localBar === breakBar && breakMode === 0),
+      bass: !(localBar === breakBar && breakMode === 1),
+      drums: !(localBar === breakBar && breakMode === 2),
+      melody: localBar === 0 || Boolean(bytes[13] & (1 << localBar)),
     };
   });
   const voiceAt = (slot, choices) => ((Number(scene.voices[slot]) || 0) % choices.length + choices.length) % choices.length;
@@ -460,6 +546,9 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     family: session.family,
     arrangementName: arrangementNames[arrangementMode],
     meter,
+    engine: normalizedEngine,
+    barCount,
+    songForm,
     stepsPerBar,
     totalSteps,
     voicing: voicing.name,
@@ -472,8 +561,8 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
     bass,
     palette,
     melody,
-    melodyForm: melodicForm.name,
-    leadRhythm: leadRhythm.name,
+    melodyForm: legacy ? melodicForm.name : `${melodicForm.name} / ${MELODIC_FORMS[alternateFormIndex].name}`,
+    leadRhythm: legacy ? leadRhythm.name : `${leadRhythm.name} / ${LEAD_RHYTHMS[alternateRhythmIndex].name}`,
     leadDurations,
     leadVelocities,
     economyMelodyPattern,
@@ -513,6 +602,9 @@ export function compositionFromBlock(hash, height = 0, previousComposition = nul
       filterBase: 900 + bytes[29] * 6,
       delayTime: ['16n', '8n', '8n.', '4t'][bytes[30] % 4],
       delayFeedback: .12 + (bytes[31] % 22) / 100,
+      delayMode: legacy ? 'feedback' : ['feedback', 'ping-pong'][bytes[23] % 2],
+      modulationType: legacy ? 'phaser' : ['phaser', 'auto-filter', 'auto-pan'][bytes[21] % 3],
+      effectProfile: legacy ? 'v4 studio' : ['tape room', 'wide echoes', 'filter motion', 'dub space', 'dry close-up', 'slow orbit'][bytes[22] % 6],
       chorusDepth: .08 + (bytes[20] % 28) / 100,
       space: SPACES[bytes[12] % SPACES.length],
       motion: MOTIONS[bytes[11] % MOTIONS.length],
@@ -545,8 +637,9 @@ function replayDecisionOverrides(hash) {
 export function replayCompositionFromHash(value, engine = REPLAY_ENGINE_VERSION) {
   const hash = normalizeReplayHash(value);
   if (!hash) throw new TypeError('A replay requires a 64-character hexadecimal block hash');
-  if (normalizeReplayEngine(engine) === 'v1') return compositionFromBlock(hash, 0, null);
-  return compositionFromBlock(hash, 0, null, replayDecisionOverrides(hash));
+  const normalizedEngine = normalizeReplayEngine(engine);
+  if (normalizedEngine === 'v1') return compositionFromBlock(hash, 0, null, null, 'v1');
+  return compositionFromBlock(hash, 0, null, replayDecisionOverrides(hash), normalizedEngine);
 }
 
 export function latestBlockFromFrame(frame = {}) {
@@ -677,7 +770,7 @@ export function flowFromTransactions(seed, composition, summary = {}) {
     seed: cleanHash(seed),
     phrase,
     velocities: Array.from({length: phraseLength}, (_, step) => 0.16 + (bytes[(step + 16) % 32] % 23) / 100),
-    chordInversions: Array.from({length: 4}, (_, bar) => bytes[bar + 3] % 3),
+    chordInversions: Array.from({length: composition.barCount || 4}, (_, bar) => bytes[(bar + 3) % 32] % 3),
     leadVoice: (composition.sound.leadVoice + (voiceOffsetByType[summary.dominantType] ?? bytes[8])) % LEAD_VOICES.length,
     chordVoice: (composition.sound.chordVoice + (complexity > .65 ? 1 : 0)) % CHORD_VOICES.length,
     bassVoice: (composition.sound.bassVoice + (summary.dominantType === 'Consolidation' ? 1 : 0)) % BASS_VOICES.length,

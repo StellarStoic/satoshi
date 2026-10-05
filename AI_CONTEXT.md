@@ -271,6 +271,7 @@ Use the selected page section to answer questions such as "What does this button
 ### Page: [21FM]
 - **URL**: /21fm.html
 - **Purpose**: Generative music player that turns live Bitcoin block data and mempool activity into unique, ever-changing music tracks.
+- **Generation model**: Engine v5 uses a domain-separated 128-bit deterministic generator to write 16-to-64-bar song forms across 32 groove families. V1 and v4 replay links remain supported. Similar genre traits can recur, but the block-height BIP39 title remains unique and reversible.
 - **Key Elements**:
     - **Play button (`#playButton`)**: Starts the audio.
     - **Volume control (`#volumeControl`)**: Adjust playback volume.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {bip39CodeToBlockHeight, blockHeightToBip39Code, cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, halvingEraFromHeight, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from '../lofiModel.mjs';
+import {bip39CodeToBlockHeight, blockHeightToBip39Code, cleanHash, compositionFromBlock, describeTransaction, fallbackChainState, flowFromTransactions, foldTransactionIds, halvingEraFromHeight, latestBlockFromFrame, mempoolToSound, normalizeReplayEngine, normalizeReplayHash, normalizeReplayHeight, replayCompositionFromHash, replayHashRoleAt, replaySoundStateFromHash, REPLAY_ENGINE_VERSION, seededRandom, summarizeTransactions, trackTitleFromBlock, transactionGravityPoint} from '../lofiModel.mjs';
 
 const HASH = '000000000000000000000000b4c9f08f7ef4d967bc812591a4fa25e65a19d7ac';
 
@@ -8,7 +8,8 @@ test('block composition is deterministic and musically bounded', () => {
   const first = compositionFromBlock(HASH, 900000);
   const second = compositionFromBlock(HASH, 900000);
   assert.deepEqual(first, second);
-  assert.equal(first.chords.length, 4);
+  assert.ok([16, 24, 32, 48, 64].includes(first.barCount));
+  assert.equal(first.chords.length, first.barCount);
   assert.equal(first.chords.every(chord => chord.length >= 3 && chord.length <= 4), true);
   assert.equal(first.melody.length, first.totalSteps);
   assert.equal(first.economyMelodyPattern.length, first.totalSteps);
@@ -16,7 +17,7 @@ test('block composition is deterministic and musically bounded', () => {
   assert.equal(first.leadVelocities.length, first.totalSteps);
   assert.equal(typeof first.melodyForm, 'string');
   assert.equal(typeof first.leadRhythm, 'string');
-  for (let bar = 0; bar < 4; bar += 1) {
+  for (let bar = 0; bar < first.barCount; bar += 1) {
     const economyNotes = first.economyMelodyPattern.slice(bar * first.stepsPerBar, (bar + 1) * first.stepsPerBar).filter(Boolean).length;
     assert.ok(economyNotes >= 1 && economyNotes <= 2);
   }
@@ -24,11 +25,12 @@ test('block composition is deterministic and musically bounded', () => {
   assert.ok(first.bpm >= 48 && first.bpm <= 176);
   assert.ok(first.swing >= 0.5 && first.swing <= 0.68);
   assert.ok([12, 14, 16, 20].includes(first.stepsPerBar));
-  assert.equal(first.totalSteps, first.stepsPerBar * 4);
+  assert.equal(first.totalSteps, first.stepsPerBar * first.barCount);
   assert.equal(first.rhythm.kick.length, first.totalSteps);
   assert.equal(first.rhythm.snare.length, first.totalSteps);
   assert.equal(first.rhythm.chord.length, first.totalSteps);
-  assert.equal(first.arrangement.length, 4);
+  assert.equal(first.arrangement.length, first.barCount);
+  assert.equal(first.songForm.length, Math.ceil(first.barCount / 4));
   assert.ok(first.sound.chordVoice >= 0 && first.sound.chordVoice < 8);
   assert.ok(first.sound.leadVoice >= 0 && first.sound.leadVoice < 11);
   assert.ok(first.sound.bassVoice >= 0 && first.sound.bassVoice < 7);
@@ -78,20 +80,38 @@ test('hash replay validates links and produces a versioned deterministic track',
   const otherHash = '000000000000000000019f4c03f7cd4d1414582857f53d96be456b3948c7a2d1';
   assert.equal(normalizeReplayHash(`  ${uppercase}  `), HASH);
   assert.equal(normalizeReplayHash('not-a-block'), null);
-  assert.equal(REPLAY_ENGINE_VERSION, 'v4');
+  assert.equal(REPLAY_ENGINE_VERSION, 'v5');
   assert.deepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(uppercase));
   assert.notDeepEqual(replayCompositionFromHash(HASH), replayCompositionFromHash(otherHash));
   assert.equal(replayCompositionFromHash(HASH).height, 0);
-  assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null));
+  assert.deepEqual(replayCompositionFromHash(HASH, 'v1'), compositionFromBlock(HASH, 0, null, null, 'v1'));
   assert.equal(normalizeReplayEngine('v1'), 'v1');
-  assert.equal(normalizeReplayEngine('unknown'), 'v4');
+  assert.equal(normalizeReplayEngine('v4'), 'v4');
+  assert.equal(normalizeReplayEngine('unknown'), 'v5');
+});
+
+test('v5 separates seed domains and retains deterministic v4 replay', () => {
+  const compositionRandom = seededRandom(HASH, 'composition:v5');
+  const replayRandom = seededRandom(HASH, 'replay-sound:v5');
+  assert.notDeepEqual(Array.from({length: 8}, compositionRandom), Array.from({length: 8}, replayRandom));
+  assert.deepEqual(
+    {...compositionFromBlock(HASH, 900000), height: 0},
+    {...compositionFromBlock(HASH, 900001), height: 0},
+    'the same hash must write the same music whether replay starts from its hash or height',
+  );
+  assert.deepEqual(replayCompositionFromHash(HASH, 'v4'), replayCompositionFromHash(HASH, 'v4'));
+  assert.equal(replayCompositionFromHash(HASH, 'v4').barCount, 4);
+  assert.notDeepEqual(replayCompositionFromHash(HASH, 'v4'), replayCompositionFromHash(HASH, 'v5'));
 });
 
 test('early block replays always select valid audio voices', () => {
-  const block22 = replayCompositionFromHash('0000000098b58d427a10c860335a21c1a9a7639e96c3d6f1a03d8c8c885b5e3b');
+  const block22Hash = '0000000098b58d427a10c860335a21c1a9a7639e96c3d6f1a03d8c8c885b5e3b';
+  const block22 = replayCompositionFromHash(block22Hash, 'v4');
   assert.equal(block22.scene, 'Wooden Jazzhop');
   assert.equal(block22.sound.padVoice, 4);
   assert.equal(block22.sound.padName, 'night drone');
+  assert.equal(block22.barCount, 4);
+  assert.ok(replayCompositionFromHash(block22Hash, 'v5').barCount >= 16);
 
   const bounds = {chordVoice: 8, bassVoice: 7, leadVoice: 11, drumKit: 10, padVoice: 5, arpVoice: 8, malletVoice: 5, percussionVoice: 8, textureVoice: 4};
   for (let index = 0; index < 1024; index += 1) {
@@ -153,8 +173,9 @@ test('proof-of-work zero prefixes do not collapse real blocks into one style', (
 
 test('a run of blocks explores the session, harmony and instrument palette', () => {
   const blocks = Array.from({length: 512}, (_, index) => compositionFromBlock(index.toString(16).padStart(64, '0'), 900100 + index));
-  assert.ok(new Set(blocks.map(block => block.session)).size >= 20);
+  assert.ok(new Set(blocks.map(block => block.session)).size >= 30);
   assert.deepEqual([...new Set(blocks.map(block => block.meter))].sort(), ['3/4', '4/4', '5/4', '6/8', '7/8']);
+  assert.deepEqual([...new Set(blocks.map(block => block.barCount))].sort((a, b) => a - b), [16, 24, 32, 48, 64]);
   assert.ok(Math.min(...blocks.map(block => block.bpm)) <= 55);
   assert.ok(Math.max(...blocks.map(block => block.bpm)) >= 160);
   assert.ok(new Set(blocks.map(block => `${block.stepsPerBar}:${block.rhythm.kick.join('')}:${block.rhythm.snare.join('')}`)).size >= 100);
@@ -164,6 +185,8 @@ test('a run of blocks explores the session, harmony and instrument palette', () 
   assert.ok(new Set(blocks.map(block => block.sound.padVoice)).size >= 4);
   assert.ok(new Set(blocks.map(block => block.sound.arpVoice)).size >= 5);
   assert.ok(new Set(blocks.map(block => block.scene)).size >= 10);
+  assert.equal(new Set(blocks.map(block => block.sound.effectProfile)).size, 6);
+  assert.equal(new Set(blocks.map(block => block.sound.modulationType)).size, 3);
   assert.ok(new Set(blocks.map(block => block.melodyForm)).size >= 10);
   assert.ok(new Set(blocks.map(block => block.leadRhythm)).size >= 10);
   assert.ok(new Set(blocks.map(block => `${block.melodyForm}:${block.leadRhythm}:${block.melody.join(',')}:${block.rhythm.melody.join('')}`)).size >= 480);
@@ -183,16 +206,12 @@ test('different blocks can select different sessions, rhythms and instruments', 
   assert.notEqual(`${first.session}:${first.key}`, `${second.session}:${second.key}`);
 });
 
-test('consecutive blocks never repeat the previous production scene', () => {
-  let previous = compositionFromBlock(HASH, 900000);
-  for (let index = 1; index <= 64; index += 1) {
-    const current = compositionFromBlock(index.toString(16).padStart(64, '0'), 900000 + index, previous);
-    assert.notEqual(current.sceneIndex, previous.sceneIndex);
-    const changedRoles = ['chordVoice', 'bassVoice', 'leadVoice', 'drumKit', 'padVoice', 'arpVoice', 'malletVoice', 'percussionVoice', 'textureVoice']
-      .filter(role => current.sound[role] !== previous.sound[role]);
-    assert.ok(changedRoles.length >= 4);
-    previous = current;
-  }
+test('v5 composition is independent of listening order', () => {
+  const previous = compositionFromBlock('f'.repeat(64), 899999);
+  assert.deepEqual(
+    compositionFromBlock(HASH, 900000, previous),
+    compositionFromBlock(HASH, 900000, null),
+  );
 });
 
 test('live transaction IDs continually change the musical flow', () => {
@@ -204,7 +223,7 @@ test('live transaction IDs continually change the musical flow', () => {
   assert.notEqual(firstSeed, secondSeed);
   assert.notDeepEqual(first.phrase, second.phrase);
   assert.equal(first.phrase.length, composition.totalSteps);
-  assert.equal(first.chordInversions.length, 4);
+  assert.equal(first.chordInversions.length, composition.barCount);
 });
 
 test('mempool mapping clamps extreme network values', () => {

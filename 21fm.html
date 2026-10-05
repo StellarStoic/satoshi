@@ -125,7 +125,7 @@
         <p>This is not a playlist with blockchain decoration. The browser turns live public Bitcoin data into complete musical decisions, spanning quiet ambient sessions, beat music, dance rhythms, jazz, dub, Latin grooves and unusual meters.</p>
       </header>
       <ol class="signal-path">
-        <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique seed. It chooses one coherent production scene, then sets its key, progression, melodic form, lead rhythm, swing and arrangement. Keys, bass, lead, pluck, drums and room are selected as an ensemble, and consecutive blocks never reuse the same scene.</p></div><code>hash → musical world</code></li>
+        <li><span>01</span><div><h3>A block builds the studio</h3><p>The block hash is a unique fingerprint. It chooses one coherent production scene, then writes a 16-to-64-bar form with its key, progression, contrasting phrases, groove, swing and effects. Keys, bass, lead, pluck, drums and room are selected as an ensemble.</p></div><code>hash → musical world</code></li>
         <li><span>02</span><div><h3>The mempool conducts it</h3><p>Waiting transaction count, projected blocks and fee pressure continuously shade tempo, brightness, percussion density, echo and noise. Busy does not simply mean loud; it means more energy and detail.</p></div><code>pressure → energy</code></li>
         <li><span>03</span><div><h3>Transactions write phrases</h3><p>Incoming TXIDs reshape the next phrase. Sampled transaction size controls note length and visual mass; fee rate affects brightness and speed; inputs, outputs, RBF and script family influence rhythm, voicing and color.</p></div><code>transactions → variation</code></li>
         <li><span>04</span><div><h3>Blocks never overlap</h3><p>The completed block fades fully to silence and its instruments are released. Only then does the new block choose its ensemble and fade in, so two block sessions never play over each other.</p></div><code>fade out -> reset -> fade in</code></li>
@@ -167,7 +167,7 @@
             <p>Every Bitcoin block has a unique digital fingerprint called a block hash. 21FM uses that fingerprint like a recipe number. It decides the kind of song, its instruments, key, beat, melody and atmosphere. The block height becomes a reversible name made from the BIP39 word list.</p>
             <div class="lofi-help-story">
               <div><b>1</b><p><strong>The block gets a name.</strong> Blocks 1 through 2,048 use one BIP39 word. Then two-word names begin, followed much later by three and four words. The highlighted word is selected by the block's halving era, and the complete name can be turned back into the height.</p></div>
-              <div><b>2</b><p><strong>The block writes the music.</strong> Its fingerprint chooses the musical style, tempo, chords, drums, bass, instruments and effects. It also writes a lead shape: perhaps a slow climb, a falling line, wide leaps, a question and answer, or another distinct phrase.</p></div>
+              <div><b>2</b><p><strong>The block writes the music.</strong> Its fingerprint chooses the musical style, tempo, chords, drums, bass, instruments and effects. It then arranges 16 to 64 bars into an intro, changing sections, breaks, returns and an outro.</p></div>
               <div><b>3</b><p><strong>Waiting transactions conduct the band.</strong> When Bitcoin traffic changes, the music can become busier, brighter or more spacious.</p></div>
               <div><b>4</b><p><strong>New transactions suggest variations.</strong> Their IDs and basic shapes influence upcoming notes, fills and instrument choices at musical boundaries.</p></div>
               <div><b>5</b><p><strong>The rules keep it musical.</strong> Bitcoin supplies the decisions, while scales, chord rules and rhythm templates stop those decisions from becoming random noise.</p></div>
@@ -182,15 +182,15 @@
         <section>
           <span class="lofi-help-step">01 · The permanent seed</span>
           <h3>A block builds the musical world</h3>
-          <p>A Bitcoin block hash contains 64 hexadecimal characters, or 32 bytes. The generator normalizes the hash, reads each pair of characters as a byte from 0 to 255, and folds those bytes into a seeded pseudo-random number generator. Its output is deterministic: the same hash and 21FM engine version produce the same decision bytes every time.</p>
-          <p>The hash independently selects one of <strong>12 production scenes</strong> and one of <strong>25 groove sessions</strong>, plus a root note, musical mode, four-chord progression, chord shape, arrangement, drum kit, room texture and effects. A consecutive live block is prevented from reusing the immediately previous production scene.</p>
+          <p>A Bitcoin block hash contains 64 hexadecimal characters, or 32 bytes. V5 mixes the complete hash, engine version and a purpose label into four 32-bit words, then uses the deterministic <code>xoshiro128**</code> generator. Separate labels such as <code>composition:v5</code> and <code>replay-sound:v5</code> create independent number streams instead of accidentally reusing the same stream. The height is deliberately excluded from the music seed, so entering either a block height or its hash rebuilds the same score. This generator is for repeatable art, not cryptography.</p>
+          <p>The hash independently selects one of <strong>12 production scenes</strong> and one of <strong>32 groove sessions</strong>, plus a root note, musical mode, chord progression, chord shape, song length, arrangement, drum kit, room texture and effects. Scene selection does not inspect the previous block, so listening order cannot change a replay.</p>
           <div class="lofi-help-grid">
             <div><b>10 modes</b><small>Major, minor, blues, dorian, phrygian, lydian, mixolydian and more.</small></div>
-            <div><b>25 grooves</b><small>Ambient, hip-hop, jazz, house, techno, jungle, funk, dub, Latin and more.</small></div>
-            <div><b>10 progressions</b><small>Each becomes four chords in the chosen key.</small></div>
+            <div><b>32 grooves</b><small>Ambient, hip-hop, jazz, blues, acid, house, techno, jungle, samba and more.</small></div>
+            <div><b>10 progressions</b><small>Each supplies a four-chord idea that develops across the longer form.</small></div>
             <div><b>5 voicings</b><small>Triads, sevenths, ninths, shells or wide fifths.</small></div>
           </div>
-          <p>In replay engine v4, four visible eight-character sections of the hash are mapped directly into decision groups: characters 25-32 shape harmony, 33-40 shape groove, 41-48 select the ensemble, and 49-56 shape texture and effects. Those are the colored characters drawn around the record. Other decisions still come from the seeded byte stream, so the complete hash remains part of the identity.</p>
+          <p>Four visible eight-character sections of the hash are mapped directly into decision groups: characters 25-32 shape harmony, 33-40 shape groove, 41-48 select the ensemble, and 49-56 shape texture and effects. Those are the colored characters drawn around the record. Other decisions come from the v5 number stream, so the complete hash remains part of the identity.</p>
           <p>The displayed name comes only from the block height and uses a length-prefixed base-2,048 code. Block 1 maps to BIP39 index 0 and block 2,048 maps to index 2,047, so every one-word name is used first. Block 2,049 starts at indexes <code>0, 0</code>; after all 2,048² two-word combinations are exhausted, three-word names begin, followed by four and eventually five words. Decoding first adds the capacity reserved by all shorter names, then reads the words as base-2,048 digits. This keeps names unique, searchable and reversible without leading-word collisions.</p>
           <p>A halving era is calculated directly from <code>floor(block height ÷ 210,000)</code>; no extra request is needed. The era rotates the orange anchor through the words and is shown in the track metadata. It deliberately does not scramble or add words, because the exact BIP39 sequence must remain sufficient to recover the block height.</p>
           <p>These words are a public block label, not a wallet mnemonic, seed phrase or source of private keys.</p>
@@ -198,10 +198,10 @@
 
         <section>
           <span class="lofi-help-step">02 · Notes and time</span>
-          <h3>The seed writes a four-bar composition</h3>
-          <p>The selected scale is expanded into a 21-note palette. The generator builds four chords, four bass roots and a lead composition as long as the complete four-bar cycle. Twelve melodic forms provide different contours such as question-and-answer, ascent, descent, arch, valley, pedal tones, broken thirds and wide leaps. Twelve independent lead rhythms place those notes as spacious statements, syncopated replies, held phrases, quick exchanges and other patterns. Each bar then receives its own response shift, cadence, register turn, durations and dynamics.</p>
-          <p>Every musical cycle contains four bars, but the bars are not forced into one rhythm. A block can choose <strong>3/4, 4/4, 5/4, 6/8 or 7/8</strong>, producing cycles from 48 to 80 scheduler steps. The groove supplies the kick, snare, hi-hat, chord and bass positions while the separate lead writer supplies its melodic timing. Tempo ranges from <strong>48 to 176 BPM</strong> and swing ranges from <strong>50% to 68%</strong>.</p>
-          <p>Five arrangement shapes can drop and return, build gradually, alternate call and response, put rhythm first or open with the full ensemble. Melody is allowed into selected bars rather than running continuously. Chord inversions, bass pickups, arpeggios, mallet answers and small percussion patterns create movement around the main loop.</p>
+          <h3>The seed writes a complete song form</h3>
+          <p>V5 chooses <strong>16, 24, 32, 48 or 64 bars</strong> and groups them into four-bar sections: intro, A, variations, B, breaks, returns, C and outro. The four-degree harmonic idea remains recognizable, but section cadences and selected inner bars receive deterministic substitutions. Layer rules introduce and remove harmony, bass, drums and melody as the form develops.</p>
+          <p>The selected scale is expanded into a 21-note palette. Twelve melodic contours include question-and-answer, ascent, descent, arches, pedal tones, broken thirds and wide leaps. Every track selects a primary and contrasting contour plus two lead rhythms. Sections alternate or return to those ideas, while each bar receives its own timing shift, cadence, register turn, duration and dynamics.</p>
+          <p>A block can choose <strong>3/4, 4/4, 5/4, 6/8 or 7/8</strong>. The groove supplies kick, snare, hi-hat, chord and bass positions, then section energy introduces fills, displaced hits and quieter passages. Tempo ranges from <strong>48 to 176 BPM</strong> and swing from <strong>50% to 68%</strong>. The scheduler still advances on a light sixteenth-note clock, but it now reads a much longer score instead of repeating one four-bar score.</p>
         </section>
 
         <section>
@@ -215,7 +215,7 @@
             <li><strong>Pluck and mallet:</strong> guitars, harp, piano, harmonium and xylophone.</li>
           </ul>
           <p>Tone.js plays the nearest recorded note and pitch-shifts only when an exact sample is unavailable. Organic sessions use 28 compact CC0 recordings of acoustic bass drum, snare, sidestick, hi-hat, cajon, conga, bongos, shaker, claves, tambourine and woodblock. Paired recordings alternate on repeated hits. Electronic sessions retain synthesized drums, while pads, room texture and the subtle transaction whistle are generated locally.</p>
-          <p>The audio graph is: voice or sampler → role gain → music bus → low-pass filter → distortion → tremolo → phaser → reverb → stereo width → compressor → limiter → volume control. The block sets filter, delay, chorus, reverb, modulation, distortion and width values. The limiter catches peaks after the louder mix bus. Drums, bass and rhythm sit forward; the lead bus is deliberately lower, with pad, arpeggio and mallet used as supporting color.</p>
+          <p>The audio graph is: voice or sampler → role gain → music bus → low-pass filter → distortion → tremolo → selected modulation → reverb → stereo width → compressor → limiter → volume. V5 selects phaser, auto-filter or auto-pan for the modulation slot and feedback or ping-pong delay for the lead send. A slow block-derived LFO moves the room texture across the stereo field. Effects remain bounded and unused alternatives are not stacked together, protecting slower devices. Drums, bass and rhythm sit forward; lead, pad, arpeggio and mallet remain supporting color.</p>
         </section>
 
         <section>
@@ -229,7 +229,7 @@
             <div><dt>Transaction count</dt><dd>Count / 500,000, clamped from 0 to 1. It contributes up to 500 Hz of brightness and raises percussion probability.</dd></div>
             <div><dt>Projected blocks</dt><dd>Projected blocks / 12, clamped from 0 to 1. It increases delay wetness from 8% toward 20%.</dd></div>
           </dl>
-          <p>Each WebSocket batch is reduced to at most 96 TXIDs on low-power devices or 192 on larger devices. Every selected 32-byte TXID is XORed and mixed into different positions of a rolling 32-byte flow seed. That seed creates a variation spanning the track's complete 48-to-80-step cycle, influencing note choices, velocities, chord inversions, lead/bass/harmony variations, hi-hat offset, fills and melodic register. Written notes remain recurring anchors, so transactions vary the block's composition instead of replacing it with the same generic loop. The result is queued and activated at the next bar boundary, so network timing cannot tear a phrase apart.</p>
+          <p>Each WebSocket batch is reduced to at most 96 TXIDs on low-power devices or 192 on larger devices. Every selected 32-byte TXID is XORed and mixed into different positions of a rolling 32-byte flow seed. That seed creates a variation spanning the complete 16-to-64-bar score, influencing note choices, velocities, chord inversions, lead/bass/harmony variations, hi-hat offset, fills and melodic register. Written notes remain recurring anchors, so transactions vary the block's composition instead of replacing it. The result activates at the next bar boundary, so network timing cannot tear a phrase apart.</p>
           <p>Economy audio uses the same block-written melody but selects only one or two of its notes per bar. This keeps CPU use predictable without collapsing every block into the former single repeated accent.</p>
         </section>
 
@@ -253,7 +253,7 @@
           <h3>The record is a second view of the same data</h3>
           <p>Transaction bubbles are released in batches no more often than every 4 seconds. Their color represents a transaction family; their area grows with virtual size; a pale outer ring means replace-by-fee; and a square means a data output was detected. Higher-fee bubbles travel faster.</p>
           <p>Bubbles enter from different directions and are curved back toward the record by its visual “gravity.” Roughly one third receive a path across the center. Crossing close enough can produce a quiet whistle whose speed and pitch follow fee motion and whose strength follows proximity. The whistle is intentionally a background detail.</p>
-          <p>The center shows block height and the complete block hash runs clockwise around the record. During replay, colored hash characters show the sections used for harmony, groove, ensemble and texture. Turning animation off stops canvas work and bubbles, but it does not stop the music or live data.</p>
+          <p>The center shows block height and the complete block hash runs clockwise around the record. During replay, colored hash characters show the sections used for harmony, groove, ensemble and texture. The small inner spectrum is a 32-bin FFT view of the current mix and is omitted on low-power devices. Turning animation off stops canvas analysis, drawing and bubbles, but it does not stop the music or live data.</p>
         </section>
 
         <section>
@@ -269,6 +269,14 @@
           <p>Faster devices receive denser visuals and the full effects path. Lower-power devices use fewer particles, a lower canvas frame rate, smaller synth polyphony and a leaner effects mix. Both use the same block identity and musical rules.</p>
           <p>The browser contacts mempool.space for public Bitcoin data and downloads only the instrument banks selected by the current block. It does not upload microphone audio, wallet data or personal Bitcoin information. Used samples can be cached by the PWA for later playback.</p>
           <p>This is a musical interpretation, not a scientific sonification where one satoshi equals one note. Bitcoin data makes real, bounded decisions; the composition system translates those decisions into something intended to remain listenable.</p>
+        </section>
+
+        <section>
+          <span class="lofi-help-step">09 · Repetition and collisions</span>
+          <h3>Same block is repeatable; different blocks are not promised to be mathematically unique</h3>
+          <p>A block hash has 256 bits, but a music generator must turn that enormous value into a finite set of musical decisions. V5 first maps it into a 128-bit generator state. Under the simplifying assumption that states are evenly distributed, one million blocks have roughly a <strong>1.5 × 10<sup>-27</sup></strong> chance of containing any pair with the same state. The next block matching any one of a million earlier states is roughly <strong>2.9 × 10<sup>-33</sup></strong>. These are model estimates, not a proof that two audible recordings can never match.</p>
+          <p>Two tracks could share a genre, key, chord idea or instrument without being identical because those are intentionally limited musical choices. An exact composition also includes the longer note arrays, velocities, section form, effects and many other decisions, while a live performance additionally depends on mempool traffic and transaction timing. “Sounds similar” therefore has no honest single probability: it depends on what a listener considers the same.</p>
+          <p>Legacy v4 reduced the hash to one 32-bit state. At one million blocks, the birthday calculation predicts about 116 state-collision pairs, and the next state has about a 1-in-4,295 chance of matching one of those million states. V4 links remain supported so old block performances do not change, but new sessions use v5. Track <em>names</em> are separate: the BIP39 base-2,048 height code is reversible and unique for every supported block height even if two compositions ever resemble one another.</p>
         </section>
         </div>
       </div>

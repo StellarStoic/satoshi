@@ -513,8 +513,8 @@ function showComposition(composition) {
   if (ui.mallet) ui.mallet.textContent = `${instrumentLabel(selectedInstrument(composition, 'mallet'))} · ${composition.sound.malletName}`;
   if (ui.percussion) ui.percussion.textContent = REAL_PERCUSSION[composition.sound.percussionVoice]?.name || composition.sound.percussionName;
   if (ui.texture) ui.texture.textContent = composition.sound.textureName;
-  if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.space} + ${composition.sound.motion}`;
-  if (ui.scene) ui.scene.textContent = `${composition.scene} · ${composition.arrangementName}`;
+  if (ui.effects) ui.effects.textContent = economyAudio ? 'tape-dark mix' : `${composition.sound.effectProfile} · ${composition.sound.space} + ${composition.sound.motion}`;
+  if (ui.scene) ui.scene.textContent = `${composition.scene} · ${composition.arrangementName} · ${composition.barCount} bars`;
   state.engine?.setTexture(composition.sound.textureVoice);
   applyNetworkSound();
 }
@@ -880,7 +880,14 @@ function createEngine() {
   const compressor = economyAudio ? new ToneApi.Gain(1).connect(limiter) : new ToneApi.Compressor(-20, 3).connect(limiter);
   const widener = economyAudio ? bypass(compressor, ['width']) : new ToneApi.StereoWidener(.35).connect(compressor);
   const reverb = economyAudio ? bypass(widener, ['roomSize', 'dampening', 'wet']) : new ToneApi.Freeverb({roomSize: .62, dampening: 2800, wet: .1}).connect(widener);
-  const phaser = economyAudio ? bypass(reverb, ['wet']) : new ToneApi.Phaser({frequency: .08, octaves: 2, baseFrequency: 420, wet: 0}).connect(reverb);
+  const modulationType = state.composition?.sound?.modulationType || 'phaser';
+  const phaser = economyAudio
+    ? bypass(reverb, ['wet'])
+    : modulationType === 'auto-filter'
+      ? new ToneApi.AutoFilter({frequency: '2m', baseFrequency: 360, octaves: 2.4, depth: .32, wet: 0}).connect(reverb).start()
+      : modulationType === 'auto-pan'
+        ? new ToneApi.AutoPanner({frequency: '1m', depth: .3, wet: 0}).connect(reverb).start()
+        : new ToneApi.Phaser({frequency: .08, octaves: 2, baseFrequency: 420, wet: 0}).connect(reverb);
   const tremolo = economyAudio ? bypass(phaser, ['wet']) : new ToneApi.Tremolo({frequency: 1.6, depth: .28, wet: 0}).connect(phaser).start();
   const distortion = economyAudio ? bypass(tremolo, ['wet']) : new ToneApi.Distortion({distortion: .12, oversample: '2x', wet: .04}).connect(tremolo);
   const filter = new ToneApi.Filter(economyAudio ? 1250 : 1800, 'lowpass').connect(distortion);
@@ -890,7 +897,9 @@ function createEngine() {
   }
   const musicBus = new ToneApi.Gain(MUSIC_BUS_LEVEL).connect(filter);
   const analyser = state.animationEnabled ? new ToneApi.Analyser('waveform', lowPower ? 64 : 128) : null;
+  const spectrum = state.animationEnabled && !lowPower ? new ToneApi.FFT(32) : null;
   if (analyser) musicBus.connect(analyser);
+  if (spectrum) musicBus.connect(spectrum);
 
   const harmonyGain = new ToneApi.Gain(economyAudio ? .44 : .66).connect(musicBus);
   const bassGain = new ToneApi.Gain(economyAudio ? 1.55 : 1.28).connect(musicBus);
@@ -902,7 +911,14 @@ function createEngine() {
   const percussionGain = new ToneApi.Gain(economyAudio ? .62 : .78).connect(musicBus);
   const dustGain = new ToneApi.Gain(ToneApi.dbToGain(economyAudio ? -52 : -39)).connect(musicBus);
   const textureGain = new ToneApi.Gain(ToneApi.dbToGain(-55)).connect(musicBus);
-  const textureFilter = new ToneApi.Filter(2400, 'lowpass').connect(textureGain);
+  const texturePanner = economyAudio ? bypass(textureGain, ['pan']) : new ToneApi.Panner(0).connect(textureGain);
+  const textureFilter = new ToneApi.Filter(2400, 'lowpass').connect(texturePanner);
+  const textureMotion = economyAudio ? null : new ToneApi.LFO({
+    frequency: ['8m', '4m', '2m'][(state.composition?.visual?.[0] || 0) % 3],
+    min: -.18,
+    max: .18,
+    type: 'sine',
+  }).connect(texturePanner.pan).start();
   const whistleGain = new ToneApi.Gain(.72).connect(musicBus);
   const whistleFilter = new ToneApi.Filter(1750, 'lowpass').connect(whistleGain);
   const whistle = new ToneApi.Synth({
@@ -910,7 +926,9 @@ function createEngine() {
     envelope: {attack: .045, decay: .1, sustain: .035, release: .24},
     volume: -14,
   }).connect(whistleFilter);
-  const delay = new ToneApi.FeedbackDelay('8n.', economyAudio ? .1 : .23).connect(melodyGain);
+  const delay = !economyAudio && state.composition?.sound?.delayMode === 'ping-pong'
+    ? new ToneApi.PingPongDelay('8n.', .23).connect(melodyGain)
+    : new ToneApi.FeedbackDelay('8n.', economyAudio ? .1 : .23).connect(melodyGain);
   delay.wet.value = economyAudio ? .035 : .12;
   const chorus = economyAudio ? bypass(harmonyGain) : new ToneApi.Chorus(1.2, 2.6, 0.18).connect(harmonyGain).start();
   if (economyAudio) chorus.depth = 0;
@@ -1157,7 +1175,7 @@ function createEngine() {
   };
 
   const engine = {
-    master, filter, musicBus, analyser, delay, compressor, widener, reverb, phaser, tremolo, distortion,
+    master, filter, musicBus, analyser, spectrum, delay, compressor, widener, reverb, phaser, tremolo, distortion,
     chordVoices: Array(8),
     bassVoices: Array(7),
     leadVoices: Array(11),
@@ -1168,7 +1186,7 @@ function createEngine() {
     arpVoices: Array(8),
     malletVoices: Array(5),
     percussionVoices: Array(8),
-    chorus, dust, dustFilter, roomTexture, textureFilter, whistle, whistleFilter,
+    chorus, dust, dustFilter, roomTexture, textureFilter, texturePanner, textureMotion, whistle, whistleFilter,
     dustGain, textureGain,
     layerGains: {harmony: harmonyGain, bass: bassGain, melody: melodyGain, drums: drumsGain, dust: dustGain},
     step: 0,
@@ -1180,11 +1198,17 @@ function createEngine() {
       if (this.analyser) return;
       this.analyser = new ToneApi.Analyser('waveform', lowPower ? 64 : 128);
       this.musicBus.connect(this.analyser);
+      if (!lowPower) {
+        this.spectrum = new ToneApi.FFT(32);
+        this.musicBus.connect(this.spectrum);
+      }
     },
     disableAnalyser() {
       if (!this.analyser) return;
       this.analyser.dispose();
       this.analyser = null;
+      this.spectrum?.dispose();
+      this.spectrum = null;
     },
     setTexture(index) {
       this.textureFilter.frequency.rampTo(textureFrequencies[index] || 2400, 2);
@@ -1283,7 +1307,7 @@ function createEngine() {
       [...this.chordVoices, ...this.bassVoices, ...this.leadVoices, ...this.kickVoices, ...this.snareVoices, ...this.hatVoices, ...this.padVoices, ...this.arpVoices, ...this.malletVoices]
         .filter(Boolean).forEach(voice => voice.dispose());
       this.percussionVoices.filter(Boolean).forEach(voice => voice.node.dispose());
-      [this.dust, this.dustFilter, this.roomTexture, this.textureFilter, this.textureGain, this.whistle, this.whistleFilter, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.musicBus, bassGain, padGain, arpGain, malletGain, percussionGain, whistleGain]
+      [this.dust, this.dustFilter, this.roomTexture, this.textureFilter, this.texturePanner, this.textureMotion, this.textureGain, this.whistle, this.whistleFilter, this.delay, this.chorus, this.filter, this.distortion, this.tremolo, this.phaser, this.reverb, this.widener, this.compressor, this.limiter, this.analyser, this.spectrum, this.musicBus, bassGain, padGain, arpGain, malletGain, percussionGain, whistleGain]
         .filter(Boolean).forEach(node => { try { node.dispose(); } catch {} });
     },
   };
@@ -1319,7 +1343,7 @@ function createEngine() {
     if (arrangement.harmony && rhythm.chord[step]) {
       const chord = economyAudio
         ? composition.chords[bar].slice(0, 3).map((note, index) => transposeNote(note, index === 0 ? -12 : 0))
-        : invertChord(composition.chords[bar], flow.chordInversions[bar]);
+        : invertChord(composition.chords[bar], flow.chordInversions[bar % flow.chordInversions.length]);
       const chordVoice = engine.chordVoice(economyAudio ? composition.sound.chordVoice : flow.chordVoice ?? composition.sound.chordVoice, selectedInstrument(composition, 'harmony'));
       const chordVelocity = Math.min(.72, composition.sound.chordVelocity * (flow.chordWeight || 1));
       chordVoice.triggerAttackRelease(chord, economyAudio ? '4n' : rhythm.chordDuration, safeTriggerTime(chordVoice, time), economyAudio ? chordVelocity * .82 : chordVelocity);
@@ -1338,7 +1362,7 @@ function createEngine() {
     }
     const bassPickupStep = Math.max(1, stepsPerBar - 2);
     if (arrangement.bass && (rhythm.bass[step] || (position === bassPickupStep && flow.bassPickup))) {
-      const bassBar = position === bassPickupStep ? (bar + 1) % 4 : bar;
+      const bassBar = position === bassPickupStep ? (bar + 1) % composition.barCount : bar;
       const bassVoice = engine.bassVoice(economyAudio ? composition.sound.bassVoice : flow.bassVoice ?? composition.sound.bassVoice, selectedInstrument(composition, 'bass'));
       bassVoice.triggerAttackRelease(composition.bass[bassBar], position % 4 === 0 ? '4n' : '8n', safeTriggerTime(bassVoice, time), position === bassPickupStep ? .3 : .54);
     }
@@ -1805,6 +1829,21 @@ function draw() {
     context.lineTo(Math.cos(angle) * radius * (.7 + value / 850), Math.sin(angle) * radius * (.7 + value / 850));
     context.stroke();
   });
+  const spectrum = state.engine?.spectrum?.getValue();
+  if (spectrum) {
+    spectrum.slice(1, 25).forEach((level, index) => {
+      const normalized = Math.max(0, Math.min(1, (Number(level) + 96) / 84));
+      const angle = index / 24 * Math.PI * 2;
+      const inner = radius * .22;
+      const outer = inner + normalized * radius * .12;
+      context.strokeStyle = `rgba(242,169,0,${.16 + normalized * .42})`;
+      context.lineWidth = Math.max(1, radius * .012);
+      context.beginPath();
+      context.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+      context.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+      context.stroke();
+    });
+  }
   context.restore();
   drawBlockIdentity(context, cx, cy, radius);
 
