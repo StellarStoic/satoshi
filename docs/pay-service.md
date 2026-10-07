@@ -340,8 +340,8 @@ GET  /nip05/v1/worker/queue            orders needing an invoice or a status che
 POST /nip05/v1/worker/names            publish the names snapshot
 POST /nip05/v1/worker/orders/{id}/invoice    attach the payment rails
 POST /nip05/v1/worker/orders/{id}/status     new | paid | expired | conflict
-GET  /sticky/v1/worker/queue?wait=20   sticky orders; long-polls up to 25 s when empty
-POST /sticky/v1/worker/orders/{id}/invoice   attach the Bark rail
+GET  /sticky/v1/worker/queue?wait=20   sticky orders; ?wait is in SECONDS, held up to 25 s when empty
+POST /sticky/v1/worker/orders/{id}/invoice   attach the payment rails (ark and/or BOLT11)
 POST /sticky/v1/worker/orders/{id}/status    paid | expired | cancelled
 GET  /sticky/v1/health                 sticky liveness and counts
 GET  /sticky/v1/config                 price, styles, bounds, 501-char limit, commitment
