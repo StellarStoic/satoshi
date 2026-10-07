@@ -134,10 +134,15 @@ Lightning rail is present, a `lightning=` parameter as well). A Lightning wallet
 so a wallet can scan one QR or paste one invoice without the page having to know which rail
 the buyer prefers.
 
-**Latency.** The desk holds this request for up to ~20 s while the worker attaches the
+**Latency.** The desk holds this request for up to ~8 s while the worker attaches the
 rail, so a normal call already comes back payable. If `payment` is `null`
 (`status: "awaiting_invoice"`), the worker has not got to it yet — poll
-`GET /sticky/v1/orders/{id}` every ~5 s rather than creating another order.
+`GET /sticky/v1/orders/{id}` every ~3 s rather than creating another order. The board
+opens its payment dialog before this call returns and says `Preparing invoice...` while
+`status` is `awaiting_invoice`, so a slow order is visible rather than a dead button;
+the QR appears as soon as a rail exists. (The hold was 20 s, which only froze the
+browser: the worker long-polls the queue, so a parked worker attaches the rail in about
+a second either way.)
 
 **Refusals**
 

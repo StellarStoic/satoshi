@@ -29,6 +29,7 @@ const elements = {
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
   paymentRails: document.getElementById('stickyPaymentRails'),
+  paymentHint: document.getElementById('stickyPaymentHint'),
   copyPayment: document.getElementById('copyStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
@@ -147,9 +148,37 @@ function loadQr() {
   return qrPromise;
 }
 
+/**
+ * Answer the click before the invoice exists.
+ *
+ * The order is created first and the worker writes the BTCPay invoice after that, so
+ * there is a gap. Opening this dialog in that gap — saying what is actually happening
+ * — beats a dead button, and the QR drops into it the moment the rail arrives.
+ */
+function openPaymentPreparing(sats) {
+  currentRails = [];
+  currentRailId = '';
+  currentPaymentValue = '';
+  elements.paymentAmount.textContent = `Pay ${sats} sats`;
+  elements.paymentRails.hidden = true;
+  elements.paymentRails.replaceChildren();
+  elements.paymentValue.textContent = '';
+  elements.paymentQr.hidden = true;
+  elements.paymentQr.removeAttribute('src');
+  elements.paymentHint.textContent = 'Preparing invoice...';
+  showDialog(elements.paymentDialog);
+}
+
 async function renderPayment(order) {
   const rails = stickyPaymentRails(order);
-  if (!rails.length) return false;
+  if (!rails.length) {
+    // The dialog is open already, so say why it is empty instead of showing a frame
+    // with no QR in it.
+    elements.paymentQr.hidden = true;
+    elements.paymentValue.textContent = '';
+    elements.paymentHint.textContent = 'Preparing invoice...';
+    return false;
+  }
   const sats = stickyOrderPrice(order, pending?.sats || STICKY_PRICE_SATS);
   currentRails = rails;
   // One rail: name it, the way this dialog always did. Two: let the buyer pick, and
@@ -172,6 +201,8 @@ async function renderPayment(order) {
     button.addEventListener('click', () => { selectRail(rail.id); });
     return button;
   }));
+  elements.paymentQr.hidden = false;
+  elements.paymentHint.textContent = `Waiting for the ${sats}-sat payment...`;
   showDialog(elements.paymentDialog);
   const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
   await selectRail(wanted);
@@ -453,7 +484,8 @@ async function startPayment() {
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
-    status(elements.paymentStatus, 'Preparing the payment...');
+    status(elements.paymentStatus, 'Preparing invoice...');
+    openPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const order = await api('/orders', {
       method: 'POST',
@@ -463,12 +495,13 @@ async function startPayment() {
     savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, contentHash, sats, status: 'waiting'});
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
-    else if (!railReady) status(elements.paymentStatus, 'Preparing your payment...');
+    else if (!railReady) status(elements.paymentStatus, 'Preparing invoice...');
     status(elements.paymentStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
     status(elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
+    if (elements.paymentDialog.open) elements.paymentDialog.close();
   }
 }
 
@@ -489,7 +522,8 @@ async function pollPayment() {
       return;
     }
     if (['expired', 'invalid', 'cancelled'].includes(String(order.status || '').toLowerCase())) throw new Error('The invoice expired. Start again when you are ready.');
-    status(pending.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, 'Waiting for payment...');
+    status(pending.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus,
+      String(order.status || '').toLowerCase() === 'awaiting_invoice' ? 'Preparing invoice...' : 'Waiting for payment...');
     paymentTimer = setTimeout(pollPayment, 3000);
   } catch (error) {
     status(pending?.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, error.message, true);
@@ -638,7 +672,8 @@ async function startRemovalPayment() {
     if (!record || !session || record.event.pubkey !== session.pubkey) throw new Error('Only the note author can remove it.');
     await ensureReadySigner();
     elements.removeSticky.disabled = true;
-    status(elements.noteMenuStatus, 'Preparing the removal payment...');
+    status(elements.noteMenuStatus, 'Preparing invoice...');
+    openPaymentPreparing(quotedPrice);
     const order = await api('/orders', {
       method: 'POST',
       body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
@@ -652,6 +687,7 @@ async function startRemovalPayment() {
   } catch (error) {
     status(elements.noteMenuStatus, error.message, true);
     elements.removeSticky.disabled = false;
+    if (elements.paymentDialog.open) elements.paymentDialog.close();
   }
 }
 

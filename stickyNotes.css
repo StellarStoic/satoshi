@@ -62,3 +62,5 @@
   .placement-controls > span { display:none; }.placement-controls { bottom: calc(48px + env(safe-area-inset-bottom)); }
   .board-controls { right:8px; bottom:calc(48px + env(safe-area-inset-bottom)); }.board-controls button { width:34px; height:34px; }
 }
+
+.sticky-payment img[hidden] { display: none; }
