@@ -105,10 +105,14 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "sats": 11,
   "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" },
   "paymentMethod": "BARK",
+  "paymentMethods": ["BARK", "BTC-LN"],
   "expiresAt": 1791352314,
   "payment": {
     "arkAddress": "ark1…",
+    "bolt11": "lnbc110n1p…",
+    "lightningUri": "lightning:lnbc110n1p…",
     "paymentLink": "bitcoin:?amount=0.00000011&ark=ark1…",
+    "methods": ["BARK", "BTC-LN"],
     "invoiceId": "Rb7aCbq1e3W9qAbitdyEQZ"
   },
   "commitment": { "contentHash": "f85b33…" },
@@ -124,7 +128,11 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
 checkout URL (`http://10.0.3.1:52143/i/<invoice>`): a browser on the internet cannot open
 it, and BTCPay is intentionally not published. What a Bark wallet can act on is the rail
 itself, so `payment.arkAddress` and `payment.paymentLink` are the payable things.
-`paymentLink` is BTCPay's own `bitcoin:` URI carrying the exact amount.
+`paymentLink` is BTCPay's own `bitcoin:` URI carrying the exact amount (and, when the
+Lightning rail is present, a `lightning=` parameter as well). A Lightning wallet acts on
+`payment.lightningUri`, or on the bare `payment.bolt11`; both are passed through unchanged,
+so a wallet can scan one QR or paste one invoice without the page having to know which rail
+the buyer prefers.
 
 **Latency.** The desk holds this request for up to ~20 s while the worker attaches the
 rail, so a normal call already comes back payable. If `payment` is `null`
@@ -147,8 +155,10 @@ compares its author. A stranger cannot even buy a removal for your note.
 
 ```json
 { "ok": true, "id": "03ad90da9fc3716c0dad4fd5", "action": "pin",
-  "status": "paid", "sats": 21, "paymentMethod": "BARK", "expiresAt": 1791352314,
-  "payment": { "arkAddress": "ark1…", "paymentLink": "bitcoin:…", "invoiceId": "…" },
+  "status": "paid", "sats": 21, "paymentMethod": "BARK", "paymentMethods": ["BARK", "BTC-LN"],
+  "expiresAt": 1791352314,
+  "payment": { "arkAddress": "ark1…", "bolt11": "lnbc210n1…", "lightningUri": "lightning:lnbc210n1…",
+               "paymentLink": "bitcoin:…", "methods": ["BARK", "BTC-LN"], "invoiceId": "…" },
   "commitment": { "contentHash": "f85b33…" },
   "paid": true,
   "publishToken": "eyJ…",
@@ -270,11 +280,19 @@ pricing it. `content` may hold a short reason.
 
 ## Paying
 
-* Rail: **Bark only**. The invoice is created with the `BARK` payment method pinned, and
-  the desk refuses an invoice that comes back without an ark address — so a sticky order
-  never shows a rail the flow would not look for.
-* Lightning and on-chain are **not** offered for stickies; they are neither required nor
-  watched here.
+* Rails: **Bark and Lightning**. The invoice is created with `checkout.paymentMethods`
+  pinned to `["BARK", "BTC-LN"]`, so exactly those two are offered and on-chain is not
+  (21 sats is far below dust anyway). The desk refuses an invoice that comes back with
+  neither an ark address nor a BOLT11, so a sticky order never shows a rail the flow would
+  not look for.
+* **The Lightning amount is read, not trusted.** The desk decodes the sats out of the
+  BOLT11 human-readable part (`lnbc210n1…` is 210 nano-BTC, i.e. 21 sats) and refuses an
+  invoice asking for anything else — or one that is amount-less or sub-satoshi, which
+  cannot carry a fixed price. A discounted 11-sat order therefore cannot be handed a
+  21-sat Lightning invoice, and a full-price order cannot be handed an 11-sat one.
+* `payment` carries every destination the invoice offers; the board shows them as a
+  two-way choice. `paymentMethod` remains `"BARK"` (the native rail, and what the earlier
+  response shape carried) while `paymentMethods` lists what is actually on offer.
 * Amount: 21 sats normally or 11 sats for a currently eligible satoshi.si NIP-05 pubkey.
   The amount lives in the service; the worker reads it from the order queue and never
   accepts one from the browser.
