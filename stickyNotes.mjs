@@ -1,18 +1,4 @@
-import {
-  STICKY_COLORS,
-  STICKY_FONTS,
-  STICKY_MAX_CHARACTERS,
-  STICKY_PRICE_SATS,
-  STICKY_TOPIC,
-  clampPlacement,
-  clampRotation,
-  makeDeletionTemplate,
-  makeStickyTemplate,
-  normaliseStickyText,
-  parseStickyEvent,
-  stickyContentHash,
-  stickyOrderPrice,
-} from './stickyNotesModel.mjs';
+import {STICKY_COLORS, STICKY_FONTS, STICKY_MAX_CHARACTERS, STICKY_PRICE_SATS, STICKY_TOPIC, clampPlacement, clampRotation, makeDeletionTemplate, makeStickyTemplate, normaliseStickyText, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   getNostrSession,
@@ -42,6 +28,7 @@ const elements = {
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
+  paymentRails: document.getElementById('stickyPaymentRails'),
   copyPayment: document.getElementById('copyStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
@@ -66,6 +53,8 @@ let selectedNoteId = '';
 let quotedPrice = STICKY_PRICE_SATS;
 let quotedPubkey = '';
 let currentPaymentValue = '';
+let currentRails = [];
+let currentRailId = '';
 const boardView = {scale: .6, x: 0, y: 0};
 const CANVAS_WIDTH = 2600;
 const CANVAS_HEIGHT = 1800;
@@ -159,22 +148,57 @@ function loadQr() {
 }
 
 async function renderPayment(order) {
-  const value = order?.payment?.paymentLink || order?.payment?.arkAddress || order?.payment?.ark || '';
-  if (!value) return false;
+  const rails = stickyPaymentRails(order);
+  if (!rails.length) return false;
   const sats = stickyOrderPrice(order, pending?.sats || STICKY_PRICE_SATS);
-  currentPaymentValue = value;
-  elements.paymentAmount.textContent = `Pay ${sats} sats with Bark`;
-  elements.paymentValue.textContent = value;
+  currentRails = rails;
+  // One rail: name it, the way this dialog always did. Two: let the buyer pick, and
+  // keep their pick, because the payment poll re-renders this every few seconds.
+  elements.paymentAmount.textContent = rails.length > 1
+    ? `Pay ${sats} sats`
+    : `Pay ${sats} sats with ${rails[0].label}`;
+  elements.paymentRails.hidden = rails.length < 2;
+  elements.paymentRails.replaceChildren(...rails.map(rail => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'rail-tab';
+    button.dataset.rail = rail.id;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', 'false');
+    const icon = document.createElement('i');
+    icon.className = `lni lni-${rail.id === 'lightning' ? 'bolt' : 'map-marker-1'}`;
+    icon.setAttribute('aria-hidden', 'true');
+    button.append(icon, Object.assign(document.createElement('span'), {textContent: rail.label}));
+    button.addEventListener('click', () => { selectRail(rail.id); });
+    return button;
+  }));
   showDialog(elements.paymentDialog);
+  const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
+  await selectRail(wanted);
+  return true;
+}
+
+/** Point the QR, the copied value and the alt text at the chosen rail. */
+async function selectRail(id) {
+  const rail = currentRails.find(item => item.id === id) || currentRails[0];
+  if (!rail) return;
+  currentRailId = rail.id;
+  currentPaymentValue = rail.copyValue || rail.uri;
+  for (const button of elements.paymentRails.querySelectorAll('.rail-tab')) {
+    const active = button.dataset.rail === rail.id;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', String(active));
+  }
+  elements.paymentValue.textContent = rail.uri;
+  elements.paymentQr.alt = `${rail.label} payment QR code`;
   if (await loadQr()) {
     try {
       const qr = window.qrcode(0, 'M');
-      qr.addData(value);
+      qr.addData(rail.uri);
       qr.make();
       elements.paymentQr.src = qr.createDataURL(6, 8);
     } catch { elements.paymentQr.removeAttribute('src'); }
   }
-  return true;
 }
 
 async function copyPayment() {
@@ -429,7 +453,7 @@ async function startPayment() {
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
-    status(elements.paymentStatus, 'Preparing the Bark checkout...');
+    status(elements.paymentStatus, 'Preparing the payment...');
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const order = await api('/orders', {
       method: 'POST',
@@ -439,7 +463,7 @@ async function startPayment() {
     savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, contentHash, sats, status: 'waiting'});
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
-    else if (!railReady) status(elements.paymentStatus, 'Preparing your Bark payment...');
+    else if (!railReady) status(elements.paymentStatus, 'Preparing your payment...');
     status(elements.paymentStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {

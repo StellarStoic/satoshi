@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {STICKY_MAX_CHARACTERS, STICKY_MEMBER_PRICE_SATS, STICKY_PRICE_SATS, makeDeletionTemplate, makeStickyTemplate, parseStickyEvent, stickyContentHash, stickyOrderPrice} from '../stickyNotesModel.mjs';
+import {STICKY_MAX_CHARACTERS, STICKY_MEMBER_PRICE_SATS, STICKY_PRICE_SATS, makeDeletionTemplate, makeStickyTemplate, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from '../stickyNotesModel.mjs';
 
 test('sticky notes accept up to 501 characters', () => {
   assert.equal(STICKY_MAX_CHARACTERS, 501);
@@ -54,4 +54,31 @@ test('font choices preview Bunny-hosted typefaces', async () => {
   assert.match(css, /#noteCapacity\.is-almost-full/);
   assert.match(css, /#noteCapacity\.is-full/);
   assert.match(css, /sticky-note--dense/);
+});
+
+test('the board offers every rail the payment service returned', () => {
+  const both = stickyPaymentRails({
+    payment: {arkAddress: 'ark1abc', paymentLink: 'bitcoin:?amount=0.00000021&ark=ark1abc',
+      bolt11: 'lnbc210n1x', lightningUri: 'lightning:lnbc210n1x'},
+  });
+  assert.deepEqual(both, [
+    {id: 'bark', label: 'Bark', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc',
+      copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc'},
+    {id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc210n1x', copyValue: 'lnbc210n1x'},
+  ]);
+});
+
+test('a single-rail order shows only the rail it can actually be paid on', () => {
+  assert.deepEqual(stickyPaymentRails({payment: {arkAddress: 'ark1abc'}}),
+    [{id: 'bark', label: 'Bark', uri: 'ark1abc', copyValue: 'ark1abc'}]);
+  assert.deepEqual(stickyPaymentRails({payment: {bolt11: 'lnbc110n1y'}}),
+    [{id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc110n1y', copyValue: 'lnbc110n1y'}]);
+  assert.deepEqual(stickyPaymentRails({payment: {paymentLink: 'bitcoin:?ark=ark1abc'}}),
+    [{id: 'bark', label: 'Bark', uri: 'bitcoin:?ark=ark1abc', copyValue: 'bitcoin:?ark=ark1abc'}]);
+});
+
+test('an order with no rails offers nothing rather than a dead tab', () => {
+  assert.deepEqual(stickyPaymentRails({payment: null}), []);
+  assert.deepEqual(stickyPaymentRails({}), []);
+  assert.deepEqual(stickyPaymentRails(null), []);
 });

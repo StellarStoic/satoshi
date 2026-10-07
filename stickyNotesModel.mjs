@@ -12,6 +12,37 @@ export function stickyOrderPrice(value, fallback = STICKY_PRICE_SATS) {
   return Number.isInteger(sats) && sats > 0 && sats <= STICKY_PRICE_SATS ? sats : fallback;
 }
 
+export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);
+
+/**
+ * The rails this order can be paid on, in the order to offer them: Bark first (the
+ * native rail) then Lightning.
+ *
+ * A rail appears only when the payment service actually handed back a destination
+ * for it, so a Bark-only or Lightning-only order keeps a single-rail checkout
+ * instead of showing a tab that cannot pay. `uri` is what the QR encodes, and
+ * `copyValue` is what the buyer pastes into a wallet.
+ */
+export function stickyPaymentRails(order) {
+  const payment = order?.payment || {};
+  const rails = [];
+  const bark = String(payment.paymentLink || payment.arkAddress || payment.ark || '').trim();
+  if (bark) rails.push({ id: 'bark', label: 'Bark', uri: bark, copyValue: bark });
+
+  const lightningUri = String(payment.lightningUri || '');
+  const bolt11 = String(payment.bolt11 || '').trim()
+    || (lightningUri.toLowerCase().startsWith('lightning:') ? lightningUri.slice('lightning:'.length) : '');
+  if (bolt11) {
+    rails.push({
+      id: 'lightning',
+      label: 'Lightning',
+      uri: lightningUri.toLowerCase().startsWith('lightning:') ? lightningUri : `lightning:${bolt11}`,
+      copyValue: bolt11,
+    });
+  }
+  return rails;
+}
+
 export function normaliseStickyText(value) {
   return String(value || '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
 }
