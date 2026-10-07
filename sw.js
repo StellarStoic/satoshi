@@ -1,7 +1,7 @@
-const CACHE = 'satoshi-static-v177';
+const CACHE = 'satoshi-static-v179';
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
-    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
+    '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
     '/settings.html', '/settings.css', '/settings.js',
     '/selfCustody.html', '/selfCustody.css', '/selfCustody.js',
@@ -10,6 +10,7 @@ const CORE = [
     '/wallet.html', '/wallet.css', '/wallet.mjs', '/walletModel.mjs', '/walletSecurity.mjs', '/qrCodeGenerator_1_4_4.js', '/vendor/jsqr/jsQR.js',
     '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
+    '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js', '/MoscowTime.js', '/MoscowTimeModel.mjs',

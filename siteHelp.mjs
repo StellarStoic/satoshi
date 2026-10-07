@@ -47,6 +47,10 @@ export const PAGE_HELP = Object.freeze({
         title: 'About the NIP-05 name store',
         description: 'Buy a name like yourname@satoshi.si with Lightning, on-chain bitcoin, or Ark. It goes live after payment, has no renewal fee, allows one name per public key, and can be used with the satoshi.si Nostr relay.'
     },
+    '/stickyNotes.html': {
+        title: 'About Nostr sticky notes',
+        description: 'Write, style, place and sign a public Nostr note for 21 sats. An active satoshi.si NIP-05 gives its owner the 11-sat member price for posting or removing their note. Pan or zoom the board to explore.'
+    },
     '/offers.html': {
         title: 'About the P2P order book',
         description: 'Compare public peer-to-peer Bitcoin buy and sell offers from several markets in one place, then continue on the original platform.'

@@ -1,7 +1,7 @@
 // NIP-05 name store.
 //
 // The site is static, so this page can hold no key and cannot write
-// .well-known/nostr.json. It talks to the order desk at nip05.satoshi.si, which
+// .well-known/nostr.json. It talks to the shared payment service, which
 // prices names and records orders; a worker on D's Start9 creates the BTCPay
 // invoice and commits the name once the payment settles.
 //
@@ -12,7 +12,10 @@
 //   * The payment rails are rendered from whatever the invoice actually offers, so
 //     a rail can never be shown to a buyer that the invoice cannot accept.
 
-const API = 'https://nip05.satoshi.si';
+import {LEGACY_NIP05_ORIGIN, PAY_SERVICE_ORIGIN} from './paymentService.mjs';
+
+let API = PAY_SERVICE_ORIGIN;
+const API_CANDIDATES = [PAY_SERVICE_ORIGIN, LEGACY_NIP05_ORIGIN];
 const POLL_MS = 3000;
 const POLL_LIMIT = 100; // about five minutes, then stop hammering the desk
 
@@ -488,12 +491,17 @@ async function start() {
   els.button.addEventListener('click', createOrder);
 
   try {
-    const response = await fetch(`${API}/nip05/v1/config`);
-    if (!response.ok) {
-      setVerdict(els.verdict, describeFailure(response), 'bad');
-      statusLine(describeFailure(response), 'bad');
-      return;
+    let response = null;
+    for (const candidate of API_CANDIDATES) {
+      try {
+        const candidateResponse = await fetch(`${candidate}/nip05/v1/config`);
+        if (!candidateResponse.ok) continue;
+        API = candidate;
+        response = candidateResponse;
+        break;
+      } catch {}
     }
+    if (!response) throw new Error('No payment service answered.');
     config = await response.json();
   } catch (error) {
     setVerdict(els.verdict, 'The name service is unreachable right now. Try again in a moment.', 'bad');

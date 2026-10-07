@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Write a Nostr sticky note, pay in sats, and pin it to the public Satoshi.si cardboard board.">
+  <title>Nostr Sticky Notes | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/stickyNotes.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="sticky-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main class="sticky-shell">
+    <header class="sticky-header">
+      <div><h1>Sticky notes</h1><p>21 sats, or 11 with a satoshi.si NIP-05.</p></div>
+      <div class="sticky-account-actions">
+        <button type="button" id="nostrAccount" class="icon-text-button"><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in</span></button>
+        <button type="button" id="newSticky" class="primary-action" hidden><i class="lni lni-plus" aria-hidden="true"></i><span>New note</span></button>
+      </div>
+    </header>
+
+    <section id="stickyBoard" class="sticky-board" aria-label="Public Nostr sticky note board">
+      <div id="stickyCanvas" class="sticky-canvas"></div>
+      <div class="board-status" id="boardStatus" role="status" aria-live="polite">Opening the board...</div>
+    </section>
+    <div class="board-controls" aria-label="Board view controls">
+      <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><i class="lni lni-minus" aria-hidden="true"></i></button>
+      <output id="zoomLevel" aria-live="polite">60%</output>
+      <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in"><i class="lni lni-plus" aria-hidden="true"></i></button>
+      <button type="button" id="zoomFit" aria-label="Fit board" title="Fit board"><i class="lni lni-frame-expand" aria-hidden="true"></i></button>
+    </div>
+  </main>
+
+  <dialog id="loginDialog" class="sticky-dialog" aria-labelledby="loginTitle">
+    <div class="dialog-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="loginTitle">Log in to Nostr</h2>
+      <p>Your signer proves the note is yours. Satoshi.si never needs your private key.</p>
+      <div class="login-methods">
+        <button type="button" data-login="extension"><i class="lni lni-extension" aria-hidden="true"></i><span>Browser extension</span></button>
+        <button type="button" data-login="amber"><i class="lni lni-mobile" aria-hidden="true"></i><span>Amber</span></button>
+      </div>
+      <label class="login-field"><span>Bunker</span><input id="bunkerInput" type="text" inputmode="url" autocomplete="off" placeholder="bunker://..."><button type="button" data-login="bunker">Connect</button></label>
+      <details class="private-key-login">
+        <summary>Private key</summary>
+        <p>Not recommended. The key stays in memory and is never saved, but a signer is safer.</p>
+        <label class="login-field"><span>nsec</span><input id="privateKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="nsec1..."><button type="button" data-login="private">Use once</button></label>
+      </details>
+      <div id="loginStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="accountDialog" class="sticky-dialog" aria-labelledby="accountTitle">
+    <div class="dialog-inner account-card">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="accountTitle">Nostr account</h2>
+      <strong id="accountName"></strong><code id="accountNpub"></code><span id="accountMethod"></span>
+      <button type="button" id="logoutNostr" class="secondary-action">Log out</button>
+    </div>
+  </dialog>
+
+  <dialog id="composerDialog" class="sticky-dialog composer-dialog" aria-labelledby="composerTitle">
+    <div class="dialog-inner composer-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="composerTitle">Write your note</h2>
+      <div id="draftNote" class="sticky-note sticky-note--yellow draft-note">
+        <div id="stickyEditor" class="sticky-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Type here..." spellcheck="true"></div>
+      </div>
+      <div class="color-swatches" id="colorSwatches" aria-label="Note color">
+        <button type="button" class="swatch swatch--yellow is-selected" data-color="yellow" aria-label="Yellow"></button>
+        <button type="button" class="swatch swatch--pink" data-color="pink" aria-label="Pink"></button>
+        <button type="button" class="swatch swatch--blue" data-color="blue" aria-label="Blue"></button>
+        <button type="button" class="swatch swatch--green" data-color="green" aria-label="Green"></button>
+        <button type="button" class="swatch swatch--orange" data-color="orange" aria-label="Orange"></button>
+      </div>
+      <fieldset class="font-choice"><legend>Font</legend><div id="noteFont" class="font-options" role="radiogroup" aria-label="Note font"><button type="button" class="font-option font-option--typewriter is-selected" role="radio" aria-checked="true" data-font="typewriter">Special Elite</button><button type="button" class="font-option font-option--mono" role="radio" aria-checked="false" data-font="mono">Roboto Mono</button><button type="button" class="font-option font-option--handwritten" role="radio" aria-checked="false" data-font="handwritten">Caveat</button><button type="button" class="font-option font-option--serif" role="radio" aria-checked="false" data-font="serif">Lora</button></div></fieldset>
+      <div class="composer-count"><span id="noteCapacity">The paper is empty</span></div>
+      <button type="button" id="payForSticky" class="pay-button"><i class="lni lni-bolt-2" aria-hidden="true"></i><span>Pay 21 sats</span></button>
+      <div id="paymentStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="paymentDialog" class="sticky-dialog payment-dialog" aria-labelledby="stickyPaymentAmount">
+    <div class="dialog-inner sticky-payment" id="stickyPayment">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <strong id="stickyPaymentAmount"></strong>
+      <img id="stickyPaymentQr" alt="Bark payment QR code">
+      <button type="button" id="copyStickyPayment" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy payment</span></button>
+      <code id="stickyPaymentValue"></code>
+      <p>Waiting for payment...</p>
+    </div>
+  </dialog>
+
+  <div id="placementControls" class="placement-controls" hidden>
+    <span>Drag to place</span>
+    <button type="button" data-rotate="-1" aria-label="Tilt left" title="Tilt left"><i class="lni lni-arrow-left" aria-hidden="true"></i></button>
+    <button type="button" data-rotate="1" aria-label="Tilt right" title="Tilt right"><i class="lni lni-arrow-right" aria-hidden="true"></i></button>
+    <button type="button" id="pinSticky" class="primary-action"><i class="lni lni-map-marker-1" aria-hidden="true"></i><span>Pin note</span></button>
+  </div>
+
+  <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Sticky note details">
+    <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    <span>Event ID</span><code id="noteEventId"></code>
+    <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
+    <span>Posted</span><time id="notePostedAt"></time>
+    <button type="button" id="removeSticky" class="remove-note" hidden><i class="lni lni-trash-3" aria-hidden="true"></i><span>Remove for 21 sats</span></button>
+    <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
+  </div>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+    <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+  <script src="/stego/vendor/nostr-tools.bundle.js"></script>
+  <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
+  <script type="module" src="/stickyNotes.mjs"></script>
+</body>
+</html>

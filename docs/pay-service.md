@@ -35,16 +35,32 @@ place: the page should read it from a single constant.
 # 1. Sticky notes
 
 A sticky note is a note pinned to the satoshi.si board. Publishing one, or removing one,
-costs **21 sats**, paid on the Bark rail.
+costs **21 sats**, or **11 sats** when the paying pubkey owns an active satoshi.si NIP-05
+name. Payment uses the Bark rail.
 
 ## Price
 
-| action   | price     |
-| -------- | --------- |
-| `pin`    | 21 sats   |
-| `remove` | 21 sats   |
+| action   | standard | satoshi.si NIP-05 member |
+| -------- | -------- | ------------------------- |
+| `pin`    | 21 sats  | 11 sats                   |
+| `remove` | 21 sats  | 11 sats                   |
 
-Fixed server-side. The desk prices every order from its own constants.
+Fixed server-side. Half of 21 is not a whole satoshi, so the 50% member discount rounds
+up to 11 sats. The desk checks its authoritative NIP-05 records using the order pubkey;
+it never trusts a browser claim or a kind-0 profile. The eligibility decision, price and
+pubkey are bound to the order.
+
+## GET /sticky/v1/quote?pubkey={64-hex-key}
+
+Returns the current display price before checkout:
+
+```json
+{ "ok": true, "baseSats": 21, "sats": 11,
+  "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" } }
+```
+
+An ineligible key receives 21 sats and `applied: false`. This quote is informational;
+order creation checks the authoritative records again.
 
 ## Order lifecycle
 
@@ -86,12 +102,13 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "id": "03ad90da9fc3716c0dad4fd5",
   "action": "pin",
   "status": "awaiting_payment",
-  "sats": 21,
+  "sats": 11,
+  "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" },
   "paymentMethod": "BARK",
   "expiresAt": 1791352314,
   "payment": {
     "arkAddress": "ark1…",
-    "paymentLink": "bitcoin:?amount=0.00000021&ark=ark1…",
+    "paymentLink": "bitcoin:?amount=0.00000011&ark=ark1…",
     "invoiceId": "Rb7aCbq1e3W9qAbitdyEQZ"
   },
   "commitment": { "contentHash": "f85b33…" },
@@ -150,8 +167,10 @@ POST /sticky/v1/orders/03ad90da9fc3716c0dad4fd5/publish
 Authorization: Bearer eyJ…
 Content-Type: application/json
 
-{ "event": { "id": "…", "pubkey": "…", "created_at": 1791350494, "kind": 30078,
-             "tags": [["t","sticky"],["style","yellow"],["pos","42","99"],["d","f85b…"],["x","f85b…"]],
+{ "event": { "id": "…", "pubkey": "…", "created_at": 1791350494, "kind": 1,
+             "tags": [["t","satoshi-sticky"],["client","satoshi.si"],
+                      ["sticky","v1","yellow","0.42","0.99","-2.00","typewriter"],
+                      ["alt","A paid sticky note pinned on satoshi.si"]],
              "content": "sticky e2e test note", "sig": "…" } }
 ```
 
@@ -188,13 +207,12 @@ fix the problem and retry with the same token:
 | 400  | `wrong_signer`        | signed by a key other than the one that paid                |
 | 400  | `stale_event`         | signed more than an hour before the order                   |
 | 400  | `future_event`        | timestamp too far ahead                                     |
-| 400  | `wrong_kind`          | pin must be kind 30078, removal kind 5                      |
+| 400  | `wrong_kind`          | pin must be kind 1, removal kind 5                          |
 | 400  | `too_long`            | content over 501 characters                                 |
-| 400  | `bad_marker`          | missing or duplicated `["t","sticky"]`                      |
+| 400  | `bad_marker`          | missing or duplicated sticky marker                         |
 | 400  | `bad_style`           | style not in the allowed list                               |
 | 400  | `bad_placement`       | `pos` not two integers, or outside the board                |
 | 400  | `fingerprint_mismatch`| the note does not hash to the commitment that was paid      |
-| 400  | `bad_d_tag` / `bad_x_tag` | the paid hash is not in `d` (and `x`)                   |
 | 400  | `wrong_target`        | the deletion does not reference the paid `targetEventId`     |
 | 400  | `target_missing` / `target_not_owned` / `target_mismatch` | as above    |
 | 502  | `relay_rejected`      | the relay refused the write; `error` carries its reason     |
@@ -206,40 +224,39 @@ persists, showing the relay's message.
 
 ## The commitment (what the 21 sats buy)
 
-`contentHash` is the fingerprint of the note you intend to publish. Compute it exactly
-like this — a JS one-liner, no JSON key-ordering traps:
+`contentHash` is the fingerprint of the note text and appearance bought by the order.
+Placement happens after payment, so it is deliberately not part of this commitment:
 
 ```js
-async function stickyFingerprint(content, style, x, y) {
-  const payload = `sticky/v1\n${style}\n${x}\n${y}\n${content}`;
+async function stickyFingerprint(content, color, font) {
+  const payload = `v1\n${color}\n${font}\n${content.trim()}`;
   const bytes = new TextEncoder().encode(payload);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 ```
 
-`sha256(utf8("sticky/v1\n" + style + "\n" + x + "\n" + y + "\n" + content))`, lowercase hex.
-`content` is last so its own newlines are unambiguous. Change any of the four inputs and
-the seller cannot publish what you paid for — that is the point.
+Line endings are normalized to `\n`, trailing horizontal whitespace before a newline is
+removed, and the whole note is trimmed before hashing. Change the text, color or font and
+the event no longer matches the paid commitment.
 
 ## The events
 
-### pin — kind `30078`
+### pin — kind `1`
 
-| tag       | value                                    | rule                                   |
-| --------- | ---------------------------------------- | -------------------------------------- |
-| `t`       | `sticky`                                 | exactly one                            |
-| `style`   | `yellow` `green` `blue` `pink` `purple` `orange` | exactly one, from that list    |
-| `pos`     | `x`, `y`                                 | exactly two integers, each `0…1000`    |
-| `d`       | the paid `contentHash`                   | exactly one — makes repins replaceable |
-| `x`       | the paid `contentHash`                   | exactly one                            |
+| tag       | value                                                        | rule        |
+| --------- | ------------------------------------------------------------ | ----------- |
+| `t`       | `satoshi-sticky`                                             | exactly one |
+| `client`  | `satoshi.si`                                                 | exactly one |
+| `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
+| `alt`     | `A paid sticky note pinned on satoshi.si`                    | exactly one |
+
+Colors are `yellow`, `pink`, `blue`, `green`, or `orange`; fonts are `typewriter`,
+`mono`, `handwritten`, or `serif`. Positions are decimal fractions from 0 through 1 and
+rotation is from -12 through 12 degrees.
 
 `content` is the note text: **at most 501 characters**, counted as the UI counts them
 (Unicode code points, so one emoji is one character).
-
-Because `d` is the content hash, publishing the same note again replaces it rather than
-duplicating it — and the desk refuses to sell a pin for a note that is already pinned and
-live on the same key.
 
 ### remove — kind `5` (NIP-09)
 
@@ -254,8 +271,9 @@ pricing it. `content` may hold a short reason.
   never shows a rail the flow would not look for.
 * Lightning and on-chain are **not** offered for stickies; they are neither required nor
   watched here.
-* Amount: exactly 21 sats (`0.00000021 BTC`). The amount lives in the service; the worker
-  reads it from the order queue and never invents one.
+* Amount: 21 sats normally or 11 sats for a currently eligible satoshi.si NIP-05 pubkey.
+  The amount lives in the service; the worker reads it from the order queue and never
+  accepts one from the browser.
 * Expiry: the invoice window is 30 minutes. `expiresAt` on the order is the authoritative
   time, in Unix seconds.
 

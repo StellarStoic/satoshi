@@ -1,0 +1,190 @@
+const SESSION_KEY = 'satoshi:nostr:session:v1';
+const BUNKER_KEY = 'satoshi:nostr:bunker:v1';
+const AMBER_PREFIX = 'satoshi:nostr:amber:';
+const AMBER_MAX_AGE = 30 * 60 * 1000;
+let privateSecret = null;
+let bunkerSigner = null;
+
+function tools() {
+  if (!window.NostrTools) throw new Error('Nostr tools did not load.');
+  return window.NostrTools;
+}
+
+function parseSecret(value) {
+  const clean = String(value || '').trim();
+  if (/^nsec1/i.test(clean)) {
+    const decoded = tools().nip19.decode(clean.toLowerCase());
+    if (decoded.type !== 'nsec' || !(decoded.data instanceof Uint8Array)) throw new Error('That nsec is not valid.');
+    return new Uint8Array(decoded.data);
+  }
+  if (!/^[0-9a-f]{64}$/i.test(clean)) throw new Error('Enter a valid nsec or 64-character private key.');
+  return Uint8Array.from(clean.match(/.{2}/g), pair => Number.parseInt(pair, 16));
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function readJson(storage, key) {
+  try { return JSON.parse(storage.getItem(key) || 'null'); } catch { return null; }
+}
+
+function saveSession(pubkey, method, profile = null) {
+  const session = {pubkey, method, npub: tools().nip19.npubEncode(pubkey), profile: profile || null};
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: session}));
+  return session;
+}
+
+export function getNostrSession() {
+  const session = readJson(localStorage, SESSION_KEY);
+  if (!session || !/^[0-9a-f]{64}$/.test(session.pubkey) || !session.method) return null;
+  return session;
+}
+
+export function shortNpub(npub) {
+  return `${npub.slice(0, 9)}...${npub.slice(-5)}`;
+}
+
+export async function loginWithExtension() {
+  if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) throw new Error('No Nostr browser extension was found.');
+  const pubkey = await window.nostr.getPublicKey();
+  if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('The extension returned an invalid public key.');
+  return saveSession(pubkey, 'extension');
+}
+
+export function loginWithPrivateKey(value) {
+  const secret = parseSecret(value);
+  privateSecret?.fill?.(0);
+  privateSecret = secret;
+  return saveSession(tools().getPublicKey(secret), 'private');
+}
+
+function randomId() {
+  return crypto.randomUUID?.() || bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+}
+
+function amberCallback(id) {
+  return `${location.origin}${location.pathname}#nostr_signer=${id}.`;
+}
+
+function openAmber(type, payload, id, options = {}) {
+  const params = new URLSearchParams({type, callbackUrl: amberCallback(id), ...options});
+  location.assign(`nostrsigner:${encodeURIComponent(payload)}?${params.toString()}`);
+}
+
+export function beginAmberLogin() {
+  if (!/Android/i.test(navigator.userAgent || '')) throw new Error('Amber login is available on Android.');
+  const id = randomId();
+  localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({createdAt: Date.now(), action: 'login'}));
+  openAmber('get_public_key', '', id, {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])});
+}
+
+export function beginAmberSigning(template, context = null) {
+  const session = getNostrSession();
+  if (!session || session.method !== 'amber') throw new Error('Connect Amber first.');
+  const id = randomId();
+  localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({createdAt: Date.now(), action: 'sign', template, context}));
+  openAmber('sign_event', JSON.stringify(template), id, {current_user: session.pubkey, returnType: 'event', compressionType: 'none'});
+}
+
+export function resumeAmber() {
+  const match = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
+  if (!match) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  const key = AMBER_PREFIX + match[1];
+  const state = readJson(localStorage, key);
+  localStorage.removeItem(key);
+  if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
+  let result = match[2];
+  try { result = decodeURIComponent(result); } catch {}
+  if (state.action === 'login') {
+    const pubkey = result.trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
+    return {action: 'login', session: saveSession(pubkey, 'amber')};
+  }
+  const event = JSON.parse(result);
+  if (!tools().verifyEvent(event) || event.pubkey !== getNostrSession()?.pubkey) throw new Error('Amber returned an invalid signed event.');
+  return {action: 'sign', event, context: state.context};
+}
+
+async function connectBunker(saved) {
+  if (!window.NostrBunker) throw new Error('Nostr bunker tools did not load.');
+  const pointer = await window.NostrBunker.parseBunkerInput(saved.url);
+  if (!pointer?.pubkey || !pointer.relays?.length) throw new Error('Enter a bunker:// link with at least one relay.');
+  const clientSecret = Uint8Array.from(saved.clientSecret.match(/.{2}/g), pair => Number.parseInt(pair, 16));
+  const signer = window.NostrBunker.BunkerSigner.fromBunker(clientSecret, pointer, {
+    onauth: url => window.open(url, '_blank', 'noopener,noreferrer'),
+  });
+  await signer.connect({name: 'satoshi.si', url: location.origin + '/stickyNotes.html'});
+  bunkerSigner = signer;
+  return signer;
+}
+
+async function persistentBunkerUrl(url) {
+  const pointer = await window.NostrBunker.parseBunkerInput(url);
+  if (!pointer?.pubkey || !pointer.relays?.length) throw new Error('Enter a bunker:// link with at least one relay.');
+  const params = new URLSearchParams();
+  pointer.relays.forEach(relay => params.append('relay', relay));
+  return `bunker://${pointer.pubkey}?${params.toString()}`;
+}
+
+export async function loginWithBunker(url) {
+  const clean = String(url || '').trim();
+  if (!clean.startsWith('bunker://')) throw new Error('Enter a valid bunker:// connection link.');
+  const clientSecret = tools().generateSecretKey();
+  const saved = {url: clean, clientSecret: bytesToHex(clientSecret)};
+  clientSecret.fill(0);
+  const signer = await connectBunker(saved);
+  const pubkey = await signer.getPublicKey();
+  // The optional bunker secret is a one-use invitation. Keep the established
+  // client keypair, but discard that invitation before persisting the session.
+  saved.url = await persistentBunkerUrl(clean);
+  localStorage.setItem(BUNKER_KEY, JSON.stringify(saved));
+  return saveSession(pubkey, 'bunker');
+}
+
+export async function signerReady() {
+  const session = getNostrSession();
+  if (!session) return false;
+  if (session.method === 'private') return Boolean(privateSecret);
+  if (session.method === 'extension') return Boolean(window.nostr?.signEvent);
+  if (session.method === 'amber') return /Android/i.test(navigator.userAgent || '');
+  if (session.method === 'bunker') {
+    if (bunkerSigner) return true;
+    const saved = readJson(localStorage, BUNKER_KEY);
+    if (!saved?.url || !saved?.clientSecret) return false;
+    await connectBunker(saved);
+    return true;
+  }
+  return false;
+}
+
+export async function signNostrEvent(template, context = null) {
+  const session = getNostrSession();
+  if (!session) throw new Error('Log in to Nostr first.');
+  if (session.method === 'extension') return window.nostr.signEvent(template);
+  if (session.method === 'private') {
+    if (!privateSecret) throw new Error('Enter your private key again to sign. It was not saved by this site.');
+    return tools().finalizeEvent(template, privateSecret);
+  }
+  if (session.method === 'bunker') {
+    if (!await signerReady()) throw new Error('Reconnect your bunker to sign.');
+    return bunkerSigner.signEvent(template);
+  }
+  if (session.method === 'amber') {
+    beginAmberSigning(template, context);
+    return null;
+  }
+  throw new Error('This signer is not supported.');
+}
+
+export function logoutNostr() {
+  privateSecret?.fill?.(0);
+  privateSecret = null;
+  bunkerSigner?.close?.().catch(() => {});
+  bunkerSigner = null;
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(BUNKER_KEY);
+  window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: null}));
+}

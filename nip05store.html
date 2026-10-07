@@ -116,7 +116,7 @@
     </div>
 
 <!-- ---------------------------------------------------------------------- -->
-<!-- NIP-05 name store. The order desk lives at nip05.satoshi.si and is the only
+<!-- NIP-05 name store. The order desk lives at pay.satoshi.si and is the only
      thing this page talks to: the site is static, so no key can live in here.
      Prices come from that service's config, which is also what the worker bills
      from, so what you see here cannot disagree with the invoice. -->
@@ -429,11 +429,11 @@ RELAY     Every published name's key may write to wss://nostr.satoshi.si. Access
           synced from the name file, up to an hour of latency.
 
 API       Public order desk, JSON, no key needed to read:
-            GET  https://nip05.satoshi.si/nip05/v1/config             prices + rules + relay note
-            GET  https://nip05.satoshi.si/nip05/v1/names/&lt;name&gt;      free? price? why not
-            GET  https://nip05.satoshi.si/nip05/v1/keys/&lt;64hex&gt;      which names that key owns
-            POST https://nip05.satoshi.si/nip05/v1/orders             {name, pubkey} -> order + rails
-            GET  https://nip05.satoshi.si/nip05/v1/orders/&lt;id&gt;       status + payment rails
+            GET  https://pay.satoshi.si/nip05/v1/config             prices + rules + relay note
+            GET  https://pay.satoshi.si/nip05/v1/names/&lt;name&gt;      free? price? why not
+            GET  https://pay.satoshi.si/nip05/v1/keys/&lt;64hex&gt;      which names that key owns
+            POST https://pay.satoshi.si/nip05/v1/orders             {name, pubkey} -> order + rails
+            GET  https://pay.satoshi.si/nip05/v1/orders/&lt;id&gt;       status + payment rails
           Browser CORS allows only https://satoshi.si; requests with NO Origin header
           (curl, an agent, a server) are allowed — read the desk from a shell freely.
 
