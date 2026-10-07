@@ -1,7 +1,25 @@
-import {STICKY_COLORS, STICKY_FONTS, STICKY_MAX_CHARACTERS, STICKY_PRICE_SATS, STICKY_TOPIC, clampPlacement, clampRotation, makeDeletionTemplate, makeStickyTemplate, normaliseStickyText, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from './stickyNotesModel.mjs';
+import {
+  STICKY_COLORS,
+  STICKY_FONTS,
+  STICKY_ANONYMOUS_PRICE_SATS,
+  STICKY_MAX_CHARACTERS,
+  STICKY_PRICE_SATS,
+  STICKY_TOPIC,
+  clampPlacement,
+  clampRotation,
+  makeDeletionTemplate,
+  makeStickyTemplate,
+  normaliseGeohash,
+  normaliseStickyText,
+  parseStickyEvent,
+  stickyContentHash,
+  stickyOrderPrice,
+  stickyPaymentRails,
+} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   getNostrSession,
+  loginAnonymously,
   loginWithBunker,
   loginWithExtension,
   loginWithPrivateKey,
@@ -10,31 +28,37 @@ import {
   shortNpub,
   signNostrEvent,
   signerReady,
+  updateNostrProfile,
 } from './nostrSession.mjs';
 import {payServiceUrl} from './paymentService.mjs';
 
 const API = document.querySelector('meta[name="sticky-api"]')?.content || payServiceUrl('sticky');
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
+const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
+  openBoard: document.getElementById('openStickyBoard'), boardDialog: document.getElementById('boardDialog'),
+  boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
+  boardChooserStatus: document.getElementById('boardChooserStatus'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
   accountNpub: document.getElementById('accountNpub'), accountMethod: document.getElementById('accountMethod'),
+  accountPicture: document.getElementById('accountPicture'), accountNip05: document.getElementById('accountNip05'),
+  anonymousExpiry: document.getElementById('anonymousExpiry'), logout: document.getElementById('logoutNostr'),
   composer: document.getElementById('composerDialog'), editor: document.getElementById('stickyEditor'),
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
-  paymentRails: document.getElementById('stickyPaymentRails'),
-  paymentHint: document.getElementById('stickyPaymentHint'),
+  paymentRails: document.getElementById('stickyPaymentRails'), paymentHint: document.getElementById('stickyPaymentHint'),
   copyPayment: document.getElementById('copyStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   zoomOut: document.getElementById('zoomOut'), zoomIn: document.getElementById('zoomIn'),
-  zoomFit: document.getElementById('zoomFit'), zoomLevel: document.getElementById('zoomLevel'),
+  zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
   removeSticky: document.getElementById('removeSticky'), noteMenuStatus: document.getElementById('noteMenuStatus'),
@@ -47,6 +71,7 @@ let pending = readPending();
 let placingNote = null;
 let paymentTimer = null;
 let boardSocket = null;
+let boardConnectionVersion = 0;
 const rendered = new Set();
 const noteEvents = new Map();
 const pendingDeletions = new Map();
@@ -56,6 +81,15 @@ let quotedPubkey = '';
 let currentPaymentValue = '';
 let currentRails = [];
 let currentRailId = '';
+let profileFetchPubkey = '';
+let composingPubkey = '';
+let composingGeohash = '';
+let activeGeohash = normaliseGeohash(localStorage.getItem(BOARD_KEY));
+if (pending?.action === 'pin' && Object.hasOwn(pending, 'geohash')) {
+  activeGeohash = normaliseGeohash(pending.geohash);
+  if (activeGeohash) localStorage.setItem(BOARD_KEY, activeGeohash);
+  else localStorage.removeItem(BOARD_KEY);
+}
 const boardView = {scale: .6, x: 0, y: 0};
 const CANVAS_WIDTH = 2600;
 const CANVAS_HEIGHT = 1800;
@@ -80,32 +114,134 @@ function showDialog(dialog) {
 }
 
 function sessionLabel(session) {
-  return session?.profile?.name || session?.profile?.display_name || (session ? shortNpub(session.npub) : 'Log in');
+  if (session?.method === 'anonymous') return 'Anonymous';
+  return session?.profile?.display_name || session?.profile?.name || (session ? shortNpub(session.npub) : 'Log in');
+}
+
+function safeProfilePicture(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' ? url.href : '';
+  } catch { return ''; }
+}
+
+function readProfileFromRelay(url, pubkey) {
+  return new Promise(resolve => {
+    const socket = new WebSocket(url);
+    const subscription = `sticky-profile-${crypto.randomUUID?.() || Date.now()}`;
+    let newest = null;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      try { socket.close(); } catch {}
+      resolve(newest);
+    };
+    const timer = setTimeout(finish, 3500);
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {authors: [pubkey], kinds: [0], limit: 5}])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE') { clearTimeout(timer); finish(); return; }
+      if (data[0] !== 'EVENT' || !window.NostrTools.verifyEvent(data[2]) || data[2].pubkey !== pubkey) return;
+      if (!newest || data[2].created_at > newest.created_at) newest = data[2];
+    });
+    socket.addEventListener('error', finish);
+  });
+}
+
+async function loadAccountProfile(session) {
+  if (!session || session.method === 'anonymous' || profileFetchPubkey === session.pubkey) return;
+  profileFetchPubkey = session.pubkey;
+  const results = await Promise.allSettled([
+    readProfileFromRelay(RELAY, session.pubkey),
+    readProfileFromRelay('wss://relay.damus.io', session.pubkey),
+    readProfileFromRelay('wss://nos.lol', session.pubkey),
+    readProfileFromRelay('wss://relay.ditto.pub', session.pubkey),
+  ]);
+  const events = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+  const event = events.filter(Boolean).sort((left, right) => right.created_at - left.created_at)[0];
+  if (!event || getNostrSession()?.pubkey !== session.pubkey) return;
+  try {
+    const source = JSON.parse(event.content || '{}');
+    const profile = {
+      name: String(source.name || '').trim().slice(0, 80),
+      display_name: String(source.display_name || source.displayName || '').trim().slice(0, 80),
+      nip05: String(source.nip05 || '').trim().slice(0, 180),
+      picture: safeProfilePicture(source.picture),
+    };
+    updateNostrProfile(session.pubkey, profile);
+  } catch {}
+}
+
+function anonymousCountdown(expiresAt) {
+  const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+function updateAnonymousCountdown() {
+  const session = getNostrSession();
+  if (session?.method !== 'anonymous') {
+    elements.anonymousExpiry.hidden = true;
+    return;
+  }
+  elements.anonymousExpiry.hidden = false;
+  elements.anonymousExpiry.innerHTML = `Local access expires in <strong>${anonymousCountdown(session.expiresAt)}</strong>`;
 }
 
 function updateAccount() {
   const session = getNostrSession();
-  elements.account.querySelector('span').textContent = sessionLabel(session);
-  elements.newSticky.hidden = !session;
+  const accountLabel = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
+  elements.account.setAttribute('aria-label', accountLabel);
+  elements.account.title = accountLabel;
   if (session) {
     elements.accountName.textContent = sessionLabel(session);
     elements.accountNpub.textContent = session.npub;
-    elements.accountMethod.textContent = `Signer: ${session.method === 'private' ? 'private key (not saved)' : session.method}`;
+    elements.accountMethod.textContent = session.method === 'anonymous' ? 'Temporary local Nostr identity' : `Signer: ${session.method === 'private' ? 'private key (not saved)' : session.method}`;
+    const nip05 = session.profile?.nip05 || '';
+    elements.accountNip05.textContent = nip05;
+    elements.accountNip05.hidden = !nip05 || session.method === 'anonymous';
+    const picture = session.method === 'anonymous' ? '' : safeProfilePicture(session.profile?.picture);
+    elements.accountPicture.hidden = !picture;
+    if (picture) {
+      elements.accountPicture.src = picture;
+      elements.accountPicture.alt = `${sessionLabel(session)} profile image`;
+    }
+    else elements.accountPicture.removeAttribute('src');
+    elements.logout.querySelector('span').textContent = session.method === 'anonymous' ? 'Leave anonymous mode' : 'Log out';
+    loadAccountProfile(session);
+  } else {
+    elements.accountName.textContent = '';
+    elements.accountNpub.textContent = '';
+    elements.accountMethod.textContent = '';
+    elements.accountNip05.hidden = true;
+    elements.accountPicture.hidden = true;
   }
+  updateAnonymousCountdown();
   refreshPriceQuote(session);
 }
 
 function renderQuotedPrice(discountApplied = false) {
   const pinLabel = elements.pay.querySelector('span');
   const removeLabel = elements.removeSticky.querySelector('span');
-  pinLabel.textContent = discountApplied ? `NIP-05 price: ${quotedPrice} sats` : `Pay ${quotedPrice} sats`;
-  removeLabel.textContent = discountApplied ? `Remove for ${quotedPrice} sats · NIP-05 price` : `Remove for ${quotedPrice} sats`;
+  const anonymous = getNostrSession()?.method === 'anonymous';
+  pinLabel.textContent = anonymous ? `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : discountApplied ? `NIP-05 price: ${quotedPrice} sats` : `Pay ${quotedPrice} sats`;
+  removeLabel.textContent = anonymous ? `Remove for ${STICKY_PRICE_SATS} sats` : discountApplied ? `Remove for ${quotedPrice} sats · NIP-05 price` : `Remove for ${quotedPrice} sats`;
 }
 
 async function refreshPriceQuote(session) {
   if (!session) {
     quotedPubkey = '';
     quotedPrice = STICKY_PRICE_SATS;
+    renderQuotedPrice(false);
+    return;
+  }
+  if (session.method === 'anonymous') {
+    quotedPubkey = session.pubkey;
+    quotedPrice = STICKY_ANONYMOUS_PRICE_SATS;
     renderQuotedPrice(false);
     return;
   }
@@ -148,32 +284,9 @@ function loadQr() {
   return qrPromise;
 }
 
-/**
- * Answer the click before the invoice exists.
- *
- * The order is created first and the worker writes the BTCPay invoice after that, so
- * there is a gap. Opening this dialog in that gap — saying what is actually happening
- * — beats a dead button, and the QR drops into it the moment the rail arrives.
- */
-function openPaymentPreparing(sats) {
-  currentRails = [];
-  currentRailId = '';
-  currentPaymentValue = '';
-  elements.paymentAmount.textContent = `Pay ${sats} sats`;
-  elements.paymentRails.hidden = true;
-  elements.paymentRails.replaceChildren();
-  elements.paymentValue.textContent = '';
-  elements.paymentQr.hidden = true;
-  elements.paymentQr.removeAttribute('src');
-  elements.paymentHint.textContent = 'Preparing invoice...';
-  showDialog(elements.paymentDialog);
-}
-
 async function renderPayment(order) {
   const rails = stickyPaymentRails(order);
   if (!rails.length) {
-    // The dialog is open already, so say why it is empty instead of showing a frame
-    // with no QR in it.
     elements.paymentQr.hidden = true;
     elements.paymentValue.textContent = '';
     elements.paymentHint.textContent = 'Preparing invoice...';
@@ -181,11 +294,7 @@ async function renderPayment(order) {
   }
   const sats = stickyOrderPrice(order, pending?.sats || STICKY_PRICE_SATS);
   currentRails = rails;
-  // One rail: name it, the way this dialog always did. Two: let the buyer pick, and
-  // keep their pick, because the payment poll re-renders this every few seconds.
-  elements.paymentAmount.textContent = rails.length > 1
-    ? `Pay ${sats} sats`
-    : `Pay ${sats} sats with ${rails[0].label}`;
+  elements.paymentAmount.textContent = rails.length > 1 ? `Pay ${sats} sats` : `Pay ${sats} sats with ${rails[0].label}`;
   elements.paymentRails.hidden = rails.length < 2;
   elements.paymentRails.replaceChildren(...rails.map(rail => {
     const button = document.createElement('button');
@@ -198,10 +307,12 @@ async function renderPayment(order) {
     icon.className = `lni lni-${rail.id === 'lightning' ? 'bolt' : 'map-marker-1'}`;
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon, Object.assign(document.createElement('span'), {textContent: rail.label}));
-    button.addEventListener('click', () => { selectRail(rail.id); });
+    button.addEventListener('click', () => selectRail(rail.id));
     return button;
   }));
   elements.paymentQr.hidden = false;
+  elements.paymentValue.hidden = false;
+  elements.copyPayment.hidden = false;
   elements.paymentHint.textContent = `Waiting for the ${sats}-sat payment...`;
   showDialog(elements.paymentDialog);
   const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
@@ -209,7 +320,6 @@ async function renderPayment(order) {
   return true;
 }
 
-/** Point the QR, the copied value and the alt text at the chosen rail. */
 async function selectRail(id) {
   const rail = currentRails.find(item => item.id === id) || currentRails[0];
   if (!rail) return;
@@ -228,8 +338,24 @@ async function selectRail(id) {
       qr.addData(rail.uri);
       qr.make();
       elements.paymentQr.src = qr.createDataURL(6, 8);
+      elements.paymentQr.hidden = false;
     } catch { elements.paymentQr.removeAttribute('src'); }
   }
+}
+
+function showPaymentPreparing(sats = quotedPrice) {
+  currentRails = [];
+  currentRailId = '';
+  currentPaymentValue = '';
+  elements.paymentAmount.textContent = `Pay ${sats} sats`;
+  elements.paymentRails.hidden = true;
+  elements.paymentRails.replaceChildren();
+  elements.paymentQr.hidden = true;
+  elements.paymentQr.removeAttribute('src');
+  elements.paymentValue.hidden = true;
+  elements.copyPayment.hidden = true;
+  elements.paymentHint.textContent = 'Preparing invoice...';
+  showDialog(elements.paymentDialog);
 }
 
 async function copyPayment() {
@@ -247,9 +373,47 @@ function noteAtPlacement(note, placement) {
   note.style.setProperty('--rotation', `${placement.rotation}deg`);
 }
 
+function noteBelongsToBoard(sticky) {
+  return Boolean(activeGeohash) && sticky.geohash === activeGeohash;
+}
+
+function updateBoardControl() {
+  const label = activeGeohash ? `Corkboard: ${activeGeohash}` : 'Choose a geohash corkboard';
+  elements.openBoard.setAttribute('aria-label', label);
+  elements.openBoard.title = label;
+}
+
+function selectBoard(geohash) {
+  if (placingNote) {
+    status(elements.boardChooserStatus, 'Pin the current note before changing corkboards.', true);
+    return;
+  }
+  const nextGeohash = normaliseGeohash(geohash);
+  if (!nextGeohash) {
+    status(elements.boardChooserStatus, 'Enter a valid geohash first.', true);
+    return;
+  }
+  activeGeohash = nextGeohash;
+  localStorage.setItem(BOARD_KEY, activeGeohash);
+  updateBoardControl();
+  closeNoteMenu();
+  boardConnectionVersion += 1;
+  try { boardSocket?.close(); } catch {}
+  boardSocket = null;
+  rendered.clear();
+  noteEvents.clear();
+  pendingDeletions.clear();
+  elements.canvas.replaceChildren();
+  elements.boardStatus.hidden = false;
+  status(elements.boardStatus, `Opening corkboard ${activeGeohash}...`);
+  elements.boardDialog.close();
+  connectBoard(boardConnectionVersion);
+}
+
 function applyBoardTransform() {
   elements.canvas.style.transform = `translate(${boardView.x}px, ${boardView.y}px) scale(${boardView.scale})`;
-  elements.zoomLevel.textContent = `${Math.round(boardView.scale * 100)}%`;
+  elements.board.style.backgroundSize = `${600 * boardView.scale}px ${600 * boardView.scale}px`;
+  elements.board.style.backgroundPosition = `${boardView.x}px ${boardView.y}px`;
 }
 
 function fitBoard() {
@@ -279,6 +443,7 @@ function renderNote(sticky, event = null, temporary = false) {
   note.className = `sticky-note sticky-note--${sticky.color} sticky-note--font-${sticky.font || 'typewriter'}${temporary ? ' sticky-note--placing' : ''}`;
   note.classList.toggle('sticky-note--dense', sticky.content.length > 280);
   if (sticky.id) note.dataset.eventId = sticky.id;
+  note.dataset.createdAt = String(sticky.createdAt || 0);
   note.tabIndex = temporary ? 0 : -1;
   const text = document.createElement('div');
   text.className = 'sticky-note__text';
@@ -299,11 +464,13 @@ function renderNote(sticky, event = null, temporary = false) {
     note.appendChild(pin);
     const author = document.createElement('span');
     author.className = 'sticky-note__author';
-    author.textContent = shortAuthor(sticky.pubkey);
+    author.textContent = sticky.anonymous ? 'Anonymous' : shortAuthor(sticky.pubkey);
     note.appendChild(author);
   }
   noteAtPlacement(note, sticky);
-  elements.canvas.appendChild(note);
+  const nextNewer = [...elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)')]
+    .find(existing => Number(existing.dataset.createdAt || 0) > Number(sticky.createdAt || 0));
+  elements.canvas.insertBefore(note, nextNewer || placingNote || null);
   fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
   document.fonts?.ready?.then(() => {
     if (note.isConnected) fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
@@ -316,17 +483,24 @@ function shortAuthor(pubkey) {
   try { return shortNpub(window.NostrTools.nip19.npubEncode(pubkey)); } catch { return 'Nostr user'; }
 }
 
-function connectBoard() {
+function connectBoard(version = boardConnectionVersion) {
+  if (!activeGeohash) {
+    status(elements.boardStatus, 'Choose a geohash to open its corkboard.');
+    elements.boardStatus.hidden = false;
+    return;
+  }
   const subscription = `sticky-${Date.now()}`;
-  boardSocket = new WebSocket(RELAY);
+  const socket = new WebSocket(RELAY);
+  boardSocket = socket;
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);
-  boardSocket.addEventListener('open', () => {
-    boardSocket.send(JSON.stringify(['REQ', subscription,
-      {kinds: [1], '#t': [STICKY_TOPIC], limit: 500},
+  socket.addEventListener('open', () => {
+    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [activeGeohash], limit: 500};
+    socket.send(JSON.stringify(['REQ', subscription,
+      noteFilter,
       {kinds: [5], '#t': ['satoshi-sticky-delete'], limit: 500},
     ]));
   });
-  boardSocket.addEventListener('message', message => {
+  socket.addEventListener('message', message => {
     try {
       const data = JSON.parse(message.data);
       if (data[0] === 'EOSE' && data[1] === subscription) {
@@ -341,18 +515,19 @@ function connectBoard() {
         return;
       }
       const sticky = parseStickyEvent(event);
-      if (!sticky) return;
+      if (!sticky || !noteBelongsToBoard(sticky)) return;
       const deletion = pendingDeletions.get(sticky.id);
       if (deletion?.pubkey === sticky.pubkey) return;
       renderNote(sticky, event);
     } catch {}
   });
-  boardSocket.addEventListener('error', () => {
+  socket.addEventListener('error', () => {
     clearTimeout(timeout);
     status(elements.boardStatus, 'The Nostr board is temporarily unavailable.', true);
   });
-  boardSocket.addEventListener('close', () => {
-    if (!document.hidden) setTimeout(connectBoard, 5000);
+  socket.addEventListener('close', () => {
+    clearTimeout(timeout);
+    if (!document.hidden && version === boardConnectionVersion) setTimeout(() => connectBoard(version), 5000);
   }, {once: true});
 }
 
@@ -479,29 +654,32 @@ async function startPayment() {
     status(elements.paymentStatus, '');
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
+    if (composingPubkey && composingPubkey !== session.pubkey) throw new Error('Your active Nostr identity changed. Reopen the note and try again.');
+    if (!activeGeohash || composingGeohash !== activeGeohash) throw new Error('Choose the geohash corkboard again, then reopen the note.');
     await ensureReadySigner();
     const content = normaliseStickyText(elements.editor.textContent);
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
     status(elements.paymentStatus, 'Preparing invoice...');
-    openPaymentPreparing(quotedPrice);
+    showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const order = await api('/orders', {
       method: 'POST',
-      body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash}),
+      body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
     });
-    const sats = stickyOrderPrice(order);
-    savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, contentHash, sats, status: 'waiting'});
+    const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_PRICE_SATS);
+    if (session.method === 'anonymous' && sats !== STICKY_ANONYMOUS_PRICE_SATS) throw new Error('Anonymous posting is not ready on the payment service yet. No note was published.');
+    savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, contentHash, sats, anonymous: session.method === 'anonymous', status: 'waiting'});
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
     else if (!railReady) status(elements.paymentStatus, 'Preparing invoice...');
     status(elements.paymentStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
+    if (elements.paymentDialog.open && !pending?.orderId) elements.paymentDialog.close();
     status(elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
-    if (elements.paymentDialog.open) elements.paymentDialog.close();
   }
 }
 
@@ -522,8 +700,10 @@ async function pollPayment() {
       return;
     }
     if (['expired', 'invalid', 'cancelled'].includes(String(order.status || '').toLowerCase())) throw new Error('The invoice expired. Start again when you are ready.');
+    const invoicePending = String(order.status || '').toLowerCase() === 'awaiting_invoice' || !order.payment;
     status(pending.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus,
-      String(order.status || '').toLowerCase() === 'awaiting_invoice' ? 'Preparing invoice...' : 'Waiting for payment...');
+      invoicePending ? 'Preparing invoice...' : 'Waiting for payment...');
+    if (invoicePending) elements.paymentHint.textContent = 'Preparing invoice...';
     paymentTimer = setTimeout(pollPayment, 3000);
   } catch (error) {
     status(pending?.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, error.message, true);
@@ -543,6 +723,8 @@ function beginPlacement() {
   savePending({...pending, placement});
   placingNote = renderNote({...pending, ...placement}, null, true);
   elements.placementControls.hidden = false;
+  elements.pin.disabled = false;
+  elements.pin.querySelector('span').textContent = 'Pin note';
   installPlacementGestures(placingNote);
   placingNote.focus();
 }
@@ -560,14 +742,41 @@ function setPlacement(next) {
 }
 
 function installPlacementGestures(note) {
+  const pointers = new Map();
   let gesture = null;
+
+  const point = event => ({x: event.clientX, y: event.clientY});
+  const angleBetween = () => {
+    const [first, second] = [...pointers.values()];
+    return Math.atan2(second.y - first.y, second.x - first.x) * 180 / Math.PI;
+  };
+  const resetSinglePointer = () => {
+    const [remaining] = pointers.entries();
+    if (!remaining) { gesture = null; return; }
+    gesture = {id: remaining[0], startX: remaining[1].x, startY: remaining[1].y, placement: {...currentPlacement()}, rotate: false};
+  };
+
   note.addEventListener('pointerdown', event => {
     event.preventDefault();
     note.setPointerCapture(event.pointerId);
-    gesture = {id: event.pointerId, startX: event.clientX, startY: event.clientY, placement: {...currentPlacement()}, rotate: event.shiftKey};
+    pointers.set(event.pointerId, point(event));
+    if (pointers.size === 1) {
+      gesture = {id: event.pointerId, startX: event.clientX, startY: event.clientY, placement: {...currentPlacement()}, rotate: event.shiftKey};
+    } else if (pointers.size === 2) {
+      gesture = {angle: angleBetween(), placement: {...currentPlacement()}, twoFinger: true};
+    }
   });
   note.addEventListener('pointermove', event => {
-    if (!gesture || gesture.id !== event.pointerId) return;
+    if (!pointers.has(event.pointerId) || !gesture) return;
+    pointers.set(event.pointerId, point(event));
+    if (pointers.size >= 2 && gesture.twoFinger) {
+      let difference = angleBetween() - gesture.angle;
+      if (difference > 180) difference -= 360;
+      if (difference < -180) difference += 360;
+      setPlacement({...gesture.placement, rotation: gesture.placement.rotation + difference});
+      return;
+    }
+    if (gesture.id !== event.pointerId) return;
     if (gesture.rotate || event.shiftKey) {
       setPlacement({...gesture.placement, rotation: gesture.placement.rotation + (event.clientX - gesture.startX) / 10});
     } else {
@@ -576,7 +785,13 @@ function installPlacementGestures(note) {
         y: gesture.placement.y + (event.clientY - gesture.startY) / (CANVAS_HEIGHT * boardView.scale)});
     }
   });
-  note.addEventListener('pointerup', () => { gesture = null; });
+  const release = event => {
+    pointers.delete(event.pointerId);
+    if (pointers.size === 1) resetSinglePointer();
+    else if (!pointers.size) gesture = null;
+  };
+  note.addEventListener('pointerup', release);
+  note.addEventListener('pointercancel', release);
   note.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault();
@@ -593,11 +808,12 @@ function installPlacementGestures(note) {
 }
 
 async function publishPinnedNote(resumedEvent = null) {
+  let published = false;
   try {
     elements.pin.disabled = true;
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
-    const template = makeStickyTemplate({...pending, ...placement});
+    const template = makeStickyTemplate({...pending, ...placement, anonymous: Boolean(pending.anonymous)});
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     if (!event) return;
     if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid event.');
@@ -612,6 +828,8 @@ async function publishPinnedNote(resumedEvent = null) {
     elements.editor.textContent = '';
     lastValidEditor = '';
     elements.pay.disabled = false;
+    published = true;
+    elements.pin.querySelector('span').textContent = 'Pinned';
     status(elements.boardStatus, result.message || 'Your note is pinned.');
     elements.boardStatus.hidden = false;
     setTimeout(() => { elements.boardStatus.hidden = true; }, 3500);
@@ -619,7 +837,7 @@ async function publishPinnedNote(resumedEvent = null) {
     status(elements.boardStatus, error.message, true);
     elements.boardStatus.hidden = false;
   } finally {
-    elements.pin.disabled = false;
+    elements.pin.disabled = published;
   }
 }
 
@@ -673,7 +891,7 @@ async function startRemovalPayment() {
     await ensureReadySigner();
     elements.removeSticky.disabled = true;
     status(elements.noteMenuStatus, 'Preparing invoice...');
-    openPaymentPreparing(quotedPrice);
+    showPaymentPreparing(STICKY_PRICE_SATS);
     const order = await api('/orders', {
       method: 'POST',
       body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
@@ -685,9 +903,9 @@ async function startRemovalPayment() {
     status(elements.noteMenuStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
+    if (elements.paymentDialog.open && !pending?.orderId) elements.paymentDialog.close();
     status(elements.noteMenuStatus, error.message, true);
     elements.removeSticky.disabled = false;
-    if (elements.paymentDialog.open) elements.paymentDialog.close();
   }
 }
 
@@ -717,21 +935,69 @@ async function publishRemoval(resumedEvent = null) {
 }
 
 function installBoardNavigation() {
-  let pan = null;
+  const pointers = new Map();
+  let gesture = null;
+
+  const point = event => ({x: event.clientX, y: event.clientY});
+  const distance = () => {
+    const [first, second] = [...pointers.values()];
+    return Math.hypot(second.x - first.x, second.y - first.y);
+  };
+  const midpoint = () => {
+    const [first, second] = [...pointers.values()];
+    return {x: (first.x + second.x) / 2, y: (first.y + second.y) / 2};
+  };
+  const beginPinch = () => {
+    const center = midpoint();
+    const rect = elements.board.getBoundingClientRect();
+    const localX = center.x - rect.left;
+    const localY = center.y - rect.top;
+    gesture = {
+      pinch: true,
+      distance: Math.max(1, distance()),
+      scale: boardView.scale,
+      worldX: (localX - boardView.x) / boardView.scale,
+      worldY: (localY - boardView.y) / boardView.scale,
+    };
+  };
+  const resetPan = () => {
+    const [remaining] = pointers.entries();
+    if (!remaining) { gesture = null; return; }
+    gesture = {id: remaining[0], x: remaining[1].x, y: remaining[1].y, boardX: boardView.x, boardY: boardView.y};
+  };
+
   elements.board.addEventListener('pointerdown', event => {
     if (event.target.closest('.sticky-note')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, point(event));
     elements.board.classList.add('is-panning');
-    pan = {id: event.pointerId, x: event.clientX, y: event.clientY, boardX: boardView.x, boardY: boardView.y};
+    if (pointers.size === 1) resetPan();
+    else if (pointers.size === 2) beginPinch();
   });
   elements.board.addEventListener('pointermove', event => {
-    if (!pan || pan.id !== event.pointerId) return;
-    boardView.x = pan.boardX + event.clientX - pan.x;
-    boardView.y = pan.boardY + event.clientY - pan.y;
+    if (!pointers.has(event.pointerId) || !gesture) return;
+    pointers.set(event.pointerId, point(event));
+    if (pointers.size >= 2 && gesture.pinch) {
+      const center = midpoint();
+      const rect = elements.board.getBoundingClientRect();
+      boardView.scale = Math.min(2.5, Math.max(.28, gesture.scale * distance() / gesture.distance));
+      boardView.x = center.x - rect.left - gesture.worldX * boardView.scale;
+      boardView.y = center.y - rect.top - gesture.worldY * boardView.scale;
+    } else if (gesture.id === event.pointerId) {
+      boardView.x = gesture.boardX + event.clientX - gesture.x;
+      boardView.y = gesture.boardY + event.clientY - gesture.y;
+    }
     applyBoardTransform();
   });
-  const stop = () => { pan = null; elements.board.classList.remove('is-panning'); };
+  const stop = event => {
+    pointers.delete(event.pointerId);
+    if (pointers.size === 1) resetPan();
+    else if (!pointers.size) {
+      gesture = null;
+      elements.board.classList.remove('is-panning');
+    }
+  };
   elements.board.addEventListener('pointerup', stop);
   elements.board.addEventListener('pointercancel', stop);
   elements.board.addEventListener('wheel', event => {
@@ -746,6 +1012,7 @@ async function handleLogin(method) {
     if (method === 'extension') await loginWithExtension();
     else if (method === 'amber') { beginAmberLogin(); return; }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
+    else if (method === 'anonymous') loginAnonymously();
     else if (method === 'private') {
       loginWithPrivateKey(elements.privateKey.value);
       elements.privateKey.value = '';
@@ -762,7 +1029,16 @@ async function handleLogin(method) {
 }
 
 function openComposer() {
-  if (!getNostrSession()) { showDialog(elements.login); return; }
+  if (!activeGeohash) {
+    status(elements.boardChooserStatus, 'Choose a geohash before writing a note.');
+    showDialog(elements.boardDialog);
+    requestAnimationFrame(() => elements.boardGeohash.focus());
+    return;
+  }
+  const session = getNostrSession();
+  if (!session) { showDialog(elements.login); return; }
+  composingPubkey = session.pubkey;
+  composingGeohash = activeGeohash;
   elements.pay.disabled = false;
   showDialog(elements.composer);
   requestAnimationFrame(() => elements.editor.focus());
@@ -770,9 +1046,25 @@ function openComposer() {
 
 elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
 elements.newSticky.addEventListener('click', openComposer);
+elements.openBoard.addEventListener('click', () => {
+  elements.boardGeohash.value = activeGeohash;
+  status(elements.boardChooserStatus, '');
+  showDialog(elements.boardDialog);
+  requestAnimationFrame(() => elements.boardGeohash.focus());
+});
+elements.boardChooser.addEventListener('submit', event => {
+  event.preventDefault();
+  const value = elements.boardGeohash.value.trim().toLowerCase();
+  if (!normaliseGeohash(value)) {
+    status(elements.boardChooserStatus, 'Enter a valid geohash using 0-9 and b-h, j, k, m, n, p-z.', true);
+    return;
+  }
+  selectBoard(value);
+});
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 document.querySelectorAll('[data-login]').forEach(button => button.addEventListener('click', () => handleLogin(button.dataset.login)));
-document.getElementById('logoutNostr').addEventListener('click', () => { logoutNostr(); elements.accountDialog.close(); updateAccount(); });
+elements.logout.addEventListener('click', () => { logoutNostr(); elements.accountDialog.close(); updateAccount(); });
+elements.accountPicture.addEventListener('error', () => { elements.accountPicture.hidden = true; });
 elements.colors.addEventListener('click', event => selectColor(event.target.closest('[data-color]')?.dataset.color));
 elements.font.addEventListener('click', event => selectFont(event.target.closest('[data-font]')?.dataset.font));
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
@@ -797,11 +1089,24 @@ document.addEventListener('pointerdown', event => {
 window.addEventListener('satoshi-nostr-session', updateAccount);
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 window.addEventListener('resize', () => { if (boardView.scale < .5) fitBoard(); });
+setInterval(() => {
+  const before = elements.account.getAttribute('aria-label');
+  updateAnonymousCountdown();
+  const session = getNostrSession();
+  const after = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
+  if (before !== after) updateAccount();
+}, 1000);
 
 updateAccount();
+updateBoardControl();
 installBoardNavigation();
 requestAnimationFrame(fitBoard);
-connectBoard();
+if (activeGeohash) connectBoard();
+else {
+  status(elements.boardStatus, 'Choose a geohash to open its corkboard.');
+  showDialog(elements.boardDialog);
+  requestAnimationFrame(() => elements.boardGeohash.focus());
+}
 let resumedSigning = false;
 try {
   const amber = resumeAmber();

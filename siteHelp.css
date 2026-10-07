@@ -133,6 +133,10 @@
     line-height: 1.65;
 }
 
+.site-help-dialog p + p {
+    margin-top: 12px;
+}
+
 .site-help-dialog__close {
     position: absolute;
     top: 14px;

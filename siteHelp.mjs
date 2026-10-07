@@ -49,7 +49,15 @@ export const PAGE_HELP = Object.freeze({
     },
     '/stickyNotes.html': {
         title: 'About Nostr sticky notes',
-        description: 'Write, style, place and sign a public Nostr note for 21 sats. An active satoshi.si NIP-05 gives its owner the 11-sat member price for posting or removing their note. Pan or zoom the board to explore.'
+        description: 'Sticky notes are small public messages signed with your Nostr identity and placed on a shared corkboard.',
+        details: [
+            'After payment, your note text, color, font, position and tilt are written into one signed Nostr event. These details travel together, so the board can rebuild the note in the same place on any device.',
+            'Your Nostr signer proves which public key created the note. It signs the event without giving Satoshi.si your private key.',
+            'You can instead post anonymously for 42 sats. The browser creates a temporary Nostr identity and stores its signing key only on this device. Local access stops after 24 hours and the saved key is removed while the page is running or when you next return. The published note remains public.',
+            'Choose a geohash before any notes load. Notes carry that geohash in signed Nostr tags and appear in this interface only when the exact same board is selected. Everyone at a workplace can use the same precise geohash as a shared public board. A geohash filters public notes; it is not a password or privacy feature.',
+            'The board reads compatible events from the Nostr relay, checks their signatures and places each note using the coordinates saved in its signed tags. Zooming and panning move the notes and corkboard together.',
+            'The pin opens the event ID and posting time. Removing your own note creates a separate deletion event signed by the same Nostr identity.'
+        ]
     },
     '/offers.html': {
         title: 'About the P2P order book',
@@ -110,7 +118,8 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
     '/priceScanner.html': {selector: '.scanner-top-controls', wide: true},
     '/isBip39.html': {selector: '#openWordlistSettings', group: true, icon: true},
     '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true},
-    '/MoscowTime.html': {selector: '#openMoscowSettings', group: true, icon: true}
+    '/MoscowTime.html': {selector: '#openMoscowSettings', group: true, icon: true},
+    '/stickyNotes.html': {selector: '.sticky-top-actions', wide: true}
 });
 
 function groupTopRightControls(trigger, companion) {
@@ -173,6 +182,12 @@ function createHelpDialog(help) {
     const description = document.createElement('p');
     description.textContent = help.description;
 
+    const details = (help.details || []).map(text => {
+        const paragraph = document.createElement('p');
+        paragraph.textContent = text;
+        return paragraph;
+    });
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'site-help-dialog__close';
@@ -181,7 +196,7 @@ function createHelpDialog(help) {
     close.textContent = '\u00d7';
     close.addEventListener('click', () => dialog.close());
 
-    content.append(close, title, description);
+    content.append(close, title, description, ...details);
     dialog.append(content);
     dialog.addEventListener('click', event => {
         if (event.target === dialog) dialog.close();

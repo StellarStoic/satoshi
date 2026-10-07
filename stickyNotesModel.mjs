@@ -3,13 +3,21 @@ export const STICKY_TOPIC = 'satoshi-sticky';
 export const STICKY_VERSION = 'v1';
 export const STICKY_PRICE_SATS = 21;
 export const STICKY_MEMBER_PRICE_SATS = 11;
+export const STICKY_ANONYMOUS_PRICE_SATS = 42;
 export const STICKY_MAX_CHARACTERS = 501;
 export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', 'orange']);
 export const STICKY_FONTS = Object.freeze(['typewriter', 'mono', 'handwritten', 'serif']);
+export const GEOHASH_PATTERN = /^[0123456789bcdefghjkmnpqrstuvwxyz]{1,12}$/;
+
+export function normaliseGeohash(value, fallback = '') {
+  const geohash = String(value || '').trim().toLowerCase();
+  if (!geohash) return fallback;
+  return GEOHASH_PATTERN.test(geohash) ? geohash : fallback;
+}
 
 export function stickyOrderPrice(value, fallback = STICKY_PRICE_SATS) {
   const sats = Number(value?.sats ?? value?.priceSats ?? value);
-  return Number.isInteger(sats) && sats > 0 && sats <= STICKY_PRICE_SATS ? sats : fallback;
+  return Number.isInteger(sats) && sats > 0 && sats <= STICKY_ANONYMOUS_PRICE_SATS ? sats : fallback;
 }
 
 export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);
@@ -57,22 +65,29 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
+  const boardGeohash = normaliseGeohash(geohash);
+  if (!boardGeohash) throw new Error('Choose a valid geohash corkboard first.');
+  const tags = [
+    ['t', STICKY_TOPIC],
+    ['client', 'satoshi.si'],
+    ['g', boardGeohash],
+    ['i', `geo:${boardGeohash}`],
+    ['k', 'geo'],
+    ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
+    ['alt', 'A paid sticky note pinned on satoshi.si'],
+  ];
+  if (anonymous) tags.push(['anonymous', '24h-local-key']);
   return {
     kind: STICKY_EVENT_KIND,
     created_at: createdAt,
     content: text,
-    tags: [
-      ['t', STICKY_TOPIC],
-      ['client', 'satoshi.si'],
-      ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
-      ['alt', 'A paid sticky note pinned on satoshi.si'],
-    ],
+    tags,
   };
 }
 
@@ -85,6 +100,8 @@ export function parseStickyEvent(event) {
   if (!STICKY_FONTS.includes(font)) return null;
   const content = normaliseStickyText(event.content);
   if (!content || content.length > STICKY_MAX_CHARACTERS) return null;
+  const geohash = normaliseGeohash(event.tags.find(tag => tag?.[0] === 'g')?.[1]);
+  if (!geohash) return null;
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -95,6 +112,8 @@ export function parseStickyEvent(event) {
     x: clampPlacement(sticky[3]),
     y: clampPlacement(sticky[4]),
     rotation: clampRotation(sticky[5]),
+    geohash,
+    anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
   };
 }
 

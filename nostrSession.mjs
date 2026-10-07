@@ -1,7 +1,10 @@
 const SESSION_KEY = 'satoshi:nostr:session:v1';
 const BUNKER_KEY = 'satoshi:nostr:bunker:v1';
+const ANONYMOUS_KEY = 'satoshi:nostr:anonymous:v1';
+const PREVIOUS_SESSION_KEY = 'satoshi:nostr:previous-session:v1';
 const AMBER_PREFIX = 'satoshi:nostr:amber:';
 const AMBER_MAX_AGE = 30 * 60 * 1000;
+export const ANONYMOUS_SESSION_MS = 24 * 60 * 60 * 1000;
 let privateSecret = null;
 let bunkerSigner = null;
 
@@ -29,17 +32,42 @@ function readJson(storage, key) {
   try { return JSON.parse(storage.getItem(key) || 'null'); } catch { return null; }
 }
 
-function saveSession(pubkey, method, profile = null) {
-  const session = {pubkey, method, npub: tools().nip19.npubEncode(pubkey), profile: profile || null};
+function saveSession(pubkey, method, profile = null, extra = {}) {
+  const session = {pubkey, method, npub: tools().nip19.npubEncode(pubkey), profile: profile || null, ...extra};
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: session}));
   return session;
 }
 
 export function getNostrSession() {
-  const session = readJson(localStorage, SESSION_KEY);
+  let session = readJson(localStorage, SESSION_KEY);
   if (!session || !/^[0-9a-f]{64}$/.test(session.pubkey) || !session.method) return null;
+  if (session.method === 'anonymous' && (!Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now())) {
+    localStorage.removeItem(ANONYMOUS_KEY);
+    session = readJson(localStorage, PREVIOUS_SESSION_KEY);
+    localStorage.removeItem(PREVIOUS_SESSION_KEY);
+    if (session?.pubkey && session?.method) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    else localStorage.removeItem(SESSION_KEY);
+  }
   return session;
+}
+
+export function loginAnonymously() {
+  const current = getNostrSession();
+  if (current?.method === 'anonymous' && current.expiresAt > Date.now()) return current;
+  if (current) localStorage.setItem(PREVIOUS_SESSION_KEY, JSON.stringify(current));
+  const secret = tools().generateSecretKey();
+  const pubkey = tools().getPublicKey(secret);
+  const expiresAt = Date.now() + ANONYMOUS_SESSION_MS;
+  localStorage.setItem(ANONYMOUS_KEY, JSON.stringify({pubkey, secret: bytesToHex(secret), expiresAt}));
+  secret.fill(0);
+  return saveSession(pubkey, 'anonymous', {name: 'Anonymous'}, {expiresAt});
+}
+
+export function updateNostrProfile(pubkey, profile) {
+  const session = getNostrSession();
+  if (!session || session.pubkey !== pubkey || session.method === 'anonymous') return session;
+  return saveSession(session.pubkey, session.method, profile, session.expiresAt ? {expiresAt: session.expiresAt} : {});
 }
 
 export function shortNpub(npub) {
@@ -150,6 +178,10 @@ export async function signerReady() {
   if (session.method === 'private') return Boolean(privateSecret);
   if (session.method === 'extension') return Boolean(window.nostr?.signEvent);
   if (session.method === 'amber') return /Android/i.test(navigator.userAgent || '');
+  if (session.method === 'anonymous') {
+    const saved = readJson(localStorage, ANONYMOUS_KEY);
+    return saved?.pubkey === session.pubkey && saved?.expiresAt > Date.now() && /^[0-9a-f]{64}$/.test(saved.secret || '');
+  }
   if (session.method === 'bunker') {
     if (bunkerSigner) return true;
     const saved = readJson(localStorage, BUNKER_KEY);
@@ -176,15 +208,32 @@ export async function signNostrEvent(template, context = null) {
     beginAmberSigning(template, context);
     return null;
   }
+  if (session.method === 'anonymous') {
+    const saved = readJson(localStorage, ANONYMOUS_KEY);
+    if (!saved || saved.pubkey !== session.pubkey || saved.expiresAt <= Date.now()) throw new Error('This temporary identity has expired. Create a new anonymous identity.');
+    const secret = parseSecret(saved.secret);
+    try { return tools().finalizeEvent(template, secret); } finally { secret.fill(0); }
+  }
   throw new Error('This signer is not supported.');
 }
 
 export function logoutNostr() {
+  const session = readJson(localStorage, SESSION_KEY);
   privateSecret?.fill?.(0);
   privateSecret = null;
   bunkerSigner?.close?.().catch(() => {});
   bunkerSigner = null;
+  if (session?.method === 'anonymous') {
+    localStorage.removeItem(ANONYMOUS_KEY);
+    const previous = readJson(localStorage, PREVIOUS_SESSION_KEY);
+    localStorage.removeItem(PREVIOUS_SESSION_KEY);
+    if (previous?.pubkey && previous?.method) localStorage.setItem(SESSION_KEY, JSON.stringify(previous));
+    else localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: previous || null}));
+    return;
+  }
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(BUNKER_KEY);
+  localStorage.removeItem(PREVIOUS_SESSION_KEY);
   window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: null}));
 }

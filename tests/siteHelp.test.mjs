@@ -34,6 +34,13 @@ test('home resolves with and without an explicit filename', () => {
     assert.deepEqual(helpForPath('/index.html'), PAGE_HELP['/index.html']);
 });
 
+test('sticky notes help explains its signed Nostr layout without backend details', () => {
+    const help = PAGE_HELP['/stickyNotes.html'];
+    const copy = [help.description, ...(help.details || [])].join(' ');
+    for (const term of ['Nostr event', 'signer', 'public key', 'coordinates', 'deletion event']) assert.match(copy, new RegExp(term, 'i'));
+    assert.doesNotMatch(copy, /API|payment server|write policy|attestation/i);
+});
+
 test('top controls are document-positioned and share one horizontal center line', () => {
     assert.match(siteHelpSource, /document\.body\.append\(trigger, companion\)/);
     assert.match(siteHelpSource, /trigger\.parentElement !== document\.body/);

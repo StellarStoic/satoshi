@@ -21,25 +21,35 @@
   <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
 
   <main class="sticky-shell">
-    <header class="sticky-header">
-      <div><h1>Sticky notes</h1><p>21 sats, or 11 with a satoshi.si NIP-05.</p></div>
-      <div class="sticky-account-actions">
-        <button type="button" id="nostrAccount" class="icon-text-button"><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in</span></button>
-        <button type="button" id="newSticky" class="primary-action" hidden><i class="lni lni-plus" aria-hidden="true"></i><span>New note</span></button>
-      </div>
-    </header>
+    <h1 class="sticky-page-title">Nostr sticky notes</h1>
+    <div class="sticky-top-actions" aria-label="Sticky note controls">
+      <button type="button" id="openStickyBoard" class="sticky-top-button" aria-label="Choose corkboard" title="Choose corkboard"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
+      <button type="button" id="newSticky" class="sticky-top-button" aria-label="New note" title="New note"><i class="lni lni-plus" aria-hidden="true"></i></button>
+      <button type="button" id="nostrAccount" class="sticky-top-button" aria-label="Log in to Nostr" title="Log in to Nostr"><i class="lni lni-gear-1" aria-hidden="true"></i></button>
+    </div>
 
-    <section id="stickyBoard" class="sticky-board" aria-label="Public Nostr sticky note board">
+    <section id="stickyBoard" class="sticky-board" aria-label="Geohash Nostr sticky note board">
       <div id="stickyCanvas" class="sticky-canvas"></div>
       <div class="board-status" id="boardStatus" role="status" aria-live="polite">Opening the board...</div>
     </section>
     <div class="board-controls" aria-label="Board view controls">
-      <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><i class="lni lni-minus" aria-hidden="true"></i></button>
-      <output id="zoomLevel" aria-live="polite">60%</output>
-      <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in"><i class="lni lni-plus" aria-hidden="true"></i></button>
-      <button type="button" id="zoomFit" aria-label="Fit board" title="Fit board"><i class="lni lni-frame-expand" aria-hidden="true"></i></button>
+      <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><i class="lni lni-search-minus" aria-hidden="true"></i></button>
+      <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in"><i class="lni lni-search-plus" aria-hidden="true"></i></button>
+      <button type="button" id="zoomFit" aria-label="Fit board" title="Fit board"><i class="lni lni-expand-square-4" aria-hidden="true"></i></button>
     </div>
   </main>
+
+  <dialog id="boardDialog" class="sticky-dialog" aria-labelledby="boardDialogTitle">
+    <form id="boardChooser" class="dialog-inner board-chooser">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="boardDialogTitle">Choose a corkboard</h2>
+      <p>Enter the geohash shared by your group or workplace. A longer code covers a smaller area; 9 characters is precise enough for a building.</p>
+      <label for="boardGeohash">Geohash</label>
+      <input id="boardGeohash" type="text" maxlength="12" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y1">
+      <div class="board-chooser__actions"><button type="submit" class="primary-action">Open board</button></div>
+      <div id="boardChooserStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </form>
+  </dialog>
 
   <dialog id="loginDialog" class="sticky-dialog" aria-labelledby="loginTitle">
     <div class="dialog-inner">
@@ -49,6 +59,7 @@
       <div class="login-methods">
         <button type="button" data-login="extension"><i class="lni lni-extension" aria-hidden="true"></i><span>Browser extension</span></button>
         <button type="button" data-login="amber"><i class="lni lni-mobile" aria-hidden="true"></i><span>Amber</span></button>
+        <button type="button" class="anonymous-login" data-login="anonymous"><i class="lni lni-user-4" aria-hidden="true"></i><span>Post anonymously · 42 sats</span></button>
       </div>
       <label class="login-field"><span>Bunker</span><input id="bunkerInput" type="text" inputmode="url" autocomplete="off" placeholder="bunker://..."><button type="button" data-login="bunker">Connect</button></label>
       <details class="private-key-login">
@@ -64,8 +75,13 @@
     <div class="dialog-inner account-card">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="accountTitle">Nostr account</h2>
-      <strong id="accountName"></strong><code id="accountNpub"></code><span id="accountMethod"></span>
-      <button type="button" id="logoutNostr" class="secondary-action">Log out</button>
+      <div class="account-identity">
+        <img id="accountPicture" alt="" hidden>
+        <div><strong id="accountName"></strong><span id="accountNip05" hidden></span></div>
+      </div>
+      <code id="accountNpub"></code><span id="accountMethod"></span>
+      <span id="anonymousExpiry" class="anonymous-expiry" hidden></span>
+      <button type="button" id="logoutNostr" class="secondary-action"><span>Log out</span></button>
     </div>
   </dialog>
 

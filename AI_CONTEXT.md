@@ -361,17 +361,19 @@ Use the selected page section to answer questions such as "What does this button
 
 ### Page: [Nostr Sticky Notes]
 - **URL**: /stickyNotes.html
-- **Purpose**: A public cardboard board for short, paid, signed Nostr notes.
+- **Purpose**: A public corkboard for short, paid, signed Nostr notes.
 - **Key Elements**:
-    - **Nostr account (`#nostrAccount`)**: Log in with a browser extension, Amber on Android, a NIP-46 bunker, or a private key used only in memory. The public identity and signer choice persist in this browser; raw private keys are never saved.
+    - **Nostr account (`#nostrAccount`)**: Log in with a browser extension, Amber on Android, a NIP-46 bunker, or a private key used only in memory. Signed-in profiles show their name, NIP-05 and profile picture when available.
+    - **Anonymous identity (`[data-login="anonymous"]`)**: Generates a random Nostr signing key locally for a 42-sat anonymous post. The key is stored only in this browser and the account dialog shows its 24-hour countdown. Local signing stops at expiry; the saved key is removed while the page is running or on the next visit. The identity cannot be recovered afterward, but its published notes remain public.
     - **Board (`#stickyBoard`)**: A full-screen, pannable cork board with zoom in, zoom out, and fit controls. Notes may overlap.
+    - **Geohash board (`#openStickyBoard`, `#boardDialog`)**: A lowercase geohash is required before any notes load. A note carries an indexed `g` tag and NIP-73 `geo:` identifier, and appears in this interface only in the exact matching board view. The selection is stored locally. Geohashes organize public events and do not make them private.
     - **Note editor (`#stickyEditor`)**: Write from the vertical center of the paper. The text grows upward and downward, and the visible paper is the limit, up to 501 characters.
     - **Color and font (`#colorSwatches`, `#noteFont`)**: Choose the paper color and a Bunny-hosted Special Elite, Roboto Mono, Caveat, or Lora font before payment. Each font button previews its own typeface.
-    - **Pay (`#payForSticky`)**: Creates a 21-sat BTCPay invoice, or an 11-sat member invoice when the signed-in pubkey owns an active satoshi.si NIP-05 name. The payment service decides eligibility and price. Payment unlocks placement; it does not publish immediately.
-    - **Placement (`#placementControls`)**: Drag the paid note into position. Tilt with the arrow controls, Shift-drag, or Shift plus an arrow key.
-    - **Pin (`#pinSticky`)**: Signs the final text, color, position, and rotation, then asks the payment service to publish the kind-1 event to `wss://nostr.satoshi.si`.
+    - **Pay (`#payForSticky`)**: Creates a 21-sat invoice, an 11-sat member invoice when the signed-in pubkey owns an active satoshi.si NIP-05 name, or a 42-sat anonymous invoice. The payment service decides eligibility and price. Payment unlocks placement; it does not publish immediately.
+    - **Placement (`#placementControls`)**: Drag the paid note into position. On touch screens, one finger moves it and two fingers rotate it. Desktop users can also use the arrow controls, Shift-drag, or Shift plus an arrow key.
+    - **Pin (`#pinSticky`)**: Signs the final text, color, position, rotation, identity mode, and required geohash, then asks the payment service to publish the kind-1 event to `wss://nostr.satoshi.si`. Newer notes are layered above older notes.
     - **Published pin menu (`#noteMenu`)**: Shows the event ID and posting time and can copy the ID. The author can pay 21 sats, or the 11-sat NIP-05 member price, to sign and publish a kind-5 removal request.
-    - **Privacy and safety**: Notes are public. The payment service receives a note fingerprint and public key before payment, then the already signed public event. It never receives a private key.
+    - **Privacy and safety**: Notes are public. The payment service receives a note fingerprint and public key before payment, then the already signed public event. It never receives a private key. The temporary anonymous key is a local browser credential, not a cryptographically expiring Nostr key.
     - **[Ignore unless specifically asked for]**: Footer content.
 
 ### Page: [Cost of Living in Bitcoin]
