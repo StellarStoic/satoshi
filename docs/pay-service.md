@@ -209,9 +209,13 @@ fix the problem and retry with the same token:
 | 400  | `future_event`        | timestamp too far ahead                                     |
 | 400  | `wrong_kind`          | pin must be kind 1, removal kind 5                          |
 | 400  | `too_long`            | content over 501 characters                                 |
-| 400  | `bad_marker`          | missing or duplicated sticky marker                         |
-| 400  | `bad_style`           | style not in the allowed list                               |
-| 400  | `bad_placement`       | `pos` not two integers, or outside the board                |
+| 400  | `bad_marker`          | missing, duplicated or wrong `["t","satoshi-sticky"]` tag    |
+| 400  | `bad_sticky_tag`      | missing the `["sticky","v1",…]` tag, or an unknown version   |
+| 400  | `bad_color`           | color not in the allowed list                               |
+| 400  | `bad_font`            | font not in the allowed list                                |
+| 400  | `bad_placement`       | x/y not two fractions between 0 and 1                       |
+| 400  | `bad_rotation`        | rotation outside -12 through 12 degrees                     |
+| 400  | `empty_note`          | the note carries no text                                    |
 | 400  | `fingerprint_mismatch`| the note does not hash to the commitment that was paid      |
 | 400  | `wrong_target`        | the deletion does not reference the paid `targetEventId`     |
 | 400  | `target_missing` / `target_not_owned` / `target_mismatch` | as above    |
@@ -222,14 +226,14 @@ settlement the buyer's key is not yet in the relay's whitelist, so a *paid* orde
 only one that can publish (see below). A 502 from a paid order is worth retrying and, if it
 persists, showing the relay's message.
 
-## The commitment (what the 21 sats buy)
+## The commitment (what the order buys)
 
 `contentHash` is the fingerprint of the note text and appearance bought by the order.
 Placement happens after payment, so it is deliberately not part of this commitment:
 
 ```js
 async function stickyFingerprint(content, color, font) {
-  const payload = `v1\n${color}\n${font}\n${content.trim()}`;
+  const payload = `v1\n${color}\n${font}\n${normaliseStickyText(content)}`;
   const bytes = new TextEncoder().encode(payload);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
