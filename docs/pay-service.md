@@ -349,3 +349,44 @@ GET  /sticky/v1/config                 price, styles, bounds, 501-char limit, co
 
 `GET /sticky/v1/config` is the public one: a frontend should read the styles, the board
 bounds and the character limit from it rather than keeping its own copy.
+
+
+## Refusal codes you will actually see (pin orders and publication)
+
+| Code | Where | Means |
+| --- | --- | --- |
+| `bad_geohash` | `POST /orders` 400 | a pin without a geohash, or a geohash outside `[0123456789bcdefghjkmnpqrstuvwxyz]`, length 1–12, lowercase. A `remove` that sends one is refused the same way. |
+| `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean, or was sent for a `remove`. |
+| `geohash_mismatch` | `publish` 400 | the note does not carry exactly `["g", <order geohash>]`, `["i", "geo:<order geohash>"]` and `["k", "geo"]`. Missing, duplicated, or a different cell — all the same refusal, because the note would otherwise land in a cell nobody paid for. |
+| `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
+| `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
+
+The client tag is enforced, not decorative: exactly one `["client","satoshi.si"]` per pin, so a note
+that reached the relay some other way can be told apart. Removals stay geohash-free — a NIP-09
+deletion has no place on the board, so there is nothing to bind.
+
+`GET /sticky/v1/config` additionally publishes `anonymousSats: 42`, the geohash rules
+(`requiredForPin`, `alphabet`, `minLength`, `maxLength`, the three tag names) and the tag map
+(`clientValue`, `anonymousTagValue`), so a frontend never keeps its own copy of any of it.
+
+## Relay write access — how it is actually enforced
+
+The relay does not keep a list of who may write. It asks an admission gate about every event it is
+offered, and the gate is the only thing that decides.
+
+* **`satoshi-admit`** (systemd unit on the VPS, `/opt/satoshi-admit/admit.mjs`, loopback only):
+  answers `nauthz.Authorization/EventAdmit` on `127.0.0.1:7791` and takes registrations on
+  `127.0.0.1:7792` with a bearer token. It permits exactly two things: an author on the
+  satoshi.si NIP-05 key list, or **one event id** that the payment desk registered after the event
+  passed every rule above. A grant is spent by the first write that uses it and expires after 15
+  minutes; registering one does not make the key able to write anything else.
+* **The relay's own `pubkey_whitelist` is absent on purpose.** With `pay_to_relay` off, the relay
+  checks its own list *before* it consults the gate, so a whitelist there would make the gate
+  unreachable for every key not already on it — including a paid anonymous pin. The key list lives
+  in `/etc/satoshi-admit-whitelist.toml`, written by `nostr_whitelist_sync.py` from `nostr.json`.
+* **It fails closed.** If the gate cannot answer, the relay refuses the event
+  (`blocked: admission service unavailable`) rather than admitting it ungated.
+
+Consequences worth stating plainly: a buyer's key never joins any list, a throwaway anonymous key
+never joins any list, and a paid note is admissible only from the moment the desk registers it until
+the first write that uses that registration.
