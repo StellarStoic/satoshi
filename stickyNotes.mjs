@@ -14,6 +14,7 @@ import {
   geohashBounds,
   geohashNeighbours,
   clampBoardView,
+  pinColourFor,
   geohashSetIssue,
   geohashTouches,
   GEOHASH_MAX_CELLS,
@@ -1081,6 +1082,15 @@ function renderNote(sticky, event = null, temporary = false) {
     pin.setAttribute('role', 'button');
     pin.tabIndex = 0;
     pin.setAttribute('aria-label', 'Open note details');
+    // A picture holds the note down. The colour comes from the note's own event id, so it is
+    // random between notes and identical every time this note is drawn; the button keeps the
+    // note menu reachable, exactly as the painted dot did.
+    const pinArt = document.createElement('img');
+    pinArt.className = 'sticky-note__pin-art';
+    pinArt.alt = '';
+    pinArt.decoding = 'async';
+    pinArt.src = `/img/pin_${pinColourFor(sticky.id || `${sticky.pubkey}:${sticky.createdAt}`)}.png`;
+    pin.appendChild(pinArt);
     pin.addEventListener('click', click => { click.stopPropagation(); openNoteMenu(sticky.id, pin); });
     pin.addEventListener('keydown', key => {
       if (key.key === 'Enter' || key.key === ' ') { key.preventDefault(); openNoteMenu(sticky.id, pin); }

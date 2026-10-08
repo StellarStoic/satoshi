@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, pinColourFor,
   geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
@@ -904,4 +904,58 @@ test('a note may be pinned as crooked as 75 degrees, and no further', () => {
   // nonsense is still upright
   assert.equal(clampRotation('sideways'), 0);
   assert.equal(clampRotation(undefined), 0);
+});
+
+test('every note is held down by a pin whose colour comes from the note itself', () => {
+  assert.deepEqual([...STICKY_PIN_COLOURS],
+    ['red', 'blue', 'yellow', 'green', 'white', 'purple', 'magenta', 'black']);
+
+  // the same note always gets the same pin, and it is always a real pin
+  const id = 'b1f2'.padEnd(64, 'a');
+  assert.equal(pinColourFor(id), pinColourFor(id));
+  assert.ok(STICKY_PIN_COLOURS.includes(pinColourFor(id)));
+
+  // a note id is a sha256 and its own bytes decide: eight ids differing in the last bytes
+  // must cover all eight pins exactly, which is what a board of notes sees
+  const lead = 'a'.repeat(56);
+  const byId = new Set();
+  for (let tail = 0; tail < 8; tail += 1) {
+    byId.add(pinColourFor(`${lead}${tail.toString(16).padStart(8, '0')}`));
+  }
+  assert.equal(byId.size, STICKY_PIN_COLOURS.length, `ids reached only ${byId.size} of 8 pins`);
+
+  // a seed that is not an id (the pubkey and time fallback) still spreads
+  const seen = new Set();
+  for (let index = 0; index < 200; index += 1) {
+    seen.add(pinColourFor(`note-${index}`));
+  }
+  assert.equal(seen.size, STICKY_PIN_COLOURS.length, `fallback seeds reached only ${seen.size} of 8 pins`);
+
+  // a note with nothing usable as a seed still gets a pin
+  assert.ok(STICKY_PIN_COLOURS.includes(pinColourFor(undefined)));
+  assert.ok(STICKY_PIN_COLOURS.includes(pinColourFor('')));
+});
+
+test('the note is held down by a picture, and an installed board still has its pins', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  const worker = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
+
+  assert.match(page, /pinArt\.src = `\/img\/pin_\$\{pinColourFor\(/);
+  assert.match(page, /pinArt\.className = 'sticky-note__pin-art'/);
+  assert.match(page, /pinArt\.alt = ''/);
+  assert.match(page, /pin\.appendChild\(pinArt\)/);
+  // the pin image must not swallow clicks: the button around it is the way into the menu
+  assert.match(page, /aria-label', 'Open note details'/);
+  assert.match(css, /\.sticky-note__pin-art \{[^}]*pointer-events: none/);
+
+  // the painted red dot is gone
+  assert.doesNotMatch(css, /#c32920/);
+  // the sprite sits inside the note, which clips what is inside it
+  assert.match(css, /\.sticky-note__pin \{[^}]*overflow: visible/);
+
+  // every sprite is precached, or an installed board shows notes with no pins
+  for (const colour of STICKY_PIN_COLOURS) {
+    assert.match(worker, new RegExp(`/img/pin_${colour}\\.png'`));
+  }
 });
