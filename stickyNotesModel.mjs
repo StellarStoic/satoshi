@@ -26,6 +26,32 @@ export const STICKY_KNOWN_PRICES = Object.freeze([
 ]);
 export const STICKY_MAX_CHARACTERS = 501;
 export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', 'orange']);
+
+// The pins that hold a note down, and which one holds which note. The colour is taken from the
+// note's own event id, so it looks random between notes while staying fixed for a given note:
+// it survives a reload, and every reader of a board sees the same pins. Nothing about the
+// colour travels in the note itself.
+export const STICKY_PIN_COLOURS = Object.freeze(['red', 'blue', 'yellow', 'green', 'white', 'purple', 'magenta', 'black']);
+
+const NOTE_ID_PATTERN = /^[0-9a-f]{64}$/i;
+
+export function pinColourFor(seed) {
+  const text = String(seed ?? '');
+  // A note's id is already a sha256, and its bytes are uniform, so they are used directly:
+  // hashing a hash again only mixes it worse, and three ordinary notes were seen landing on
+  // one colour that way. Anything else (the fallback seed) is hashed first.
+  let value;
+  if (NOTE_ID_PATTERN.test(text)) {
+    value = parseInt(text.slice(-8), 16);
+  } else {
+    value = 2166136261;                  // FNV-1a
+    for (let index = 0; index < text.length; index += 1) {
+      value = Math.imul(value ^ text.charCodeAt(index), 16777619) >>> 0;
+    }
+  }
+  return STICKY_PIN_COLOURS[value % STICKY_PIN_COLOURS.length];
+}
+
 export const STICKY_FONTS = Object.freeze([
   'typewriter', 'handwritten', 'patrick-hand', 'kalam', 'comfortaa',
   'noto-sans', 'noto-serif', 'noto-mono', 'roboto', 'mono', 'roboto-slab',
