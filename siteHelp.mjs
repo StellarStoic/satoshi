@@ -106,7 +106,9 @@ export const PAGE_HELP = Object.freeze({
                     + ' moment has already passed by the time it is published, because the relay drops an event that'
                     + ' arrives expired. The relay never serves an expired event, and a cleanup deletes expired events'
                     + ' from its store every ten minutes. A removal carries no expiration on purpose: an expiring'
-                    + ' deletion would be deleted itself, and the note it removed would come back.',
+                    + ' deletion would be deleted itself, and the note it removed would come back. A note on the'
+                    + ' relay that names no expiration at all is not drawn either: this board shows only notes that'
+                    + ' say when they go, so a note written past the desk is invisible here rather than permanent.',
                     'Mentions follow NIP-27 and are the reason a tag means something. Typing @ offers the names the'
                     + ' board can resolve — the satoshi.si store it is served from, or any name@domain it asks directly —'
                     + ' and only a key that answers with a NIP-05 name can be picked. What travels is the canonical form:'

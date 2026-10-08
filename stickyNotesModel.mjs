@@ -624,9 +624,12 @@ export function parseStickyEvent(event) {
   const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
   const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
-  // Older notes on the relay carry no expiration tag at all; they are read as
-  // notes that do not expire rather than discarded.
+  // A note that names no moment is not a note this board shows. Every note is
+  // temporary (NIP-40), so one without an expiration tag is either older than the
+  // rule or written past the desk — either way it would sit on the relay forever,
+  // which is the one thing this board does not publish. Ignored on the way in.
   const expires = Number(event.tags.find(tag => tag?.[0] === EXPIRATION_TAG)?.[1]);
+  if (!Number.isFinite(expires) || expires <= 0) return null;
   return {
     id: event.id,
     pubkey: event.pubkey,

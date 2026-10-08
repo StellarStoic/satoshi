@@ -485,7 +485,7 @@ test('every note carries exactly one expiration tag, in unix seconds', () => {
     geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long the note should live/);
 });
 
-test('a note reads its expiration back, and a note published before this still reads', () => {
+test('a note reads its expiration back, and one that names none is not drawn', () => {
   const createdAt = 1700000000;
   const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
     geohash: TEST_GEOHASH, liveliness: '1w', createdAt});
@@ -495,12 +495,16 @@ test('a note reads its expiration back, and a note published before this still r
   assert.equal(isStickyExpired(parsed, createdAt + 7 * 86400), true, 'the moment it names is the end of it');
   assert.equal(isStickyExpired(parsed, createdAt + 8 * 86400), true);
 
-  // a note from before liveliness existed carries no tag and never expires
-  const {expiration, ...templateWithout} = template;
-  const old = parseStickyEvent({...templateWithout, tags: template.tags.filter(tag => tag[0] !== 'expiration'),
-    id: 'c'.repeat(64), pubkey: 'b'.repeat(64)});
-  assert.equal(old.expiration, null);
-  assert.equal(isStickyExpired(old, 1700000000 + 10 * 365 * 86400), false);
+  // A note with no expiration tag at all — older than the rule, or written past
+  // the desk — would sit on the relay forever, so the board does not read it.
+  const withoutExpiration = {...template,
+    tags: template.tags.filter(tag => tag[0] !== 'expiration'),
+    id: 'c'.repeat(64), pubkey: 'b'.repeat(64)};
+  assert.equal(parseStickyEvent(withoutExpiration), null, 'no moment, no note');
+  assert.equal(parseStickyEvent({...withoutExpiration, tags: [...withoutExpiration.tags, ['expiration', '0']]}), null,
+    'a zero is not a moment either');
+  assert.equal(parseStickyEvent({...withoutExpiration, tags: [...withoutExpiration.tags, ['expiration', 'soon']]}), null,
+    'and neither is a word');
   assert.equal(isStickyExpired(null), false, 'a missing note is not an expired one');
 });
 
@@ -587,7 +591,7 @@ test('a note read off the relay carries the people it tags', () => {
   const event = {kind: 1, id: 'a'.repeat(64), pubkey: BOB, created_at: 1000,
     content: `hi nostr:${ALICE_NPUB}`,
     tags: [['t', 'satoshi-sticky'], ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
-      ['g', TEST_GEOHASH], [MENTION_TAG, ALICE], [MENTION_TAG, 'nonsense']]};
+      ['g', TEST_GEOHASH], ['expiration', '1794044775'], [MENTION_TAG, ALICE], [MENTION_TAG, 'nonsense']]};
   const sticky = parseStickyEvent(event);
   assert.deepEqual(sticky.mentions, [ALICE]);
   assert.equal(noteMentions(sticky, ALICE), true);
