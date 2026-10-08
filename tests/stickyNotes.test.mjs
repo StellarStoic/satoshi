@@ -692,3 +692,58 @@ test('a note tags people by @, and the wire form is the whole npub', async () =>
   assert.match(script, /noteMentions\(sticky, key\)/);
   assert.match(css, /sticky-note--filtered-out\s*\{\s*display:\s*none/);
 });
+
+test('the board can start from where the reader is', async () => {
+  const [html, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  // the control and the four sizes it offers
+  assert.match(html, /id="shareArea"/);
+  assert.match(html, /id="areaDialog"/);
+  assert.match(html, /id="areaStatus"[^>]*aria-live="polite"/);
+  assert.match(script, /const AREA_SCALES = \[8, 7, 5, 4\]/);
+  const offered = [...html.matchAll(/data-area-precision="(\d+)"/g)].map(match => match[1]);
+  assert.deepEqual(offered, ['8', '7', '5', '4'], 'the markup offers exactly the sizes the script lists');
+  for (const label of ['Building', 'Street', 'City', 'State']) assert.match(html, new RegExp(`>${label}<`));
+  // every size is a depth the board accepts: shorter than four is a region, not a place
+  for (const precision of offered) {
+    assert.ok(Number(precision) >= 4 && Number(precision) <= 9, `${precision} is a board depth`);
+  }
+  // the position is read from the device, used in the page, and never sent
+  assert.match(script, /navigator\.geolocation\.getCurrentPosition/);
+  assert.match(script, /encodeGeohash\(coords\.latitude, coords\.longitude, precision\)/);
+  assert.match(script, /selectBoard\(cell\)/);
+  assert.match(script, /enableHighAccuracy: precision >= 7/);
+  assert.match(html, /turned into a geohash here and never sent to satoshi\.si/);
+  // every way it can fail says what to do instead
+  for (const code of [1, 2, 3]) assert.match(script, new RegExp(`code === ${code}`));
+  assert.match(script, /has no location support/);
+  assert.match(script, /Pin the current note before changing corkboards/);
+  // a vague fix is not presented as a certain cell, and the comparison is in metres:
+  // geohashCellDimensions() answers in degrees, which is what made every size read "0 m"
+  assert.match(script, /coords\.accuracy <= geohashCellHeightMetres\(precision\)/);
+  assert.match(script, /const DEGREE_METRES = 111320/);
+  assert.match(script, /geohashCellDimensions\(precision\)\.height \* DEGREE_METRES/);
+  assert.match(script, /may be the cell next door/);
+  assert.match(css, /\.area-scale\b/);
+});
+
+test('the four "around me" sizes really are a building, a street, a city and a state', () => {
+  // The page quotes a cell's height in metres. Measure the depths it offers through the
+  // model's own bounds instead of trusting the page's arithmetic: at Ljubljana's latitude
+  // the four choices must land on the scales they are named after.
+  const heights = [8, 7, 5, 4].map(precision => {
+    const cell = encodeGeohash(46.0569, 14.5058, precision);
+    const {south, north} = geohashBounds(cell);
+    return (north - south) * 111320;
+  });
+  const [building, street, city, state] = heights;
+  assert.ok(building >= 15 && building <= 25, `a building-sized cell is about 19 m, got ${Math.round(building)}`);
+  assert.ok(street >= 120 && street <= 190, `a street-sized cell is about 153 m, got ${Math.round(street)}`);
+  assert.ok(city >= 4000 && city <= 6000, `a city-sized cell is about 4.9 km, got ${Math.round(city)}`);
+  assert.ok(state >= 15000 && state <= 25000, `a state-sized cell is about 20 km, got ${Math.round(state)}`);
+  // and each one is a depth the board accepts
+  for (const precision of [8, 7, 5, 4]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
+});

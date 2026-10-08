@@ -75,6 +75,9 @@ const elements = {
   geohashMapStatus: document.getElementById('geohashMapStatus'), clearGeohashSelection: document.getElementById('clearGeohashSelection'),
   useGeohashSelection: document.getElementById('useGeohashSelection'),
   boardChooserStatus: document.getElementById('boardChooserStatus'),
+  shareArea: document.getElementById('shareArea'), areaDialog: document.getElementById('areaDialog'),
+  areaStatus: document.getElementById('areaStatus'),
+  areaScaleList: document.getElementById('areaScaleList'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
   accountNpub: document.getElementById('accountNpub'), accountMethod: document.getElementById('accountMethod'),
@@ -2277,6 +2280,109 @@ elements.rememberBoard.addEventListener('change', () => {
   updateBoardUrl();
   status(elements.boardChooserStatus, rememberBoard ? 'This board will open on your next visit.' : 'This board will not be remembered.');
 });
+
+// "Show notes around me": the browser's own position, turned into a geohash in the
+// page. A geohash board is only as useful as the depth it is read at, so the reader
+// picks how much ground to cover instead of being handed one guess. The coordinate
+// is never sent anywhere: what the board asks the relay for is the geohash it became.
+const AREA_SCALES = [8, 7, 5, 4];
+// geohashCellDimensions() answers in degrees; a reader thinks in metres. A degree of
+// latitude is within half a percent of this everywhere, which is what makes a cell's
+// height the honest size to quote (its width narrows towards the poles).
+const DEGREE_METRES = 111320;
+
+function geohashCellHeightMetres(precision) {
+  return geohashCellDimensions(precision).height * DEGREE_METRES;
+}
+
+function areaSizeLabel(precision) {
+  const metres = geohashCellHeightMetres(precision);
+  return metres >= 1000 ? `about ${Math.round(metres / 1000)} km` : `about ${Math.round(metres)} m`;
+}
+
+function areaScaleButtons() {
+  return [...elements.areaScaleList.querySelectorAll('[data-area-precision]')];
+}
+
+function renderAreaScales() {
+  // The sizes come from AREA_SCALES, and a test pins the markup's four buttons to the
+  // same list, so the two cannot drift into offering a size that is not listed.
+  const sizes = new Map(AREA_SCALES.map(precision => [String(precision), areaSizeLabel(precision)]));
+  for (const button of areaScaleButtons()) {
+    const size = button.querySelector('[data-area-size]');
+    if (size) size.textContent = sizes.get(button.dataset.areaPrecision) || '';
+  }
+}
+
+function geolocationTrouble(error) {
+  const code = error && error.code;
+  if (code === 1) return 'Your browser refused the location. You can still pick the cell on the map, or type the geohash.';
+  if (code === 2) return 'Your device could not work out where it is just now. Try again, or pick the cell on the map.';
+  if (code === 3) return 'Finding your location took too long. Try again, or pick the cell on the map.';
+  return 'Could not get a location from this browser. You can still pick the cell on the map.';
+}
+
+function readPosition(precision) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      // A building or a street needs the device's best effort; a city or a state does
+      // not, and the coarser answer is quicker and kinder to the battery.
+      enableHighAccuracy: precision >= 7,
+      timeout: 12000,
+      maximumAge: 30000,
+    });
+  });
+}
+
+async function showNotesAroundMe(precision) {
+  if (placingNote) {
+    status(elements.areaStatus, 'Pin the current note before changing corkboards.', true);
+    return;
+  }
+  if (!navigator.geolocation) {
+    status(elements.areaStatus, 'This browser has no location support. You can still pick the cell on the map.', true);
+    return;
+  }
+  const controls = [elements.shareArea, ...areaScaleButtons()];
+  for (const control of controls) control.disabled = true;
+  status(elements.areaStatus, 'Finding where you are...');
+  try {
+    const {coords} = await readPosition(precision);
+    const cell = encodeGeohash(coords.latitude, coords.longitude, precision);
+    elements.areaDialog.close();
+    selectBoard(cell);
+    // Say it in the reader's own terms, and say when the device was too vague for the
+    // size they chose: a ±40 m fix cannot tell one building-sized cell from its neighbour.
+    const certain = !coords.accuracy || coords.accuracy <= geohashCellHeightMetres(precision);
+    // The board's own status line is transient — the relay's answer replaces it within a
+    // second — so the caveat goes where it will still be readable later, too.
+    if (!certain) {
+      status(elements.boardChooserStatus,
+        `Your device was only accurate to ±${Math.round(coords.accuracy)} m, so ${cell} may be the cell next door.`);
+    }
+    status(elements.boardStatus, certain
+      ? `Notes around you: ${cell}, ${areaSizeLabel(precision)} across.`
+      : `Notes around you: ${cell}, ${areaSizeLabel(precision)} across — your device was only accurate to `
+        + `±${Math.round(coords.accuracy)} m, so this may be the cell next door.`,
+      !certain);
+  } catch (error) {
+    status(elements.areaStatus, geolocationTrouble(error), true);
+  } finally {
+    for (const control of controls) control.disabled = false;
+  }
+}
+
+function openAreaDialog() {
+  status(elements.areaStatus, '');
+  showDialog(elements.areaDialog);
+}
+
+elements.shareArea.addEventListener('click', openAreaDialog);
+for (const button of areaScaleButtons()) {
+  button.addEventListener('click', () => { showNotesAroundMe(Number.parseInt(button.dataset.areaPrecision, 10)); });
+}
+renderAreaScales();
+
 elements.shareBoard.addEventListener('click', async () => {
   const typed = geohashCellsFrom(elements.boardGeohash.value);
   const cells = typed.length ? typed : activeGeohashes;
