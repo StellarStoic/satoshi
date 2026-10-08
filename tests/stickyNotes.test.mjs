@@ -238,3 +238,28 @@ test('anonymous posting and signed-in profile details are present', async () => 
   assert.match(session, /generateSecretKey\(\)/);
   assert.match(session, /localStorage\.removeItem\(ANONYMOUS_KEY\)/);
 });
+
+test('dragging a paid note onto the bin asks before discarding it', async () => {
+  const [html, css, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  // a red bin, hidden until a note is actually being placed
+  assert.match(html, /id="discardBin"[\s\S]{0,200}lni-trash-3/);
+  assert.match(html, /id="discardBin"[^>]*hidden/);
+  assert.match(css, /\.discard-bin \{[^}]*position: fixed/);
+  assert.match(css, /\.discard-bin\.is-armed/);
+  // the confirmation offers both answers and says the payment is not refunded
+  assert.match(html, /id="discardDialog"[\s\S]{0,1500}id="discardNoteConfirm"[\s\S]{0,400}id="discardNoteCancel"/);
+  assert.match(html, /Yes, discard/);
+  assert.match(html, /No, keep it/);
+  assert.match(html, /not refunded/);
+  // it appears with placement mode, arms under the pointer, and asks on drop
+  assert.match(script, /elements\.discardBin\.hidden = false/);
+  assert.match(script, /setBinArmed\(isOverBin\(event\.clientX, event\.clientY\)\)/);
+  assert.match(script, /if \(dropped\) openDiscardDialog\(origin\)/);
+  // yes drops the note and its pending, no puts it back where the drag started
+  assert.match(script, /function discardPendingNote[\s\S]{0,1200}savePending\(null\)/);
+  assert.match(script, /function keepDiscardedNote[\s\S]{0,400}setPlacement\(restore\)/);
+});

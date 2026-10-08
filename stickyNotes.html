@@ -158,6 +158,24 @@
     <button type="button" id="pinSticky" class="primary-action"><i class="lni lni-map-marker-1" aria-hidden="true"></i><span>Pin note</span></button>
   </div>
 
+  <button type="button" id="discardBin" class="discard-bin" hidden>
+    <i class="lni lni-trash-3" aria-hidden="true"></i>
+    <span>Drop here to discard</span>
+  </button>
+
+  <dialog id="discardDialog" class="sticky-dialog discard-dialog" aria-labelledby="discardTitle">
+    <div class="dialog-inner discard-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="discardTitle">Discard this note?</h2>
+      <p>It is not pinned yet. Discarding drops it — the note will never appear on this board.</p>
+      <p id="discardWarning" class="discard-warning" hidden>You already paid for it, and that payment is not refunded.</p>
+      <div class="discard-actions">
+        <button type="button" id="discardNoteConfirm" class="discard-confirm"><i class="lni lni-trash-3" aria-hidden="true"></i><span>Yes, discard</span></button>
+        <button type="button" id="discardNoteCancel" class="secondary-action"><span>No, keep it</span></button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Sticky note details">
     <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
     <span>Event ID</span><code id="noteEventId"></code>

@@ -64,6 +64,9 @@ const elements = {
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
+  discardBin: document.getElementById('discardBin'), discardDialog: document.getElementById('discardDialog'),
+  discardWarning: document.getElementById('discardWarning'), discardConfirm: document.getElementById('discardNoteConfirm'),
+  discardCancel: document.getElementById('discardNoteCancel'),
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
   paymentRails: document.getElementById('stickyPaymentRails'), paymentHint: document.getElementById('stickyPaymentHint'),
@@ -83,6 +86,7 @@ let selectedFont = 'typewriter';
 let lastValidEditor = '';
 let pending = readPending();
 let placingNote = null;
+let discardRestore = null;
 let paymentTimer = null;
 let boardSocket = null;
 let boardConnectionVersion = 0;
@@ -986,6 +990,8 @@ function beginPlacement() {
   savePending({...pending, placement});
   placingNote = renderNote({...pending, ...placement}, null, true);
   elements.placementControls.hidden = false;
+  elements.discardBin.hidden = false;
+  setBinArmed(false);
   elements.pin.disabled = false;
   elements.pin.querySelector('span').textContent = 'Pin note';
   installPlacementGestures(placingNote);
@@ -1007,6 +1013,8 @@ function setPlacement(next) {
 function installPlacementGestures(note) {
   const pointers = new Map();
   let gesture = null;
+  // Where the note sat before this drag, so a declined discard can put it back.
+  let dragOrigin = null;
 
   const point = event => ({x: event.clientX, y: event.clientY});
   const angleBetween = () => {
@@ -1025,8 +1033,10 @@ function installPlacementGestures(note) {
     pointers.set(event.pointerId, point(event));
     if (pointers.size === 1) {
       gesture = {id: event.pointerId, startX: event.clientX, startY: event.clientY, placement: {...currentPlacement()}, rotate: event.shiftKey};
+      dragOrigin = {...gesture.placement};
     } else if (pointers.size === 2) {
       gesture = {angle: angleBetween(), placement: {...currentPlacement()}, twoFinger: true};
+      dragOrigin = null;
     }
   });
   note.addEventListener('pointermove', event => {
@@ -1037,15 +1047,18 @@ function installPlacementGestures(note) {
       if (difference > 180) difference -= 360;
       if (difference < -180) difference += 360;
       setPlacement({...gesture.placement, rotation: gesture.placement.rotation + difference});
+      setBinArmed(false);
       return;
     }
     if (gesture.id !== event.pointerId) return;
     if (gesture.rotate || event.shiftKey) {
       setPlacement({...gesture.placement, rotation: gesture.placement.rotation + (event.clientX - gesture.startX) / 10});
+      setBinArmed(false);
     } else {
       setPlacement({...gesture.placement,
         x: gesture.placement.x + (event.clientX - gesture.startX) / (CANVAS_WIDTH * boardView.scale),
         y: gesture.placement.y + (event.clientY - gesture.startY) / (CANVAS_HEIGHT * boardView.scale)});
+      setBinArmed(isOverBin(event.clientX, event.clientY));
     }
   });
   const release = event => {
@@ -1053,8 +1066,16 @@ function installPlacementGestures(note) {
     if (pointers.size === 1) resetSinglePointer();
     else if (!pointers.size) gesture = null;
   };
-  note.addEventListener('pointerup', release);
-  note.addEventListener('pointercancel', release);
+  note.addEventListener('pointerup', event => {
+    const dropped = Boolean(dragOrigin) && Boolean(gesture) && !gesture.twoFinger && !gesture.rotate
+      && gesture.id === event.pointerId && isOverBin(event.clientX, event.clientY);
+    const origin = dragOrigin;
+    dragOrigin = null;
+    release(event);
+    setBinArmed(false);
+    if (dropped) openDiscardDialog(origin);
+  });
+  note.addEventListener('pointercancel', event => { dragOrigin = null; setBinArmed(false); release(event); });
   note.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault();
@@ -1068,6 +1089,63 @@ function installPlacementGestures(note) {
         y: placement.y + (event.key === 'ArrowUp' ? -.01 : event.key === 'ArrowDown' ? .01 : 0)});
     }
   });
+}
+
+function isOverBin(clientX, clientY) {
+  if (elements.discardBin.hidden) return false;
+  const rect = elements.discardBin.getBoundingClientRect();
+  const slack = 10;
+  return clientX >= rect.left - slack && clientX <= rect.right + slack
+    && clientY >= rect.top - slack && clientY <= rect.bottom + slack;
+}
+
+function setBinArmed(armed) {
+  const on = Boolean(armed);
+  elements.discardBin.classList.toggle('is-armed', on);
+  placingNote?.classList.toggle('sticky-note--doomed', on);
+}
+
+function openDiscardDialog(restore = null) {
+  discardRestore = restore ? {...restore} : {...currentPlacement()};
+  elements.discardWarning.hidden = pending?.status !== 'paid';
+  if (!elements.discardDialog.open) elements.discardDialog.showModal();
+  requestAnimationFrame(() => elements.discardCancel.focus());
+}
+
+function keepDiscardedNote() {
+  const restore = discardRestore;
+  discardRestore = null;
+  if (elements.discardDialog.open) elements.discardDialog.close();
+  setBinArmed(false);
+  if (restore) setPlacement(restore);
+  status(elements.boardStatus, 'Note kept. Pin it when you are ready.');
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 3000);
+}
+
+function discardPendingNote() {
+  const wasPaid = pending?.status === 'paid';
+  discardRestore = null;
+  setBinArmed(false);
+  placingNote?.remove();
+  placingNote = null;
+  elements.placementControls.hidden = true;
+  elements.discardBin.hidden = true;
+  elements.pin.disabled = false;
+  elements.pin.querySelector('span').textContent = 'Pin note';
+  // The note was never published, so there is nothing to sign or to undo on the relay;
+  // the order and any payment stay as they are on the payment service.
+  savePending(null);
+  if (elements.discardDialog.open) elements.discardDialog.close();
+  elements.editor.textContent = '';
+  lastValidEditor = '';
+  elements.pay.disabled = false;
+  updateCapacity();
+  status(elements.boardStatus, wasPaid
+    ? 'Note discarded. It was never pinned, and the sats you paid are not refunded.'
+    : 'Note discarded.');
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 4500);
 }
 
 async function publishPinnedNote(resumedEvent = null) {
@@ -1087,6 +1165,8 @@ async function publishPinnedNote(resumedEvent = null) {
     placingNote?.remove(); placingNote = null;
     if (sticky) renderNote(sticky, event);
     elements.placementControls.hidden = true;
+    setBinArmed(false);
+    elements.discardBin.hidden = true;
     savePending(null);
     elements.editor.textContent = '';
     lastValidEditor = '';
@@ -1403,6 +1483,11 @@ elements.placementControls.addEventListener('click', event => {
   if (rotate) setPlacement({...currentPlacement(), rotation: currentPlacement().rotation + Number(rotate.dataset.rotate)});
 });
 elements.pin.addEventListener('click', () => publishPinnedNote());
+elements.discardBin.addEventListener('click', () => openDiscardDialog());
+elements.discardConfirm.addEventListener('click', () => discardPendingNote());
+elements.discardCancel.addEventListener('click', () => keepDiscardedNote());
+// Closing with the X or Escape is a no: put the note back where the drag started.
+elements.discardDialog.addEventListener('close', () => { if (discardRestore) keepDiscardedNote(); });
 elements.zoomOut.addEventListener('click', () => setZoom(boardView.scale - .15));
 elements.zoomIn.addEventListener('click', () => setZoom(boardView.scale + .15));
 elements.zoomFit.addEventListener('click', fitBoard);
