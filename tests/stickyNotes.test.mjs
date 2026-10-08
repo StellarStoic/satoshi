@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_MEMBER_PRICE_SATS, STICKY_PRICE_SATS, makeDeletionTemplate, makeStickyTemplate, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from '../stickyNotesModel.mjs';
+import {STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_MEMBER_PRICE_SATS, STICKY_PRICE_SATS, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashPrecisionForZoom, geohashPrefixes, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -11,14 +11,14 @@ test('sticky notes accept up to 501 characters', () => {
 });
 
 test('uses the authoritative whole-satoshi order price', () => {
-  assert.equal(STICKY_PRICE_SATS, 21);
-  assert.equal(STICKY_MEMBER_PRICE_SATS, 11);
+  assert.equal(STICKY_PRICE_SATS, 11);
+  assert.equal(STICKY_MEMBER_PRICE_SATS, 0);
   assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 42);
   assert.equal(stickyOrderPrice({sats: 11}), 11);
-  assert.equal(stickyOrderPrice({sats: 21}), 21);
   assert.equal(stickyOrderPrice({sats: 42}), 42);
-  assert.equal(stickyOrderPrice({sats: 10.5}), 21);
-  assert.equal(stickyOrderPrice({sats: 0}), 21);
+  assert.equal(stickyOrderPrice({sats: 0}), 0);
+  assert.equal(stickyOrderPrice({sats: 10.5}), 11);
+  assert.equal(stickyOrderPrice({sats: 43}), 11);
 });
 
 test('anonymous notes carry a signed identity-mode marker', () => {
@@ -40,6 +40,14 @@ test('sticky event round-trips its visual placement', () => {
   assert.equal(parsed.geohash, TEST_GEOHASH);
 });
 
+test('new multilingual font keys survive signed event parsing', () => {
+  for (const font of ['noto-sans', 'noto-serif', 'noto-mono', 'patrick-hand', 'roboto-slab']) {
+    const template = makeStickyTemplate({content: 'Pozdrav κόσμος Привет', color: 'green', font, x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH});
+    const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+    assert.equal(parsed.font, font);
+  }
+});
+
 test('a board geohash is required and carries searchable Nostr geo tags', () => {
   assert.equal(normaliseGeohash(' U0QJ7Z0Y1 '), TEST_GEOHASH);
   assert.equal(normaliseGeohash('u0qil'), '');
@@ -48,6 +56,48 @@ test('a board geohash is required and carries searchable Nostr geo tags', () => 
   assert.deepEqual(template.tags.find(tag => tag[0] === 'g'), ['g', TEST_GEOHASH]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'i'), ['i', `geo:${TEST_GEOHASH}`]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'k'), ['k', 'geo']);
+  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]), geohashPrefixes(TEST_GEOHASH));
+  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', 'prefix']);
+});
+
+test('geohash depth includes only the selected number of child levels', () => {
+  assert.deepEqual(geohashPrefixes('u24jed'), ['u24jed', 'u24je', 'u24j', 'u24', 'u2', 'u']);
+  assert.equal(geohashMatchesBoard('u24jed', 'u', 4), false);
+  assert.equal(geohashMatchesBoard('u24jed', 'u', 5), true);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24j', 2), true);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24j', 1), false);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24jed', 0, true), true);
+  assert.equal(geohashMatchesBoard('u24jed', 'u', 11, true), false);
+});
+
+test('map coordinates round-trip through geohash cells up to precision 9', () => {
+  assert.equal(encodeGeohash(42.6, -5.6, 5), 'ezs42');
+  const hash = encodeGeohash(46.0569, 14.5058, 9);
+  const bounds = geohashBounds(hash);
+  assert.equal(hash.length, 9);
+  assert.ok(bounds.south <= 46.0569 && bounds.north >= 46.0569);
+  assert.ok(bounds.west <= 14.5058 && bounds.east >= 14.5058);
+  assert.equal(encodeGeohash(bounds.center.lat, bounds.center.lng, 9), hash);
+  assert.equal(geohashPrecisionForZoom(2), 1);
+  assert.equal(geohashPrecisionForZoom(20), 8);
+  assert.equal(geohashPrecisionForZoom(21), 9);
+  assert.equal(mapZoomForGeohashPrecision(9), 21);
+});
+
+test('exact-geohash notes publish and parse as exact only', () => {
+  const template = makeStickyTemplate({content: 'local only', color: 'blue', x: .5, y: .5, rotation: 0, geohash: 'u24jed', exactGeohash: true});
+  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g'), [['g', 'u24jed']]);
+  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', 'exact']);
+  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(parsed.geohash, 'u24jed');
+  assert.equal(parsed.exactGeohash, true);
+});
+
+test('legacy single-geohash notes stay exact instead of widening unexpectedly', () => {
+  const template = makeStickyTemplate({content: 'old note', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: 'u24jed', exactGeohash: true});
+  template.tags = template.tags.filter(tag => tag[0] !== 'geohash');
+  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(parsed.exactGeohash, true);
 });
 
 test('content fingerprint binds the paid text and color', async () => {
@@ -83,14 +133,18 @@ test('deletion request targets one event on the satoshi relay', () => {
   assert.deepEqual(template.tags[0], ['e', eventId, 'wss://nostr.satoshi.si']);
 });
 
-test('font choices preview Bunny-hosted typefaces', async () => {
+test('font dropdown previews broad Bunny-hosted typeface families', async () => {
   const [html, css] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
   assert.match(css, /fonts\.bunny\.net/);
-  for (const name of ['Special Elite', 'Roboto Mono', 'Caveat', 'Lora']) assert.match(html, new RegExp(name));
-  assert.match(css, /font-option--handwritten[^}]+Caveat/s);
+  for (const name of ['Special Elite', 'Caveat', 'Noto Sans', 'Noto Serif', 'Roboto', 'Open Sans', 'Lora']) assert.match(html, new RegExp(name));
+  assert.match(html, /<select id="noteFont"/);
+  assert.doesNotMatch(html, /class="font-option/);
+  assert.ok((html.match(/<option class="font-preview--/g) || []).length >= 18);
+  assert.match(css, /font-preview--handwritten[^}]+Caveat/s);
+  assert.match(css, /font-preview--noto-sans[^}]+Noto Sans/s);
   assert.match(css, /#noteCapacity\.is-almost-full/);
   assert.match(css, /#noteCapacity\.is-full/);
   assert.match(css, /sticky-note--dense/);
@@ -119,6 +173,8 @@ test('payment sheet opens during invoice creation and pinned state stays complet
   assert.match(script, /setTimeout\(pollPayment, 3000\)/);
   assert.match(script, /textContent = 'Pinned'/);
   assert.match(script, /elements\.pin\.disabled = published/);
+  assert.match(script, /sats === 0/);
+  assert.match(script, /Free note ready/);
   assert.doesNotMatch(`${html}\n${script}`, /Bark/i);
 });
 
@@ -138,6 +194,34 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.doesNotMatch(script, /zoomLevel/);
   assert.doesNotMatch(html, /Global board/);
   assert.match(script, /'#g': \[activeGeohash\]/);
+  assert.match(html, /id="boardDepth"/);
+  assert.match(html, /id="rememberStickyBoard"[^>]+role="switch"/);
+  assert.match(html, /id="shareStickyBoard"/);
+  assert.match(html, /id="exactGeohashNote"/);
+  assert.match(html, /id="openGeohashMap"/);
+  assert.match(html, /id="geohashMapDialog"/);
+  assert.match(html, /vendor\/leaflet\/leaflet\.js/);
+  assert.match(script, /tile\.openstreetmap\.org/);
+  assert.match(script, /geohashPrecisionForZoom/);
+  assert.match(script, /OpenStreetMap/);
+  assert.match(script, /searchParams\.get\('g'\)/);
+  assert.match(script, /searchParams\.set\('g', geohash\)/);
+  assert.match(script, /BOARD_REMEMBER_KEY/);
+  assert.match(script, /localStorage\.removeItem\(BOARD_KEY\)/);
+});
+
+test('published notes resolve a readable author label in relay batches', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(script, /author\.textContent = '~anonymous'/);
+  assert.match(script, /profile\.name \|\| profile\.display_name \|\| profile\.displayName \|\| profile\.nip05/);
+  assert.match(script, /`~\$\{shortAuthor\(pubkey\)\}`/);
+  assert.match(script, /readAuthorProfilesFromRelay/);
+  assert.match(script, /authors: pubkeys/);
+  assert.match(script, /authorProfilesLoading/);
+  assert.match(css, /\.sticky-note__author\s*\{[^}]*right:\s*10px;[^}]*bottom:\s*7px;/s);
 });
 
 test('anonymous posting and signed-in profile details are present', async () => {

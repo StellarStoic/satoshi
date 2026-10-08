@@ -97,7 +97,7 @@
 
 .site-help-dialog {
     width: min(520px, calc(100vw - 32px));
-    max-height: min(78vh, 620px);
+    max-height: min(620px, calc(100dvh - 32px));
     margin: auto;
     padding: 0;
     overflow: hidden;
@@ -114,9 +114,15 @@
 }
 
 .site-help-dialog__content {
+    box-sizing: border-box;
     position: relative;
+    max-height: min(620px, calc(100dvh - 32px));
     padding: 28px 54px 30px 28px;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
 }
 
 .site-help-dialog h2 {
@@ -176,6 +182,7 @@
     }
 
     .site-help-dialog__content {
+        max-height: calc(100dvh - 32px);
         padding: 24px 48px 26px 22px;
     }
 }

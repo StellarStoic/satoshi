@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/stickyNotes.css">
   <script src="/pwa.js" defer></script>
   <script src="/siteEffects.js" defer></script>
@@ -45,10 +46,41 @@
       <h2 id="boardDialogTitle">Choose a corkboard</h2>
       <p>Enter the geohash shared by your group or workplace. A longer code covers a smaller area; 9 characters is precise enough for a building.</p>
       <label for="boardGeohash">Geohash</label>
-      <input id="boardGeohash" type="text" maxlength="12" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y1">
-      <div class="board-chooser__actions"><button type="submit" class="primary-action">Open board</button></div>
+      <div class="geohash-field">
+        <input id="boardGeohash" type="text" maxlength="12" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y1">
+        <button type="button" id="openGeohashMap" aria-label="Choose geohash on a map" title="Choose on map"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
+      </div>
+      <label for="boardDepth">Include child boards</label>
+      <select id="boardDepth">
+        <option value="0">Exact board only</option>
+        <option value="1">1 level deeper</option>
+        <option value="2">2 levels deeper</option>
+        <option value="3">3 levels deeper</option>
+        <option value="5">5 levels deeper</option>
+        <option value="11">All child boards</option>
+      </select>
+      <label class="board-memory-toggle" for="rememberStickyBoard"><span>Open the last board on my next visit</span><input id="rememberStickyBoard" type="checkbox" role="switch"><span class="board-memory-toggle__track" aria-hidden="true"></span></label>
+      <div class="board-chooser__actions">
+        <button type="button" id="shareStickyBoard" class="secondary-action"><i class="lni lni-share-1" aria-hidden="true"></i><span>Share board</span></button>
+        <button type="submit" class="primary-action">Open board</button>
+      </div>
       <div id="boardChooserStatus" class="inline-status" role="status" aria-live="polite"></div>
     </form>
+  </dialog>
+
+  <dialog id="geohashMapDialog" class="geohash-map-dialog" aria-labelledby="geohashMapTitle">
+    <div class="geohash-map-shell">
+      <header class="geohash-map-header">
+        <div><h2 id="geohashMapTitle">Choose a geohash</h2><p>Zoom for a smaller area, then tap a grid cell.</p></div>
+        <button type="button" id="closeGeohashMap" class="dialog-close" aria-label="Close map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      </header>
+      <div id="geohashMap" class="geohash-map" aria-label="OpenStreetMap geohash selector"></div>
+      <footer class="geohash-map-selection">
+        <span>Grid: <strong id="geohashMapPrecision">1 character</strong></span>
+        <span>Selected: <code id="geohashMapSelection">None</code></span>
+        <button type="button" id="useGeohashSelection" class="primary-action" disabled>Use this area</button>
+      </footer>
+    </div>
   </dialog>
 
   <dialog id="loginDialog" class="sticky-dialog" aria-labelledby="loginTitle">
@@ -99,9 +131,10 @@
         <button type="button" class="swatch swatch--green" data-color="green" aria-label="Green"></button>
         <button type="button" class="swatch swatch--orange" data-color="orange" aria-label="Orange"></button>
       </div>
-      <fieldset class="font-choice"><legend>Font</legend><div id="noteFont" class="font-options" role="radiogroup" aria-label="Note font"><button type="button" class="font-option font-option--typewriter is-selected" role="radio" aria-checked="true" data-font="typewriter">Special Elite</button><button type="button" class="font-option font-option--mono" role="radio" aria-checked="false" data-font="mono">Roboto Mono</button><button type="button" class="font-option font-option--handwritten" role="radio" aria-checked="false" data-font="handwritten">Caveat</button><button type="button" class="font-option font-option--serif" role="radio" aria-checked="false" data-font="serif">Lora</button></div></fieldset>
+      <label class="font-choice" for="noteFont"><span>Font</span><select id="noteFont" class="note-font-select note-font-select--typewriter" aria-label="Note font"><option class="font-preview--typewriter" value="typewriter">Special Elite</option><option class="font-preview--handwritten" value="handwritten">Caveat · Handwritten</option><option class="font-preview--patrick-hand" value="patrick-hand">Patrick Hand · Handwritten</option><option class="font-preview--kalam" value="kalam">Kalam · Handwritten</option><option class="font-preview--comfortaa" value="comfortaa">Comfortaa · Rounded</option><option class="font-preview--noto-sans" value="noto-sans">Noto Sans · Multilingual</option><option class="font-preview--noto-serif" value="noto-serif">Noto Serif · Multilingual</option><option class="font-preview--noto-mono" value="noto-mono">Noto Sans Mono · Multilingual</option><option class="font-preview--roboto" value="roboto">Roboto</option><option class="font-preview--mono" value="mono">Roboto Mono</option><option class="font-preview--roboto-slab" value="roboto-slab">Roboto Slab</option><option class="font-preview--open-sans" value="open-sans">Open Sans</option><option class="font-preview--source-sans" value="source-sans">Source Sans 3</option><option class="font-preview--ubuntu" value="ubuntu">Ubuntu</option><option class="font-preview--pt-sans" value="pt-sans">PT Sans</option><option class="font-preview--pt-serif" value="pt-serif">PT Serif</option><option class="font-preview--fira-mono" value="fira-mono">Fira Mono</option><option class="font-preview--ibm-plex-mono" value="ibm-plex-mono">IBM Plex Mono</option><option class="font-preview--merriweather" value="merriweather">Merriweather</option><option class="font-preview--atkinson" value="atkinson">Atkinson Hyperlegible</option><option class="font-preview--serif" value="serif">Lora</option></select></label>
+      <label class="note-scope-toggle" title="Hide this note from broader parent boards"><input id="exactGeohashNote" type="checkbox"><span>Show only on this exact geohash</span></label>
       <div class="composer-count"><span id="noteCapacity">The paper is empty</span></div>
-      <button type="button" id="payForSticky" class="pay-button"><i class="lni lni-bolt-2" aria-hidden="true"></i><span>Pay 21 sats</span></button>
+      <button type="button" id="payForSticky" class="pay-button"><i class="lni lni-bolt-2" aria-hidden="true"></i><span>Post note · 11 sats</span></button>
       <div id="paymentStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>
@@ -130,7 +163,7 @@
     <span>Event ID</span><code id="noteEventId"></code>
     <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
     <span>Posted</span><time id="notePostedAt"></time>
-    <button type="button" id="removeSticky" class="remove-note" hidden><i class="lni lni-trash-3" aria-hidden="true"></i><span>Remove for 21 sats</span></button>
+    <button type="button" id="removeSticky" class="remove-note" hidden><i class="lni lni-trash-3" aria-hidden="true"></i><span>Remove · 11 sats</span></button>
     <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
   </div>
 
@@ -144,6 +177,7 @@
   <script src="/burgerMenu.js"></script>
   <script src="/stego/vendor/nostr-tools.bundle.js"></script>
   <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
+  <script src="/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="/stickyNotes.mjs"></script>
 </body>
 </html>

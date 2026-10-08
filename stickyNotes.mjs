@@ -7,8 +7,13 @@ import {
   STICKY_TOPIC,
   clampPlacement,
   clampRotation,
+  encodeGeohash,
+  geohashBounds,
   makeDeletionTemplate,
   makeStickyTemplate,
+  geohashMatchesBoard,
+  geohashPrecisionForZoom,
+  mapZoomForGeohashPrecision,
   normaliseGeohash,
   normaliseStickyText,
   parseStickyEvent,
@@ -36,11 +41,19 @@ const API = document.querySelector('meta[name="sticky-api"]')?.content || paySer
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const BOARD_KEY = 'satoshi:sticky:geohash:v1';
+const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
+const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   openBoard: document.getElementById('openStickyBoard'), boardDialog: document.getElementById('boardDialog'),
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
+  boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
+  rememberBoard: document.getElementById('rememberStickyBoard'),
+  openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
+  closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
+  geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
+  useGeohashSelection: document.getElementById('useGeohashSelection'),
   boardChooserStatus: document.getElementById('boardChooserStatus'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
@@ -57,6 +70,7 @@ const elements = {
   copyPayment: document.getElementById('copyStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
+  exactGeohash: document.getElementById('exactGeohashNote'),
   zoomOut: document.getElementById('zoomOut'), zoomIn: document.getElementById('zoomIn'),
   zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
@@ -75,6 +89,10 @@ let boardConnectionVersion = 0;
 const rendered = new Set();
 const noteEvents = new Map();
 const pendingDeletions = new Map();
+const authorLabels = new Map();
+const authorProfileQueue = new Set();
+const authorProfilesLoading = new Set();
+let authorProfileTimer = null;
 let selectedNoteId = '';
 let quotedPrice = STICKY_PRICE_SATS;
 let quotedPubkey = '';
@@ -84,11 +102,24 @@ let currentRailId = '';
 let profileFetchPubkey = '';
 let composingPubkey = '';
 let composingGeohash = '';
-let activeGeohash = normaliseGeohash(localStorage.getItem(BOARD_KEY));
+let geohashMap = null;
+let geohashGrid = null;
+let geohashMapSelection = '';
+let geohashGridFrame = 0;
+const linkedGeohash = normaliseGeohash(new URL(location.href).searchParams.get('g'));
+let rememberBoard = localStorage.getItem(BOARD_REMEMBER_KEY) !== 'false';
+let activeGeohash = linkedGeohash || (rememberBoard ? normaliseGeohash(localStorage.getItem(BOARD_KEY)) : '');
+let boardDepth = Math.max(0, Math.min(11, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
+if (linkedGeohash && rememberBoard) localStorage.setItem(BOARD_KEY, linkedGeohash);
 if (pending?.action === 'pin' && Object.hasOwn(pending, 'geohash')) {
   activeGeohash = normaliseGeohash(pending.geohash);
-  if (activeGeohash) localStorage.setItem(BOARD_KEY, activeGeohash);
-  else localStorage.removeItem(BOARD_KEY);
+  if (activeGeohash && rememberBoard) localStorage.setItem(BOARD_KEY, activeGeohash);
+  else if (!rememberBoard) localStorage.removeItem(BOARD_KEY);
+}
+if (rememberBoard && activeGeohash && activeGeohash !== linkedGeohash) {
+  const boardUrl = new URL(location.href);
+  boardUrl.searchParams.set('g', activeGeohash);
+  history.replaceState(null, '', boardUrl);
 }
 const boardView = {scale: .6, x: 0, y: 0};
 const CANVAS_WIDTH = 2600;
@@ -111,6 +142,120 @@ function status(target, message, error = false) {
 
 function showDialog(dialog) {
   if (!dialog.open) dialog.showModal();
+}
+
+function geohashCellDimensions(precision) {
+  const bits = precision * 5;
+  return {
+    height: 180 / (2 ** Math.floor(bits / 2)),
+    width: 360 / (2 ** Math.ceil(bits / 2)),
+  };
+}
+
+function setMapSelection(geohash) {
+  geohashMapSelection = normaliseGeohash(geohash);
+  elements.geohashMapSelection.textContent = geohashMapSelection || 'None';
+  elements.useGeohashSelection.disabled = !geohashMapSelection;
+}
+
+function drawGeohashGrid() {
+  geohashGridFrame = 0;
+  if (!geohashMap || !elements.geohashMapDialog.open) return;
+  const precision = geohashPrecisionForZoom(geohashMap.getZoom());
+  const {height, width} = geohashCellDimensions(precision);
+  const bounds = geohashMap.getBounds();
+  const south = Math.max(-85.0511, bounds.getSouth());
+  const north = Math.min(85.0511, bounds.getNorth());
+  const west = Math.max(-180, bounds.getWest());
+  const east = Math.min(180, bounds.getEast());
+  const latStart = Math.max(0, Math.floor((south + 90) / height));
+  const latEnd = Math.min(Math.ceil(180 / height) - 1, Math.floor((north + 90) / height));
+  const lonStart = Math.max(0, Math.floor((west + 180) / width));
+  const lonEnd = Math.min(Math.ceil(360 / width) - 1, Math.floor((east + 180) / width));
+  const center = geohashMap.getCenter();
+  const firstCorner = geohashMap.latLngToContainerPoint([center.lat, center.lng]);
+  const secondCorner = geohashMap.latLngToContainerPoint([center.lat + height, center.lng + width]);
+  const showLabels = Math.abs(secondCorner.x - firstCorner.x) >= 42 && Math.abs(secondCorner.y - firstCorner.y) >= 22;
+
+  geohashGrid.clearLayers();
+  elements.geohashMapPrecision.textContent = `${precision} character${precision === 1 ? '' : 's'}`;
+  for (let latIndex = latStart; latIndex <= latEnd; latIndex += 1) {
+    const cellSouth = -90 + latIndex * height;
+    const cellNorth = Math.min(90, cellSouth + height);
+    for (let lonIndex = lonStart; lonIndex <= lonEnd; lonIndex += 1) {
+      const cellWest = -180 + lonIndex * width;
+      const cellEast = Math.min(180, cellWest + width);
+      const geohash = encodeGeohash((cellSouth + cellNorth) / 2, (cellWest + cellEast) / 2, precision);
+      const selected = geohash === geohashMapSelection;
+      const rectangle = window.L.rectangle([[cellSouth, cellWest], [cellNorth, cellEast]], {
+        className: 'geohash-grid-cell',
+        color: selected ? '#ffbd25' : '#f2a900',
+        fillColor: '#f2a900',
+        fillOpacity: selected ? .3 : .035,
+        opacity: selected ? 1 : .72,
+        weight: selected ? 3 : 1,
+      });
+      if (showLabels) rectangle.bindTooltip(geohash, {permanent: true, direction: 'center', className: 'geohash-cell-label'});
+      rectangle.on('click', event => {
+        if (event.originalEvent) window.L.DomEvent.stopPropagation(event.originalEvent);
+        setMapSelection(geohash);
+        scheduleGeohashGrid();
+      });
+      rectangle.addTo(geohashGrid);
+    }
+  }
+}
+
+function scheduleGeohashGrid() {
+  if (geohashGridFrame) cancelAnimationFrame(geohashGridFrame);
+  geohashGridFrame = requestAnimationFrame(drawGeohashGrid);
+}
+
+function initialiseGeohashMap() {
+  if (geohashMap || !window.L) return;
+  geohashMap = window.L.map(elements.geohashMap, {
+    center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 21, preferCanvas: true,
+    maxBounds: [[-85.0511, -180], [85.0511, 180]], maxBoundsViscosity: 1,
+  });
+  window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    minZoom: 2, maxNativeZoom: 19, maxZoom: 21, noWrap: true,
+  }).addTo(geohashMap);
+  geohashGrid = window.L.layerGroup().addTo(geohashMap);
+  geohashMap.on('moveend', scheduleGeohashGrid);
+  geohashMap.on('zoomend', () => {
+    const center = geohashMap.getCenter();
+    setMapSelection(encodeGeohash(center.lat, center.lng, geohashPrecisionForZoom(geohashMap.getZoom())));
+    scheduleGeohashGrid();
+  });
+  geohashMap.on('click', event => {
+    setMapSelection(encodeGeohash(event.latlng.lat, event.latlng.lng, geohashPrecisionForZoom(geohashMap.getZoom())));
+    scheduleGeohashGrid();
+  });
+}
+
+function openGeohashMap() {
+  const current = normaliseGeohash(elements.boardGeohash.value) || activeGeohash;
+  elements.boardDialog.close();
+  showDialog(elements.geohashMapDialog);
+  initialiseGeohashMap();
+  if (!geohashMap) {
+    elements.geohashMap.replaceChildren(document.createTextNode('The map could not load. You can still enter a geohash manually.'));
+    return;
+  }
+  requestAnimationFrame(() => {
+    geohashMap.invalidateSize();
+    if (current) {
+      const mapHash = current.slice(0, 9);
+      const bounds = geohashBounds(mapHash);
+      setMapSelection(mapHash);
+      geohashMap.setView([bounds.center.lat, bounds.center.lng], mapZoomForGeohashPrecision(mapHash.length), {animate: false});
+    } else {
+      setMapSelection('');
+      geohashMap.setView([20, 0], 2, {animate: false});
+    }
+    scheduleGeohashGrid();
+  });
 }
 
 function sessionLabel(session) {
@@ -148,6 +293,100 @@ function readProfileFromRelay(url, pubkey) {
     });
     socket.addEventListener('error', finish);
   });
+}
+
+function readAuthorProfilesFromRelay(url, pubkeys) {
+  return new Promise(resolve => {
+    const profiles = new Map();
+    const socket = new WebSocket(url);
+    const subscription = `sticky-authors-${crypto.randomUUID?.() || Date.now()}`;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { socket.close(); } catch {}
+      resolve(profiles);
+    };
+    const timer = setTimeout(finish, 3500);
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {authors: pubkeys, kinds: [0], limit: Math.min(1000, pubkeys.length * 2)}])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE' && data[1] === subscription) { finish(); return; }
+      const event = data[2];
+      if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools.verifyEvent(event) || !pubkeys.includes(event.pubkey)) return;
+      const current = profiles.get(event.pubkey);
+      if (!current || event.created_at > current.created_at) profiles.set(event.pubkey, event);
+    });
+    socket.addEventListener('error', finish);
+    socket.addEventListener('close', finish);
+  });
+}
+
+function profileAuthorLabel(event, pubkey) {
+  if (event) {
+    try {
+      const profile = JSON.parse(event.content || '{}');
+      const identity = String(profile.name || profile.display_name || profile.displayName || profile.nip05 || '').trim().replace(/\s+/g, ' ');
+      if (identity) return `~${identity.slice(0, 80)}`;
+    } catch {}
+  }
+  return `~${shortAuthor(pubkey)}`;
+}
+
+function updateAuthorElements(pubkey, label) {
+  elements.canvas.querySelectorAll('.sticky-note__author').forEach(author => {
+    if (author.dataset.authorPubkey === pubkey) {
+      author.textContent = label;
+      author.title = label;
+    }
+  });
+}
+
+async function flushAuthorProfiles() {
+  authorProfileTimer = null;
+  const pubkeys = [...authorProfileQueue].filter(pubkey => !authorProfilesLoading.has(pubkey));
+  authorProfileQueue.clear();
+  if (!pubkeys.length) return;
+  pubkeys.forEach(pubkey => authorProfilesLoading.add(pubkey));
+  try {
+    const results = await Promise.allSettled([
+      readAuthorProfilesFromRelay(RELAY, pubkeys),
+      readAuthorProfilesFromRelay('wss://relay.damus.io', pubkeys),
+      readAuthorProfilesFromRelay('wss://nos.lol', pubkeys),
+      readAuthorProfilesFromRelay('wss://relay.ditto.pub', pubkeys),
+    ]);
+    const newest = new Map();
+    results.filter(result => result.status === 'fulfilled').forEach(result => {
+      result.value.forEach((event, pubkey) => {
+        if (!newest.has(pubkey) || event.created_at > newest.get(pubkey).created_at) newest.set(pubkey, event);
+      });
+    });
+    pubkeys.forEach(pubkey => {
+      const label = profileAuthorLabel(newest.get(pubkey), pubkey);
+      authorLabels.set(pubkey, label);
+      updateAuthorElements(pubkey, label);
+    });
+  } finally {
+    pubkeys.forEach(pubkey => authorProfilesLoading.delete(pubkey));
+  }
+}
+
+function labelNoteAuthor(author, sticky) {
+  if (sticky.anonymous) {
+    author.textContent = '~anonymous';
+    author.title = '~anonymous';
+    return;
+  }
+  author.dataset.authorPubkey = sticky.pubkey;
+  const known = authorLabels.get(sticky.pubkey);
+  author.textContent = known || `~${shortAuthor(sticky.pubkey)}`;
+  author.title = author.textContent;
+  if (known || authorProfilesLoading.has(sticky.pubkey)) return;
+  authorProfileQueue.add(sticky.pubkey);
+  clearTimeout(authorProfileTimer);
+  authorProfileTimer = setTimeout(flushAuthorProfiles, 90);
 }
 
 async function loadAccountProfile(session) {
@@ -228,8 +467,9 @@ function renderQuotedPrice(discountApplied = false) {
   const pinLabel = elements.pay.querySelector('span');
   const removeLabel = elements.removeSticky.querySelector('span');
   const anonymous = getNostrSession()?.method === 'anonymous';
-  pinLabel.textContent = anonymous ? `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : discountApplied ? `NIP-05 price: ${quotedPrice} sats` : `Pay ${quotedPrice} sats`;
-  removeLabel.textContent = anonymous ? `Remove for ${STICKY_PRICE_SATS} sats` : discountApplied ? `Remove for ${quotedPrice} sats · NIP-05 price` : `Remove for ${quotedPrice} sats`;
+  const free = !anonymous && quotedPrice === 0 && discountApplied;
+  pinLabel.textContent = anonymous ? `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : free ? 'Post free · satoshi.si NIP-05' : `Post note · ${quotedPrice} sats`;
+  removeLabel.textContent = anonymous ? `Remove · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : free ? 'Remove free · satoshi.si NIP-05' : `Remove · ${quotedPrice} sats`;
 }
 
 async function refreshPriceQuote(session) {
@@ -292,7 +532,7 @@ async function renderPayment(order) {
     elements.paymentHint.textContent = 'Preparing invoice...';
     return false;
   }
-  const sats = stickyOrderPrice(order, pending?.sats || STICKY_PRICE_SATS);
+  const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_PRICE_SATS);
   currentRails = rails;
   elements.paymentAmount.textContent = rails.length > 1 ? `Pay ${sats} sats` : `Pay ${sats} sats with ${rails[0].label}`;
   elements.paymentRails.hidden = rails.length < 2;
@@ -374,16 +614,17 @@ function noteAtPlacement(note, placement) {
 }
 
 function noteBelongsToBoard(sticky) {
-  return Boolean(activeGeohash) && sticky.geohash === activeGeohash;
+  return geohashMatchesBoard(sticky.geohash, activeGeohash, boardDepth, sticky.exactGeohash);
 }
 
 function updateBoardControl() {
-  const label = activeGeohash ? `Corkboard: ${activeGeohash}` : 'Choose a geohash corkboard';
+  const reach = boardDepth === 0 ? 'exact only' : boardDepth === 11 ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
+  const label = activeGeohash ? `Corkboard: ${activeGeohash} (${reach})` : 'Choose a geohash corkboard';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
 }
 
-function selectBoard(geohash) {
+function selectBoard(geohash, closeDialog = true) {
   if (placingNote) {
     status(elements.boardChooserStatus, 'Pin the current note before changing corkboards.', true);
     return;
@@ -394,7 +635,12 @@ function selectBoard(geohash) {
     return;
   }
   activeGeohash = nextGeohash;
-  localStorage.setItem(BOARD_KEY, activeGeohash);
+  if (rememberBoard) localStorage.setItem(BOARD_KEY, activeGeohash);
+  else localStorage.removeItem(BOARD_KEY);
+  const boardUrl = new URL(location.href);
+  if (rememberBoard) boardUrl.searchParams.set('g', activeGeohash);
+  else boardUrl.searchParams.delete('g');
+  history.replaceState(null, '', boardUrl);
   updateBoardControl();
   closeNoteMenu();
   boardConnectionVersion += 1;
@@ -406,7 +652,7 @@ function selectBoard(geohash) {
   elements.canvas.replaceChildren();
   elements.boardStatus.hidden = false;
   status(elements.boardStatus, `Opening corkboard ${activeGeohash}...`);
-  elements.boardDialog.close();
+  if (closeDialog) elements.boardDialog.close();
   connectBoard(boardConnectionVersion);
 }
 
@@ -464,7 +710,7 @@ function renderNote(sticky, event = null, temporary = false) {
     note.appendChild(pin);
     const author = document.createElement('span');
     author.className = 'sticky-note__author';
-    author.textContent = sticky.anonymous ? 'Anonymous' : shortAuthor(sticky.pubkey);
+    labelNoteAuthor(author, sticky);
     note.appendChild(author);
   }
   noteAtPlacement(note, sticky);
@@ -557,11 +803,9 @@ function selectFont(font) {
   if (!STICKY_FONTS.includes(font)) return;
   elements.draft.classList.remove(...STICKY_FONTS.map(item => `sticky-note--font-${item}`));
   elements.draft.classList.add(`sticky-note--font-${font}`);
-  elements.font.querySelectorAll('[data-font]').forEach(button => {
-    const selected = button.dataset.font === font;
-    button.classList.toggle('is-selected', selected);
-    button.setAttribute('aria-checked', String(selected));
-  });
+  elements.font.classList.remove(...STICKY_FONTS.map(item => `note-font-select--${item}`));
+  elements.font.classList.add(`note-font-select--${font}`);
+  elements.font.value = font;
   selectedFont = font;
   requestAnimationFrame(() => {
     fitDraftTypography();
@@ -573,7 +817,14 @@ function selectFont(font) {
 }
 
 function baseFontSize(font, draft = false) {
-  const sizes = {typewriter: draft ? 18 : 17, mono: draft ? 17 : 16, handwritten: draft ? 24 : 22, serif: draft ? 18 : 17};
+  const sizes = {
+    typewriter: draft ? 18 : 17,
+    mono: draft ? 17 : 16,
+    handwritten: draft ? 24 : 22,
+    'patrick-hand': draft ? 22 : 20,
+    kalam: draft ? 21 : 19,
+    serif: draft ? 18 : 17,
+  };
   return sizes[font] || sizes.typewriter;
 }
 
@@ -646,7 +897,7 @@ function handleEditorInput() {
 async function ensureReadySigner() {
   if (await signerReady().catch(() => false)) return true;
   showDialog(elements.login);
-  throw new Error('Reconnect your signer before paying.');
+  throw new Error('Reconnect your signer before continuing.');
 }
 
 async function startPayment() {
@@ -661,16 +912,28 @@ async function startPayment() {
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
-    status(elements.paymentStatus, 'Preparing invoice...');
-    showPaymentPreparing(quotedPrice);
+    status(elements.paymentStatus, quotedPrice === 0 ? 'Checking free membership...' : 'Preparing invoice...');
+    if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
+    const exactGeohash = elements.exactGeohash.checked;
     const order = await api('/orders', {
       method: 'POST',
-      body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
+      body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
     });
     const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_PRICE_SATS);
     if (session.method === 'anonymous' && sats !== STICKY_ANONYMOUS_PRICE_SATS) throw new Error('Anonymous posting is not ready on the payment service yet. No note was published.');
-    savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, contentHash, sats, anonymous: session.method === 'anonymous', status: 'waiting'});
+    if (sats === 0) {
+      if (!order.paid || !order.publishToken) throw new Error('Free posting is not ready on the payment service yet. No note was published.');
+      if (elements.paymentDialog.open) elements.paymentDialog.close();
+      savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, sats, anonymous: false, status: 'paid', publishToken: order.publishToken});
+      if (elements.composer.open) elements.composer.close();
+      status(elements.boardStatus, 'Free note ready. Place it on the board.');
+      elements.boardStatus.hidden = false;
+      beginPlacement();
+      return;
+    }
+    savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, sats, anonymous: session.method === 'anonymous', status: 'waiting'});
+    if (!elements.paymentDialog.open) showPaymentPreparing(sats);
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
     else if (!railReady) status(elements.paymentStatus, 'Preparing invoice...');
@@ -688,7 +951,7 @@ async function pollPayment() {
   if (!pending?.orderId) return;
   try {
     const order = await api(`/orders/${encodeURIComponent(pending.orderId)}`);
-    if (pending.action === 'pin') await renderPayment(order);
+    if (pending.action === 'pin' && pending.sats > 0) await renderPayment(order);
     if (order.paid && order.publishToken) {
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({...pending, status: 'paid', publishToken: order.publishToken});
@@ -891,13 +1154,21 @@ async function startRemovalPayment() {
     await ensureReadySigner();
     elements.removeSticky.disabled = true;
     status(elements.noteMenuStatus, 'Preparing invoice...');
-    showPaymentPreparing(STICKY_PRICE_SATS);
+    if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const order = await api('/orders', {
       method: 'POST',
       body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
     });
     const sats = stickyOrderPrice(order);
+    if (sats === 0) {
+      if (!order.paid || !order.publishToken) throw new Error('Free removal is not ready on the payment service yet. The note was not removed.');
+      if (elements.paymentDialog.open) elements.paymentDialog.close();
+      savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'paid', publishToken: order.publishToken});
+      await publishRemoval();
+      return;
+    }
     savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'waiting'});
+    if (!elements.paymentDialog.open) showPaymentPreparing(sats);
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
     status(elements.noteMenuStatus, `Waiting for the ${sats}-sat payment...`);
@@ -1039,6 +1310,7 @@ function openComposer() {
   if (!session) { showDialog(elements.login); return; }
   composingPubkey = session.pubkey;
   composingGeohash = activeGeohash;
+  if (!pending?.orderId) elements.exactGeohash.checked = false;
   elements.pay.disabled = false;
   showDialog(elements.composer);
   requestAnimationFrame(() => elements.editor.focus());
@@ -1046,8 +1318,21 @@ function openComposer() {
 
 elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
 elements.newSticky.addEventListener('click', openComposer);
+elements.openGeohashMap.addEventListener('click', openGeohashMap);
+elements.closeGeohashMap.addEventListener('click', () => elements.geohashMapDialog.close());
+elements.geohashMapDialog.addEventListener('close', () => {
+  showDialog(elements.boardDialog);
+  requestAnimationFrame(() => elements.boardGeohash.focus());
+});
+elements.useGeohashSelection.addEventListener('click', () => {
+  if (!geohashMapSelection) return;
+  elements.boardGeohash.value = geohashMapSelection;
+  elements.geohashMapDialog.close();
+});
 elements.openBoard.addEventListener('click', () => {
   elements.boardGeohash.value = activeGeohash;
+  elements.boardDepth.value = String(boardDepth);
+  elements.rememberBoard.checked = rememberBoard;
   status(elements.boardChooserStatus, '');
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
@@ -1061,12 +1346,53 @@ elements.boardChooser.addEventListener('submit', event => {
   }
   selectBoard(value);
 });
+elements.boardDepth.addEventListener('change', () => {
+  boardDepth = Math.max(0, Math.min(11, Number.parseInt(elements.boardDepth.value, 10) || 0));
+  localStorage.setItem(BOARD_DEPTH_KEY, String(boardDepth));
+  updateBoardControl();
+  if (activeGeohash) selectBoard(activeGeohash, false);
+});
+elements.rememberBoard.addEventListener('change', () => {
+  rememberBoard = elements.rememberBoard.checked;
+  localStorage.setItem(BOARD_REMEMBER_KEY, String(rememberBoard));
+  if (rememberBoard && activeGeohash) localStorage.setItem(BOARD_KEY, activeGeohash);
+  else localStorage.removeItem(BOARD_KEY);
+  const boardUrl = new URL(location.href);
+  if (rememberBoard && activeGeohash) boardUrl.searchParams.set('g', activeGeohash);
+  else boardUrl.searchParams.delete('g');
+  history.replaceState(null, '', boardUrl);
+  status(elements.boardChooserStatus, rememberBoard ? 'This board will open on your next visit.' : 'This board will not be remembered.');
+});
+elements.shareBoard.addEventListener('click', async () => {
+  const geohash = normaliseGeohash(elements.boardGeohash.value) || activeGeohash;
+  if (!geohash) {
+    status(elements.boardChooserStatus, 'Enter or open a geohash before sharing it.', true);
+    return;
+  }
+  const url = new URL('/stickyNotes.html', location.origin);
+  url.searchParams.set('g', geohash);
+  try {
+    if (navigator.share) {
+      try {
+        await navigator.share({title: `Corkboard ${geohash}`, text: `Open the ${geohash} Nostr corkboard on satoshi.si.`, url: url.href});
+        status(elements.boardChooserStatus, 'Board link shared.');
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard.writeText(url.href);
+    status(elements.boardChooserStatus, 'Board link copied.');
+  } catch (error) {
+    status(elements.boardChooserStatus, 'Could not share the board link.', true);
+  }
+});
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 document.querySelectorAll('[data-login]').forEach(button => button.addEventListener('click', () => handleLogin(button.dataset.login)));
 elements.logout.addEventListener('click', () => { logoutNostr(); elements.accountDialog.close(); updateAccount(); });
 elements.accountPicture.addEventListener('error', () => { elements.accountPicture.hidden = true; });
 elements.colors.addEventListener('click', event => selectColor(event.target.closest('[data-color]')?.dataset.color));
-elements.font.addEventListener('click', event => selectFont(event.target.closest('[data-font]')?.dataset.font));
+elements.font.addEventListener('change', () => selectFont(elements.font.value));
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
 elements.editor.addEventListener('input', handleEditorInput);
 elements.editor.addEventListener('paste', event => { event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain')); });
@@ -1098,6 +1424,8 @@ setInterval(() => {
 }, 1000);
 
 updateAccount();
+elements.boardDepth.value = String(boardDepth);
+elements.rememberBoard.checked = rememberBoard;
 updateBoardControl();
 installBoardNavigation();
 requestAnimationFrame(fitBoard);
@@ -1126,6 +1454,7 @@ if (!resumedSigning && pending?.status === 'waiting') {
   } else {
     selectColor(pending.color);
     selectFont(pending.font || 'typewriter');
+    elements.exactGeohash.checked = Boolean(pending.exactGeohash);
     elements.editor.textContent = pending.content;
     lastValidEditor = pending.content;
     showDialog(elements.composer);

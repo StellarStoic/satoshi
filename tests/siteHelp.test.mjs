@@ -53,6 +53,12 @@ test('top controls are document-positioned and share one horizontal center line'
     assert.match(sharedStyles, /#toggle span\s*\{[\s\S]*?top:\s*12px/);
 });
 
+test('long help copy scrolls inside the visible viewport', () => {
+    assert.match(siteHelpCss, /\.site-help-dialog__content\s*\{[\s\S]*?max-height:\s*min\(620px, calc\(100dvh - 32px\)\)/);
+    assert.match(siteHelpCss, /\.site-help-dialog__content\s*\{[\s\S]*?overflow-y:\s*auto/);
+    assert.match(siteHelpCss, /touch-action:\s*pan-y/);
+});
+
 test('page-specific top controls do not restore viewport-fixed positioning', async () => {
     const checks = [
         ['quotes.css', /#next-quote\s*\{[^}]*position:\s*fixed/s],

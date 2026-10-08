@@ -34,46 +34,50 @@ place: the page should read it from a single constant.
 
 # 1. Sticky notes
 
-A sticky note is a note pinned to the satoshi.si board. Publishing one, or removing one,
-costs **21 sats**, or **11 sats** when the paying pubkey owns an active satoshi.si NIP-05
-name. A pin made with a browser-generated 24-hour anonymous identity costs **42 sats**.
-Payment is available over Ark and Lightning.
+A sticky note is a note pinned to the satoshi.si board. Publishing or removing one costs
+**11 sats** for an ordinary signed-in Nostr user and is **free** when that pubkey owns an
+active satoshi.si NIP-05 name. A browser-generated 24-hour anonymous identity costs
+**42 sats**. Paid orders are payable over Ark and Lightning.
 
 ## Price
 
-| action   | standard | satoshi.si NIP-05 member | anonymous identity |
-| -------- | -------- | ------------------------- | ------------------ |
-| `pin`    | 21 sats  | 11 sats                   | 42 sats            |
-| `remove` | 21 sats  | 11 sats                   | 21 sats            |
+| action   | signed-in Nostr user | satoshi.si NIP-05 member | anonymous identity |
+| -------- | -------------------- | ------------------------- | ------------------ |
+| `pin`    | 11 sats              | free                      | 42 sats            |
+| `remove` | 11 sats              | free                      | 42 sats            |
 
-Fixed server-side. Half of 21 is not a whole satoshi, so the 50% member discount rounds
-up to 11 sats. The desk checks its authoritative NIP-05 records using the order pubkey;
-it never trusts a browser claim or a kind-0 profile. The eligibility decision, price and
-pubkey are bound to the order.
+Fixed server-side. The desk checks its authoritative NIP-05 records using the order
+pubkey; it never trusts a browser claim, a submitted NIP-05 string, or a kind-0 profile.
+The eligibility decision, price and pubkey are bound to the order. For removal, the desk
+also reads the target event: its signed `anonymous` marker determines the 42-sat tier.
 
 ## GET /sticky/v1/quote?pubkey={64-hex-key}
 
-Returns the current display price before checkout:
+Returns the current display price before checkout. An active satoshi.si member receives:
 
 ```json
-{ "ok": true, "baseSats": 21, "sats": 11,
+{ "ok": true, "baseSats": 11, "sats": 0,
   "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" } }
 ```
 
-An ineligible key receives 21 sats and `applied: false`. This quote is informational;
+An ordinary signed-in key receives 11 sats and `applied: false`. This quote is informational;
 order creation checks the authoritative records again.
 
 ## Order lifecycle
 
 ```
-awaiting_invoice ──► awaiting_payment ──► paid ──► published
+paid (free member) ───────────────────────────────► published
+        ▲
+awaiting_invoice ──► awaiting_payment ────────────► paid ──► published
         │                    │
         │                    └────► expired   (invoice window closed)
         └──────────────────────────► (pruned an hour after expiry)
 ```
 
-`paid` means BTCPay reports the invoice **Settled**. `Processing` (seen, not confirmed)
-does not count. `published` means the signed note was accepted by the relay.
+For an 11- or 42-sat order, `paid` means BTCPay reports the invoice **Settled**;
+`Processing` does not count. A verified zero-sat member order starts in `paid` without
+creating an invoice or worker job. `published` means the signed event was accepted by
+the relay.
 
 ## POST /sticky/v1/orders
 
@@ -86,7 +90,7 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "pubkey": "a127e1254181099aa2891a9b0a15823777a2e0ce666ba618d53a07b890de56af",
   "contentHash": "f85b3318961505a15465bd9bfca8ce0fa45336ed68cf53b4564643db6c14d1e9",
   "geohash": "u0qj7z0y1",
-  "anonymous": true }
+  "geohashMode": "prefix" }
 ```
 
 ```json
@@ -97,9 +101,10 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
 
 `action` is exactly `pin` or `remove`. `pubkey`, `contentHash` and `targetEventId` are
 64-character lowercase hex. Every pin requires a lowercase geohash of 1 through 12
-characters from the geohash alphabet. `anonymous: true` is optional and valid only for
-`pin`; it selects the fixed 42-sat price. Nothing else is accepted. The created order
-binds the geohash and identity mode alongside the pubkey and commitment.
+characters from the geohash alphabet. `geohashMode` is required for a pin and is exactly
+`prefix` or `exact`. `anonymous: true` is optional and valid only for `pin`; it selects
+the fixed 42-sat price. Nothing else is accepted. The created order binds the geohash,
+geohash mode and identity mode alongside the pubkey and commitment.
 
 **response — `201`**
 
@@ -107,37 +112,34 @@ binds the geohash and identity mode alongside the pubkey and commitment.
 { "ok": true,
   "id": "03ad90da9fc3716c0dad4fd5",
   "action": "pin",
-  "status": "awaiting_payment",
-  "sats": 11,
+  "status": "paid",
+  "sats": 0,
   "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" },
-  "paymentMethod": "BARK",
-  "paymentMethods": ["BARK", "BTC-LN"],
+  "paymentMethod": null,
+  "paymentMethods": [],
   "expiresAt": 1791352314,
-  "payment": {
-    "arkAddress": "ark1…",
-    "bolt11": "lnbc110n1p…",
-    "lightningUri": "lightning:lnbc110n1p…",
-    "paymentLink": "bitcoin:?amount=0.00000011&ark=ark1…",
-    "methods": ["BARK", "BTC-LN"],
-    "invoiceId": "Rb7aCbq1e3W9qAbitdyEQZ"
-  },
+  "payment": null,
   "commitment": { "contentHash": "f85b33…" },
-  "paid": false,
-  "publishToken": null,
-  "publishTokenExpiresAt": null,
+  "paid": true,
+  "publishToken": "eyJ…",
+  "publishTokenExpiresAt": 1791353214,
   "publishedEventId": null,
-  "note": "Pay one offered rail, then poll this order for your publish token."
+  "note": "No payment required. Place and sign the note before the publish token expires."
 }
 ```
 
-**There is no `checkoutLink`, deliberately.** BTCPay on this box reports a LAN-only
+The response above is the zero-sat member path. It must return the publish token in the
+creation response because there is nothing to poll or settle. An 11- or 42-sat response
+keeps the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails.
+
+**Paid orders have no `checkoutLink`, deliberately.** BTCPay on this box reports a LAN-only
 checkout URL (`http://10.0.3.1:52143/i/<invoice>`): a browser on the internet cannot open
 it, and BTCPay is intentionally not published. What a Bark wallet can act on is the rail
 itself, so `payment.arkAddress` and `payment.paymentLink` are payable things.
 `paymentLink` is BTCPay's own `bitcoin:` URI carrying the exact amount. Lightning wallets
 use `payment.lightningUri` or the bare `payment.bolt11`.
 
-**Latency.** The desk holds this request for up to about 8 seconds while the worker
+**Paid-order latency.** The desk holds this request for up to about 8 seconds while the worker
 attaches the invoice. If `payment` is still `null` (`status: "awaiting_invoice"`), the
 browser keeps the already-open payment sheet visible and polls the same order every
 3 seconds. It must never create a second order.
@@ -148,6 +150,7 @@ browser keeps the already-open payment sheet visible and polls the same order ev
 | ---- | ------------------ | -------------------------------------------------------- |
 | 400  | (validation text)  | bad `action`, a key or hash that is not 64 hex, a `sats` field |
 | 400  | `bad_geohash`      | a pin has no geohash or uses an invalid geohash alphabet/length |
+| 400  | `bad_geohash_mode` | a pin does not choose exactly `prefix` or `exact`          |
 | 409  | `target_missing`   | a removal for a note the relay does not have             |
 | 409  | `target_not_owned` | a removal for a note written by a different pubkey       |
 | 409  | `already_pinned`   | the same note on the same key is already pinned and live  |
@@ -159,7 +162,7 @@ compares its author. A stranger cannot even buy a removal for your note.
 
 ```json
 { "ok": true, "id": "03ad90da9fc3716c0dad4fd5", "action": "pin",
-  "status": "paid", "sats": 21, "paymentMethod": "BARK", "paymentMethods": ["BARK", "BTC-LN"],
+  "status": "paid", "sats": 11, "paymentMethod": "BARK", "paymentMethods": ["BARK", "BTC-LN"],
   "expiresAt": 1791352314,
   "payment": { "arkAddress": "ark1…", "bolt11": "lnbc210n1…",
                "lightningUri": "lightning:lnbc210n1…", "paymentLink": "bitcoin:…", "invoiceId": "…" },
@@ -170,9 +173,9 @@ compares its author. A stranger cannot even buy a removal for your note.
   "publishedEventId": null }
 ```
 
-`publishToken` is `null` until the invoice is **Settled**, then it is present exactly once
-per order: it disappears from this response the moment it has been used successfully or
-once it expires (15 minutes after settlement). Poll this endpoint after paying.
+For paid orders, `publishToken` is `null` until the invoice is **Settled**. For a free
+member order it is issued immediately. It disappears from this response once used or
+expired (15 minutes after settlement or free authorization). Poll only paid orders.
 
 ## POST /sticky/v1/orders/{id}/publish
 
@@ -183,9 +186,12 @@ Content-Type: application/json
 
 { "event": { "id": "…", "pubkey": "…", "created_at": 1791350494, "kind": 1,
              "tags": [["t","satoshi-sticky"],["client","satoshi.si"],
-                      ["g","u0qj7z0y1"],["i","geo:u0qj7z0y1"],["k","geo"],
+                      ["g","u0qj7z0y1"],["g","u0qj7z0y"],["g","u0qj7z0"],
+                      ["g","u0qj7z"],["g","u0qj7"],["g","u0qj"],
+                      ["g","u0q"],["g","u0"],["g","u"],
+                      ["i","geo:u0qj7z0y1"],["k","geo"],["geohash","prefix"],
                       ["sticky","v1","yellow","0.42","0.99","-2.00","typewriter"],
-                      ["alt","A paid sticky note pinned on satoshi.si"]],
+                      ["alt","A sticky note pinned on satoshi.si"]],
              "content": "sticky e2e test note", "sig": "…" } }
 ```
 
@@ -193,9 +199,9 @@ The token may go in the header (preferred) or in the body as `publishToken`.
 
 The desk checks, in this order, **before** anything reaches the relay:
 
-1. the token — valid for *this* order, *this* pubkey, *this* action, *this* geohash and *this* commitment, unused, unexpired;
+1. the token — valid for *this* order, *this* pubkey, *this* action, *this* geohash, *this* geohash mode and *this* commitment, unused, unexpired;
 2. the event — id matches its contents, and the BIP-340 signature verifies;
-3. the signer equals the pubkey that paid;
+3. the signer equals the pubkey that ordered the note;
 4. freshness — signed at most an hour before publishing, not stamped more than 5 minutes into the future;
 5. the shape for the action (see below);
 6. for a removal, that the target note exists on the relay and was written by the same pubkey.
@@ -217,7 +223,7 @@ fix the problem and retry with the same token:
 | 403  | `token_invalid`       | token does not belong to this order/pubkey/action/commitment |
 | 403  | `token_used`          | already spent on a successful publish                       |
 | 403  | `token_expired`       | older than 15 minutes                                       |
-| 403  | `not_paid`            | the invoice is not Settled                                  |
+| 403  | `not_paid`            | no Settled invoice or valid zero-sat authorization          |
 | 400  | `bad_event`           | malformed event, or its id/signature does not check out     |
 | 400  | `wrong_signer`        | signed by a key other than the one that paid                |
 | 400  | `stale_event`         | signed more than an hour before the order                   |
@@ -235,12 +241,11 @@ fix the problem and retry with the same token:
 | 400  | `target_missing` / `target_not_owned` / `target_mismatch` | as above    |
 | 502  | `relay_rejected`      | the relay refused the write; `error` carries its reason     |
 
-`502 relay_rejected` deserves a sentence in the UI rather than a generic failure: before
-settlement the buyer's key is not yet in the relay's whitelist, so a *paid* order is the
-only one that can publish (see below). A 502 from a paid order is worth retrying and, if it
-persists, showing the relay's message.
+`502 relay_rejected` deserves a sentence in the UI rather than a generic failure. A paid
+or zero-sat order is the only path that can publish (see below). A 502 is worth retrying
+and, if it persists, showing the relay's message.
 
-## The commitment (what the 21 sats buy)
+## The commitment (what the order authorizes)
 
 `contentHash` is the fingerprint of the note text and appearance bought by the order.
 Placement happens after payment, so it is deliberately not part of this commitment:
@@ -266,40 +271,51 @@ the event no longer matches the paid commitment.
 | --------- | ------------------------------------------------------------ | ----------- |
 | `t`       | `satoshi-sticky`                                             | exactly one |
 | `client`  | `satoshi.si`                                                 | exactly one |
-| `g`       | order geohash                                                | exactly one |
+| `g`       | order geohash and, for `prefix` mode, each shorter parent    | exact set   |
 | `i`       | `geo:` followed by the order geohash                         | exactly one |
 | `k`       | `geo`                                                        | exactly one |
+| `geohash` | order's `exact` or `prefix` mode                             | exactly one |
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
-| `alt`     | `A paid sticky note pinned on satoshi.si`                    | exactly one |
+| `alt`     | `A sticky note pinned on satoshi.si`                         | exactly one |
 | `anonymous` | `24h-local-key`                                             | anonymous orders only |
 
-Colors are `yellow`, `pink`, `blue`, `green`, or `orange`; fonts are `typewriter`,
-`mono`, `handwritten`, or `serif`. Positions are decimal fractions from 0 through 1 and
-rotation is from -12 through 12 degrees.
+Colors are `yellow`, `pink`, `blue`, `green`, or `orange`. Allowed font keys are
+`typewriter`, `handwritten`, `patrick-hand`, `kalam`, `comfortaa`, `noto-sans`,
+`noto-serif`, `noto-mono`, `roboto`, `mono`, `roboto-slab`, `open-sans`, `source-sans`,
+`ubuntu`, `pt-sans`, `pt-serif`, `fira-mono`, `ibm-plex-mono`, `merriweather`, `atkinson`,
+and `serif`. Positions are decimal fractions from 0 through 1 and rotation is from -12
+through 12 degrees.
 
-The `g` tag is indexed for exact relay subscriptions. The `i` and `k` pair follows
-NIP-73's external-content identifier for a lowercase geohash. These tags sort public
-events into corkboards; they do not encrypt a note or restrict who can fetch it.
+Relay tag matching is exact, not a string-prefix search. In `prefix` mode a note for
+`u24jed` therefore carries `g` tags for `u24jed`, `u24je`, `u24j`, `u24`, `u2`, and `u`.
+In `exact` mode it carries only `u24jed`. The longest `g` value is always the canonical
+note geohash. The payment service must reject a missing, duplicate, out-of-order or extra
+`g` value and any mode mismatch. The `i` and `k` pair follows NIP-73's external-content
+identifier for the full lowercase geohash. These tags sort public events into corkboards;
+they do not encrypt a note or restrict who can fetch it.
 
 `content` is the note text: **at most 501 characters**, counted as the UI counts them
 (Unicode code points, so one emoji is one character).
 
 ### remove — kind `5` (NIP-09)
 
-One `["e", "<targetEventId>"]` tag referencing the note you paid to remove. Only the author
+One `["e", "<targetEventId>"]` tag referencing the note being removed. Only the author
 of that note can order the removal, and the desk checks that against the relay before
 pricing it. `content` may hold a short reason.
 
 ## Paying
 
-* Rails: **Ark and Lightning**. The invoice requests `BARK` and `BTC-LN`; on-chain is not
-  offered. The desk refuses an invoice that provides neither an Ark address nor a BOLT11.
+* Price: **11 sats** for an ordinary signed-in user, **42 sats** for a temporary anonymous
+  identity, and **0 sats** for an authoritatively verified satoshi.si NIP-05 member.
+* Free orders never create a BTCPay invoice or enter the invoice worker queue. The service
+  marks them paid and returns their short-lived publish token directly.
+* Paid rails: **Ark and Lightning**. The invoice requests `BARK` and `BTC-LN`; on-chain is
+  not offered. The desk refuses an invoice that provides neither an Ark address nor BOLT11.
 * The service verifies the amount encoded in every BOLT11 instead of trusting the worker.
   Amount-less, sub-satoshi, and wrong-value invoices are rejected.
 * The browser shows every usable rail returned by the invoice and hides unavailable ones.
-* Amount: 21 sats normally or 11 sats for a currently eligible satoshi.si NIP-05 pubkey.
-  The amount lives in the service; the worker reads it from the order queue and never
-  accepts one from the browser.
+* The amount lives in the service. The worker reads paid amounts from the order queue and
+  never accepts one from the browser.
 * Expiry: the invoice window is 30 minutes. `expiresAt` on the order is the authoritative
   time, in Unix seconds.
 

@@ -1,13 +1,19 @@
 export const STICKY_EVENT_KIND = 1;
 export const STICKY_TOPIC = 'satoshi-sticky';
 export const STICKY_VERSION = 'v1';
-export const STICKY_PRICE_SATS = 21;
-export const STICKY_MEMBER_PRICE_SATS = 11;
+export const STICKY_PRICE_SATS = 11;
+export const STICKY_MEMBER_PRICE_SATS = 0;
 export const STICKY_ANONYMOUS_PRICE_SATS = 42;
 export const STICKY_MAX_CHARACTERS = 501;
 export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', 'orange']);
-export const STICKY_FONTS = Object.freeze(['typewriter', 'mono', 'handwritten', 'serif']);
+export const STICKY_FONTS = Object.freeze([
+  'typewriter', 'handwritten', 'patrick-hand', 'kalam', 'comfortaa',
+  'noto-sans', 'noto-serif', 'noto-mono', 'roboto', 'mono', 'roboto-slab',
+  'open-sans', 'source-sans', 'ubuntu', 'pt-sans', 'pt-serif', 'fira-mono',
+  'ibm-plex-mono', 'merriweather', 'atkinson', 'serif',
+]);
 export const GEOHASH_PATTERN = /^[0123456789bcdefghjkmnpqrstuvwxyz]{1,12}$/;
+const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
 
 export function normaliseGeohash(value, fallback = '') {
   const geohash = String(value || '').trim().toLowerCase();
@@ -15,9 +21,102 @@ export function normaliseGeohash(value, fallback = '') {
   return GEOHASH_PATTERN.test(geohash) ? geohash : fallback;
 }
 
+export function geohashPrefixes(value) {
+  const geohash = normaliseGeohash(value);
+  if (!geohash) return [];
+  return Array.from({length: geohash.length}, (_, index) => geohash.slice(0, geohash.length - index));
+}
+
+export function geohashMatchesBoard(noteGeohash, boardGeohash, depth = 0, exactOnly = false) {
+  const note = normaliseGeohash(noteGeohash);
+  const board = normaliseGeohash(boardGeohash);
+  if (!note || !board || !note.startsWith(board)) return false;
+  if (note === board) return true;
+  if (exactOnly) return false;
+  const levels = Math.max(0, Math.min(11, Number.parseInt(depth, 10) || 0));
+  return note.length - board.length <= levels;
+}
+
+export function encodeGeohash(latitude, longitude, precision = 9) {
+  const length = Math.max(1, Math.min(12, Number.parseInt(precision, 10) || 1));
+  let latMin = -90;
+  let latMax = 90;
+  let lonMin = -180;
+  let lonMax = 180;
+  let evenBit = true;
+  let bit = 0;
+  let value = 0;
+  let geohash = '';
+  const lat = Math.max(-90, Math.min(90, Number(latitude)));
+  const lon = Math.max(-180, Math.min(180, Number(longitude)));
+  while (geohash.length < length) {
+    if (evenBit) {
+      const middle = (lonMin + lonMax) / 2;
+      if (lon >= middle) { value = value * 2 + 1; lonMin = middle; }
+      else { value *= 2; lonMax = middle; }
+    } else {
+      const middle = (latMin + latMax) / 2;
+      if (lat >= middle) { value = value * 2 + 1; latMin = middle; }
+      else { value *= 2; latMax = middle; }
+    }
+    evenBit = !evenBit;
+    bit += 1;
+    if (bit === 5) {
+      geohash += GEOHASH_ALPHABET[value];
+      bit = 0;
+      value = 0;
+    }
+  }
+  return geohash;
+}
+
+export function geohashBounds(value) {
+  const geohash = normaliseGeohash(value);
+  if (!geohash) return null;
+  let south = -90;
+  let north = 90;
+  let west = -180;
+  let east = 180;
+  let evenBit = true;
+  for (const character of geohash) {
+    const index = GEOHASH_ALPHABET.indexOf(character);
+    for (const mask of [16, 8, 4, 2, 1]) {
+      if (evenBit) {
+        const middle = (west + east) / 2;
+        if (index & mask) west = middle;
+        else east = middle;
+      } else {
+        const middle = (south + north) / 2;
+        if (index & mask) south = middle;
+        else north = middle;
+      }
+      evenBit = !evenBit;
+    }
+  }
+  return {south, west, north, east, center: {lat: (south + north) / 2, lng: (west + east) / 2}};
+}
+
+export function geohashPrecisionForZoom(zoom) {
+  const level = Math.max(0, Math.min(21, Number(zoom) || 0));
+  if (level <= 3) return 1;
+  if (level <= 5) return 2;
+  if (level <= 7) return 3;
+  if (level <= 10) return 4;
+  if (level <= 12) return 5;
+  if (level <= 14) return 6;
+  if (level <= 17) return 7;
+  if (level <= 20) return 8;
+  return 9;
+}
+
+export function mapZoomForGeohashPrecision(precision) {
+  const index = Math.max(1, Math.min(9, Number.parseInt(precision, 10) || 1));
+  return [0, 2, 4, 6, 8, 11, 13, 15, 18, 21][index];
+}
+
 export function stickyOrderPrice(value, fallback = STICKY_PRICE_SATS) {
   const sats = Number(value?.sats ?? value?.priceSats ?? value);
-  return Number.isInteger(sats) && sats > 0 && sats <= STICKY_ANONYMOUS_PRICE_SATS ? sats : fallback;
+  return Number.isInteger(sats) && sats >= 0 && sats <= STICKY_ANONYMOUS_PRICE_SATS ? sats : fallback;
 }
 
 export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);
@@ -65,7 +164,7 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, exactGeohash = false, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
@@ -76,11 +175,12 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   const tags = [
     ['t', STICKY_TOPIC],
     ['client', 'satoshi.si'],
-    ['g', boardGeohash],
+    ...geohashPrefixes(boardGeohash).slice(0, exactGeohash ? 1 : undefined).map(prefix => ['g', prefix]),
     ['i', `geo:${boardGeohash}`],
     ['k', 'geo'],
+    ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
-    ['alt', 'A paid sticky note pinned on satoshi.si'],
+    ['alt', 'A sticky note pinned on satoshi.si'],
   ];
   if (anonymous) tags.push(['anonymous', '24h-local-key']);
   return {
@@ -100,8 +200,10 @@ export function parseStickyEvent(event) {
   if (!STICKY_FONTS.includes(font)) return null;
   const content = normaliseStickyText(event.content);
   if (!content || content.length > STICKY_MAX_CHARACTERS) return null;
-  const geohash = normaliseGeohash(event.tags.find(tag => tag?.[0] === 'g')?.[1]);
+  const geohashes = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
+  const geohash = geohashes.sort((left, right) => right.length - left.length)[0] || '';
   if (!geohash) return null;
+  const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -113,6 +215,7 @@ export function parseStickyEvent(event) {
     y: clampPlacement(sticky[4]),
     rotation: clampRotation(sticky[5]),
     geohash,
+    exactGeohash: scope !== 'prefix',
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
   };
 }
@@ -135,7 +238,7 @@ export function makeDeletionTemplate({eventId, createdAt = Math.floor(Date.now()
       ['e', eventId, 'wss://nostr.satoshi.si'],
       ['k', '1'],
       ['t', 'satoshi-sticky-delete'],
-      ['alt', 'A paid request to remove a sticky note from satoshi.si'],
+      ['alt', 'A request to remove a sticky note from satoshi.si'],
     ],
   };
 }
