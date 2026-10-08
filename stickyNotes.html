@@ -44,10 +44,10 @@
     <form id="boardChooser" class="dialog-inner board-chooser">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="boardDialogTitle">Choose a corkboard</h2>
-      <p>Enter the geohash shared by your group or workplace. A longer code covers a smaller area; 9 characters is precise enough for a building.</p>
+      <p>Enter the geohash shared by your group or workplace: 4 to 9 characters. A longer code covers a smaller area, and 9 is precise enough for a building. A place that straddles two or three cells can be written as a list, <code>u0qj7z0y,u0qj7z0z</code>, as long as those cells touch.</p>
       <label for="boardGeohash">Geohash</label>
       <div class="geohash-field">
-        <input id="boardGeohash" type="text" maxlength="12" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y1">
+        <input id="boardGeohash" type="text" maxlength="95" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y or u0qj7z0y,u0qj7z0z">
         <button type="button" id="openGeohashMap" aria-label="Choose geohash on a map" title="Choose on map"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
       </div>
       <label for="boardDepth">Include child boards</label>
@@ -71,13 +71,15 @@
   <dialog id="geohashMapDialog" class="geohash-map-dialog" aria-labelledby="geohashMapTitle">
     <div class="geohash-map-shell">
       <header class="geohash-map-header">
-        <div><h2 id="geohashMapTitle">Choose a geohash</h2><p>Zoom for a smaller area, then tap a grid cell.</p></div>
+        <div><h2 id="geohashMapTitle">Choose a geohash</h2><p>Zoom for a smaller area, then tap a grid cell. A place that straddles a few cells: tap the dashed ones around it to add them — a board only ever covers cells that touch.</p></div>
         <button type="button" id="closeGeohashMap" class="dialog-close" aria-label="Close map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       </header>
       <div id="geohashMap" class="geohash-map" aria-label="OpenStreetMap geohash selector"></div>
       <footer class="geohash-map-selection">
-        <span>Grid: <strong id="geohashMapPrecision">1 character</strong></span>
+        <span>Grid: <strong id="geohashMapPrecision">4 characters</strong></span>
         <span>Selected: <code id="geohashMapSelection">None</code></span>
+        <div id="geohashMapStatus" class="inline-status geohash-map-selection__status" role="status" aria-live="polite"></div>
+        <button type="button" id="clearGeohashSelection" class="map-clear-action">Clear</button>
         <button type="button" id="useGeohashSelection" class="primary-action" disabled>Use this area</button>
       </footer>
     </div>

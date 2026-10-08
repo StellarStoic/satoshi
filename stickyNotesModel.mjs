@@ -32,7 +32,15 @@ export const STICKY_FONTS = Object.freeze([
   'open-sans', 'source-sans', 'ubuntu', 'pt-sans', 'pt-serif', 'fira-mono',
   'ibm-plex-mono', 'merriweather', 'atkinson', 'serif',
 ]);
-export const GEOHASH_PATTERN = /^[0123456789bcdefghjkmnpqrstuvwxyz]{1,12}$/;
+// Codes are 4 to 9 characters: below 4 the cell is a region rather than a
+// place, and 9 is as deep as the grid is useful. Within that range a board may
+// be a clump of touching cells, which is what lets one note cover a building
+// that straddles two or three cells — a cell is what a note is pinned to, and
+// a clump is still one note on one price.
+export const GEOHASH_MIN_LENGTH = 4;
+export const GEOHASH_MAX_LENGTH = 9;
+export const GEOHASH_MAX_CELLS = 9;
+export const GEOHASH_PATTERN = new RegExp(`^[0123456789bcdefghjkmnpqrstuvwxyz]{${GEOHASH_MIN_LENGTH},${GEOHASH_MAX_LENGTH}}$`);
 const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
 
 export function normaliseGeohash(value, fallback = '') {
@@ -47,14 +55,105 @@ export function geohashPrefixes(value) {
   return Array.from({length: geohash.length}, (_, index) => geohash.slice(0, geohash.length - index));
 }
 
+/** One cell, or a list of them: both are accepted wherever a board is given. */
+function geohashCells(value) {
+  const list = Array.isArray(value) ? value : [value];
+  return list.map(cell => normaliseGeohash(cell)).filter(Boolean);
+}
+
+/**
+ * The eight cells that touch this one. Latitude has edges, longitude wraps, so
+ * the neighbours of a cell on the antimeridian are still eight (or six at a pole).
+ */
+export function geohashNeighbours(value) {
+  const geohash = normaliseGeohash(value);
+  if (!geohash) return [];
+  const bounds = geohashBounds(geohash);
+  const latStep = bounds.north - bounds.south;
+  const lonStep = bounds.east - bounds.west;
+  const neighbours = [];
+  for (const latOffset of [-1, 0, 1]) {
+    for (const lonOffset of [-1, 0, 1]) {
+      if (!latOffset && !lonOffset) continue;
+      const lat = bounds.center.lat + latOffset * latStep;
+      if (lat <= -90 || lat >= 90) continue;
+      const lng = ((bounds.center.lng + lonOffset * lonStep + 540) % 360) - 180;
+      const neighbour = encodeGeohash(lat, lng, geohash.length);
+      if (neighbour && neighbour !== geohash && !neighbours.includes(neighbour)) neighbours.push(neighbour);
+    }
+  }
+  return neighbours;
+}
+
+/** Two cells stick together when they share a side or a corner. */
+export function geohashTouches(left, right) {
+  const a = normaliseGeohash(left);
+  const b = normaliseGeohash(right);
+  if (!a || !b || a === b || a.length !== b.length) return false;
+  return geohashNeighbours(a).includes(b);
+}
+
+/** Is every cell reachable from the first one by stepping between neighbours? */
+export function geohashCellsConnected(cells) {
+  const list = geohashCells(cells);
+  if (list.length < 2) return list.length === 1;
+  const seen = new Set([list[0]]);
+  const queue = [list[0]];
+  while (queue.length) {
+    const neighbours = geohashNeighbours(queue.pop());
+    for (const cell of list) {
+      if (!seen.has(cell) && neighbours.includes(cell)) {
+        seen.add(cell);
+        queue.push(cell);
+      }
+    }
+  }
+  return seen.size === list.length;
+}
+
+/**
+ * Why a set of cells cannot be used, as a sentence for the reader, or '' when it
+ * is fine. The rules: at least one cell, no more than nine, all cut to the same
+ * depth, each chosen once, and the whole clump stuck together.
+ */
+export function geohashSetIssue(value) {
+  const list = (Array.isArray(value) ? value : value == null ? [] : [value])
+    .map(cell => String(cell ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  if (!list.length) return 'Choose at least one cell.';
+  if (list.length > GEOHASH_MAX_CELLS) return `A note can sit on at most ${GEOHASH_MAX_CELLS} cells.`;
+  if (new Set(list).size !== list.length) return 'Each cell can be chosen once.';
+  if (!list.every(cell => normaliseGeohash(cell))) {
+    return `A geohash is ${GEOHASH_MIN_LENGTH} to ${GEOHASH_MAX_LENGTH} characters from 0-9 and b-h, j, k, m, n, p-z.`;
+  }
+  if (new Set(list.map(cell => cell.length)).size !== 1) return 'Every cell has to be cut to the same depth.';
+  if (!geohashCellsConnected(list)) return 'Cells have to stick together — pick ones that touch.';
+  return '';
+}
+
+/** The usable cells, or [] when the set breaks a rule. Keeps the chosen order. */
+export function normaliseGeohashes(value) {
+  if (geohashSetIssue(value)) return [];
+  return [...new Set(geohashCells(value))];
+}
+
+/**
+ * Does a note belong on a board? Either side may be a clump, because a note or a
+ * board can cover several touching cells: a note is on the board when any of its
+ * cells is the board cell or deeper inside it, within the board's depth — and an
+ * exact note is only ever on the cells it names.
+ */
 export function geohashMatchesBoard(noteGeohash, boardGeohash, depth = 0, exactOnly = false) {
-  const note = normaliseGeohash(noteGeohash);
-  const board = normaliseGeohash(boardGeohash);
-  if (!note || !board || !note.startsWith(board)) return false;
-  if (note === board) return true;
-  if (exactOnly) return false;
+  const notes = geohashCells(noteGeohash);
+  const boards = geohashCells(boardGeohash);
+  if (!notes.length || !boards.length) return false;
   const levels = Math.max(0, Math.min(11, Number.parseInt(depth, 10) || 0));
-  return note.length - board.length <= levels;
+  return notes.some(note => boards.some(board => {
+    if (!note.startsWith(board)) return false;
+    if (note === board) return true;
+    if (exactOnly) return false;
+    return note.length - board.length <= levels;
+  }));
 }
 
 export function encodeGeohash(latitude, longitude, precision = 9) {
@@ -118,10 +217,9 @@ export function geohashBounds(value) {
 
 export function geohashPrecisionForZoom(zoom) {
   const level = Math.max(0, Math.min(21, Number(zoom) || 0));
-  if (level <= 3) return 1;
-  if (level <= 5) return 2;
-  if (level <= 7) return 3;
-  if (level <= 10) return 4;
+  // Shallow zooms are held at 4 characters: a 3-character cell is 100+ km across,
+  // and no code below 4 is a place anyone pins a note to.
+  if (level <= 10) return GEOHASH_MIN_LENGTH;
   if (level <= 12) return 5;
   if (level <= 14) return 6;
   if (level <= 17) return 7;
@@ -130,7 +228,10 @@ export function geohashPrecisionForZoom(zoom) {
 }
 
 export function mapZoomForGeohashPrecision(precision) {
-  const index = Math.max(1, Math.min(9, Number.parseInt(precision, 10) || 1));
+  const index = Math.max(
+    GEOHASH_MIN_LENGTH,
+    Math.min(GEOHASH_MAX_LENGTH, Number.parseInt(precision, 10) || GEOHASH_MIN_LENGTH),
+  );
   return [0, 2, 4, 6, 8, 11, 13, 15, 18, 21][index];
 }
 
@@ -257,19 +358,33 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, exactGeohash = false, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
-  const boardGeohash = normaliseGeohash(geohash);
-  if (!boardGeohash) throw new Error('Choose a valid geohash corkboard first.');
+  const choice = geohashes ?? geohash;
+  const issue = geohashSetIssue(choice);
+  if (issue) {
+    throw new Error(issue === 'Choose at least one cell.' ? 'Choose a valid geohash corkboard first.' : issue);
+  }
+  const cells = normaliseGeohashes(choice);
+  const primary = cells[0];
+  // An exact note names only the cells it sits on; otherwise the boards above each
+  // of them are named too, so the note is findable on the wider boards as well.
+  // Parents shallower than the shallowest code are not boards and are not named:
+  // below four characters a code is a region, and the desk refuses one outright.
+  const namedCells = exactGeohash
+    ? cells
+    : [...new Set(cells.flatMap(cell => geohashPrefixes(cell)))]
+      .filter(prefix => prefix.length >= GEOHASH_MIN_LENGTH)
+      .sort((left, right) => right.length - left.length);
   const tags = [
     ['t', STICKY_TOPIC],
     ['client', 'satoshi.si'],
-    ...geohashPrefixes(boardGeohash).slice(0, exactGeohash ? 1 : undefined).map(prefix => ['g', prefix]),
-    ['i', `geo:${boardGeohash}`],
+    ...namedCells.map(prefix => ['g', prefix]),
+    ['i', `geo:${primary}`],
     ['k', 'geo'],
     ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
@@ -293,9 +408,16 @@ export function parseStickyEvent(event) {
   if (!STICKY_FONTS.includes(font)) return null;
   const content = normaliseStickyText(event.content);
   if (!content || content.length > STICKY_MAX_CHARACTERS) return null;
-  const geohashes = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
-  const geohash = geohashes.sort((left, right) => right.length - left.length)[0] || '';
-  if (!geohash) return null;
+  const named = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
+  if (!named.length) return null;
+  // The deepest tags are the cells the note was pinned to; anything shallower is a
+  // board above them, named so the note surfaces there too. Matching the shorter
+  // ones as if they were cells would put every note on every ancestor board.
+  const depth = Math.max(...named.map(value => value.length));
+  const geohashes = [...new Set(named.filter(value => value.length === depth))];
+  const uri = event.tags.find(tag => tag?.[0] === 'i' && String(tag[1] || '').startsWith('geo:'))?.[1];
+  const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
+  const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
   return {
     id: event.id,
@@ -308,6 +430,7 @@ export function parseStickyEvent(event) {
     y: clampPlacement(sticky[4]),
     rotation: clampRotation(sticky[5]),
     geohash,
+    geohashes,
     exactGeohash: scope !== 'prefix',
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
   };

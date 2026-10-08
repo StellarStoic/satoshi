@@ -12,6 +12,11 @@ import {
   clampRotation,
   encodeGeohash,
   geohashBounds,
+  geohashNeighbours,
+  geohashSetIssue,
+  geohashTouches,
+  GEOHASH_MAX_CELLS,
+  normaliseGeohashes,
   makeDeletionTemplate,
   makeStickyTemplate,
   geohashMatchesBoard,
@@ -44,6 +49,9 @@ const API = document.querySelector('meta[name="sticky-api"]')?.content || paySer
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const BOARD_KEY = 'satoshi:sticky:geohash:v1';
+// A board can cover several cells that touch, so what is remembered is the whole
+// clump; BOARD_KEY keeps the first cell for links and older visitors.
+const BOARD_CELLS_KEY = 'satoshi:sticky:geohash-cells:v1';
 const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
 const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
 const elements = {
@@ -56,6 +64,7 @@ const elements = {
   openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
   closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
   geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
+  geohashMapStatus: document.getElementById('geohashMapStatus'), clearGeohashSelection: document.getElementById('clearGeohashSelection'),
   useGeohashSelection: document.getElementById('useGeohashSelection'),
   boardChooserStatus: document.getElementById('boardChooserStatus'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
@@ -115,26 +124,29 @@ let currentRails = [];
 let currentRailId = '';
 let profileFetchPubkey = '';
 let composingPubkey = '';
-let composingGeohash = '';
+let composingGeohashes = [];
 let geohashMap = null;
 let geohashGrid = null;
-let geohashMapSelection = '';
+let geohashMapCells = [];
 let geohashGridFrame = 0;
-const linkedGeohash = normaliseGeohash(new URL(location.href).searchParams.get('g'));
+const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
 let rememberBoard = localStorage.getItem(BOARD_REMEMBER_KEY) !== 'false';
-let activeGeohash = linkedGeohash || (rememberBoard ? normaliseGeohash(localStorage.getItem(BOARD_KEY)) : '');
+let activeGeohashes = linkedCells.length
+  ? linkedCells
+  : (rememberBoard ? geohashCellsFrom(localStorage.getItem(BOARD_CELLS_KEY) || localStorage.getItem(BOARD_KEY)) : []);
+let activeGeohash = activeGeohashes[0] || '';
 let boardDepth = Math.max(0, Math.min(11, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
-if (linkedGeohash && rememberBoard) localStorage.setItem(BOARD_KEY, linkedGeohash);
-if (pending?.action === 'pin' && Object.hasOwn(pending, 'geohash')) {
-  activeGeohash = normaliseGeohash(pending.geohash);
-  if (activeGeohash && rememberBoard) localStorage.setItem(BOARD_KEY, activeGeohash);
-  else if (!rememberBoard) localStorage.removeItem(BOARD_KEY);
+if (activeGeohashes.length && rememberBoard) rememberActiveBoard();
+if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.hasOwn(pending, 'geohashes'))) {
+  const cells = geohashCellsFrom(pending.geohashes ?? pending.geohash);
+  if (cells.length) {
+    activeGeohashes = cells;
+    activeGeohash = cells[0];
+  }
+  if (rememberBoard && activeGeohash) rememberActiveBoard();
+  else if (!rememberBoard) forgetActiveBoard();
 }
-if (rememberBoard && activeGeohash && activeGeohash !== linkedGeohash) {
-  const boardUrl = new URL(location.href);
-  boardUrl.searchParams.set('g', activeGeohash);
-  history.replaceState(null, '', boardUrl);
-}
+if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
 const CANVAS_WIDTH = 2600;
 const CANVAS_HEIGHT = 1800;
@@ -147,6 +159,49 @@ function savePending(value) {
   pending = value;
   if (value) localStorage.setItem(PENDING_KEY, JSON.stringify(value));
   else localStorage.removeItem(PENDING_KEY);
+}
+
+/**
+ * The cells a board covers, from whatever the reader or a link gave us: one code,
+ * a comma-separated clump, or an array. Invalid sets come back empty, and
+ * geohashIssueFrom() says why in words.
+ */
+function geohashCellsFrom(value) {
+  const parts = (Array.isArray(value) ? value : String(value ?? '').split(','))
+    .map(part => String(part ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  return geohashSetIssue(parts) ? [] : normaliseGeohashes(parts);
+}
+
+function geohashIssueFrom(value) {
+  const parts = (Array.isArray(value) ? value : String(value ?? '').split(','))
+    .map(part => String(part ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  return geohashSetIssue(parts.length ? parts : value);
+}
+
+/** What the board is called in messages: the cell, plus how many it covers. */
+function boardCellsLabel(cells = activeGeohashes) {
+  if (!cells.length) return '';
+  return cells.length === 1 ? cells[0] : `${cells[0]} +${cells.length - 1} cell${cells.length === 2 ? '' : 's'}`;
+}
+
+function rememberActiveBoard() {
+  if (!activeGeohashes.length) return;
+  localStorage.setItem(BOARD_CELLS_KEY, activeGeohashes.join(','));
+  localStorage.setItem(BOARD_KEY, activeGeohash);
+}
+
+function forgetActiveBoard() {
+  localStorage.removeItem(BOARD_CELLS_KEY);
+  localStorage.removeItem(BOARD_KEY);
+}
+
+function updateBoardUrl() {
+  const boardUrl = new URL(location.href);
+  if (rememberBoard && activeGeohashes.length) boardUrl.searchParams.set('g', activeGeohashes.join(','));
+  else boardUrl.searchParams.delete('g');
+  history.replaceState(null, '', boardUrl);
 }
 
 function status(target, message, error = false) {
@@ -166,10 +221,39 @@ function geohashCellDimensions(precision) {
   };
 }
 
-function setMapSelection(geohash) {
-  geohashMapSelection = normaliseGeohash(geohash);
-  elements.geohashMapSelection.textContent = geohashMapSelection || 'None';
-  elements.useGeohashSelection.disabled = !geohashMapSelection;
+function setMapCells(cells, message = '') {
+  geohashMapCells = cells;
+  elements.geohashMapSelection.textContent = cells.length ? cells.join(' + ') : 'None';
+  elements.useGeohashSelection.disabled = !cells.length;
+  status(elements.geohashMapStatus, message);
+}
+
+/**
+ * A tap adds a cell to the area, or takes it out again. The rule that cells have
+ * to touch is enforced here, and the reason is said out loud rather than the tap
+ * being swallowed: "does not touch" is the usual one, and the dashed cells on the
+ * map show which ones would be accepted.
+ */
+function toggleMapCell(cell) {
+  const next = geohashMapCells.includes(cell)
+    ? geohashMapCells.filter(existing => existing !== cell)
+    : [...geohashMapCells, cell];
+  if (!next.length) {
+    setMapCells([]);
+    return;
+  }
+  const issue = geohashSetIssue(next);
+  if (issue) {
+    // Say why rather than swallowing the tap, and say how to get where they meant:
+    // a cell across the map is not part of this area, and Clear starts a new one.
+    setMapCells(geohashMapCells, geohashMapCells.length && issue.startsWith('Cells have to stick together')
+      ? 'Cells have to stick together — pick one that touches, or Clear to start somewhere else'
+      : issue);
+    return;
+  }
+  setMapCells(next, next.length === 1
+    ? 'One cell — tap a cell touching it to cover two or three'
+    : `${next.length} cells, one note. Tap a dashed cell to widen, or a chosen one to drop it.`);
 }
 
 function drawGeohashGrid() {
@@ -200,19 +284,25 @@ function drawGeohashGrid() {
       const cellWest = -180 + lonIndex * width;
       const cellEast = Math.min(180, cellWest + width);
       const geohash = encodeGeohash((cellSouth + cellNorth) / 2, (cellWest + cellEast) / 2, precision);
-      const selected = geohash === geohashMapSelection;
+      const selected = geohashMapCells.includes(geohash);
+      // Dashed cells are the ones this area may grow into: a board is only ever
+      // cells that touch, so showing the candidates beats refusing taps.
+      const touchable = !selected && geohashMapCells.some(chosen => geohashTouches(chosen, geohash));
       const rectangle = window.L.rectangle([[cellSouth, cellWest], [cellNorth, cellEast]], {
-        className: 'geohash-grid-cell',
-        color: selected ? '#ffbd25' : '#f2a900',
+        className: `geohash-grid-cell${touchable ? ' geohash-grid-cell--touchable' : ''}`,
+        color: selected ? '#ffbd25' : touchable ? '#e8a200' : '#f2a900',
         fillColor: '#f2a900',
-        fillOpacity: selected ? .3 : .035,
-        opacity: selected ? 1 : .72,
-        weight: selected ? 3 : 1,
+        fillOpacity: selected ? .3 : touchable ? .09 : .035,
+        opacity: selected ? 1 : touchable ? .85 : .72,
+        weight: selected ? 3 : touchable ? 2 : 1,
+        // Without this a tap on a cell reaches the map as well, and the same cell
+        // is toggled twice — added and taken straight back out again.
+        bubblingMouseEvents: false,
       });
       if (showLabels) rectangle.bindTooltip(geohash, {permanent: true, direction: 'center', className: 'geohash-cell-label'});
       rectangle.on('click', event => {
         if (event.originalEvent) window.L.DomEvent.stopPropagation(event.originalEvent);
-        setMapSelection(geohash);
+        toggleMapCell(geohash);
         scheduleGeohashGrid();
       });
       rectangle.addTo(geohashGrid);
@@ -238,18 +328,37 @@ function initialiseGeohashMap() {
   geohashGrid = window.L.layerGroup().addTo(geohashMap);
   geohashMap.on('moveend', scheduleGeohashGrid);
   geohashMap.on('zoomend', () => {
+    const precision = geohashPrecisionForZoom(geohashMap.getZoom());
+    // Opening the map sets the view to the board's own zoom, which fires here too.
+    // That is not the reader zooming, and the cells they picked are still theirs —
+    // only a real change of depth makes them meaningless, and then it is said.
+    if (geohashMapCells.length && geohashMapCells[0].length === precision) {
+      scheduleGeohashGrid();
+      return;
+    }
     const center = geohashMap.getCenter();
-    setMapSelection(encodeGeohash(center.lat, center.lng, geohashPrecisionForZoom(geohashMap.getZoom())));
+    setMapCells([encodeGeohash(center.lat, center.lng, precision)],
+      'Zoomed to a new grid — pick the cells for this area again');
     scheduleGeohashGrid();
   });
   geohashMap.on('click', event => {
-    setMapSelection(encodeGeohash(event.latlng.lat, event.latlng.lng, geohashPrecisionForZoom(geohashMap.getZoom())));
+    const cell = encodeGeohash(event.latlng.lat, event.latlng.lng, geohashPrecisionForZoom(geohashMap.getZoom()));
+    const touching = geohashMapCells.some(chosen => geohashTouches(chosen, cell));
+    if (geohashMapCells.length && !touching && !geohashMapCells.includes(cell)) {
+      // Tapping somewhere else entirely starts a new area rather than being
+      // refused: the reader is plainly pointing at another place.
+      setMapCells([cell], 'Started a new area here — cells have to touch to be one board');
+      scheduleGeohashGrid();
+      return;
+    }
+    toggleMapCell(cell);
     scheduleGeohashGrid();
   });
 }
 
 function openGeohashMap() {
-  const current = normaliseGeohash(elements.boardGeohash.value) || activeGeohash;
+  const typed = geohashCellsFrom(elements.boardGeohash.value);
+  const current = typed.length ? typed : activeGeohashes;
   elements.boardDialog.close();
   showDialog(elements.geohashMapDialog);
   initialiseGeohashMap();
@@ -259,13 +368,14 @@ function openGeohashMap() {
   }
   requestAnimationFrame(() => {
     geohashMap.invalidateSize();
-    if (current) {
-      const mapHash = current.slice(0, 9);
-      const bounds = geohashBounds(mapHash);
-      setMapSelection(mapHash);
-      geohashMap.setView([bounds.center.lat, bounds.center.lng], mapZoomForGeohashPrecision(mapHash.length), {animate: false});
+    if (current.length) {
+      const bounds = geohashBounds(current[0]);
+      setMapCells(current, current.length === 1
+        ? 'Tap a cell touching this one to cover two or three'
+        : `${current.length} cells on this board`);
+      geohashMap.setView([bounds.center.lat, bounds.center.lng], mapZoomForGeohashPrecision(current[0].length), {animate: false});
     } else {
-      setMapSelection('');
+      setMapCells([]);
       geohashMap.setView([20, 0], 2, {animate: false});
     }
     scheduleGeohashGrid();
@@ -664,12 +774,14 @@ function noteAtPlacement(note, placement) {
 }
 
 function noteBelongsToBoard(sticky) {
-  return geohashMatchesBoard(sticky.geohash, activeGeohash, boardDepth, sticky.exactGeohash);
+  // Either side may be a clump: a note belongs to a board when any of the note's
+  // cells is one of the board's cells, or deeper inside one of them.
+  return geohashMatchesBoard(sticky.geohashes ?? sticky.geohash, activeGeohashes, boardDepth, sticky.exactGeohash);
 }
 
 function updateBoardControl() {
   const reach = boardDepth === 0 ? 'exact only' : boardDepth === 11 ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
-  const label = activeGeohash ? `Corkboard: ${activeGeohash} (${reach})` : 'Choose a geohash corkboard';
+  const label = activeGeohash ? `Corkboard: ${boardCellsLabel()} (${reach})` : 'Choose a geohash corkboard';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
 }
@@ -679,18 +791,18 @@ function selectBoard(geohash, closeDialog = true) {
     status(elements.boardChooserStatus, 'Pin the current note before changing corkboards.', true);
     return;
   }
-  const nextGeohash = normaliseGeohash(geohash);
-  if (!nextGeohash) {
-    status(elements.boardChooserStatus, 'Enter a valid geohash first.', true);
+  const cells = geohashCellsFrom(geohash);
+  if (!cells.length) {
+    const issue = geohashIssueFrom(geohash);
+    status(elements.boardChooserStatus,
+      issue === 'Choose at least one cell.' ? 'Enter a valid geohash first.' : issue, true);
     return;
   }
-  activeGeohash = nextGeohash;
-  if (rememberBoard) localStorage.setItem(BOARD_KEY, activeGeohash);
-  else localStorage.removeItem(BOARD_KEY);
-  const boardUrl = new URL(location.href);
-  if (rememberBoard) boardUrl.searchParams.set('g', activeGeohash);
-  else boardUrl.searchParams.delete('g');
-  history.replaceState(null, '', boardUrl);
+  activeGeohashes = cells;
+  activeGeohash = cells[0];
+  if (rememberBoard) rememberActiveBoard();
+  else forgetActiveBoard();
+  updateBoardUrl();
   updateBoardControl();
   closeNoteMenu();
   boardConnectionVersion += 1;
@@ -701,7 +813,7 @@ function selectBoard(geohash, closeDialog = true) {
   pendingDeletions.clear();
   elements.canvas.replaceChildren();
   elements.boardStatus.hidden = false;
-  status(elements.boardStatus, `Opening corkboard ${activeGeohash}...`);
+  status(elements.boardStatus, `Opening corkboard ${boardCellsLabel()}...`);
   if (closeDialog) elements.boardDialog.close();
   connectBoard(boardConnectionVersion);
 }
@@ -790,7 +902,9 @@ function connectBoard(version = boardConnectionVersion) {
   boardSocket = socket;
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);
   socket.addEventListener('open', () => {
-    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [activeGeohash], limit: 500};
+    // A board of several cells asks the relay for all of them at once: "any of
+    // these" is what the filter means, and the notes decide the rest.
+    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [...activeGeohashes], limit: 500};
     socket.send(JSON.stringify(['REQ', subscription,
       noteFilter,
       {kinds: [5], '#t': ['satoshi-sticky-delete'], limit: 500},
@@ -978,7 +1092,9 @@ async function startPayment() {
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
     if (composingPubkey && composingPubkey !== session.pubkey) throw new Error('Your active Nostr identity changed. Reopen the note and try again.');
-    if (!activeGeohash || composingGeohash !== activeGeohash) throw new Error('Choose the geohash corkboard again, then reopen the note.');
+    if (!activeGeohash || composingGeohashes.join(',') !== activeGeohashes.join(',')) {
+      throw new Error('Choose the geohash corkboard again, then reopen the note.');
+    }
     await ensureReadySigner();
     const content = normaliseStickyText(elements.editor.textContent);
     if (!content) throw new Error('Write something on the note first.');
@@ -988,12 +1104,16 @@ async function startPayment() {
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const exactGeohash = elements.exactGeohash.checked;
-    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, anonymous: session.method === 'anonymous'};
+    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont,
+      geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
+      anonymous: session.method === 'anonymous'};
     let order;
     try {
       order = await api('/orders', {
         method: 'POST',
-        body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
+        body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
+          geohash: activeGeohash, geohashes: [...activeGeohashes],
+          geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
       });
     } catch (error) {
       // 402 is the desk saying "this key is registered but has no subscription".
@@ -1503,7 +1623,7 @@ function openComposer() {
   const session = getNostrSession();
   if (!session) { showDialog(elements.login); return; }
   composingPubkey = session.pubkey;
-  composingGeohash = activeGeohash;
+  composingGeohashes = [...activeGeohashes];
   if (!pending?.orderId) elements.exactGeohash.checked = false;
   elements.pay.disabled = false;
   showDialog(elements.composer);
@@ -1519,12 +1639,13 @@ elements.geohashMapDialog.addEventListener('close', () => {
   requestAnimationFrame(() => elements.boardGeohash.focus());
 });
 elements.useGeohashSelection.addEventListener('click', () => {
-  if (!geohashMapSelection) return;
-  elements.boardGeohash.value = geohashMapSelection;
+  if (!geohashMapCells.length) return;
+  elements.boardGeohash.value = geohashMapCells.join(',');
   elements.geohashMapDialog.close();
 });
+elements.clearGeohashSelection.addEventListener('click', () => setMapCells([]));
 elements.openBoard.addEventListener('click', () => {
-  elements.boardGeohash.value = activeGeohash;
+  elements.boardGeohash.value = activeGeohashes.join(',');
   elements.boardDepth.value = String(boardDepth);
   elements.rememberBoard.checked = rememberBoard;
   status(elements.boardChooserStatus, '');
@@ -1534,37 +1655,41 @@ elements.openBoard.addEventListener('click', () => {
 elements.boardChooser.addEventListener('submit', event => {
   event.preventDefault();
   const value = elements.boardGeohash.value.trim().toLowerCase();
-  if (!normaliseGeohash(value)) {
-    status(elements.boardChooserStatus, 'Enter a valid geohash using 0-9 and b-h, j, k, m, n, p-z.', true);
+  const cells = geohashCellsFrom(value);
+  if (!cells.length) {
+    const issue = geohashIssueFrom(value);
+    status(elements.boardChooserStatus,
+      issue === 'Choose at least one cell.'
+        ? 'Enter a geohash of 4 to 9 characters using 0-9 and b-h, j, k, m, n, p-z.'
+        : issue, true);
     return;
   }
-  selectBoard(value);
+  selectBoard(cells);
 });
 elements.boardDepth.addEventListener('change', () => {
   boardDepth = Math.max(0, Math.min(11, Number.parseInt(elements.boardDepth.value, 10) || 0));
   localStorage.setItem(BOARD_DEPTH_KEY, String(boardDepth));
   updateBoardControl();
-  if (activeGeohash) selectBoard(activeGeohash, false);
+  if (activeGeohash) selectBoard([...activeGeohashes], false);
 });
 elements.rememberBoard.addEventListener('change', () => {
   rememberBoard = elements.rememberBoard.checked;
   localStorage.setItem(BOARD_REMEMBER_KEY, String(rememberBoard));
-  if (rememberBoard && activeGeohash) localStorage.setItem(BOARD_KEY, activeGeohash);
-  else localStorage.removeItem(BOARD_KEY);
-  const boardUrl = new URL(location.href);
-  if (rememberBoard && activeGeohash) boardUrl.searchParams.set('g', activeGeohash);
-  else boardUrl.searchParams.delete('g');
-  history.replaceState(null, '', boardUrl);
+  if (rememberBoard) rememberActiveBoard();
+  else forgetActiveBoard();
+  updateBoardUrl();
   status(elements.boardChooserStatus, rememberBoard ? 'This board will open on your next visit.' : 'This board will not be remembered.');
 });
 elements.shareBoard.addEventListener('click', async () => {
-  const geohash = normaliseGeohash(elements.boardGeohash.value) || activeGeohash;
-  if (!geohash) {
+  const typed = geohashCellsFrom(elements.boardGeohash.value);
+  const cells = typed.length ? typed : activeGeohashes;
+  if (!cells.length) {
     status(elements.boardChooserStatus, 'Enter or open a geohash before sharing it.', true);
     return;
   }
+  const geohash = boardCellsLabel(cells);
   const url = new URL('/stickyNotes.html', location.origin);
-  url.searchParams.set('g', geohash);
+  url.searchParams.set('g', cells.join(','));
   try {
     if (navigator.share) {
       try {

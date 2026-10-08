@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashPrecisionForZoom, geohashPrefixes, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+import {GEOHASH_MIN_LENGTH, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -110,18 +110,20 @@ test('a board geohash is required and carries searchable Nostr geo tags', () => 
   assert.deepEqual(template.tags.find(tag => tag[0] === 'g'), ['g', TEST_GEOHASH]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'i'), ['i', `geo:${TEST_GEOHASH}`]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'k'), ['k', 'geo']);
-  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]), geohashPrefixes(TEST_GEOHASH));
+  // Every parent that is still a code: the chain stops at 4 characters, because a
+  // shorter code is a region rather than a board.
+  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]),
+    geohashPrefixes(TEST_GEOHASH).filter(prefix => prefix.length >= GEOHASH_MIN_LENGTH));
   assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', 'prefix']);
 });
 
 test('geohash depth includes only the selected number of child levels', () => {
   assert.deepEqual(geohashPrefixes('u24jed'), ['u24jed', 'u24je', 'u24j', 'u24', 'u2', 'u']);
-  assert.equal(geohashMatchesBoard('u24jed', 'u', 4), false);
-  assert.equal(geohashMatchesBoard('u24jed', 'u', 5), true);
   assert.equal(geohashMatchesBoard('u24jed', 'u24j', 2), true);
   assert.equal(geohashMatchesBoard('u24jed', 'u24j', 1), false);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24je', 1), true);
   assert.equal(geohashMatchesBoard('u24jed', 'u24jed', 0, true), true);
-  assert.equal(geohashMatchesBoard('u24jed', 'u', 11, true), false);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24je', 11, true), false);
 });
 
 test('map coordinates round-trip through geohash cells up to precision 9', () => {
@@ -132,10 +134,59 @@ test('map coordinates round-trip through geohash cells up to precision 9', () =>
   assert.ok(bounds.south <= 46.0569 && bounds.north >= 46.0569);
   assert.ok(bounds.west <= 14.5058 && bounds.east >= 14.5058);
   assert.equal(encodeGeohash(bounds.center.lat, bounds.center.lng, 9), hash);
-  assert.equal(geohashPrecisionForZoom(2), 1);
+  assert.equal(geohashPrecisionForZoom(2), 4, 'a shallower zoom than 4 characters is not offered');
+  assert.equal(geohashPrecisionForZoom(9), 4);
   assert.equal(geohashPrecisionForZoom(20), 8);
   assert.equal(geohashPrecisionForZoom(21), 9);
   assert.equal(mapZoomForGeohashPrecision(9), 21);
+  assert.equal(mapZoomForGeohashPrecision(2), mapZoomForGeohashPrecision(4), 'zoom for 4 is the floor');
+});
+
+test('a geohash code is 4 to 9 characters', () => {
+  assert.equal(normaliseGeohash('u4p'), '', '3 characters is a region, not a place');
+  assert.equal(normaliseGeohash('u4pr'), 'u4pr', '4 is the shallowest code');
+  assert.equal(normaliseGeohash('u4pr7z0y1'), 'u4pr7z0y1', '9 is the deepest');
+  assert.equal(normaliseGeohash('u4pr7z0y1x'), '', '10 is deeper than the grid goes');
+  assert.equal(normaliseGeohash('u4pr7z0i'), '', 'i is not in the geohash alphabet');
+  assert.equal(normaliseGeohash('U4PR7Z0Y'), 'u4pr7z0y', 'codes are lowercase');
+});
+
+test('cells stick together when they share a side or a corner', () => {
+  const cell = 'u4pr7z0y';
+  const neighbours = geohashNeighbours(cell);
+  assert.equal(neighbours.length, 8, 'a cell has eight neighbours');
+  assert.ok(neighbours.every(neighbour => geohashTouches(cell, neighbour)));
+  assert.equal(geohashTouches(cell, cell), false, 'a cell is not its own neighbour');
+  assert.equal(geohashTouches(cell, 'u4pr7z0'), false, 'a shallower cell is a parent, not a neighbour');
+  assert.equal(geohashTouches(cell, 'u4pr7z0y1'), false, 'a deeper cell is a child, not a neighbour');
+  assert.equal(geohashTouches(cell, '9q8yyk8y'), false, 'another country does not stick');
+});
+
+test('a board may be a clump of touching cells, within the rules', () => {
+  const cell = 'u4pr7z0y';
+  const neighbours = geohashNeighbours(cell);
+  const nine = [cell, ...neighbours];
+  assert.equal(geohashSetIssue([cell]), '', 'one cell on its own is a board');
+  assert.equal(geohashSetIssue([cell, neighbours[0]]), '', 'and so are two that touch');
+  assert.equal(geohashSetIssue(nine), '', 'a cell and its eight neighbours is the widest clump');
+  const tenth = geohashNeighbours(neighbours[0]).find(neighbour => !nine.includes(neighbour));
+  assert.equal(geohashSetIssue([...nine, tenth]), 'A note can sit on at most 9 cells.');
+  assert.equal(geohashSetIssue([cell, cell]), 'Each cell can be chosen once.');
+  assert.equal(geohashSetIssue([cell, 'u4pr7z0']), 'Every cell has to be cut to the same depth.');
+  assert.equal(geohashSetIssue([cell, 'u4pr7z00']), 'Cells have to stick together — pick ones that touch.');
+  assert.equal(geohashSetIssue([cell, '9q8yyk8y']), 'Cells have to stick together — pick ones that touch.');
+  assert.equal(geohashSetIssue([]), 'Choose at least one cell.');
+  assert.equal(geohashSetIssue('u4p'), 'A geohash is 4 to 9 characters from 0-9 and b-h, j, k, m, n, p-z.');
+});
+
+test('a clump may reach out two steps, but not fall apart', () => {
+  const cell = 'u4pr7z0y';
+  const step = geohashNeighbours(cell)[0];
+  const beyond = geohashNeighbours(step).find(neighbour => neighbour !== cell && !geohashNeighbours(cell).includes(neighbour));
+  assert.equal(geohashTouches(cell, beyond), false, 'two steps away');
+  assert.equal(geohashSetIssue([cell, step, beyond]), '', 'it still holds together through the middle cell');
+  assert.equal(geohashSetIssue([cell, step, beyond, '9q8yyk8y']),
+    'Cells have to stick together — pick ones that touch.', 'one loose cell breaks the clump');
 });
 
 test('exact-geohash notes publish and parse as exact only', () => {
@@ -145,6 +196,42 @@ test('exact-geohash notes publish and parse as exact only', () => {
   const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
   assert.equal(parsed.geohash, 'u24jed');
   assert.equal(parsed.exactGeohash, true);
+});
+
+test('a note on several cells names every cell, and stays on those boards', () => {
+  const cell = 'u4pr7z0y';
+  const step = geohashNeighbours(cell)[0];
+  const cells = [cell, step];
+
+  const exact = makeStickyTemplate({content: 'corner shop', color: 'green', x: .4, y: .6, rotation: 3, geohash: cell, geohashes: cells, exactGeohash: true});
+  assert.deepEqual(exact.tags.filter(tag => tag[0] === 'g'), [['g', cell], ['g', step]]);
+  assert.deepEqual(exact.tags.find(tag => tag[0] === 'i'), ['i', `geo:${cell}`],
+    'the cell the note was written on stays its primary');
+  const parsed = parseStickyEvent({...exact, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.deepEqual(parsed.geohashes, cells);
+  assert.equal(parsed.geohash, cell);
+
+  const prefix = makeStickyTemplate({content: 'corner shop', color: 'green', x: .4, y: .6, rotation: 3, geohashes: cells});
+  const named = prefix.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]);
+  assert.ok(named.includes(cell) && named.includes(step), 'both cells are named');
+  assert.ok(named.includes('u4pr7z0'), 'and the boards above them');
+  const parsedPrefix = parseStickyEvent({...prefix, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.deepEqual(parsedPrefix.geohashes, cells,
+    'the shallower tags are boards, not cells, so they cannot count as cells of the note');
+  assert.equal(parsedPrefix.exactGeohash, false);
+});
+
+test('a note on several cells belongs to each of those boards', () => {
+  const cell = 'u4pr7z0y';
+  const step = geohashNeighbours(cell)[0];
+  const cells = [cell, step];
+  assert.equal(geohashMatchesBoard(cells, cell, 0), true, 'the board it was written on');
+  assert.equal(geohashMatchesBoard(cells, step, 0), true, 'and the neighbour it also sits on');
+  assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 1), true, 'the board above it, within depth');
+  assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 0), false, 'but not beyond the depth the reader chose');
+  assert.equal(geohashMatchesBoard(cell, cells, 0, true), true, 'a clump board shows a note on any of its cells');
+  assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 1, true), false, 'an exact note is only on the cells it names');
+  assert.equal(geohashMatchesBoard(cells, '9q8yyk8y', 9), false, 'and never on an unrelated board');
 });
 
 test('legacy single-geohash notes stay exact instead of widening unexpectedly', () => {
@@ -249,7 +336,7 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(css, /\.board-controls[^}]+left:\s*50%/);
   assert.doesNotMatch(script, /zoomLevel/);
   assert.doesNotMatch(html, /Global board/);
-  assert.match(script, /'#g': \[activeGeohash\]/);
+  assert.match(script, /'#g': \[\.\.\.activeGeohashes\]/);
   assert.match(html, /id="boardDepth"/);
   assert.match(html, /id="rememberStickyBoard"[^>]+role="switch"/);
   assert.match(html, /id="shareStickyBoard"/);
@@ -261,7 +348,7 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(script, /geohashPrecisionForZoom/);
   assert.match(script, /OpenStreetMap/);
   assert.match(script, /searchParams\.get\('g'\)/);
-  assert.match(script, /searchParams\.set\('g', geohash\)/);
+  assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
   assert.match(script, /BOARD_REMEMBER_KEY/);
   assert.match(script, /localStorage\.removeItem\(BOARD_KEY\)/);
 });
@@ -318,4 +405,51 @@ test('dragging a paid note onto the bin asks before discarding it', async () => 
   // yes drops the note and its pending, no puts it back where the drag started
   assert.match(script, /function discardPendingNote[\s\S]{0,1200}savePending\(null\)/);
   assert.match(script, /function keepDiscardedNote[\s\S]{0,400}setPlacement\(restore\)/);
+});
+
+test('a board may be one cell or a clump of touching ones', async () => {
+  const [html, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  // the chooser takes a list, and says how long a code may be
+  assert.match(html, /id="boardGeohash"[^>]*maxlength="95"/);
+  assert.match(html, /4 to 9 characters/);
+  assert.match(html, /u0qj7z0y,u0qj7z0z/);
+  // the map picks cells, and shows which ones may be added to the area
+  assert.match(script, /function toggleMapCell\(cell\)/);
+  assert.match(script, /geohashMapCells\.some\(chosen => geohashTouches\(chosen, geohash\)\)/);
+  assert.match(html, /id="clearGeohashSelection"/);
+  assert.match(script, /elements\.clearGeohashSelection\.addEventListener/);
+  assert.match(html, /id="geohashMapStatus"/);
+  assert.match(css, /\.geohash-grid-cell--touchable \{ stroke-dasharray/);
+  // the whole area is what gets used, and the old single-cell path is gone
+  assert.match(script, /elements\.boardGeohash\.value = geohashMapCells\.join\(','\)/);
+  assert.doesNotMatch(script, /setMapSelection/);
+  assert.doesNotMatch(script, /composingGeohash = activeGeohash/);
+  // the board remembers, links and shares every cell
+  assert.match(script, /const BOARD_CELLS_KEY = 'satoshi:sticky:geohash-cells:v1'/);
+  assert.match(script, /searchParams\.set\('g', activeGeohashes\.join\(','\)\)/);
+  // and orders, publishes and reads for every cell it covers
+  assert.match(script, /geohash: activeGeohash, geohashes: \[\.\.\.activeGeohashes\]/);
+  assert.match(script, /'#g': \[\.\.\.activeGeohashes\]/);
+  assert.match(script, /geohashMatchesBoard\(sticky\.geohashes \?\? sticky\.geohash, activeGeohashes/);
+});
+
+test('every control the board reaches for is in its element map', async () => {
+  // A wiring line for an element that was never mapped throws on load, and the
+  // whole board then does nothing at all — the failure mode this test exists for.
+  const [script, html] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+  const defined = new Map([...script.matchAll(/([A-Za-z_$][\w$]*):\s*document\.getElementById\('([^']+)'\)/g)]
+    .map(match => [match[1], match[2]]));
+  assert.ok(defined.size >= 60, `the element map looks short: ${defined.size} entries`);
+  const used = [...new Set([...script.matchAll(/elements\.([A-Za-z_$][\w$]*)/g)].map(match => match[1]))];
+  const unmapped = used.filter(name => !defined.has(name));
+  assert.deepEqual(unmapped, [], `used but not mapped: ${unmapped.join(', ')}`);
+  const missing = used.map(name => defined.get(name)).filter(id => id && !html.includes(`id="${id}"`));
+  assert.deepEqual(missing, [], `mapped but not in the markup: ${missing.join(', ')}`);
 });

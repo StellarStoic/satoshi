@@ -90,6 +90,7 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "pubkey": "a127e1254181099aa2891a9b0a15823777a2e0ce666ba618d53a07b890de56af",
   "contentHash": "f85b3318961505a15465bd9bfca8ce0fa45336ed68cf53b4564643db6c14d1e9",
   "geohash": "u0qj7z0y1",
+  "geohashes": ["u0qj7z0y1", "u0qj7z0z1"],
   "geohashMode": "prefix" }
 ```
 
@@ -100,11 +101,26 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
 ```
 
 `action` is exactly `pin` or `remove`. `pubkey`, `contentHash` and `targetEventId` are
-64-character lowercase hex. Every pin requires a lowercase geohash of 1 through 12
-characters from the geohash alphabet. `geohashMode` is required for a pin and is exactly
-`prefix` or `exact`. `anonymous: true` is optional and valid only for `pin`; it selects
-the fixed 42-sat price. Nothing else is accepted. The created order binds the geohash,
-geohash mode and identity mode alongside the pubkey and commitment.
+64-character lowercase hex. Every pin requires a lowercase geohash of **4 through 9**
+characters from the geohash alphabet: below 4 a cell is a region rather than a place, and
+9 is as deep as the grid is useful.
+
+A pin may cover **one cell or a clump of them**, which is what lets one note sit on a
+building that straddles two or three cells. Send either `geohash` (one cell, the older
+shape, still accepted) or `geohashes` (an array, one to nine cells). When both are sent
+they have to agree, and `geohash` must be the first entry of `geohashes`. The rules for a
+clump: every cell cut to the **same depth**, each cell listed **once**, no more than
+**nine** cells, and the cells must **touch** — sharing an edge or a corner — so that the
+clump is one connected piece. Any violation is `bad_geohash`, before anything is priced.
+The first cell is the *primary*: the one the note is written on, and the one the `["i"]`
+tag names. The whole clump is what is bought, and it is **one note on one price** — a
+clump costs exactly what a single cell costs.
+
+`geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
+is optional and valid only for `pin`; it selects the fixed 42-sat price. Nothing else is
+accepted. The created order binds every cell of the clump, the geohash mode and the
+identity mode alongside the pubkey and commitment; the publish token is derived from
+all of them.
 
 **response — `201`**
 
@@ -186,9 +202,8 @@ Content-Type: application/json
 
 { "event": { "id": "…", "pubkey": "…", "created_at": 1791350494, "kind": 1,
              "tags": [["t","satoshi-sticky"],["client","satoshi.si"],
-                      ["g","u0qj7z0y1"],["g","u0qj7z0y"],["g","u0qj7z0"],
-                      ["g","u0qj7z"],["g","u0qj7"],["g","u0qj"],
-                      ["g","u0q"],["g","u0"],["g","u"],
+                      ["g","u0qj7z0y1"],["g","u0qj7z0z1"],
+                      ["g","u0qj7z0y"],["g","u0qj7z0"],["g","u0qj7"],["g","u0qj"],
                       ["i","geo:u0qj7z0y1"],["k","geo"],["geohash","prefix"],
                       ["sticky","v1","yellow","0.42","0.99","-2.00","typewriter"],
                       ["alt","A sticky note pinned on satoshi.si"]],
@@ -199,7 +214,7 @@ The token may go in the header (preferred) or in the body as `publishToken`.
 
 The desk checks, in this order, **before** anything reaches the relay:
 
-1. the token — valid for *this* order, *this* pubkey, *this* action, *this* geohash, *this* geohash mode and *this* commitment, unused, unexpired;
+1. the token — valid for *this* order, *this* pubkey, *this* action, *this* clump of cells, *this* geohash mode and *this* commitment, unused, unexpired;
 2. the event — id matches its contents, and the BIP-340 signature verifies;
 3. the signer equals the pubkey that ordered the note;
 4. freshness — signed at most an hour before publishing, not stamped more than 5 minutes into the future;
@@ -271,8 +286,8 @@ the event no longer matches the paid commitment.
 | --------- | ------------------------------------------------------------ | ----------- |
 | `t`       | `satoshi-sticky`                                             | exactly one |
 | `client`  | `satoshi.si`                                                 | exactly one |
-| `g`       | order geohash and, for `prefix` mode, each shorter parent    | exact set   |
-| `i`       | `geo:` followed by the order geohash                         | exactly one |
+| `g`       | every cell the order paid for, and in `prefix` mode the boards above them | exact set |
+| `i`       | `geo:` followed by one of the paid cells                     | exactly one |
 | `k`       | `geo`                                                        | exactly one |
 | `geohash` | order's `exact` or `prefix` mode                             | exactly one |
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
@@ -286,13 +301,19 @@ Colors are `yellow`, `pink`, `blue`, `green`, or `orange`. Allowed font keys are
 and `serif`. Positions are decimal fractions from 0 through 1 and rotation is from -12
 through 12 degrees.
 
-Relay tag matching is exact, not a string-prefix search. In `prefix` mode a note for
-`u24jed` therefore carries `g` tags for `u24jed`, `u24je`, `u24j`, `u24`, `u2`, and `u`.
-In `exact` mode it carries only `u24jed`. The longest `g` value is always the canonical
-note geohash. The payment service must reject a missing, duplicate, out-of-order or extra
-`g` value and any mode mismatch. The `i` and `k` pair follows NIP-73's external-content
-identifier for the full lowercase geohash. These tags sort public events into corkboards;
-they do not encrypt a note or restrict who can fetch it.
+Relay tag matching is exact, not a string-prefix search. In `prefix` mode a note on the
+cell `u24jed` carries `g` tags for `u24jed`, `u24je`, `u24j`, and `u24` — every parent that
+is still a code, so the chain stops at four characters rather than walking up to `u2` and
+`u`, which are regions and are not boards. In `exact` mode it carries only `u24jed`. For a
+clump, every paid cell is named, and in `prefix` mode so is each of their parent boards.
+
+Reading those tags back, the **deepest** `g` values are the cells the note was pinned to
+and anything shallower is a board above them — that is how a clump of the same depth is
+told apart from the parents that were added for reach. The payment service must reject a
+missing cell, a duplicate, an extra `g` value that is neither a paid cell nor a board
+above one, and any mode mismatch. The `i` and `k` pair follows NIP-73's external-content
+identifier, naming one of the cells that was paid for. These tags sort public events into
+corkboards; they do not encrypt a note or restrict who can fetch it.
 
 `content` is the note text: **at most 501 characters**, counted as the UI counts them
 (Unicode code points, so one emoji is one character).
@@ -371,9 +392,9 @@ bounds and the character limit from it rather than keeping its own copy.
 
 | Code | Where | Means |
 | --- | --- | --- |
-| `bad_geohash` | `POST /orders` 400 | a pin without a geohash, or a geohash outside `[0123456789bcdefghjkmnpqrstuvwxyz]`, length 1–12, lowercase. A `remove` that sends one is refused the same way. |
+| `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 4–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. A `remove` that sends either field is refused the same way. |
 | `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean, or was sent for a `remove`. |
-| `geohash_mismatch` | `publish` 400 | the note does not carry exactly `["g", <order geohash>]`, `["i", "geo:<order geohash>"]` and `["k", "geo"]`. Missing, duplicated, or a different cell — all the same refusal, because the note would otherwise land in a cell nobody paid for. |
+| `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |
 | `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
 | `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
 
@@ -382,7 +403,7 @@ that reached the relay some other way can be told apart. Removals stay geohash-f
 deletion has no place on the board, so there is nothing to bind.
 
 `GET /sticky/v1/config` additionally publishes `anonymousSats: 42`, the geohash rules
-(`requiredForPin`, `alphabet`, `minLength`, `maxLength`, the three tag names) and the tag map
+(`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names) and the tag map
 (`clientValue`, `anonymousTagValue`), so a frontend never keeps its own copy of any of it.
 
 ## Relay write access — how it is actually enforced

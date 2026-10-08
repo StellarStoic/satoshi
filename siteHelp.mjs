@@ -57,8 +57,9 @@ export const PAGE_HELP = Object.freeze({
                 paragraphs: [
                     'Picture a corkboard on a wall that anyone can walk up to and read. You write a short note, pick its'
                     + ' colour and font, choose a spot on the map, and pin it there. The note carries its own appearance and'
-                    + ' address, so every device draws it in the same place. Everything you pin is public: anyone can read'
-                    + ' it, with or without an account.',
+                    + ' address, so every device draws it in the same place. A note can also cover a few cells that touch'
+                    + ' when a place straddles them — a building sitting on a corner — and it is still one note on one'
+                    + ' price. Everything you pin is public: anyone can read it, with or without an account.',
                     'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
                     + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like and'
                     + ' remove your own, with no per-note price. If you own a satoshi.si name such as yourname@satoshi.si,'
@@ -87,12 +88,14 @@ export const PAGE_HELP = Object.freeze({
                     + ' own line. The event that publishes is therefore the event that was paid for.',
                     'Placement is deliberately not part of that commitment: you place the note after paying, so its'
                     + ' position and tilt are bounds-checked when the event is published instead of being fixed in advance.',
-                    'Every pin belongs to a geohash. You enter one or pick it on the OpenStreetMap view, where zooming'
-                    + ' changes the grid from 1 to 9 characters. The note names the geohash it was pinned for in a'
-                    + ' ["g",<geohash>] tag, the parent geohashes above it so it is also findable on the broader boards,'
-                    + ' ["i","geo:<geohash>"] and ["k","geo"] — unless you mark it exact-only, when only the full geohash is'
-                    + ' named and the note appears on that board alone. This is organisation, not privacy: a published note'
-                    + ' is public.',
+                    'Every pin belongs to a geohash of four to nine characters: you enter one or pick it on the'
+                    + ' OpenStreetMap view, where zooming changes the grid between those depths. A place that straddles two'
+                    + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'
+                    + ' touch (along an edge or at a corner) and there are no more than nine: one note, one price. The note'
+                    + ' names each of those cells in its own ["g",<cell>] tag, the boards above them so it is also findable'
+                    + ' on the wider boards, ["i","geo:<cell>"] for the cell it was written on, and ["k","geo"] — unless you'
+                    + ' mark it exact-only, when only the cells themselves are named and the note appears on those boards'
+                    + ' alone. This is organisation, not privacy: a published note is public.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
                     + ' extended rather than restarted when you renew early, covering any number of pins and removals while'
                     + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'
