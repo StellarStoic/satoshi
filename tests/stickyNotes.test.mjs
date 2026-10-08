@@ -706,7 +706,7 @@ test('the board can start from where the reader is', async () => {
   assert.match(script, /const AREA_SCALES = \[8, 7, 5, 4\]/);
   const offered = [...html.matchAll(/data-area-precision="(\d+)"/g)].map(match => match[1]);
   assert.deepEqual(offered, ['8', '7', '5', '4'], 'the markup offers exactly the sizes the script lists');
-  for (const label of ['Building', 'Street', 'City', 'State']) assert.match(html, new RegExp(`>${label}<`));
+  for (const label of ['Building', 'Neighbourhood', 'City', 'State']) assert.match(html, new RegExp(`>${label}<`));
   // every size is a depth the board accepts: shorter than four is a region, not a place
   for (const precision of offered) {
     assert.ok(Number(precision) >= 4 && Number(precision) <= 9, `${precision} is a board depth`);
@@ -730,7 +730,7 @@ test('the board can start from where the reader is', async () => {
   assert.match(css, /\.area-scale\b/);
 });
 
-test('the four "around me" sizes really are a building, a street, a city and a state', () => {
+test('the four "around me" sizes really are a building, a neighbourhood, a city and a state', () => {
   // The page quotes a cell's height in metres. Measure the depths it offers through the
   // model's own bounds instead of trusting the page's arithmetic: at Ljubljana's latitude
   // the four choices must land on the scales they are named after.
@@ -739,9 +739,10 @@ test('the four "around me" sizes really are a building, a street, a city and a s
     const {south, north} = geohashBounds(cell);
     return (north - south) * 111320;
   });
-  const [building, street, city, state] = heights;
+  const [building, neighbourhood, city, state] = heights;
   assert.ok(building >= 15 && building <= 25, `a building-sized cell is about 19 m, got ${Math.round(building)}`);
-  assert.ok(street >= 120 && street <= 190, `a street-sized cell is about 153 m, got ${Math.round(street)}`);
+  assert.ok(neighbourhood >= 120 && neighbourhood <= 190,
+    `a neighbourhood-sized cell is about 153 m, got ${Math.round(neighbourhood)}`);
   assert.ok(city >= 4000 && city <= 6000, `a city-sized cell is about 4.9 km, got ${Math.round(city)}`);
   assert.ok(state >= 15000 && state <= 25000, `a state-sized cell is about 20 km, got ${Math.round(state)}`);
   // and each one is a depth the board accepts

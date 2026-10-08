@@ -123,7 +123,8 @@ export const PAGE_HELP = Object.freeze({
                     + ' mark it exact-only, when only the cells themselves are named and the note appears on those boards'
                     + ' alone. This is organisation, not privacy: a published note is public.',
                     'Around me asks the browser where you are, and then asks how much ground to cover: a building,'
-                    + ' a street, a city or a state, which are geohash depths 8, 7, 5 and 4 — about 19 m, 153 m, 4.9 km'
+                    + ' a neighbourhood, a city or a state, which are geohash depths 8, 7, 5 and 4 — about 19 m,'
+                    + ' 153 m, 4.9 km'
                     + ' and 20 km of cell height, and a cell is the same height at every latitude. The position is turned'
                     + ' into a geohash inside the page and is never sent anywhere: the board asks the relay for that'
                     + ' geohash, not for you. The size is the reader\u2019s own choice because a board is only as useful as'
