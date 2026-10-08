@@ -13,6 +13,7 @@ import {
   encodeGeohash,
   geohashBounds,
   geohashNeighbours,
+  clampBoardView,
   geohashSetIssue,
   geohashTouches,
   GEOHASH_MAX_CELLS,
@@ -67,6 +68,7 @@ const SAVED_PLACES_MAX = 24;
 const SAVED_PLACE_NAME_MAX = 40;
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
+  corkFrame: document.getElementById('corkFrame'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   mentionFilter: document.getElementById('mentionFilter'), mentionFilterStatus: document.getElementById('mentionFilterStatus'),
   mentionMenu: document.getElementById('mentionMenu'), mentionOptions: document.getElementById('mentionOptions'),
@@ -201,6 +203,9 @@ const CANVAS_WIDTH = 2600;
 // 2600x1800 board, so it never covers a note; the board is fitted with the rail
 // included, otherwise the frame would be cropped off at Fit board.
 const BOARD_FRAME_WIDTH = 90;
+// Fitting leaves a little daylight so the rail reads as a border rather than sitting
+// flush on the window edge, which is how it went missing on a phone.
+const BOARD_FIT_MARGIN = 0.94;
 const CANVAS_HEIGHT = 1800;
 
 function readPending() {
@@ -963,14 +968,29 @@ function selectBoard(geohash, closeDialog = true) {
   rendered.clear();
   noteEvents.clear();
   pendingDeletions.clear();
-  elements.canvas.replaceChildren();
+  // The wooden rail is markup inside this canvas, so a bare replaceChildren() deleted the
+  // board's own edge every time a board was opened - which is why the border was missing on
+  // a phone, where a board almost always gets chosen before the board is looked at. Keep it.
+  elements.canvas.replaceChildren(elements.corkFrame);
   elements.boardStatus.hidden = false;
   status(elements.boardStatus, `Opening corkboard ${boardCellsLabel()}...`);
   if (closeDialog) elements.boardDialog.close();
   connectBoard(boardConnectionVersion);
 }
 
+function clampViewToBoard() {
+  const rect = elements.board.getBoundingClientRect();
+  const clamped = clampBoardView(boardView, {width: rect.width, height: rect.height}, {
+    canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, frame: BOARD_FRAME_WIDTH,
+  });
+  boardView.x = clamped.x;
+  boardView.y = clamped.y;
+}
+
 function applyBoardTransform() {
+  // Every pan, zoom and fit passes through here, so this is the one place that has to hold
+  // the line: the rail is the board's edge, and the board does not continue past it.
+  clampViewToBoard();
   elements.canvas.style.transform = `translate(${boardView.x}px, ${boardView.y}px) scale(${boardView.scale})`;
   // How far the frame has to reach outside the board to cover the window: a fixed
   // band would leave bare cork showing past it at a zoomed-out view, so it is
@@ -988,9 +1008,14 @@ function applyBoardTransform() {
 
 function fitBoard() {
   const rect = elements.board.getBoundingClientRect();
-  // Fit the rail too, but keep the cork itself centred exactly as before.
+  // Fit the rail, not just the cork, with margin left over so the border is actually
+  // visible: the framed sheet is what a reader sees, so it is what has to fit. The clamp in
+  // applyBoardTransform then centres the framed sheet rather than the bare cork.
   const frame = BOARD_FRAME_WIDTH * 2;
-  boardView.scale = Math.min(rect.width / (CANVAS_WIDTH + frame), rect.height / (CANVAS_HEIGHT + frame));
+  boardView.scale = BOARD_FIT_MARGIN * Math.min(
+    rect.width / (CANVAS_WIDTH + frame),
+    rect.height / (CANVAS_HEIGHT + frame),
+  );
   boardView.x = (rect.width - CANVAS_WIDTH * boardView.scale) / 2;
   boardView.y = (rect.height - CANVAS_HEIGHT * boardView.scale) / 2;
   applyBoardTransform();
@@ -1798,6 +1823,14 @@ function installBoardNavigation() {
       boardView.y = gesture.boardY + event.clientY - gesture.y;
     }
     applyBoardTransform();
+    // At an edge the board stops while the finger keeps going. Re-anchor every frame so
+    // dragging back responds at once, instead of first retracing travel that was refused.
+    if (!gesture.pinch && gesture.id === event.pointerId) {
+      gesture.x = event.clientX;
+      gesture.y = event.clientY;
+      gesture.boardX = boardView.x;
+      gesture.boardY = boardView.y;
+    }
   });
   const stop = event => {
     pointers.delete(event.pointerId);

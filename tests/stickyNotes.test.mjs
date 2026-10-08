@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView,
+  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -520,12 +521,18 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(css, /box-shadow: 0 0 0 var\(--cork-surround, 420px\)/, 'a solid band sits outside the rail');
   assert.match(page, /setProperty\('--cork-surround'/, 'the band is sized from the window, in board pixels');
 
-  // One source of truth for that variable, and Fit board must not crop the rail.
+  // One source of truth for that variable, and Fit board must not crop the rail. The margin
+  // is what leaves the rail visible rather than flush on the window edge, which is how the
+  // border went missing on a phone.
   assert.match(page, /const BOARD_FRAME_WIDTH = \d+;/);
+  assert.match(page, /const BOARD_FIT_MARGIN = 0\.94;/);
   assert.match(page, /setProperty\('--cork-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
     'the constant is published to the stylesheet');
-  assert.match(page, /Math\.min\(rect\.width \/ \(CANVAS_WIDTH \+ frame\), rect\.height \/ \(CANVAS_HEIGHT \+ frame\)\)/,
-    'Fit board fits the rail as well as the cork');
+  assert.match(page, /BOARD_FIT_MARGIN \* Math\.min\(\s*\n?\s*rect\.width \/ \(CANVAS_WIDTH \+ frame\),\s*\n?\s*rect\.height \/ \(CANVAS_HEIGHT \+ frame\),\s*\n?\s*\)/,
+    'Fit board fits the rail as well as the cork, with margin left around it');
+  // The rail is also the limit: nothing may be panned into the cork that lies past it.
+  assert.match(page, /clampViewToBoard\(\)/, 'the transform holds the line');
+  assert.match(page, /frame: BOARD_FRAME_WIDTH,/);
 });
 
 test('a note reads its expiration back, and one that names none is not drawn', () => {
@@ -801,4 +808,67 @@ test('saved places carry a name the reader chose, and stay in the browser', asyn
   // a saved place is a shortcut, not the kept place
   assert.match(flat, /elements\.geohashMapDialog\.close\(\); selectBoard\(cells\);/);
   assert.match(script, /const SAVED_PLACES_MAX = 24/);
+});
+
+test('the rail is the board\u2019s limit, so the view cannot leave the framed sheet', () => {
+  const viewport = {width: 1000, height: 800};
+  // where the rail's four outer edges land on screen: -90 is the rail on the near side,
+  // 2690/1890 on the far side of the 2600x1800 cork
+  const rails = view => ({
+    left: view.x - 90 * view.scale,
+    right: view.x + 2690 * view.scale,
+    top: view.y - 90 * view.scale,
+    bottom: view.y + 1890 * view.scale,
+  });
+
+  // dragged far past the right and bottom: the rail's near edges land exactly on the window
+  const pulled = rails(clampBoardView({x: 5000, y: 5000, scale: .6}, viewport));
+  assert.equal(pulled.left, 0, 'the left rail stops at the left window edge');
+  assert.equal(pulled.top, 0, 'the top rail stops at the top window edge');
+
+  // dragged far past the left and top: the rail's far edges land on the window
+  const pushed = rails(clampBoardView({x: -5000, y: -5000, scale: .6}, viewport));
+  assert.equal(pushed.right, 1000, 'the right rail stops at the right window edge');
+  assert.equal(pushed.bottom, 800, 'the bottom rail stops at the bottom window edge');
+
+  // a view already inside the board is left alone
+  assert.deepEqual(clampBoardView({x: -300, y: -120, scale: .6}, viewport), {scale: .6, x: -300, y: -120});
+
+  // a phone at low zoom cannot fill the window, so the framed sheet is centred instead
+  const small = rails(clampBoardView({x: 999, y: 999, scale: .28}, viewport));
+  assert.ok(small.left > 0 && small.right < 1000, 'the framed sheet is centred, not pinned');
+  assert.equal(Math.round(small.left), Math.round(1000 - small.right), 'the margins match');
+});
+
+test('every pan, zoom and fit goes through the limit, and fitting leaves daylight', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const transform = script.slice(script.indexOf('function applyBoardTransform()'), script.indexOf('function fitBoard()'));
+  assert.match(transform, /clampViewToBoard\(\)/, 'the transform clamps before it draws');
+  assert.ok(transform.indexOf('clampViewToBoard()') < transform.indexOf('elements.canvas.style.transform'),
+    'the clamp happens before the transform is written, not after');
+  assert.match(script, /const BOARD_FIT_MARGIN = 0\.94;/);
+  assert.match(script, /boardView\.scale = BOARD_FIT_MARGIN \* Math\.min\(/);
+  // the pan gesture re-anchors at the edge, or dragging back feels stuck
+  assert.match(script, /gesture\.boardX = boardView\.x;\n      gesture\.boardY = boardView\.y;/);
+  assert.match(script, /clampBoardView\(boardView, \{width: rect\.width, height: rect\.height\}, \{\n    canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, frame: BOARD_FRAME_WIDTH,/);
+});
+
+test('opening a board keeps the wooden rail, instead of deleting it with the canvas', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+
+  // the rail is markup inside the canvas, not something the script builds
+  const canvasStart = html.indexOf('id="stickyCanvas"');
+  assert.ok(canvasStart > 0 && html.indexOf('id="corkFrame"', canvasStart) > canvasStart,
+    'the frame lives inside the canvas, so it pans and zooms with the board');
+
+  // so the place that clears the canvas must keep it
+  assert.match(page, /elements\.canvas\.replaceChildren\(elements\.corkFrame\)/,
+    'clearing the canvas keeps the rail');
+  assert.doesNotMatch(page, /elements\.canvas\.replaceChildren\(\)/,
+    'a bare clear would delete the board\u2019s own edge');
+  assert.match(page, /corkFrame: document\.getElementById\('corkFrame'\)/);
+  // and nothing else clears that canvas
+  assert.equal((page.match(/elements\.canvas\.replaceChildren/g) || []).length, 1,
+    'one place clears the canvas, and it keeps the rail');
 });

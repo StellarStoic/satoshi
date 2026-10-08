@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v205';   // v205: an install survives one bad file, and the panel always has a time
+const CACHE = 'satoshi-static-v206';   // v206: the rail is the board's edge, and the pan stops there
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

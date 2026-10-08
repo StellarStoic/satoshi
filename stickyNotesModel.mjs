@@ -541,6 +541,37 @@ export function normaliseStickyText(value) {
   return String(value || '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
 }
 
+/**
+ * The framed sheet is the whole world.
+ *
+ * A board coordinate lands on screen at `view.x + coordinate * scale`, so the rail's outer
+ * edge (`-frame` on the left, `canvasWidth + frame` on the right) may sit on the window
+ * edge but never inside it - otherwise a reader is looking at cork that past the board does
+ * not exist. When the framed sheet cannot fill the window, as on a phone at low zoom, it is
+ * centred instead of pinned to one edge.
+ */
+export function clampBoardView(view, viewport, options = {}) {
+  const canvasWidth = options.canvasWidth ?? 2600;
+  const canvasHeight = options.canvasHeight ?? 1800;
+  const frame = options.frame ?? 90;
+  const scale = view.scale || 1;
+  const minX = -frame;
+  const minY = -frame;
+  const maxX = canvasWidth + frame;
+  const maxY = canvasHeight + frame;
+  const spanX = (maxX - minX) * scale;
+  const spanY = (maxY - minY) * scale;
+  const axis = (position, span, extent, min, max) => {
+    if (span <= extent) return (extent - span) / 2 - min * scale;
+    return Math.min(-min * scale, Math.max(extent - max * scale, position));
+  };
+  return {
+    scale,
+    x: axis(view.x, spanX, viewport.width, minX, maxX),
+    y: axis(view.y, spanY, viewport.height, minY, maxY),
+  };
+}
+
 export function clampPlacement(value, fallback = 0.5) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : fallback;
