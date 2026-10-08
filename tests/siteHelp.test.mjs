@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { helpForPath, PAGE_HELP } from '../siteHelp.mjs';
+import { helpCopy, helpForPath, helpSections, PAGE_HELP } from '../siteHelp.mjs';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const existingTriggerPattern = /info-modal-trigger|lofi-help-trigger|id=["']helpIcon["']|id=["']mood-info-modal-btn["']/;
@@ -35,8 +35,7 @@ test('home resolves with and without an explicit filename', () => {
 });
 
 test('sticky notes help explains its signed Nostr layout without backend details', () => {
-    const help = PAGE_HELP['/stickyNotes.html'];
-    const copy = [help.description, ...(help.details || [])].join(' ');
+    const copy = helpCopy(PAGE_HELP['/stickyNotes.html']);
     for (const term of ['Nostr event', 'signer', 'public key', 'coordinates', 'deletion event']) assert.match(copy, new RegExp(term, 'i'));
     assert.doesNotMatch(copy, /API|payment server|write policy|attestation/i);
 });
@@ -75,5 +74,52 @@ test('page-specific top controls do not restore viewport-fixed positioning', asy
     for (const [file, pattern] of checks) {
         const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
         assert.doesNotMatch(source, pattern, `${file} fixes a top control to the viewport`);
+    }
+});
+
+test('sticky notes help has a plain view and a technical one', () => {
+    const sections = helpSections(PAGE_HELP['/stickyNotes.html']);
+    assert.equal(sections.length, 2, 'two views');
+    assert.deepEqual(sections.map(section => section.label), ['In plain words', 'Technical']);
+    for (const section of sections) assert.ok(section.paragraphs.length >= 4, `${section.label} needs substance`);
+    // The plain view has to stay plain: no tag soup, no algorithm names.
+    const plain = sections[0].paragraphs.join(' ');
+    assert.doesNotMatch(plain, /\[/, 'the plain view should not be full of tags');
+    assert.doesNotMatch(plain, /sha256|kind 1|geohash/i);
+    // The technical view is where the wire format lives.
+    const technical = sections[1].paragraphs.join(' ');
+    for (const term of ['kind 1', 'sha256', 'geohash', 'publish token']) {
+        assert.match(technical, new RegExp(term, 'i'));
+    }
+});
+
+test('the explainer states the prices the board actually charges, and no retired ones', async () => {
+    const model = await import('../stickyNotesModel.mjs');
+    const copy = helpCopy(PAGE_HELP['/stickyNotes.html']);
+    const live = [
+        model.STICKY_SUB_WEEK_SATS,
+        model.STICKY_SUB_YEAR_SATS,
+        model.STICKY_SUB_MEMBER_WEEK_SATS,
+        model.STICKY_SUB_MEMBER_YEAR_SATS,
+        model.STICKY_ANONYMOUS_PRICE_SATS,
+    ];
+    for (const price of live) {
+        assert.match(copy, new RegExp(`\\b${price}\\b`), `the explainer should state ${price} sats`);
+    }
+    // There is no per-note price for a signed-in writer any more, so the modal must
+    // not advertise one.
+    assert.doesNotMatch(copy, /\b11 sats\b|\b21 sats\b/);
+});
+
+test('a flat details list still renders as one unlabelled view', () => {
+    assert.deepEqual(helpSections({details: ['a', 'b']}), [{label: '', paragraphs: ['a', 'b']}]);
+    assert.deepEqual(helpSections({}), []);
+    // an empty view is dropped rather than shown blank
+    assert.deepEqual(
+        helpSections({sections: [{label: 'Empty', paragraphs: []}, {label: 'Real', paragraphs: ['a']}]}),
+        [{label: 'Real', paragraphs: ['a']}]);
+    // and every other page keeps working through the same accessor
+    for (const [path, help] of Object.entries(PAGE_HELP)) {
+        assert.ok(helpCopy(help).length > 40, `${path} has no explainable copy`);
     }
 });

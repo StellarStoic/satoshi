@@ -49,16 +49,70 @@ export const PAGE_HELP = Object.freeze({
     },
     '/stickyNotes.html': {
         title: 'About Nostr sticky notes',
-        description: 'Sticky notes are small public messages signed with your Nostr identity and placed on a shared corkboard.',
-        details: [
-            'After payment or free member authorization, your note text, color, font, position and tilt are written into one signed Nostr event. These details travel together, so the board can rebuild the note in the same place on any device.',
-            'Your Nostr signer proves which public key created the note. It signs the event without giving Satoshi.si your private key.',
-            'A signed-in Nostr user posts for 11 sats. An active satoshi.si NIP-05 owner posts free after the service verifies the public key. You can instead post anonymously for 42 sats. The browser creates a temporary Nostr identity and stores its signing key only on this device. Local access stops after 24 hours and the saved key is removed while the page is running or when you next return. The published note remains public.',
-            'Choose a geohash before any notes load. Enter one directly or use the OpenStreetMap picker: zooming changes the visible grid from 1 to 9 characters, and tapping a cell selects it. Share creates a link that opens that board. You can show only its exact notes or include a chosen number of more precise child geohashes. For example, u can include u24jed when its depth allows five more characters.',
-            'A note normally appears on its precise board and eligible broader parent boards. Authors can mark a note exact-only so Satoshi.si loads it only when its full geohash is selected. This is a display preference, not privacy: the signed Nostr event remains public.',
-            'The board setting can remember the last selected geohash locally or forget it after the visit. Each note shows its author as a Nostr profile name, then NIP-05, then a shortened npub; temporary identities are labeled anonymous.',
-            'The board reads compatible events from the Nostr relay, checks their signatures and places each note using the coordinates saved in its signed tags. Zooming and panning move the notes and corkboard together.',
-            'The pin opens the event ID and posting time. Removing your own note creates a separate deletion event signed by the same Nostr identity.'
+        description: 'Sticky notes are small public messages signed with your Nostr identity and placed on a shared'
+            + ' corkboard. Posting is a subscription: 10 sats a week, or 5 with a satoshi.si name.',
+        sections: [
+            {
+                label: 'In plain words',
+                paragraphs: [
+                    'Picture a corkboard on a wall that anyone can walk up to and read. You write a short note, pick its'
+                    + ' colour and font, choose a spot on the map, and pin it there. The note carries its own appearance and'
+                    + ' address, so every device draws it in the same place. Everything you pin is public: anyone can read'
+                    + ' it, with or without an account.',
+                    'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
+                    + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like and'
+                    + ' remove your own, with no per-note price. If you own a satoshi.si name such as yourname@satoshi.si,'
+                    + ' the same pass costs half: 5 sats a week or 205 a year.',
+                    'You do not have to decide about the pass before you start writing. Write the note, press the button,'
+                    + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
+                    + ' of the pass the button simply says that posting is included.',
+                    'Not signed in? An anonymous note costs 42 sats each. Your browser invents a temporary identity for'
+                    + ' that note, keeps its key only on this device, and forgets it after 24 hours. A pass never applies to'
+                    + ' an anonymous note: each one costs 42 sats.',
+                    'When a pass runs out, nothing you already pinned disappears. Your notes stay on the board for'
+                    + ' everyone to read; only new notes and removals need a pass.',
+                    'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
+                    + ' private key and never holds your sats; the pass is a record the board checks when you post.',
+                ]
+            },
+            {
+                label: 'Technical',
+                paragraphs: [
+                    'A note is one kind 1 Nostr event signed by your own signer: a browser extension, a bunker, or a key'
+                    + ' pasted for a single visit. The text is the event content and everything else travels in tags:'
+                    + ' ["t","satoshi-sticky"], ["client","satoshi.si"], one ["sticky","v1",color,x,y,rotation,font] whose x'
+                    + ' and y coordinates are fractions of the board and whose rotation is in degrees, and ["alt",…].'
+                    + ' Colours are yellow, pink, blue, green, orange, and the text is capped at 501 characters. Before you'
+                    + ' pay, the content is hashed with sha256 over the string v1, the colour, the font and the text, each on its'
+                    + ' own line. The event that publishes is therefore the event that was paid for.',
+                    'Placement is deliberately not part of that commitment: you place the note after paying, so its'
+                    + ' position and tilt are bounds-checked when the event is published instead of being fixed in advance.',
+                    'Every pin belongs to a geohash. You enter one or pick it on the OpenStreetMap view, where zooming'
+                    + ' changes the grid from 1 to 9 characters. The note names the geohash it was pinned for in a'
+                    + ' ["g",<geohash>] tag, the parent geohashes above it so it is also findable on the broader boards,'
+                    + ' ["i","geo:<geohash>"] and ["k","geo"] — unless you mark it exact-only, when only the full geohash is'
+                    + ' named and the note appears on that board alone. This is organisation, not privacy: a published note'
+                    + ' is public.',
+                    'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
+                    + ' extended rather than restarted when you renew early, covering any number of pins and removals while'
+                    + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'
+                    + ' a name, 5 × 52 = 260 → 205).',
+                    'A pin from a key with no active pass is refused with a subscription-required answer; the board then'
+                    + ' buys the pass and repeats the same action, which the second time comes back already settled at zero'
+                    + ' sats along with its publish token.',
+                    'A removal is a kind 5 deletion event signed by the same identity as the note, carrying ["e",<event'
+                    + ' id>] with a relay hint and ["k","1"]. Only the author can order one: the service reads the target'
+                    + ' note from the relay and compares its author before it prices anything.',
+                    'The publish token is bound to the note content hash, its geohash and its identity mode, lives 15'
+                    + ' minutes and is spent once, so a token bought for one note cannot publish a different one in another'
+                    + ' cell. The service verifies the event id and signature before the relay sees the event, and the relay'
+                    + ' admits a write only for the exact event id that was paid for. An anonymous note must carry the'
+                    + ' ["anonymous","24h-local-key"] marker; a named note must not.',
+                    'Payments are in sats over Lightning or Ark, for the amount the service calculated for that order,'
+                    + ' and a rail asking for any other amount is refused. Reading is always free: the relay serves every'
+                    + ' published note to anyone, and an expired pass deletes, hides and rewrites nothing.',
+                ]
+            },
         ]
     },
     '/offers.html': {
@@ -107,6 +161,36 @@ function normalisePath(pathname) {
 
 export function helpForPath(pathname) {
     return PAGE_HELP[normalisePath(pathname)] || null;
+}
+
+/**
+ * An explainer's paragraphs, grouped into views.
+ *
+ * A page may supply `sections` — each a label and its paragraphs — and the dialog
+ * then shows one view at a time, so the plain-language telling is not buried under
+ * the technical one. The original flat `details` list still works: it becomes a
+ * single unlabelled view and renders exactly as it always did.
+ */
+export function helpSections(help) {
+    const sections = (Array.isArray(help?.sections) ? help.sections : [])
+        .map(section => ({
+            label: typeof section?.label === 'string' ? section.label : '',
+            paragraphs: (Array.isArray(section?.paragraphs) ? section.paragraphs : [])
+                .filter(text => typeof text === 'string' && text.length)
+        }))
+        .filter(section => section.paragraphs.length);
+    if (sections.length) return sections;
+
+    const details = (Array.isArray(help?.details) ? help.details : [])
+        .filter(text => typeof text === 'string' && text.length);
+    return details.length ? [{label: '', paragraphs: details}] : [];
+}
+
+/** An explainer as one string, so what it claims can be checked as a whole. */
+export function helpCopy(help) {
+    return [help?.title, help?.description, ...helpSections(help).flatMap(section => [section.label, ...section.paragraphs])]
+        .filter(text => typeof text === 'string' && text.length)
+        .join(' ');
 }
 
 function iconMarkup() {
@@ -168,6 +252,70 @@ function styleExistingTrigger(trigger) {
     if (trigger.parentElement !== document.body) document.body.append(trigger);
 }
 
+function helpParagraph(text) {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = text;
+    return paragraph;
+}
+
+/**
+ * What goes under the description. One view renders as plain paragraphs, exactly as
+ * the flat list always did; more than one renders as a switchable panel, so a page
+ * can explain itself both simply and in detail without either drowning the other.
+ */
+function createHelpBody(help) {
+    const sections = helpSections(help);
+    if (sections.length <= 1) {
+        return [...(sections[0]?.paragraphs || [])].map(helpParagraph);
+    }
+
+    const tablist = document.createElement('div');
+    tablist.className = 'site-help-dialog__tabs';
+    tablist.setAttribute('role', 'tablist');
+    tablist.setAttribute('aria-label', 'Explanation');
+
+    const tabs = [];
+    const panels = [];
+    const select = index => {
+        tabs.forEach((tab, position) => tab.setAttribute('aria-selected', position === index ? 'true' : 'false'));
+        panels.forEach((panel, position) => { panel.hidden = position !== index; });
+    };
+
+    sections.forEach((section, index) => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'site-help-dialog__tab';
+        tab.id = `siteHelpTab${index}`;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-controls', `siteHelpPanel${index}`);
+        tab.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+        tab.textContent = section.label;
+        tab.addEventListener('click', () => select(index));
+        // A tablist is expected to answer the arrow keys as well as the pointer.
+        tab.addEventListener('keydown', event => {
+            if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+            event.preventDefault();
+            const next = (index + (event.key === 'ArrowRight' ? 1 : sections.length - 1)) % sections.length;
+            select(next);
+            tabs[next]?.focus();
+        });
+
+        const panel = document.createElement('div');
+        panel.className = 'site-help-dialog__panel';
+        panel.id = `siteHelpPanel${index}`;
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', tab.id);
+        panel.hidden = index !== 0;
+        section.paragraphs.forEach(text => panel.append(helpParagraph(text)));
+
+        tabs.push(tab);
+        panels.push(panel);
+        tablist.append(tab);
+    });
+
+    return [tablist, ...panels];
+}
+
 function createHelpDialog(help) {
     const dialog = document.createElement('dialog');
     dialog.id = 'siteHelpDialog';
@@ -184,11 +332,6 @@ function createHelpDialog(help) {
     const description = document.createElement('p');
     description.textContent = help.description;
 
-    const details = (help.details || []).map(text => {
-        const paragraph = document.createElement('p');
-        paragraph.textContent = text;
-        return paragraph;
-    });
 
     const close = document.createElement('button');
     close.type = 'button';
@@ -198,7 +341,7 @@ function createHelpDialog(help) {
     close.textContent = '\u00d7';
     close.addEventListener('click', () => dialog.close());
 
-    content.append(close, title, description, ...details);
+    content.append(close, title, description, ...createHelpBody(help));
     dialog.append(content);
     dialog.addEventListener('click', event => {
         if (event.target === dialog) dialog.close();
