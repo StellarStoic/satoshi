@@ -81,3 +81,44 @@
   .board-controls { bottom:calc(48px + env(safe-area-inset-bottom)); }.board-controls button { width:34px; height:34px; }
   .geohash-map-dialog { width:calc(100vw - 8px); height:calc(100dvh - 8px); }.geohash-map-header { min-height:62px; padding-left:12px; }.geohash-map-selection { display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; min-height:82px; padding:8px 10px; }.geohash-map-selection .primary-action { grid-column:1 / -1; width:100%; min-height:36px; margin:0; }
 }
+
+/* Subscription state and the plan picker inside the composer */
+.subscription-state {
+  margin: .5rem 0 0;
+  font-size: .82rem;
+  line-height: 1.4;
+  opacity: .85;
+}
+
+.plan-picker {
+  display: flex;
+  gap: .5rem;
+  margin-top: .55rem;
+}
+
+.plan-button {
+  flex: 1;
+  padding: .5rem .6rem;
+  border: 1px solid rgba(0, 0, 0, .18);
+  border-radius: .6rem;
+  background: rgba(255, 255, 255, .55);
+  color: inherit;
+  font: inherit;
+  font-size: .82rem;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.plan-button b { font-weight: 700; }
+.plan-button small { display: block; font-size: .72rem; opacity: .75; }
+
+.plan-button.is-active,
+.plan-button[aria-pressed="true"] {
+  border-color: #f7931a;
+  background: rgba(247, 147, 26, .14);
+  box-shadow: inset 0 0 0 1px #f7931a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .plan-button { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .22); }
+}

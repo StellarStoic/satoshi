@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_MEMBER_PRICE_SATS, STICKY_PRICE_SATS, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashPrecisionForZoom, geohashPrefixes, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyOrderPrice, stickyPaymentRails} from '../stickyNotesModel.mjs';
+import {STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashPrecisionForZoom, geohashPrefixes, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -10,15 +10,69 @@ test('sticky notes accept up to 501 characters', () => {
   assert.equal(STICKY_MAX_CHARACTERS, 501);
 });
 
-test('uses the authoritative whole-satoshi order price', () => {
-  assert.equal(STICKY_PRICE_SATS, 11);
-  assert.equal(STICKY_MEMBER_PRICE_SATS, 0);
+test('prices are the subscription plans, and nothing else counts as one', () => {
+  assert.equal(STICKY_SUB_WEEK_SATS, 10);
+  assert.equal(STICKY_SUB_YEAR_SATS, 411);
+  assert.equal(STICKY_SUB_MEMBER_WEEK_SATS, 5);
+  assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, 205);
   assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 42);
-  assert.equal(stickyOrderPrice({sats: 11}), 11);
+
+  assert.equal(stickySubscriptionPrice('week'), 10);
+  assert.equal(stickySubscriptionPrice('week', {member: true}), 5);
+  assert.equal(stickySubscriptionPrice('year'), 411);
+  assert.equal(stickySubscriptionPrice('year', {member: true}), 205);
+  assert.equal(stickySubscriptionPrice('month'), null, 'no invented plans');
+
+  // The yearly price is the weekly one with 21% off, not a number typed twice.
+  assert.equal(STICKY_SUB_YEAR_SATS,
+    Math.round(STICKY_SUB_WEEK_SATS * STICKY_SUB_WEEKS_PER_YEAR * (1 - STICKY_SUB_YEAR_DISCOUNT)));
+  assert.equal(STICKY_SUB_MEMBER_YEAR_SATS,
+    Math.round(STICKY_SUB_MEMBER_WEEK_SATS * STICKY_SUB_WEEKS_PER_YEAR * (1 - STICKY_SUB_YEAR_DISCOUNT)));
+
+  // Only prices this service actually quotes are displayed; anything else is not
+  // a price it issued, so the board falls back rather than showing it.
+  assert.equal(stickyOrderPrice({sats: 10}), 10);
+  assert.equal(stickyOrderPrice({sats: 411}), 411);
+  assert.equal(stickyOrderPrice({sats: 0}), 0, 'a covered note costs nothing');
   assert.equal(stickyOrderPrice({sats: 42}), 42);
-  assert.equal(stickyOrderPrice({sats: 0}), 0);
-  assert.equal(stickyOrderPrice({sats: 10.5}), 11);
-  assert.equal(stickyOrderPrice({sats: 43}), 11);
+  assert.equal(stickyOrderPrice({sats: 11}), STICKY_SUB_WEEK_SATS, 'the retired per-note price is not shown');
+  assert.equal(stickyOrderPrice({sats: 10.5}), STICKY_SUB_WEEK_SATS);
+  assert.equal(stickyOrderPrice({sats: 43}), STICKY_SUB_WEEK_SATS);
+});
+
+test('the composer says what posting costs, and what a subscription changes', () => {
+  const stranger = {active: false, prices: {weekSats: 10, yearSats: 411, member: false}};
+  const member = {active: false, prices: {weekSats: 5, yearSats: 205, member: true}};
+  const covered = {active: true, expiresAt: 1800000000, plan: 'week', prices: {weekSats: 5, yearSats: 205, member: true}};
+
+  const off = describeStickyAction({subscription: stranger});
+  assert.equal(off.needsSubscription, true);
+  assert.equal(off.label, 'Subscribe & pin · 10 sats');
+  assert.match(off.state, /10 sats a week or 411 sats a year/);
+
+  const half = describeStickyAction({subscription: member, plan: 'year'});
+  assert.equal(half.label, 'Subscribe & pin · 205 sats');
+  assert.match(half.state, /half price with your satoshi\.si name/);
+
+  const on = describeStickyAction({subscription: covered});
+  assert.equal(on.needsSubscription, false);
+  assert.equal(on.price, 0, 'a covered note is never given a price');
+  assert.equal(on.label, 'Pin it · included');
+  assert.match(on.state, /Subscription active until 2027-01-15/);
+  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).label, 'Remove · included');
+  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).price, 0);
+
+  const anon = describeStickyAction({anonymous: true, subscription: covered});
+  assert.equal(anon.needsSubscription, false);
+  assert.equal(anon.price, 42, 'an anonymous message is priced even while a subscription runs');
+  assert.equal(anon.label, 'Post anonymously · 42 sats');
+  assert.match(anon.state, /never applies/);
+
+  // Nothing from the desk yet: the base prices are shown, never "free".
+  assert.equal(describeStickyAction({}).label, 'Subscribe & pin · 10 sats');
+  assert.equal(describeStickyAction({}).price, 10);
+  assert.equal(stickyDay(1800000000), '2027-01-15');
+  assert.equal(stickyDay(null), '');
 });
 
 test('anonymous notes carry a signed identity-mode marker', () => {
@@ -174,7 +228,9 @@ test('payment sheet opens during invoice creation and pinned state stays complet
   assert.match(script, /textContent = 'Pinned'/);
   assert.match(script, /elements\.pin\.disabled = published/);
   assert.match(script, /sats === 0/);
-  assert.match(script, /Free note ready/);
+  // A note covered by a subscription is born settled, so this path now names the
+  // subscription rather than a free membership.
+  assert.match(script, /Included in your subscription/);
   assert.doesNotMatch(`${html}\n${script}`, /Bark/i);
 });
 

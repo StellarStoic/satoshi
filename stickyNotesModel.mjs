@@ -1,9 +1,29 @@
 export const STICKY_EVENT_KIND = 1;
 export const STICKY_TOPIC = 'satoshi-sticky';
 export const STICKY_VERSION = 'v1';
-export const STICKY_PRICE_SATS = 11;
-export const STICKY_MEMBER_PRICE_SATS = 0;
+// Posting is what a subscription buys. There is no per-note price for a
+// registered key any more: while a subscription is active, pins and removals are
+// included, and a note it covers is created already settled, so the board never
+// shows a payment step for one. The only per-message price left is the 24-hour
+// anonymous identity's, which can never subscribe.
+export const STICKY_SUB_WEEK_SATS = 10;
+export const STICKY_SUB_YEAR_SATS = 411;
+export const STICKY_SUB_MEMBER_WEEK_SATS = 5;
+export const STICKY_SUB_MEMBER_YEAR_SATS = 205;
+export const STICKY_SUB_WEEKS_PER_YEAR = 52;
+export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
+export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
 export const STICKY_ANONYMOUS_PRICE_SATS = 42;
+
+/** All prices this service charges, so nothing else can be displayed as one. */
+export const STICKY_KNOWN_PRICES = Object.freeze([
+  0,
+  STICKY_ANONYMOUS_PRICE_SATS,
+  STICKY_SUB_WEEK_SATS,
+  STICKY_SUB_YEAR_SATS,
+  STICKY_SUB_MEMBER_WEEK_SATS,
+  STICKY_SUB_MEMBER_YEAR_SATS,
+]);
 export const STICKY_MAX_CHARACTERS = 501;
 export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', 'orange']);
 export const STICKY_FONTS = Object.freeze([
@@ -114,9 +134,82 @@ export function mapZoomForGeohashPrecision(precision) {
   return [0, 2, 4, 6, 8, 11, 13, 15, 18, 21][index];
 }
 
-export function stickyOrderPrice(value, fallback = STICKY_PRICE_SATS) {
+/** What a plan costs this buyer: NIP-05 members pay half. Null for no such plan. */
+export function stickySubscriptionPrice(plan, { member = false } = {}) {
+  if (plan === 'week') return member ? STICKY_SUB_MEMBER_WEEK_SATS : STICKY_SUB_WEEK_SATS;
+  if (plan === 'year') return member ? STICKY_SUB_MEMBER_YEAR_SATS : STICKY_SUB_YEAR_SATS;
+  return null;
+}
+
+export function stickyOrderPrice(value, fallback = STICKY_SUB_WEEK_SATS) {
   const sats = Number(value?.sats ?? value?.priceSats ?? value);
-  return Number.isInteger(sats) && sats >= 0 && sats <= STICKY_ANONYMOUS_PRICE_SATS ? sats : fallback;
+  return Number.isInteger(sats) && STICKY_KNOWN_PRICES.includes(sats) ? sats : fallback;
+}
+
+/** A UTC day, so the same order shows the same day wherever it is read. */
+export function stickyDay(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return new Date(value * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * What the composer's buttons say. Kept as a pure function of the desk's
+ * /sticky/v1/subscription answer so the wording can be tested without a DOM.
+ *
+ * `anonymous` is the identity mode in play, and `plan` is the plan the picker is
+ * on — a buyer with no subscription is offered "subscribe and post" as one action
+ * rather than a detour they have to repeat.
+ */
+export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week' } = {}) {
+  const prices = subscription?.prices || {};
+  const member = Boolean(prices.member);
+  const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { member });
+  const year = (Number.isInteger(prices.yearSats) ? prices.yearSats : null) ?? stickySubscriptionPrice('year', { member });
+  const active = Boolean(subscription?.active);
+  const until = stickyDay(subscription?.expiresAt);
+
+  if (anonymous) {
+    return {
+      label: action === 'remove'
+        ? `Remove · ${STICKY_ANONYMOUS_PRICE_SATS} sats`
+        : `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
+      state: `Anonymous identity: ${STICKY_ANONYMOUS_PRICE_SATS} sats per message. A subscription never applies to it.`,
+      needsSubscription: false,
+      price: STICKY_ANONYMOUS_PRICE_SATS,
+      active: false,
+      member: false,
+      week,
+      year,
+    };
+  }
+
+  if (active) {
+    return {
+      label: `${action === 'remove' ? 'Remove' : 'Pin it'} · included`,
+      state: `Subscription active${until ? ` until ${until}` : ''}. Posting and removals are included.`,
+      needsSubscription: false,
+      price: 0,
+      active: true,
+      member,
+      week,
+      year,
+    };
+  }
+
+  const price = stickySubscriptionPrice(plan, { member });
+  return {
+    label: `Subscribe & ${action === 'remove' ? 'remove' : 'pin'} · ${price} sats`,
+    state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year`
+      + (member ? ', half price with your satoshi.si name' : '')
+      + '.',
+    needsSubscription: true,
+    price,
+    active: false,
+    member,
+    week,
+    year,
+  };
 }
 
 export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);

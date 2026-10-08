@@ -3,7 +3,10 @@ import {
   STICKY_FONTS,
   STICKY_ANONYMOUS_PRICE_SATS,
   STICKY_MAX_CHARACTERS,
-  STICKY_PRICE_SATS,
+  STICKY_SUB_PLANS,
+  STICKY_SUB_WEEK_SATS,
+  describeStickyAction,
+  stickySubscriptionPrice,
   STICKY_TOPIC,
   clampPlacement,
   clampRotation,
@@ -63,6 +66,7 @@ const elements = {
   composer: document.getElementById('composerDialog'), editor: document.getElementById('stickyEditor'),
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
+  subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
   discardBin: document.getElementById('discardBin'), discardDialog: document.getElementById('discardDialog'),
   discardWarning: document.getElementById('discardWarning'), discardConfirm: document.getElementById('discardNoteConfirm'),
@@ -98,8 +102,14 @@ const authorProfileQueue = new Set();
 const authorProfilesLoading = new Set();
 let authorProfileTimer = null;
 let selectedNoteId = '';
-let quotedPrice = STICKY_PRICE_SATS;
+let quotedPrice = STICKY_SUB_WEEK_SATS;
 let quotedPubkey = '';
+// The desk's answer to GET /sticky/v1/subscription for the signed-in key, and the
+// plan the picker is on. `actionInfo` is the pure description of what the buttons
+// say, rebuilt whenever any of those change.
+let subscription = null;
+let subscribePlan = 'week';
+let actionInfo = describeStickyAction({});
 let currentPaymentValue = '';
 let currentRails = [];
 let currentRailId = '';
@@ -467,40 +477,69 @@ function updateAccount() {
   refreshPriceQuote(session);
 }
 
-function renderQuotedPrice(discountApplied = false) {
-  const pinLabel = elements.pay.querySelector('span');
-  const removeLabel = elements.removeSticky.querySelector('span');
-  const anonymous = getNostrSession()?.method === 'anonymous';
-  const free = !anonymous && quotedPrice === 0 && discountApplied;
-  pinLabel.textContent = anonymous ? `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : free ? 'Post free · satoshi.si NIP-05' : `Post note · ${quotedPrice} sats`;
-  removeLabel.textContent = anonymous ? `Remove · ${STICKY_ANONYMOUS_PRICE_SATS} sats` : free ? 'Remove free · satoshi.si NIP-05' : `Remove · ${quotedPrice} sats`;
+function renderQuotedPrice() {
+  const session = getNostrSession();
+  const anonymous = session?.method === 'anonymous';
+  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
+  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan});
+  // A person who is not signed in sees no price at all: the buttons only mean
+  // something once we know which key — and which identity mode — is posting.
+  quotedPrice = session ? actionInfo.price : STICKY_SUB_WEEK_SATS;
+  elements.pay.querySelector('span').textContent = session ? actionInfo.label : 'Sign in to post';
+  elements.removeSticky.querySelector('span').textContent = session ? removeInfo.label : 'Remove note';
+  if (elements.subscriptionState) {
+    elements.subscriptionState.textContent = session ? actionInfo.state : '';
+    elements.subscriptionState.hidden = !session;
+  }
+  if (elements.planPicker) {
+    // The picker is only useful when there is a subscription to choose: an active
+    // one already covers everything, and an anonymous identity can never take one.
+    elements.planPicker.hidden = !session || anonymous || actionInfo.active;
+    for (const button of elements.planPicker.querySelectorAll('[data-plan]')) {
+      const plan = button.dataset.plan === 'year' ? 'year' : 'week';
+      const amount = button.querySelector('b');
+      const price = stickySubscriptionPrice(plan, {member: actionInfo.member});
+      if (amount && Number.isInteger(price)) amount.textContent = String(price);
+      button.classList.toggle('is-active', plan === subscribePlan);
+      button.setAttribute('aria-pressed', plan === subscribePlan ? 'true' : 'false');
+    }
+  }
 }
 
 async function refreshPriceQuote(session) {
   if (!session) {
     quotedPubkey = '';
-    quotedPrice = STICKY_PRICE_SATS;
-    renderQuotedPrice(false);
+    subscription = null;
+    renderQuotedPrice();
     return;
   }
   if (session.method === 'anonymous') {
     quotedPubkey = session.pubkey;
-    quotedPrice = STICKY_ANONYMOUS_PRICE_SATS;
-    renderQuotedPrice(false);
+    subscription = null;
+    renderQuotedPrice();
     return;
   }
-  if (quotedPubkey === session.pubkey) return;
+  if (quotedPubkey === session.pubkey && subscription) return;
   quotedPubkey = session.pubkey;
-  quotedPrice = STICKY_PRICE_SATS;
-  renderQuotedPrice(false);
+  renderQuotedPrice();
   try {
-    const quote = await api(`/quote?pubkey=${encodeURIComponent(session.pubkey)}`);
+    // One call answers both halves: whether this key may post, and what the plans
+    // cost it. The created order is still authoritative — this only draws buttons.
+    const state = await api(`/subscription?pubkey=${encodeURIComponent(session.pubkey)}`);
     if (getNostrSession()?.pubkey !== session.pubkey) return;
-    quotedPrice = stickyOrderPrice(quote);
-    renderQuotedPrice(Boolean(quote.discount?.applied));
+    if (state && state.ok !== false) subscription = state;
+    renderQuotedPrice();
   } catch {
     // The created order remains authoritative; a missing preview never blocks checkout.
   }
+}
+
+/** Read the subscription again after a payment, rather than waiting on a cache. */
+async function refreshSubscription() {
+  const session = getNostrSession();
+  if (!session || session.method === 'anonymous') return;
+  quotedPubkey = '';
+  await refreshPriceQuote(session);
 }
 
 async function api(path, options = {}) {
@@ -509,7 +548,14 @@ async function api(path, options = {}) {
     headers: {'content-type': 'application/json', ...(options.headers || {})},
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
+  if (!response.ok) {
+    const error = new Error(body.error || `Request failed (${response.status}).`);
+    // The caller needs to tell "you must subscribe first" apart from a real
+    // failure, so the status and the reason code travel with the error.
+    error.status = response.status;
+    error.reason = body.reason || '';
+    throw error;
+  }
   return body;
 }
 
@@ -536,7 +582,7 @@ async function renderPayment(order) {
     elements.paymentHint.textContent = 'Preparing invoice...';
     return false;
   }
-  const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_PRICE_SATS);
+  const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_SUB_WEEK_SATS);
   currentRails = rails;
   elements.paymentAmount.textContent = rails.length > 1 ? `Pay ${sats} sats` : `Pay ${sats} sats with ${rails[0].label}`;
   elements.paymentRails.hidden = rails.length < 2;
@@ -904,6 +950,28 @@ async function ensureReadySigner() {
   throw new Error('Reconnect your signer before continuing.');
 }
 
+/**
+ * No subscription: buy one and then finish what was being done, so paying and
+ * posting are one flow. `notePending` is the action's own state and waits in
+ * localStorage while the subscription is paid for, which is also what makes the
+ * flow survive a reload mid-payment.
+ */
+async function buySubscriptionThen(session, notePending, statusElement) {
+  const member = Boolean(actionInfo.member);
+  const order = await api('/orders', {
+    method: 'POST',
+    body: JSON.stringify({pubkey: session.pubkey, action: 'subscribe', plan: subscribePlan}),
+  });
+  const sats = stickyOrderPrice(order, stickySubscriptionPrice(subscribePlan, {member}));
+  savePending({...notePending, subscribeOrderId: order.id, subscribePlan, subscribeSats: sats, status: 'waiting_subscription'});
+  showPaymentPreparing(sats);
+  const railReady = await renderPayment(order);
+  if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
+  if (statusElement) status(statusElement, `Subscribe for ${sats} sats — the rest continues by itself.`);
+  status(elements.paymentStatus, `Waiting for the ${sats}-sat subscription payment...`);
+  pollPayment();
+}
+
 async function startPayment() {
   try {
     status(elements.paymentStatus, '');
@@ -916,27 +984,39 @@ async function startPayment() {
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
-    status(elements.paymentStatus, quotedPrice === 0 ? 'Checking free membership...' : 'Preparing invoice...');
+    status(elements.paymentStatus, quotedPrice === 0 ? 'Checking your subscription...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const exactGeohash = elements.exactGeohash.checked;
-    const order = await api('/orders', {
-      method: 'POST',
-      body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
-    });
-    const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_PRICE_SATS);
+    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, anonymous: session.method === 'anonymous'};
+    let order;
+    try {
+      order = await api('/orders', {
+        method: 'POST',
+        body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash, geohash: activeGeohash, geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
+      });
+    } catch (error) {
+      // 402 is the desk saying "this key is registered but has no subscription".
+      // Buy one now and come back to this note; anything else is a real failure.
+      if (error.status !== 402) throw error;
+      await buySubscriptionThen(session, notePending, elements.paymentStatus);
+      return;
+    }
+    const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_SUB_WEEK_SATS);
     if (session.method === 'anonymous' && sats !== STICKY_ANONYMOUS_PRICE_SATS) throw new Error('Anonymous posting is not ready on the payment service yet. No note was published.');
     if (sats === 0) {
-      if (!order.paid || !order.publishToken) throw new Error('Free posting is not ready on the payment service yet. No note was published.');
+      // Covered by the subscription the desk just confirmed: nothing to pay, and
+      // the publish token is already there, so the note goes straight to placing.
+      if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this note. No note was published.');
       if (elements.paymentDialog.open) elements.paymentDialog.close();
-      savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, sats, anonymous: false, status: 'paid', publishToken: order.publishToken});
+      savePending({...notePending, orderId: order.id, sats, status: 'paid', publishToken: order.publishToken});
       if (elements.composer.open) elements.composer.close();
-      status(elements.boardStatus, 'Free note ready. Place it on the board.');
+      status(elements.boardStatus, 'Included in your subscription. Place the note on the board.');
       elements.boardStatus.hidden = false;
       beginPlacement();
       return;
     }
-    savePending({orderId: order.id, action: 'pin', content, color: selectedColor, font: selectedFont, geohash: activeGeohash, exactGeohash, contentHash, sats, anonymous: session.method === 'anonymous', status: 'waiting'});
+    savePending({...notePending, orderId: order.id, sats, status: 'waiting'});
     if (!elements.paymentDialog.open) showPaymentPreparing(sats);
     const railReady = await renderPayment(order);
     if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
@@ -952,6 +1032,32 @@ async function startPayment() {
 
 async function pollPayment() {
   clearTimeout(paymentTimer);
+  // A subscription bought on the way to a note or a removal: when it lands, run
+  // the original action again — it is covered now, so it settles on creation.
+  if (pending?.subscribeOrderId) {
+    try {
+      const order = await api(`/orders/${encodeURIComponent(pending.subscribeOrderId)}`);
+      await renderPayment(order);
+      if (!order.paid) {
+        paymentTimer = setTimeout(pollPayment, 2500);
+        return;
+      }
+      await refreshSubscription();
+      if (elements.paymentDialog.open) elements.paymentDialog.close();
+      const {subscribeOrderId, subscribePlan: plan, subscribeSats, status: _s, ...rest} = pending;
+      savePending(rest);
+      const sats = stickyOrderPrice(rest, 0);
+      status(elements.boardStatus, `Subscription active${plan ? ` (${plan})` : ''}. Finishing what you started...`);
+      elements.boardStatus.hidden = false;
+      if (rest.action === 'remove') await startRemovalPayment();
+      else await startPayment();
+      return;
+    } catch (error) {
+      status(elements.paymentStatus, error.message, true);
+      paymentTimer = setTimeout(pollPayment, 2500);
+      return;
+    }
+  }
   if (!pending?.orderId) return;
   try {
     const order = await api(`/orders/${encodeURIComponent(pending.orderId)}`);
@@ -1233,15 +1339,23 @@ async function startRemovalPayment() {
     if (!record || !session || record.event.pubkey !== session.pubkey) throw new Error('Only the note author can remove it.');
     await ensureReadySigner();
     elements.removeSticky.disabled = true;
-    status(elements.noteMenuStatus, 'Preparing invoice...');
+    status(elements.noteMenuStatus, actionInfo.active ? 'Removing the note...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
-    const order = await api('/orders', {
-      method: 'POST',
-      body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
-    });
+    const notePending = {action: 'remove', targetEventId: selectedNoteId};
+    let order;
+    try {
+      order = await api('/orders', {
+        method: 'POST',
+        body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
+      });
+    } catch (error) {
+      if (error.status !== 402) throw error;
+      await buySubscriptionThen(session, notePending, elements.noteMenuStatus);
+      return;
+    }
     const sats = stickyOrderPrice(order);
     if (sats === 0) {
-      if (!order.paid || !order.publishToken) throw new Error('Free removal is not ready on the payment service yet. The note was not removed.');
+      if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this removal. The note was not removed.');
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'paid', publishToken: order.publishToken});
       await publishRemoval();
@@ -1477,6 +1591,12 @@ elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elemen
 elements.editor.addEventListener('input', handleEditorInput);
 elements.editor.addEventListener('paste', event => { event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain')); });
 elements.pay.addEventListener('click', startPayment);
+elements.planPicker?.addEventListener('click', event => {
+  const button = event.target.closest('[data-plan]');
+  if (!button) return;
+  subscribePlan = button.dataset.plan === 'year' ? 'year' : 'week';
+  renderQuotedPrice();
+});
 elements.copyPayment.addEventListener('click', copyPayment);
 elements.placementControls.addEventListener('click', event => {
   const rotate = event.target.closest('[data-rotate]');
