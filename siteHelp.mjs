@@ -132,6 +132,9 @@ export const PAGE_HELP = Object.freeze({
                     + ' is tall. If it is one place you look at every day, tick to keep it: the board then opens on'
                     + ' that cell on every visit, and the address bar keeps no board of its own — a link somebody'
                     + ' sends you still opens the board it names.',
+                    + ' The map in the board chooser also keeps **saved places**: tap cells, give them a name you will'
+                    + ' recognise, and the name and its geohash wait there in this browser. Tapping one opens that'
+                    + ' board; nothing is sent anywhere and no name ever leaves the device.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
                     + ' extended rather than restarted when you renew early, covering any number of pins and removals while'
                     + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'

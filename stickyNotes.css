@@ -57,6 +57,25 @@
 .area-scale:disabled { opacity:.55; cursor:progress; }
 .area-scale:focus-visible, .area-lock:focus-within { outline:none; }
 .area-lock { margin:14px 0 0; }
+.saved-places { border-top:1px solid var(--line,#2a2f38); background:var(--panel,#12161c); }
+.saved-places > summary { display:flex; gap:8px; align-items:center; padding:10px 16px; cursor:pointer; font-weight:600; }
+.saved-places__list { display:grid; gap:6px; margin:0; padding:0 16px 10px; list-style:none; max-height:32vh; overflow:auto; }
+.saved-places__list li { display:flex; gap:8px; align-items:center; }
+.saved-places__open { flex:1; display:flex; gap:10px; align-items:baseline; justify-content:space-between;
+  padding:8px 10px; border:1px solid var(--line,#2a2f38); border-radius:8px; background:transparent;
+  color:inherit; text-align:left; cursor:pointer; }
+.saved-places__open:hover { border-color:var(--accent,#f7931a); }
+.saved-places__name { font-weight:600; }
+.saved-places__open code { opacity:.75; font-size:.85em; }
+.saved-places__remove { padding:8px 10px; border:1px solid var(--line,#2a2f38); border-radius:8px;
+  background:transparent; color:inherit; cursor:pointer; }
+.saved-places__remove:hover { border-color:#e0554b; color:#e0554b; }
+.saved-places__empty { opacity:.7; font-size:.9em; }
+.saved-places__save { display:flex; gap:8px; align-items:flex-end; padding:0 16px 10px; }
+.saved-places__save label { flex:1; display:grid; gap:4px; }
+.saved-places__save input { padding:8px 10px; border:1px solid var(--line,#2a2f38); border-radius:8px;
+  background:transparent; color:inherit; }
+.saved-places > .inline-status { padding:0 16px 12px; }
 .map-clear-action { min-height:36px; padding:6px 12px; border:1px solid #505354; border-radius:5px; background:transparent; color:#c9cbc9; font:inherit; font-size:.82rem; cursor:pointer; }.map-clear-action:hover { border-color:#8a8c8a; color:#fff; }
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }

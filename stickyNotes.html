@@ -101,6 +101,15 @@
         <button type="button" id="closeGeohashMap" class="dialog-close" aria-label="Close map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       </header>
       <div id="geohashMap" class="geohash-map" aria-label="Map for choosing the geohash cells of this board"></div>
+      <details class="saved-places" id="savedPlacesPanel">
+        <summary><i class="lni lni-bookmark-1" aria-hidden="true"></i><span id="savedPlacesSummary">Saved places</span></summary>
+        <ul id="savedPlacesList" class="saved-places__list"></ul>
+        <div class="saved-places__save">
+          <label for="savedPlaceName"><span>Name the selected cells</span><input id="savedPlaceName" type="text" maxlength="40" autocomplete="off" placeholder="Home, work, my street"></label>
+          <button type="button" id="savePlaceButton" class="secondary-action">Save</button>
+        </div>
+        <div id="savedPlaceStatus" class="inline-status" role="status" aria-live="polite"></div>
+      </details>
       <footer class="geohash-map-selection">
         <span>Grid: <strong id="geohashMapPrecision">4 characters</strong></span>
         <span>Selected: <code id="geohashMapSelection">None</code></span>

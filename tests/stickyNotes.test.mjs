@@ -774,3 +774,31 @@ test('a place can be kept, and the kept place outranks the board you last browse
   assert.match(script, /if \(keep\) lockThisPlace\(\[cell\], precision\)/);
   assert.match(script, /const keep = elements\.lockToggle\.checked/);
 });
+
+test('saved places carry a name the reader chose, and stay in the browser', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  for (const id of ['savedPlacesPanel', 'savedPlacesList', 'savedPlaceName', 'savePlaceButton', 'savedPlaceStatus']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  // the panel lives in the geohash picker, above its footer
+  assert.ok(html.indexOf('id="savedPlacesPanel"') < html.indexOf('class="geohash-map-selection"'),
+    'saved places belong inside the geohash picker dialog');
+  assert.match(script, /const SAVED_PLACES_KEY = 'satoshi:sticky:saved-places:v1'/);
+  assert.match(script, /localStorage\.setItem\(SAVED_PLACES_KEY/);
+  // a name is user text: it is set with textContent, never exploded into markup
+  assert.match(script, /name\.textContent = place\.name/);
+  const renderer = script.slice(script.indexOf('function renderSavedPlaces'), script.indexOf('function saveCurrentPlace'));
+  assert.ok(renderer.length > 200, 'the saved-places renderer should have been found');
+  assert.ok(!/innerHTML/.test(renderer), 'user-chosen names must not go through innerHTML');
+  // saving takes the cells selected on the map, and the same name replaces its entry
+  const flat = script.replace(/\s+/g, ' ');
+  assert.match(flat, /const cells = geohashMapCells\.length \? \[\.\.\.geohashMapCells\] : geohashCellsFrom\(elements\.boardGeohash\.value\)/);
+  assert.match(flat, /savedPlaces\.findIndex\(place => place\.name\.toLowerCase\(\) === name\.toLowerCase\(\)\)/);
+  assert.match(flat, /It stays in this browser\./);
+  // a saved place is a shortcut, not the kept place
+  assert.match(flat, /elements\.geohashMapDialog\.close\(\); selectBoard\(cells\);/);
+  assert.match(script, /const SAVED_PLACES_MAX = 24/);
+});

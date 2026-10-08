@@ -61,6 +61,10 @@ const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
 const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
 // A place the reader keeps: one cell, opened on every visit, until they unlock it.
 const LOCKED_PLACE_KEY = 'satoshi:sticky:locked-place:v1';
+// Places the reader named themselves: a name and the cells it stands for, in this browser.
+const SAVED_PLACES_KEY = 'satoshi:sticky:saved-places:v1';
+const SAVED_PLACES_MAX = 24;
+const SAVED_PLACE_NAME_MAX = 40;
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
@@ -81,6 +85,10 @@ const elements = {
   areaStatus: document.getElementById('areaStatus'),
   lockToggle: document.getElementById('lockToggle'), unlockButton: document.getElementById('unlockButton'),
   lockCaption: document.getElementById('lockCaption'),
+  savedPlacesList: document.getElementById('savedPlacesList'),
+  savedPlacesSummary: document.getElementById('savedPlacesSummary'),
+  savedPlaceName: document.getElementById('savedPlaceName'), savePlaceButton: document.getElementById('savePlaceButton'),
+  savedPlaceStatus: document.getElementById('savedPlaceStatus'),
   areaScaleList: document.getElementById('areaScaleList'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
@@ -2387,6 +2395,112 @@ async function showNotesAroundMe(precision) {
   }
 }
 
+function readSavedPlaces() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_PLACES_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(place => ({
+        name: String((place && place.name) || '').trim().slice(0, SAVED_PLACE_NAME_MAX),
+        cells: geohashCellsFrom(place && place.cells),
+      }))
+      .filter(place => place.name && place.cells.length)
+      .slice(0, SAVED_PLACES_MAX);
+  } catch (error) {
+    return [];
+  }
+}
+
+let savedPlaces = readSavedPlaces();
+
+function writeSavedPlaces() {
+  localStorage.setItem(SAVED_PLACES_KEY, JSON.stringify(savedPlaces));
+}
+
+function renderSavedPlaces() {
+  elements.savedPlacesSummary.textContent = savedPlaces.length
+    ? `Saved places (${savedPlaces.length})`
+    : 'Saved places';
+  const rows = savedPlaces.map((place, index) => {
+    const row = document.createElement('li');
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'saved-places__open';
+    const name = document.createElement('span');
+    name.className = 'saved-places__name';
+    name.textContent = place.name;
+    const cells = document.createElement('code');
+    cells.textContent = place.cells.join(',');
+    open.append(name, cells);
+    open.addEventListener('click', () => { openSavedPlace(index); });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'saved-places__remove';
+    remove.setAttribute('aria-label', `Remove ${place.name}`);
+    const icon = document.createElement('i');
+    icon.className = 'lni lni-trash-3';
+    icon.setAttribute('aria-hidden', 'true');
+    remove.append(icon);
+    remove.addEventListener('click', () => { removeSavedPlace(index); });
+    row.append(open, remove);
+    return row;
+  });
+  if (!rows.length) {
+    const empty = document.createElement('li');
+    empty.className = 'saved-places__empty';
+    empty.textContent = 'Nothing saved yet. Pick cells on the map, name them here, and they will be waiting next time.';
+    rows.push(empty);
+  }
+  elements.savedPlacesList.replaceChildren(...rows);
+}
+
+function saveCurrentPlace() {
+  const name = (elements.savedPlaceName.value || '').trim().slice(0, SAVED_PLACE_NAME_MAX);
+  if (!name) {
+    status(elements.savedPlaceStatus, 'Give the place a name first.', true);
+    return;
+  }
+  // The cells on the map, or the geohash typed in the board chooser: a reader who types
+  // their street deserves to keep it just as much as one who taps it out.
+  const cells = geohashMapCells.length
+    ? [...geohashMapCells]
+    : geohashCellsFrom(elements.boardGeohash.value);
+  if (!cells.length) {
+    status(elements.savedPlaceStatus, 'Tap cells on the map, or type a geohash, then save.', true);
+    return;
+  }
+  const existing = savedPlaces.findIndex(place => place.name.toLowerCase() === name.toLowerCase());
+  if (existing < 0 && savedPlaces.length >= SAVED_PLACES_MAX) {
+    status(elements.savedPlaceStatus, `Only ${SAVED_PLACES_MAX} places fit. Remove one first.`, true);
+    return;
+  }
+  if (existing >= 0) savedPlaces[existing] = { name, cells };
+  else savedPlaces.push({ name, cells });
+  writeSavedPlaces();
+  renderSavedPlaces();
+  elements.savedPlaceName.value = '';
+  status(elements.savedPlaceStatus, existing >= 0
+    ? `Updated ${name} — ${cells.join(',')}.`
+    : `Saved ${name} — ${cells.join(',')}. It stays in this browser.`);
+}
+
+function openSavedPlace(index) {
+  const place = savedPlaces[index];
+  if (!place) return;
+  const cells = place.cells.join(',');
+  elements.geohashMapDialog.close();
+  selectBoard(cells);
+}
+
+function removeSavedPlace(index) {
+  const place = savedPlaces[index];
+  if (!place) return;
+  savedPlaces.splice(index, 1);
+  writeSavedPlaces();
+  renderSavedPlaces();
+  status(elements.savedPlaceStatus, `Removed ${place.name}.`);
+}
+
 function renderLockControls() {
   const locked = lockedCells.length > 0;
   elements.lockToggle.checked = locked;
@@ -2426,6 +2540,13 @@ function openAreaDialog() {
 
 elements.shareArea.addEventListener('click', openAreaDialog);
 elements.unlockButton.addEventListener('click', () => { unlockThisPlace(); });
+elements.savePlaceButton.addEventListener('click', () => { saveCurrentPlace(); });
+elements.savedPlaceName.addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  saveCurrentPlace();
+});
+renderSavedPlaces();
 renderLockControls();
 for (const button of areaScaleButtons()) {
   button.addEventListener('click', () => { showNotesAroundMe(Number.parseInt(button.dataset.areaPrecision, 10)); });
