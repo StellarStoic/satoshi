@@ -56,11 +56,9 @@ export const PAGE_HELP = Object.freeze({
             {
                 label: 'In plain words',
                 paragraphs: [
-                    'Picture a corkboard on a wall that anyone can walk up to and read. You write a short note, pick its'
-                    + ' colour and font, choose a spot on the map, and pin it there. The note carries its own appearance and'
-                    + ' address, so every device draws it in the same place. A note can also cover a few cells that touch'
-                    + ' when a place straddles them — a building sitting on a corner — and it is still one note on one'
-                    + ' price. Everything you pin is public: anyone can read it, with or without an account.',
+                    'Sticky notes are small public messages, signed with your Nostr identity or a random anonymous one,'
+                    + ' and placed on a shared corkboard. Choose where the note will be visible, and choose how long it'
+                    + ' lives. Perfect for small areas and groups pinning notes to each other.',
                     'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
                     + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
                     + ' key and the board draws their name in its place. The person button at the top of the board shows'
