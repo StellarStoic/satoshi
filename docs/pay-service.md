@@ -291,6 +291,7 @@ the event no longer matches the paid commitment.
 | `k`       | `geo`                                                        | exactly one |
 | `geohash` | order's `exact` or `prefix` mode                             | exactly one |
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
+| `expiration` | unix seconds, NIP-40: the moment the note is deleted       | exactly one |
 | `alt`     | `A sticky note pinned on satoshi.si`                         | exactly one |
 | `anonymous` | `24h-local-key`                                             | anonymous orders only |
 
@@ -315,6 +316,20 @@ above one, and any mode mismatch. The `i` and `k` pair follows NIP-73's external
 identifier, naming one of the cells that was paid for. These tags sort public events into
 corkboards; they do not encrypt a note or restrict who can fetch it.
 
+Every note is temporary. `["expiration", "<unix seconds>"]` is **mandatory** (NIP-40): the
+moment the note stops existing, computed as the event's `created_at` plus the term the writer
+chose from the ladder the board offers — a day, a week, a month (30 days), six months (180
+days) or a year (365 days). There is no third option and no way to ask for longer. The desk
+enforces the **range**, not the rungs, so a frontend may compute a month its own way: the term
+`expiration - created_at` must fall between one day and 365 days, allowing two minutes of clock
+skew, and the moment itself must still be in the future when the note is published. The relay
+drops an event that arrives expired, never serves an expired event, and deletes expired events
+from its store, so a note published after its own moment would be paid for and lost.
+
+A **removal must not carry `expiration`**. The relay records the hiding in the kind-5 row; NIP-40
+cleanup deletes expired rows, so an expiring deletion would be swept away with the record of what
+it hid and the note would come back.
+
 `content` is the note text: **at most 501 characters**, counted as the UI counts them
 (Unicode code points, so one emoji is one character).
 
@@ -326,8 +341,11 @@ pricing it. `content` may hold a short reason.
 
 ## Paying
 
-* Price: **11 sats** for an ordinary signed-in user, **42 sats** for a temporary anonymous
-  identity, and **0 sats** for an authoritatively verified satoshi.si NIP-05 member.
+* Price: posting is a **subscription** — **10 sats a week** or **411 a year** (52 weeks less
+  21%), **5 / 205** with a satoshi.si NIP-05 name — and while it runs, every pin and removal is
+  included, so a covered note is created already settled at 0 sats. A registered key with no
+  subscription gets `subscription_required` (402). A temporary anonymous identity cannot
+  subscribe and pays **42 sats per message**.
 * Free orders never create a BTCPay invoice or enter the invoice worker queue. The service
   marks them paid and returns their short-lived publish token directly.
 * Paid rails: **Ark and Lightning**. The invoice requests `BARK` and `BTC-LN`; on-chain is
@@ -397,14 +415,37 @@ bounds and the character limit from it rather than keeping its own copy.
 | `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |
 | `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
 | `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
+| `bad_expiration` | `publish` 400 | the note carries no `["expiration"]`, more than one, a value that is not a positive whole number of seconds, a term outside one day to a year, or a moment that has already passed. A removal carrying one is refused with this code too. |
 
 The client tag is enforced, not decorative: exactly one `["client","satoshi.si"]` per pin, so a note
 that reached the relay some other way can be told apart. Removals stay geohash-free — a NIP-09
 deletion has no place on the board, so there is nothing to bind.
 
 `GET /sticky/v1/config` additionally publishes `anonymousSats: 42`, the geohash rules
-(`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names) and the tag map
+(`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names), the
+liveliness rules (`requiredForPin`, `tag`, `standard`, `default`, the five `options` with their
+seconds, `minSeconds`, `maxSeconds`, `measuredFrom`, `removals`) and the tag map
 (`clientValue`, `anonymousTagValue`), so a frontend never keeps its own copy of any of it.
+
+## The relay's half of NIP-40 (already live)
+
+The relay is `nostr-rs-relay` 0.10 on the same box, and it implements the
+expiration side of NIP-40 itself — nothing here depends on the desk policing it
+after the fact:
+
+* it advertises `40` in `supported_nips` (NIP-11), so a client can tell;
+* an event that arrives already expired is **dropped** at the door rather than stored;
+* an expired event is never **served**, even while it is still on disk, because every
+  query carries `(expires_at IS NULL OR expires_at > now)`;
+* `delete_expired` removes expired rows from the store, and the cleanup task runs
+  every ten minutes.
+
+So a note that reaches its moment stops being readable immediately and leaves the
+database within the next cleanup. That is why the desk refuses a note whose moment has
+already passed rather than letting the relay silently drop it: by then it has been paid
+for. It is also why a **removal carries no expiration** — the relay records the hiding in
+the kind-5 row itself, and the cleanup would delete that row along with everything else
+that expired.
 
 ## Relay write access — how it is actually enforced
 

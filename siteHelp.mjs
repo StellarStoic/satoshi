@@ -60,6 +60,11 @@ export const PAGE_HELP = Object.freeze({
                     + ' address, so every device draws it in the same place. A note can also cover a few cells that touch'
                     + ' when a place straddles them — a building sitting on a corner — and it is still one note on one'
                     + ' price. Everything you pin is public: anyone can read it, with or without an account.',
+                    'Every note is temporary, and you choose how temporary. A slider offers a day, a week, a month, six'
+                    + ' months or a year, and it starts at a month. The note states the exact moment it will go, and the'
+                    + ' relay that holds it deletes it then, so the board stays a board people walk past rather than an'
+                    + ' archive of everything ever written. You cannot extend a note after it is pinned — pin it again'
+                    + ' if you need it for longer — and a year is the longest this board offers.',
                     'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
                     + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like and'
                     + ' remove your own, with no per-note price. If you own a satoshi.si name such as yourname@satoshi.si,'
@@ -88,6 +93,14 @@ export const PAGE_HELP = Object.freeze({
                     + ' own line. The event that publishes is therefore the event that was paid for.',
                     'Placement is deliberately not part of that commitment: you place the note after paying, so its'
                     + ' position and tilt are bounds-checked when the event is published instead of being fixed in advance.',
+                    'Liveliness travels the same way, and it is mandatory. Every note carries exactly one NIP-40'
+                    + ' ["expiration","<unix seconds>"] tag, computed as the moment it was written plus the term chosen'
+                    + ' from the ladder — a day, a week, a month, six months or a year, and no longer. The payment'
+                    + ' service refuses a pin without that tag, one whose term falls outside the ladder, and one whose'
+                    + ' moment has already passed by the time it is published, because the relay drops an event that'
+                    + ' arrives expired. The relay never serves an expired event, and a cleanup deletes expired events'
+                    + ' from its store every ten minutes. A removal carries no expiration on purpose: an expiring'
+                    + ' deletion would be deleted itself, and the note it removed would come back.',
                     'Every pin belongs to a geohash of four to nine characters: you enter one or pick it on the'
                     + ' OpenStreetMap view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'

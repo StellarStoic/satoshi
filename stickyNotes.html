@@ -135,6 +135,12 @@
       </div>
       <label class="font-choice" for="noteFont"><span>Font</span><select id="noteFont" class="note-font-select note-font-select--typewriter" aria-label="Note font"><option class="font-preview--typewriter" value="typewriter">Special Elite</option><option class="font-preview--handwritten" value="handwritten">Caveat · Handwritten</option><option class="font-preview--patrick-hand" value="patrick-hand">Patrick Hand · Handwritten</option><option class="font-preview--kalam" value="kalam">Kalam · Handwritten</option><option class="font-preview--comfortaa" value="comfortaa">Comfortaa · Rounded</option><option class="font-preview--noto-sans" value="noto-sans">Noto Sans · Multilingual</option><option class="font-preview--noto-serif" value="noto-serif">Noto Serif · Multilingual</option><option class="font-preview--noto-mono" value="noto-mono">Noto Sans Mono · Multilingual</option><option class="font-preview--roboto" value="roboto">Roboto</option><option class="font-preview--mono" value="mono">Roboto Mono</option><option class="font-preview--roboto-slab" value="roboto-slab">Roboto Slab</option><option class="font-preview--open-sans" value="open-sans">Open Sans</option><option class="font-preview--source-sans" value="source-sans">Source Sans 3</option><option class="font-preview--ubuntu" value="ubuntu">Ubuntu</option><option class="font-preview--pt-sans" value="pt-sans">PT Sans</option><option class="font-preview--pt-serif" value="pt-serif">PT Serif</option><option class="font-preview--fira-mono" value="fira-mono">Fira Mono</option><option class="font-preview--ibm-plex-mono" value="ibm-plex-mono">IBM Plex Mono</option><option class="font-preview--merriweather" value="merriweather">Merriweather</option><option class="font-preview--atkinson" value="atkinson">Atkinson Hyperlegible</option><option class="font-preview--serif" value="serif">Lora</option></select></label>
       <label class="note-scope-toggle" title="Hide this note from broader parent boards"><input id="exactGeohashNote" type="checkbox"><span>Show only on this exact geohash</span></label>
+      <div class="liveliness" role="group" aria-labelledby="livelinessLabel">
+        <div class="liveliness__head"><span id="livelinessLabel">Disappears after</span><output id="noteLivelinessValue" for="noteLiveliness">1 month</output></div>
+        <input id="noteLiveliness" class="liveliness__slider" type="range" min="0" max="4" step="1" value="2" aria-label="How long the note should live" aria-describedby="noteLivelinessHint">
+        <div id="noteLivelinessTicks" class="liveliness__ticks" aria-hidden="true"></div>
+      </div>
+      <p id="noteLivelinessHint" class="liveliness__hint"></p>
       <div class="composer-count"><span id="noteCapacity">The paper is empty</span></div>
       <p id="subscriptionState" class="subscription-state" role="status" aria-live="polite" hidden></p>
       <div id="planPicker" class="plan-picker" role="group" aria-label="Subscription plan" hidden>
@@ -188,6 +194,7 @@
     <span>Event ID</span><code id="noteEventId"></code>
     <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
     <span>Posted</span><time id="notePostedAt"></time>
+    <span id="noteExpiresLabel" hidden>Disappears</span><time id="noteExpiresAt" hidden></time>
     <button type="button" id="removeSticky" class="remove-note" hidden><i class="lni lni-trash-3" aria-hidden="true"></i><span>Remove · 11 sats</span></button>
     <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
   </div>

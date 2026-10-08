@@ -32,6 +32,38 @@ export const STICKY_FONTS = Object.freeze([
   'open-sans', 'source-sans', 'ubuntu', 'pt-sans', 'pt-serif', 'fira-mono',
   'ibm-plex-mono', 'merriweather', 'atkinson', 'serif',
 ]);
+// A note here is a temporary thing. Every one carries the NIP-40 expiration
+// tag, and the relay drops it once that moment passes — so the ladder below is
+// the whole life of a note, not a preference. The payment service enforces the
+// same range at publish time, so a client cannot hand itself a note that
+// outlives a year.
+export const STICKY_LIVELINESS = Object.freeze([
+  Object.freeze({key: '1d', label: '1 day', short: '1d', seconds: 86400}),
+  Object.freeze({key: '1w', label: '1 week', short: '1w', seconds: 7 * 86400}),
+  Object.freeze({key: '1m', label: '1 month', short: '1m', seconds: 30 * 86400}),
+  Object.freeze({key: '6m', label: '6 months', short: '6m', seconds: 180 * 86400}),
+  Object.freeze({key: '12m', label: '1 year', short: '12m', seconds: 365 * 86400}),
+]);
+export const STICKY_DEFAULT_LIVELINESS = '1m';
+export const STICKY_MIN_LIVELINESS_SECONDS = 86400;                 // the shortest rung
+export const STICKY_MAX_LIVELINESS_SECONDS = 365 * 86400;           // a year: the longest
+export const EXPIRATION_TAG = 'expiration';
+
+export function stickyLiveliness(key) {
+  return STICKY_LIVELINESS.find(rung => rung.key === key) || null;
+}
+
+/** The NIP-40 moment a note written then, to live that long, disappears. */
+export function stickyExpiration(createdAt = Math.floor(Date.now() / 1000), liveliness = STICKY_DEFAULT_LIVELINESS) {
+  const rung = stickyLiveliness(liveliness) || stickyLiveliness(STICKY_DEFAULT_LIVELINESS);
+  return createdAt + rung.seconds;
+}
+
+/** A relay should not send an expired note, and the board should not draw one. */
+export function isStickyExpired(note, now = Math.floor(Date.now() / 1000)) {
+  return Number.isFinite(note?.expiration) && note.expiration > 0 && note.expiration <= now;
+}
+
 // Codes are 4 to 9 characters: below 4 the cell is a region rather than a
 // place, and 9 is as deep as the grid is useful. Within that range a board may
 // be a clump of touching cells, which is what lets one note cover a building
@@ -358,12 +390,16 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
+  // Mandatory on purpose: a note with no expiry would sit on the relay forever,
+  // and the desk refuses one.
+  const rung = stickyLiveliness(liveliness);
+  if (!rung) throw new Error('Choose how long the note should live: a day, a week, a month, six months or a year.');
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {
@@ -388,6 +424,8 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ['k', 'geo'],
     ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
+    // NIP-40: the moment this note stops existing, relay-side.
+    [EXPIRATION_TAG, String(createdAt + rung.seconds)],
     ['alt', 'A sticky note pinned on satoshi.si'],
   ];
   if (anonymous) tags.push(['anonymous', '24h-local-key']);
@@ -419,6 +457,9 @@ export function parseStickyEvent(event) {
   const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
   const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
+  // Older notes on the relay carry no expiration tag at all; they are read as
+  // notes that do not expire rather than discarded.
+  const expires = Number(event.tags.find(tag => tag?.[0] === EXPIRATION_TAG)?.[1]);
   return {
     id: event.id,
     pubkey: event.pubkey,
@@ -432,6 +473,7 @@ export function parseStickyEvent(event) {
     geohash,
     geohashes,
     exactGeohash: scope !== 'prefix',
+    expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
   };
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {GEOHASH_MIN_LENGTH, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+import {GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -452,4 +452,75 @@ test('every control the board reaches for is in its element map', async () => {
   assert.deepEqual(unmapped, [], `used but not mapped: ${unmapped.join(', ')}`);
   const missing = used.map(name => defined.get(name)).filter(id => id && !html.includes(`id="${id}"`));
   assert.deepEqual(missing, [], `mapped but not in the markup: ${missing.join(', ')}`);
+});
+
+test('a note names when it disappears, from a ladder of five terms', () => {
+  assert.deepEqual(STICKY_LIVELINESS.map(rung => rung.key), ['1d', '1w', '1m', '6m', '12m']);
+  assert.deepEqual(STICKY_LIVELINESS.map(rung => rung.seconds),
+    [86400, 7 * 86400, 30 * 86400, 180 * 86400, 365 * 86400]);
+  assert.equal(STICKY_DEFAULT_LIVELINESS, '1m');
+  assert.equal(STICKY_MIN_LIVELINESS_SECONDS, 86400);
+  assert.equal(STICKY_MAX_LIVELINESS_SECONDS, 365 * 86400, 'a year is the longest a note may live');
+  assert.equal(stickyLiveliness('1w').label, '1 week');
+  assert.equal(stickyLiveliness('2w'), null, 'the ladder is what is offered, not a free range');
+  assert.equal(stickyExpiration(1000, '1d'), 1000 + 86400);
+  assert.equal(stickyExpiration(1000, 'nonsense'), stickyExpiration(1000, STICKY_DEFAULT_LIVELINESS));
+});
+
+test('every note carries exactly one expiration tag, in unix seconds', () => {
+  const createdAt = 1700000000;
+  for (const rung of STICKY_LIVELINESS) {
+    const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+      geohash: TEST_GEOHASH, liveliness: rung.key, createdAt});
+    const tags = template.tags.filter(tag => tag[0] === 'expiration');
+    assert.equal(tags.length, 1, `${rung.key} must be stated once`);
+    assert.equal(tags[0][1], String(createdAt + rung.seconds));
+    assert.match(tags[0][1], /^\d+$/, 'a unix timestamp in seconds, as NIP-40 asks');
+  }
+  // the default is a month, and a term nobody offered is refused rather than guessed
+  const fallback = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, createdAt});
+  assert.equal(fallback.tags.find(tag => tag[0] === 'expiration')[1], String(createdAt + 30 * 86400));
+  assert.throws(() => makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long the note should live/);
+});
+
+test('a note reads its expiration back, and a note published before this still reads', () => {
+  const createdAt = 1700000000;
+  const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, liveliness: '1w', createdAt});
+  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(parsed.expiration, createdAt + 7 * 86400);
+  assert.equal(isStickyExpired(parsed, createdAt), false);
+  assert.equal(isStickyExpired(parsed, createdAt + 7 * 86400), true, 'the moment it names is the end of it');
+  assert.equal(isStickyExpired(parsed, createdAt + 8 * 86400), true);
+
+  // a note from before liveliness existed carries no tag and never expires
+  const {expiration, ...templateWithout} = template;
+  const old = parseStickyEvent({...templateWithout, tags: template.tags.filter(tag => tag[0] !== 'expiration'),
+    id: 'c'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(old.expiration, null);
+  assert.equal(isStickyExpired(old, 1700000000 + 10 * 365 * 86400), false);
+  assert.equal(isStickyExpired(null), false, 'a missing note is not an expired one');
+});
+
+test('the composer asks how long a note lives, and the menu says when it goes', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="noteLiveliness"[^>]*type="range"[^>]*min="0"[^>]*max="4"[^>]*step="1"/);
+  assert.match(html, /id="noteLivelinessValue"/);
+  assert.match(html, /id="noteLivelinessTicks"/);
+  assert.match(html, /id="noteLivelinessHint"/);
+  assert.match(html, /Disappears after/);
+  assert.match(html, /id="noteExpiresAt"/, 'the note menu shows when a note goes');
+  assert.match(script, /elements\.liveliness\.addEventListener\('input'/);
+  assert.match(script, /liveliness: pending\.liveliness \|\| STICKY_DEFAULT_LIVELINESS/,
+    'the published note carries the term the writer chose');
+  assert.match(script, /isStickyExpired\(sticky\)/, 'an expired note is not drawn');
+  assert.match(script, /renderLiveliness\(\)/, 'the slider is built from the ladder, not from markup');
+  // the note menu reads the term off the event, and a note without one shows no row
+  assert.match(script, /elements\.noteExpiresAt\.hidden = !expiresAt/);
+  assert.match(script, /tag\?\.\[0\] === 'expiration'/);
 });

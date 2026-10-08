@@ -28,6 +28,11 @@ import {
   stickyContentHash,
   stickyOrderPrice,
   stickyPaymentRails,
+  STICKY_LIVELINESS,
+  STICKY_DEFAULT_LIVELINESS,
+  stickyLiveliness,
+  stickyExpiration,
+  isStickyExpired,
 } from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
@@ -87,6 +92,9 @@ const elements = {
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
+  liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
+  livelinessTicks: document.getElementById('noteLivelinessTicks'), livelinessHint: document.getElementById('noteLivelinessHint'),
+  noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpiresAt: document.getElementById('noteExpiresAt'),
   zoomOut: document.getElementById('zoomOut'), zoomIn: document.getElementById('zoomIn'),
   zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
@@ -96,6 +104,7 @@ const elements = {
 
 let selectedColor = 'yellow';
 let selectedFont = 'typewriter';
+let selectedLiveliness = STICKY_DEFAULT_LIVELINESS;
 let lastValidEditor = '';
 let pending = readPending();
 let placingNote = null;
@@ -925,7 +934,9 @@ function connectBoard(version = boardConnectionVersion) {
         return;
       }
       const sticky = parseStickyEvent(event);
-      if (!sticky || !noteBelongsToBoard(sticky)) return;
+      // NIP-40: an expired note is gone. The relay should not be sending one at
+      // all, and a note that expires between the send and this line is dropped here.
+      if (!sticky || isStickyExpired(sticky) || !noteBelongsToBoard(sticky)) return;
       const deletion = pendingDeletions.get(sticky.id);
       if (deletion?.pubkey === sticky.pubkey) return;
       renderNote(sticky, event);
@@ -978,6 +989,45 @@ function selectFont(font) {
   document.fonts?.ready?.then(() => {
     if (elements.draft.isConnected && selectedFont === font) fitDraftTypography();
   });
+}
+
+/** The rungs come from the model, so the slider cannot offer what the desk refuses. */
+function renderLiveliness() {
+  if (elements.livelinessTicks && !elements.livelinessTicks.childElementCount) {
+    elements.livelinessTicks.append(...STICKY_LIVELINESS.map(rung => {
+      const tick = document.createElement('span');
+      tick.textContent = rung.short;
+      tick.dataset.key = rung.key;
+      return tick;
+    }));
+  }
+  if (elements.liveliness) elements.liveliness.max = String(STICKY_LIVELINESS.length - 1);
+  selectLiveliness(selectedLiveliness);
+}
+
+function livelinessRung(key = selectedLiveliness) {
+  return stickyLiveliness(key) || stickyLiveliness(STICKY_DEFAULT_LIVELINESS);
+}
+
+function livelinessHintText(rung) {
+  const when = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'})
+    .format(stickyExpiration(Math.floor(Date.now() / 1000), rung.key) * 1000);
+  return `The relay deletes it around ${when}. Nothing keeps a copy.`;
+}
+
+function selectLiveliness(key) {
+  const rung = livelinessRung(key);
+  selectedLiveliness = rung.key;
+  const index = STICKY_LIVELINESS.indexOf(rung);
+  if (elements.liveliness) {
+    elements.liveliness.value = String(index);
+    elements.liveliness.setAttribute('aria-valuetext', rung.label);
+  }
+  if (elements.livelinessValue) elements.livelinessValue.textContent = rung.label;
+  if (elements.livelinessTicks) {
+    [...elements.livelinessTicks.children].forEach((tick, position) => tick.classList.toggle('is-selected', position === index));
+  }
+  if (elements.livelinessHint) elements.livelinessHint.textContent = livelinessHintText(rung);
 }
 
 function baseFontSize(font, draft = false) {
@@ -1104,7 +1154,8 @@ async function startPayment() {
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const exactGeohash = elements.exactGeohash.checked;
-    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont,
+    const liveliness = livelinessRung().key;
+    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
       anonymous: session.method === 'anonymous'};
     let order;
@@ -1380,7 +1431,7 @@ async function publishPinnedNote(resumedEvent = null) {
     elements.pin.disabled = true;
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
-    const template = makeStickyTemplate({...pending, ...placement, anonymous: Boolean(pending.anonymous)});
+    const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     if (!event) return;
     if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid event.');
@@ -1423,6 +1474,15 @@ function openNoteMenu(eventId, pin) {
   elements.noteEventId.textContent = eventId;
   elements.notePostedAt.dateTime = new Date(record.event.created_at * 1000).toISOString();
   elements.notePostedAt.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(record.event.created_at * 1000);
+  // The note's own NIP-40 moment: older notes carry none and show no row.
+  const expiresTag = Number(record.event.tags?.find(tag => tag?.[0] === 'expiration')?.[1]);
+  const expiresAt = Number.isFinite(expiresTag) && expiresTag > 0 ? expiresTag * 1000 : 0;
+  elements.noteExpiresLabel.hidden = !expiresAt;
+  elements.noteExpiresAt.hidden = !expiresAt;
+  if (expiresAt) {
+    elements.noteExpiresAt.dateTime = new Date(expiresAt).toISOString();
+    elements.noteExpiresAt.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(expiresAt);
+  }
   elements.removeSticky.hidden = getNostrSession()?.pubkey !== record.event.pubkey;
   elements.noteMenu.hidden = false;
   const pinRect = pin.getBoundingClientRect();
@@ -1625,6 +1685,7 @@ function openComposer() {
   composingPubkey = session.pubkey;
   composingGeohashes = [...activeGeohashes];
   if (!pending?.orderId) elements.exactGeohash.checked = false;
+  selectLiveliness(pending?.liveliness || selectedLiveliness);
   elements.pay.disabled = false;
   showDialog(elements.composer);
   requestAnimationFrame(() => elements.editor.focus());
@@ -1712,6 +1773,8 @@ elements.logout.addEventListener('click', () => { logoutNostr(); elements.accoun
 elements.accountPicture.addEventListener('error', () => { elements.accountPicture.hidden = true; });
 elements.colors.addEventListener('click', event => selectColor(event.target.closest('[data-color]')?.dataset.color));
 elements.font.addEventListener('change', () => selectFont(elements.font.value));
+elements.liveliness.addEventListener('input', () => selectLiveliness(STICKY_LIVELINESS[Number(elements.liveliness.value)]?.key));
+renderLiveliness();
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
 elements.editor.addEventListener('input', handleEditorInput);
 elements.editor.addEventListener('paste', event => { event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain')); });
@@ -1785,6 +1848,7 @@ if (!resumedSigning && pending?.status === 'waiting') {
     selectColor(pending.color);
     selectFont(pending.font || 'typewriter');
     elements.exactGeohash.checked = Boolean(pending.exactGeohash);
+    selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
     elements.editor.textContent = pending.content;
     lastValidEditor = pending.content;
     showDialog(elements.composer);
