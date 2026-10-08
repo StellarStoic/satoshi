@@ -300,8 +300,8 @@ Colors are `yellow`, `pink`, `blue`, `green`, or `orange`. Allowed font keys are
 `typewriter`, `handwritten`, `patrick-hand`, `kalam`, `comfortaa`, `noto-sans`,
 `noto-serif`, `noto-mono`, `roboto`, `mono`, `roboto-slab`, `open-sans`, `source-sans`,
 `ubuntu`, `pt-sans`, `pt-serif`, `fira-mono`, `ibm-plex-mono`, `merriweather`, `atkinson`,
-and `serif`. Positions are decimal fractions from 0 through 1 and rotation is from -12
-through 12 degrees.
+and `serif`. Positions are decimal fractions from 0 through 1 and rotation is from -75
+through 75 degrees.
 
 Relay tag matching is exact, not a string-prefix search. In `prefix` mode a note on the
 cell `u24jed` carries `g` tags for `u24jed`, `u24je`, `u24j`, and `u24` — every parent that

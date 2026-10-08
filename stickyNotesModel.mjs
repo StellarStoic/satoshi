@@ -577,9 +577,16 @@ export function clampPlacement(value, fallback = 0.5) {
   return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : fallback;
 }
 
+// A note may be pinned as crooked as this either way. The payment desk enforces the same
+// range when it publishes the event, so a tilt the board offers and the desk refuses is a
+// pin that fails after the reader has paid — which is why the desk repo's
+// deploy/check-frontend-contract.mjs compares these two bounds.
+export const ROTATION_MIN = -75;
+export const ROTATION_MAX = 75;
+
 export function clampRotation(value) {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
+  return Number.isFinite(number) ? Math.min(ROTATION_MAX, Math.max(ROTATION_MIN, number)) : 0;
 }
 
 export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
