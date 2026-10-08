@@ -79,6 +79,21 @@
     output.textContent = `v${installed.version}${age ? ` · updated ${age}` : ''}`;
   }
 
+  // When the metadata entry is missing — an install that could not cache every file, or a
+  // cache the worker is still filling — the version's own entries still carry the server's
+  // Date header, and the oldest of those is when this version arrived. Without this the
+  // panel silently dropped the age and showed a bare "v204".
+  async function oldestCachedDate(cache) {
+    let oldest = Infinity;
+    const requests = await cache.keys().catch(() => []);
+    for (const request of requests) {
+      const response = await cache.match(request).catch(() => null);
+      const stamp = Date.parse((response && response.headers.get('date')) || '');
+      if (Number.isFinite(stamp) && stamp < oldest) oldest = stamp;
+    }
+    return Number.isFinite(oldest) ? new Date(oldest).toISOString() : '';
+  }
+
   async function showInstalledVersion() {
     try {
       const versions = (await caches.keys())
@@ -95,7 +110,13 @@
       const cache = await caches.open(`${cachePrefix}${version}`);
       const metadata = await cache.match(metadataUrl);
       const details = metadata ? await metadata.json().catch(() => ({})) : {};
-      installed = {version, updatedAt: details.updatedAt || ''};
+      // A value that is present but unparsable is no better than a missing one, so each
+      // candidate is checked for a real moment before it is trusted.
+      const usable = value => (Number.isFinite(Date.parse(String(value || ''))) ? String(value) : '');
+      const updatedAt = usable(details.updatedAt)
+        || usable(metadata && metadata.headers.get('date'))
+        || await oldestCachedDate(cache);
+      installed = {version, updatedAt: updatedAt || ''};
       renderInstalledVersion();
     } catch {
       output.textContent = 'not available';
@@ -105,6 +126,11 @@
   showInstalledVersion();
   setInterval(renderInstalledVersion, 60000);
   navigator.serviceWorker?.addEventListener('controllerchange', showInstalledVersion);
+  // A backgrounded app has its timers throttled, so returning to it re-reads rather than
+  // trusting an interval that may not have run.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') showInstalledVersion();
+  });
 })();
 
 (() => {

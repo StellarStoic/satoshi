@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v204';   // v204: saved places, named by the reader, in the geohash picker
+const CACHE = 'satoshi-static-v205';   // v205: an install survives one bad file, and the panel always has a time
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
@@ -11,7 +11,7 @@ const CORE = [
     '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
     '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/cork-board.png',
-    '/vendor/leaflet/leaflet.css', '/vendor/leaflet/leaflet.js', '/vendor/leaflet/images/layers.png', '/vendor/leaflet/images/layers-2x.png', '/vendor/leaflet/images/marker-icon.png', '/vendor/leaflet/images/marker-icon-2x.png', '/vendor/leaflet/images/marker-shadow.png',
+    '/vendor/maplibre/maplibre-gl.js', '/vendor/maplibre/maplibre-gl.css',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',
     '/text.js', '/contact.js', '/index.js', '/burgerMenu.js', '/nameForm.js', '/MoscowTime.js', '/MoscowTimeModel.mjs',
@@ -36,7 +36,21 @@ const CORE = [
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE);
-        await cache.addAll(CORE);
+        // Per file, not cache.addAll(CORE): addAll rejects as a unit, so a single 404 or a
+        // dropped connection used to abort the whole install before the metadata below was
+        // written — and Settings, which reads only that metadata, lost its "updated ..." line
+        // until some later install happened to succeed.
+        const failed = [];
+        await Promise.all(CORE.map(async path => {
+            try {
+                const response = await fetch(path, {cache: 'reload'});
+                if (response.ok) await cache.put(path, response);
+                else failed.push(`${path} (${response.status})`);
+            } catch (error) {
+                failed.push(`${path} (${error && error.message})`);
+            }
+        }));
+        if (failed.length) console.warn('sw: cached everything but', failed.length, 'of', CORE.length, failed.join(', '));
         await cache.put(CACHE_METADATA_URL, new Response(JSON.stringify({
             version: CACHE.slice(CACHE.lastIndexOf('v')),
             updatedAt: new Date().toISOString()
