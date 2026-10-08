@@ -12,7 +12,6 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/siteEffects.css">
-  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="/stickyNotes.css">
   <script src="/pwa.js" defer></script>
   <script src="/siteEffects.js" defer></script>
@@ -83,7 +82,7 @@
         <div><h2 id="geohashMapTitle">Choose a geohash</h2><p>Zoom for a smaller area, then tap a grid cell. A place that straddles a few cells: tap the dashed ones around it to add them — a board only ever covers cells that touch.</p></div>
         <button type="button" id="closeGeohashMap" class="dialog-close" aria-label="Close map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       </header>
-      <div id="geohashMap" class="geohash-map" aria-label="OpenStreetMap geohash selector"></div>
+      <div id="geohashMap" class="geohash-map" aria-label="Map for choosing the geohash cells of this board"></div>
       <footer class="geohash-map-selection">
         <span>Grid: <strong id="geohashMapPrecision">4 characters</strong></span>
         <span>Selected: <code id="geohashMapSelection">None</code></span>
@@ -222,7 +221,6 @@
   <script src="/burgerMenu.js"></script>
   <script src="/stego/vendor/nostr-tools.bundle.js"></script>
   <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
-  <script src="/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="/stickyNotes.mjs"></script>
 </body>
 </html>

@@ -115,7 +115,7 @@ export const PAGE_HELP = Object.freeze({
                     + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity or on'
                     + ' a removal. Mentions cost nothing extra: one note, one price, however many people it names.',
                     'Every pin belongs to a geohash of four to nine characters: you enter one or pick it on the'
-                    + ' OpenStreetMap view, where zooming changes the grid between those depths. A place that straddles two'
+                    + ' map view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'
                     + ' touch (along an edge or at a corner) and there are no more than nine: one note, one price. The note'
                     + ' names each of those cells in its own ["g",<cell>] tag, the boards above them so it is also findable'

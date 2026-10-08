@@ -343,10 +343,16 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(html, /id="exactGeohashNote"/);
   assert.match(html, /id="openGeohashMap"/);
   assert.match(html, /id="geohashMapDialog"/);
-  assert.match(html, /vendor\/leaflet\/leaflet\.js/);
-  assert.match(script, /tile\.openstreetmap\.org/);
+  assert.doesNotMatch(html, /vendor\/leaflet/);
+  assert.match(script, /vendor\/maplibre\/maplibre-gl\.js/);
+  assert.match(script, /tiles\.openfreemap\.org\/styles\//);
+  assert.doesNotMatch(script, /tile\.openstreetmap\.org/);
   assert.match(script, /geohashPrecisionForZoom/);
-  assert.match(script, /OpenStreetMap/);
+  // the credit is ours to give: the OpenFreeMap styles ship no attribution of
+  // their own, and the data is OpenStreetMap's
+  assert.match(script, /customAttribution/);
+  assert.match(script, /href="https:\/\/openfreemap\.org\/"/);
+  assert.match(script, /openstreetmap\.org\/copyright/);
   assert.match(script, /searchParams\.get\('g'\)/);
   assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
   assert.match(script, /BOARD_REMEMBER_KEY/);
@@ -423,7 +429,11 @@ test('a board may be one cell or a clump of touching ones', async () => {
   assert.match(html, /id="clearGeohashSelection"/);
   assert.match(script, /elements\.clearGeohashSelection\.addEventListener/);
   assert.match(html, /id="geohashMapStatus"/);
-  assert.match(css, /\.geohash-grid-cell--touchable \{ stroke-dasharray/);
+  // the cells this area may grow into are drawn dashed by their own line layer,
+  // and nothing Leaflet-shaped is left in the page's stylesheet
+  assert.match(script, /filter: \['==', \['get', 'touchable'\], 1\]/);
+  assert.match(script, /'line-dasharray': \[5, 3\]/);
+  assert.doesNotMatch(css, /leaflet/);
   // the whole area is what gets used, and the old single-cell path is gone
   assert.match(script, /elements\.boardGeohash\.value = geohashMapCells\.join\(','\)/);
   assert.doesNotMatch(script, /setMapSelection/);

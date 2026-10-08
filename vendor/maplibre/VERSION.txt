@@ -1,0 +1,1 @@
+maplibre-gl 5.6.0 (BSD-3-Clause) — vendored build of dist/maplibre-gl.js + dist/maplibre-gl.css

@@ -137,8 +137,24 @@ let currentRailId = '';
 let profileFetchPubkey = '';
 let composingPubkey = '';
 let composingGeohashes = [];
+// The picker is the one part of this page that needs an outside library and an
+// outside network. Both are fetched the first time somebody opens it, so the
+// board itself never pays for the map, and if either fails the footer says so
+// and the geohash can still be typed by hand.
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const MAP_FONT = ['Noto Sans Regular'];
+const MAP_LIBRARY = {css: '/vendor/maplibre/maplibre-gl.css', js: '/vendor/maplibre/maplibre-gl.js'};
+const MAP_SOURCE_ID = 'geohash-cells';
+const MAP_FILL_LAYER = 'geohash-cells-fill';
+const MAP_LINE_LAYER = 'geohash-cells-line';
+const MAP_DASH_LAYER = 'geohash-cells-dashed';
+const MAP_LABEL_LAYER = 'geohash-cells-label';
+const MAP_TROUBLE_TEXT = 'The map tiles could not be loaded — you can still enter a geohash by hand.';
+const MAP_MISSING_TEXT = 'The map could not load. You can still enter a geohash manually.';
+let mapLibraryPromise = null;
+let mapTroubleSaid = false;
+
 let geohashMap = null;
-let geohashGrid = null;
 let geohashMapCells = [];
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
@@ -272,9 +288,74 @@ function toggleMapCell(cell) {
     : `${next.length} cells, one note. Tap a dashed cell to widen, or a chosen one to drop it.`);
 }
 
+function loadMapLibrary() {
+  if (window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (mapLibraryPromise) return mapLibraryPromise;
+  mapLibraryPromise = new Promise(resolve => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = MAP_LIBRARY.css;
+    document.head.append(link);
+    const script = document.createElement('script');
+    script.src = MAP_LIBRARY.js;
+    script.async = true;
+    script.addEventListener('load', () => resolve(window.maplibregl || null));
+    script.addEventListener('error', () => {
+      mapLibraryPromise = null;
+      resolve(null);
+    });
+    document.head.append(script);
+  });
+  return mapLibraryPromise;
+}
+
+function sayMapTrouble(message) {
+  if (mapTroubleSaid) return;
+  mapTroubleSaid = true;
+  status(elements.geohashMapStatus, message);
+}
+
+// The grid is one GeoJSON source with four layers on top of it: a wash, a solid
+// outline, a dashed outline for the cells this area may still grow into, and the
+// geohash written in the middle. Leaflet drew a rectangle per cell; a single
+// source is both cheaper and the only way to keep the touching-cell dashes.
+function addGeohashLayers(map) {
+  map.addSource(MAP_SOURCE_ID, {type: 'geojson', data: {type: 'FeatureCollection', features: []}});
+  map.addLayer({
+    id: MAP_FILL_LAYER, type: 'fill', source: MAP_SOURCE_ID,
+    paint: {
+      'fill-color': '#f2a900',
+      'fill-opacity': ['case', ['==', ['get', 'selected'], 1], .3, ['==', ['get', 'touchable'], 1], .09, .035],
+    },
+  });
+  map.addLayer({
+    id: MAP_LINE_LAYER, type: 'line', source: MAP_SOURCE_ID,
+    paint: {
+      'line-color': ['case', ['==', ['get', 'selected'], 1], '#ffbd25', ['==', ['get', 'touchable'], 1], '#e8a200', '#f2a900'],
+      'line-width': ['case', ['==', ['get', 'selected'], 1], 3, ['==', ['get', 'touchable'], 1], 2, 1],
+      'line-opacity': ['case', ['==', ['get', 'selected'], 1], 1, ['==', ['get', 'touchable'], 1], .85, .72],
+    },
+  });
+  map.addLayer({
+    id: MAP_DASH_LAYER, type: 'line', source: MAP_SOURCE_ID,
+    filter: ['==', ['get', 'touchable'], 1],
+    paint: {'line-color': '#e8a200', 'line-width': 2, 'line-opacity': .85, 'line-dasharray': [5, 3]},
+  });
+  map.addLayer({
+    id: MAP_LABEL_LAYER, type: 'symbol', source: MAP_SOURCE_ID,
+    layout: {
+      'text-field': ['get', 'geohash'], 'text-font': MAP_FONT, 'text-size': 10,
+      'text-allow-overlap': true, 'text-ignore-placement': true, 'visibility': 'none',
+    },
+    paint: {'text-color': '#17130d', 'text-halo-color': '#fff4d5', 'text-halo-width': 1.5},
+  });
+}
+
 function drawGeohashGrid() {
   geohashGridFrame = 0;
   if (!geohashMap || !elements.geohashMapDialog.open) return;
+  const source = geohashMap.getSource(MAP_SOURCE_ID);
+  if (!source) return; // the style is still on its way in
   const precision = geohashPrecisionForZoom(geohashMap.getZoom());
   const {height, width} = geohashCellDimensions(precision);
   const bounds = geohashMap.getBounds();
@@ -287,12 +368,12 @@ function drawGeohashGrid() {
   const lonStart = Math.max(0, Math.floor((west + 180) / width));
   const lonEnd = Math.min(Math.ceil(360 / width) - 1, Math.floor((east + 180) / width));
   const center = geohashMap.getCenter();
-  const firstCorner = geohashMap.latLngToContainerPoint([center.lat, center.lng]);
-  const secondCorner = geohashMap.latLngToContainerPoint([center.lat + height, center.lng + width]);
+  const firstCorner = geohashMap.project([center.lng, center.lat]);
+  const secondCorner = geohashMap.project([center.lng + width, center.lat + height]);
   const showLabels = Math.abs(secondCorner.x - firstCorner.x) >= 42 && Math.abs(secondCorner.y - firstCorner.y) >= 22;
 
-  geohashGrid.clearLayers();
   elements.geohashMapPrecision.textContent = `${precision} character${precision === 1 ? '' : 's'}`;
+  const features = [];
   for (let latIndex = latStart; latIndex <= latEnd; latIndex += 1) {
     const cellSouth = -90 + latIndex * height;
     const cellNorth = Math.min(90, cellSouth + height);
@@ -304,26 +385,21 @@ function drawGeohashGrid() {
       // Dashed cells are the ones this area may grow into: a board is only ever
       // cells that touch, so showing the candidates beats refusing taps.
       const touchable = !selected && geohashMapCells.some(chosen => geohashTouches(chosen, geohash));
-      const rectangle = window.L.rectangle([[cellSouth, cellWest], [cellNorth, cellEast]], {
-        className: `geohash-grid-cell${touchable ? ' geohash-grid-cell--touchable' : ''}`,
-        color: selected ? '#ffbd25' : touchable ? '#e8a200' : '#f2a900',
-        fillColor: '#f2a900',
-        fillOpacity: selected ? .3 : touchable ? .09 : .035,
-        opacity: selected ? 1 : touchable ? .85 : .72,
-        weight: selected ? 3 : touchable ? 2 : 1,
-        // Without this a tap on a cell reaches the map as well, and the same cell
-        // is toggled twice — added and taken straight back out again.
-        bubblingMouseEvents: false,
+      features.push({
+        type: 'Feature',
+        properties: {geohash, selected: selected ? 1 : 0, touchable: touchable ? 1 : 0},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [cellWest, cellSouth], [cellEast, cellSouth],
+            [cellEast, cellNorth], [cellWest, cellNorth], [cellWest, cellSouth],
+          ]],
+        },
       });
-      if (showLabels) rectangle.bindTooltip(geohash, {permanent: true, direction: 'center', className: 'geohash-cell-label'});
-      rectangle.on('click', event => {
-        if (event.originalEvent) window.L.DomEvent.stopPropagation(event.originalEvent);
-        toggleMapCell(geohash);
-        scheduleGeohashGrid();
-      });
-      rectangle.addTo(geohashGrid);
     }
   }
+  source.setData({type: 'FeatureCollection', features});
+  geohashMap.setLayoutProperty(MAP_LABEL_LAYER, 'visibility', showLabels ? 'visible' : 'none');
 }
 
 function scheduleGeohashGrid() {
@@ -331,17 +407,33 @@ function scheduleGeohashGrid() {
   geohashGridFrame = requestAnimationFrame(drawGeohashGrid);
 }
 
-function initialiseGeohashMap() {
-  if (geohashMap || !window.L) return;
-  geohashMap = window.L.map(elements.geohashMap, {
-    center: [20, 0], zoom: 2, minZoom: 2, maxZoom: 21, preferCanvas: true,
-    maxBounds: [[-85.0511, -180], [85.0511, 180]], maxBoundsViscosity: 1,
+async function initialiseGeohashMap() {
+  if (geohashMap) return geohashMap;
+  const library = await loadMapLibrary();
+  if (!library) return null;
+  geohashMap = new library.Map({
+    container: elements.geohashMap,
+    style: MAP_STYLE_URL,
+    center: [0, 20], zoom: 2, minZoom: 2, maxZoom: 21,
+    maxBounds: [[-180, -85.0511], [180, 85.0511]],
+    renderWorldCopies: false,
+    // A geohash picker that can be tilted or turned is a picker you can get lost
+    // in: north stays up.
+    dragRotate: false, pitchWithRotate: false, touchPitch: false,
+    // The OpenFreeMap styles carry no attribution of their own, and the data is
+    // OpenStreetMap's: the credit is ours to give.
+    attributionControl: {
+      compact: true,
+      customAttribution: 'Map <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a>'
+        + ' · &copy; <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>'
+        + ' · &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+    },
   });
-  window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    minZoom: 2, maxNativeZoom: 19, maxZoom: 21, noWrap: true,
-  }).addTo(geohashMap);
-  geohashGrid = window.L.layerGroup().addTo(geohashMap);
+  geohashMap.addControl(new library.NavigationControl({showCompass: false}), 'top-right');
+  geohashMap.on('load', () => {
+    addGeohashLayers(geohashMap);
+    scheduleGeohashGrid();
+  });
   geohashMap.on('moveend', scheduleGeohashGrid);
   geohashMap.on('zoomend', () => {
     const precision = geohashPrecisionForZoom(geohashMap.getZoom());
@@ -357,8 +449,17 @@ function initialiseGeohashMap() {
       'Zoomed to a new grid — pick the cells for this area again');
     scheduleGeohashGrid();
   });
+  // One click handler, not two: asking what was under the pointer is the only way
+  // to tell a tap on a cell from a tap on the map, and it cannot fire twice for
+  // the same tap the way a bubbling rectangle could.
   geohashMap.on('click', event => {
-    const cell = encodeGeohash(event.latlng.lat, event.latlng.lng, geohashPrecisionForZoom(geohashMap.getZoom()));
+    const under = geohashMap.queryRenderedFeatures(event.point, {layers: [MAP_FILL_LAYER]});
+    if (under.length) {
+      toggleMapCell(under[0].properties.geohash);
+      scheduleGeohashGrid();
+      return;
+    }
+    const cell = encodeGeohash(event.lngLat.lat, event.lngLat.lng, geohashPrecisionForZoom(geohashMap.getZoom()));
     const touching = geohashMapCells.some(chosen => geohashTouches(chosen, cell));
     if (geohashMapCells.length && !touching && !geohashMapCells.includes(cell)) {
       // Tapping somewhere else entirely starts a new area rather than being
@@ -370,29 +471,39 @@ function initialiseGeohashMap() {
     toggleMapCell(cell);
     scheduleGeohashGrid();
   });
+  geohashMap.on('mouseenter', MAP_FILL_LAYER, () => { geohashMap.getCanvas().style.cursor = 'pointer'; });
+  geohashMap.on('mouseleave', MAP_FILL_LAYER, () => { geohashMap.getCanvas().style.cursor = ''; });
+  // A blocked style, a tile that will not come, a machine without WebGL: each of
+  // those ends up here, and the footer says what can still be done instead of the
+  // reader staring at an empty grey box.
+  geohashMap.on('error', event => {
+    if (event && event.error) sayMapTrouble(MAP_TROUBLE_TEXT);
+  });
+  return geohashMap;
 }
 
-function openGeohashMap() {
+async function openGeohashMap() {
   const typed = geohashCellsFrom(elements.boardGeohash.value);
   const current = typed.length ? typed : activeGeohashes;
   elements.boardDialog.close();
   showDialog(elements.geohashMapDialog);
-  initialiseGeohashMap();
-  if (!geohashMap) {
-    elements.geohashMap.replaceChildren(document.createTextNode('The map could not load. You can still enter a geohash manually.'));
+  const map = geohashMap || await initialiseGeohashMap();
+  if (!map) {
+    elements.geohashMap.replaceChildren(document.createTextNode(MAP_MISSING_TEXT));
+    sayMapTrouble('The map could not load — the geohash can still be typed by hand.');
     return;
   }
   requestAnimationFrame(() => {
-    geohashMap.invalidateSize();
+    map.resize();
     if (current.length) {
       const bounds = geohashBounds(current[0]);
       setMapCells(current, current.length === 1
         ? 'Tap a cell touching this one to cover two or three'
         : `${current.length} cells on this board`);
-      geohashMap.setView([bounds.center.lat, bounds.center.lng], mapZoomForGeohashPrecision(current[0].length), {animate: false});
+      map.jumpTo({center: [bounds.center.lng, bounds.center.lat], zoom: mapZoomForGeohashPrecision(current[0].length)});
     } else {
       setMapCells([]);
-      geohashMap.setView([20, 0], 2, {animate: false});
+      map.jumpTo({center: [0, 20], zoom: 2});
     }
     scheduleGeohashGrid();
   });
@@ -2118,7 +2229,7 @@ elements.editor.addEventListener('input', updateMentionMenu);
 elements.editor.addEventListener('click', updateMentionMenu);
 elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
 elements.newSticky.addEventListener('click', openComposer);
-elements.openGeohashMap.addEventListener('click', openGeohashMap);
+elements.openGeohashMap.addEventListener('click', () => { openGeohashMap(); });
 elements.closeGeohashMap.addEventListener('click', () => elements.geohashMapDialog.close());
 elements.geohashMapDialog.addEventListener('close', () => {
   showDialog(elements.boardDialog);
