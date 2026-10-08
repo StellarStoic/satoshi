@@ -436,6 +436,21 @@ function scheduleGeohashGrid() {
   geohashGridFrame = requestAnimationFrame(drawGeohashGrid);
 }
 
+function nextPaint() {
+  return new Promise(resolve => requestAnimationFrame(resolve));
+}
+
+async function waitForGeohashMapLayout() {
+  // A modal becomes `open` before the browser has necessarily laid it out.
+  // MapLibre cannot calculate its camera matrices from a zero-sized container.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await nextPaint();
+    const bounds = elements.geohashMap.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0) return true;
+  }
+  return false;
+}
+
 async function initialiseGeohashMap() {
   if (geohashMap) return geohashMap;
   const library = await loadMapLibrary();
@@ -516,14 +531,20 @@ async function openGeohashMap() {
   const current = typed.length ? typed : activeGeohashes;
   elements.boardDialog.close();
   showDialog(elements.geohashMapDialog);
+  const hasLayout = await waitForGeohashMapLayout();
+  if (!hasLayout || !elements.geohashMapDialog.open) {
+    sayMapTrouble('The map could not fit this screen — the geohash can still be typed by hand.');
+    return;
+  }
+  const existingMap = Boolean(geohashMap);
   const map = geohashMap || await initialiseGeohashMap();
   if (!map) {
     elements.geohashMap.replaceChildren(document.createTextNode(MAP_MISSING_TEXT));
     sayMapTrouble('The map could not load — the geohash can still be typed by hand.');
     return;
   }
-  requestAnimationFrame(() => {
-    map.resize();
+  if (!elements.geohashMapDialog.open) return;
+  try {
     if (current.length) {
       const bounds = geohashBounds(current[0]);
       setMapCells(current, current.length === 1
@@ -534,8 +555,14 @@ async function openGeohashMap() {
       setMapCells([]);
       map.jumpTo({center: [0, 20], zoom: 2});
     }
+    // A new map measured the visible dialog in its constructor. Only a reused
+    // map needs resizing after the dialog was closed and opened again.
+    if (existingMap) map.resize();
     scheduleGeohashGrid();
-  });
+  } catch (error) {
+    console.error('Could not open the geohash map:', error);
+    sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
+  }
 }
 
 function sessionLabel(session) {
@@ -2286,7 +2313,12 @@ elements.editor.addEventListener('input', updateMentionMenu);
 elements.editor.addEventListener('click', updateMentionMenu);
 elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
 elements.newSticky.addEventListener('click', openComposer);
-elements.openGeohashMap.addEventListener('click', () => { openGeohashMap(); });
+elements.openGeohashMap.addEventListener('click', () => {
+  openGeohashMap().catch(error => {
+    console.error('Could not open the geohash map:', error);
+    sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
+  });
+});
 elements.closeGeohashMap.addEventListener('click', () => elements.geohashMapDialog.close());
 elements.geohashMapDialog.addEventListener('close', () => {
   showDialog(elements.boardDialog);

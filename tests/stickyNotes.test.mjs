@@ -76,6 +76,21 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(stickyDay(null), '');
 });
 
+test('public sticky-note copy has no retired per-note pricing', async () => {
+  const [html, readme, context, contract] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../README.md', import.meta.url), 'utf8'),
+    readFile(new URL('../AI_CONTEXT.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/pay-service.md', import.meta.url), 'utf8'),
+  ]);
+  const copy = `${html}\n${readme}\n${context}\n${contract}`;
+  assert.doesNotMatch(copy, /\b11 sats\b|Post note · 11|Remove · 11|\/sticky\/v1\/quote/);
+  assert.match(copy, /10 sats/);
+  assert.match(copy, /411 sats/);
+  assert.match(copy, /subscription_required/);
+  assert.match(context, /one to nine connected cells/);
+});
+
 test('anonymous notes carry a signed identity-mode marker', () => {
   const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, anonymous: true});
   assert.deepEqual(template.tags.find(tag => tag[0] === 'anonymous'), ['anonymous', '24h-local-key']);
@@ -343,6 +358,9 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(html, /id="shareStickyBoard"/);
   assert.match(html, /id="exactGeohashNote"/);
   assert.match(html, /id="openGeohashMap"/);
+  assert.match(script, /waitForGeohashMapLayout/);
+  assert.match(script, /if \(existingMap\) map\.resize\(\)/);
+  assert.match(script, /openGeohashMap\(\)\.catch/);
   assert.match(html, /id="geohashMapDialog"/);
   assert.doesNotMatch(html, /vendor\/leaflet/);
   assert.match(script, /vendor\/maplibre\/maplibre-gl\.js/);

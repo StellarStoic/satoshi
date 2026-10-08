@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v207';   // v206: the rail is the board's edge, and the pan stops there
+const CACHE = 'satoshi-static-v208';   // v208: geohash maps wait for the dialog layout before camera work
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

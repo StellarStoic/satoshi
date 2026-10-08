@@ -34,56 +34,71 @@ place: the page should read it from a single constant.
 
 # 1. Sticky notes
 
-A sticky note is a note pinned to the satoshi.si board. Publishing or removing one costs
-**11 sats** for an ordinary signed-in Nostr user and is **free** when that pubkey owns an
-active satoshi.si NIP-05 name. A browser-generated 24-hour anonymous identity costs
-**42 sats**. Paid orders are payable over Ark and Lightning.
+A sticky note is a temporary public Nostr event pinned to one geohash cell or a connected
+clump of cells. A named Nostr identity posts through a time-limited subscription; a
+browser-generated 24-hour anonymous identity cannot subscribe and pays **42 sats per
+message**. Paid orders are payable over Ark and Lightning.
 
 ## Price
 
-| action   | signed-in Nostr user | satoshi.si NIP-05 member | anonymous identity |
-| -------- | -------------------- | ------------------------- | ------------------ |
-| `pin`    | 11 sats              | free                      | 42 sats            |
-| `remove` | 11 sats              | free                      | 42 sats            |
+| purchase or action | named Nostr identity | verified satoshi.si NIP-05 | anonymous identity |
+| ------------------ | -------------------- | --------------------------- | ------------------ |
+| one-week subscription | 10 sats          | 5 sats                      | unavailable        |
+| one-year subscription | 411 sats         | 205 sats                    | unavailable        |
+| pin or remove while subscribed | included | included                  | 42 sats per message |
 
-Fixed server-side. The desk checks its authoritative NIP-05 records using the order
-pubkey; it never trusts a browser claim, a submitted NIP-05 string, or a kind-0 profile.
-The eligibility decision, price and pubkey are bound to the order. For removal, the desk
-also reads the target event: its signed `anonymous` marker determines the 42-sat tier.
+The yearly price is 52 weekly periods less 21%, rounded to a whole satoshi. Prices and
+membership eligibility are fixed server-side. The desk checks its authoritative NIP-05
+records using the order pubkey; it never trusts a browser claim, a submitted NIP-05 string,
+or a kind-0 profile. Renewing early extends the existing expiry instead of discarding the
+remaining time. For removal, the desk also reads the target event: its signed `anonymous`
+marker determines whether the 42-sat per-message path applies.
 
-## GET /sticky/v1/quote?pubkey={64-hex-key}
+## GET /sticky/v1/subscription?pubkey={64-hex-key}
 
-Returns the current display price before checkout. An active satoshi.si member receives:
+Returns whether the named identity is currently covered and the authoritative prices to
+display. A verified satoshi.si NIP-05 owner without an active subscription receives:
 
 ```json
-{ "ok": true, "baseSats": 11, "sats": 0,
-  "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" } }
+{ "ok": true,
+  "active": false,
+  "expiresAt": null,
+  "plan": null,
+  "prices": { "weekSats": 5, "yearSats": 205, "member": true } }
 ```
 
-An ordinary signed-in key receives 11 sats and `applied: false`. This quote is informational;
-order creation checks the authoritative records again.
+An ordinary identity receives `weekSats: 10`, `yearSats: 411`, and `member: false`. An
+active response sets `active: true`, supplies its Unix-seconds `expiresAt`, and identifies
+the plan. This lookup is informational; order creation checks the authoritative records
+again. Anonymous identities do not use this endpoint because subscriptions never cover
+them.
 
 ## Order lifecycle
 
 ```
-paid (free member) ───────────────────────────────► published
-        ▲
-awaiting_invoice ──► awaiting_payment ────────────► paid ──► published
-        │                    │
-        │                    └────► expired   (invoice window closed)
-        └──────────────────────────► (pruned an hour after expiry)
+subscribe ─► awaiting_invoice ─► awaiting_payment ─► paid ─► subscription active
+                                                                  │
+pin/remove with active subscription ─► paid at 0 sats ────────────┴─► published
+
+anonymous pin/remove ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
 ```
 
-For an 11- or 42-sat order, `paid` means BTCPay reports the invoice **Settled**;
-`Processing` does not count. A verified zero-sat member order starts in `paid` without
-creating an invoice or worker job. `published` means the signed event was accepted by
-the relay.
+For a subscription or 42-sat anonymous order, `paid` means BTCPay reports the invoice
+**Settled**; `Processing` does not count. A pin or removal covered by an active subscription
+starts in `paid` at 0 sats, creates no invoice or worker job, and returns its short-lived
+publish token immediately. `published` means the signed event was accepted by the relay.
 
 ## POST /sticky/v1/orders
 
 Create an order. Unauthenticated by design; the pubkey is the identity.
 
 **request**
+
+```json
+{ "action": "subscribe",
+  "pubkey": "a127e1254181099aa2891a9b0a15823777a2e0ce666ba618d53a07b890de56af",
+  "plan": "week" }
+```
 
 ```json
 { "action": "pin",
@@ -100,7 +115,9 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "targetEventId": "3afcf930479f3f1f4a9b614423ba9e83938efea78849ee111717e0d0c664eeef" }
 ```
 
-`action` is exactly `pin` or `remove`. `pubkey`, `contentHash` and `targetEventId` are
+`action` is exactly `subscribe`, `pin`, or `remove`. Every action requires a 64-character
+lowercase-hex `pubkey`. A subscription also requires `plan` to be exactly `week` or `year`
+and accepts no note fields. Pin `contentHash` and removal `targetEventId` values are likewise
 64-character lowercase hex. Every pin requires a lowercase geohash of **4 through 9**
 characters from the geohash alphabet: below 4 a cell is a region rather than a place, and
 9 is as deep as the grid is useful.
@@ -113,14 +130,15 @@ clump: every cell cut to the **same depth**, each cell listed **once**, no more 
 **nine** cells, and the cells must **touch** — sharing an edge or a corner — so that the
 clump is one connected piece. Any violation is `bad_geohash`, before anything is priced.
 The first cell is the *primary*: the one the note is written on, and the one the `["i"]`
-tag names. The whole clump is what is bought, and it is **one note on one price** — a
-clump costs exactly what a single cell costs.
+tag names. A clump remains one note: an active subscription includes it, while an
+anonymous identity pays the same 42 sats whether that note covers one or several cells.
 
 `geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
-is optional and valid only for `pin`; it selects the fixed 42-sat price. Nothing else is
-accepted. The created order binds every cell of the clump, the geohash mode and the
-identity mode alongside the pubkey and commitment; the publish token is derived from
-all of them.
+is optional and valid only for `pin`; it selects the fixed 42-sat path. A named pin or
+removal without an active subscription is refused with `402 subscription_required`, after
+which the client may buy a subscription and retry the same action. The created pin order
+binds every cell of the clump, geohash mode and identity mode alongside the pubkey and
+commitment; the publish token is derived from all of them.
 
 **response — `201`**
 
@@ -130,7 +148,6 @@ all of them.
   "action": "pin",
   "status": "paid",
   "sats": 0,
-  "discount": { "applied": true, "reason": "satoshi.si NIP-05 member" },
   "paymentMethod": null,
   "paymentMethods": [],
   "expiresAt": 1791352314,
@@ -140,22 +157,24 @@ all of them.
   "publishToken": "eyJ…",
   "publishTokenExpiresAt": 1791353214,
   "publishedEventId": null,
-  "note": "No payment required. Place and sign the note before the publish token expires."
+  "note": "Covered by the active subscription. Place and sign the note before the publish token expires."
 }
 ```
 
-The response above is the zero-sat member path. It must return the publish token in the
-creation response because there is nothing to poll or settle. An 11- or 42-sat response
-keeps the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails.
+The response above is a pin covered by an active subscription. It must return the publish
+token in the creation response because there is nothing to poll or settle. Subscription
+orders use 10, 411, 5, or 205 sats; anonymous message orders use 42 sats. Those paid orders
+keep the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails. A paid
+subscription activates the pass but has no Nostr event and therefore no publish token.
 
-**Paid orders have no `checkoutLink`, deliberately.** BTCPay on this box reports a LAN-only
+**Invoice-backed orders have no `checkoutLink`, deliberately.** BTCPay on this box reports a LAN-only
 checkout URL (`http://10.0.3.1:52143/i/<invoice>`): a browser on the internet cannot open
 it, and BTCPay is intentionally not published. What a Bark wallet can act on is the rail
 itself, so `payment.arkAddress` and `payment.paymentLink` are payable things.
 `paymentLink` is BTCPay's own `bitcoin:` URI carrying the exact amount. Lightning wallets
 use `payment.lightningUri` or the bare `payment.bolt11`.
 
-**Paid-order latency.** The desk holds this request for up to about 8 seconds while the worker
+**Invoice latency.** The desk holds this request for up to about 8 seconds while the worker
 attaches the invoice. If `payment` is still `null` (`status: "awaiting_invoice"`), the
 browser keeps the already-open payment sheet visible and polls the same order every
 3 seconds. It must never create a second order.
@@ -165,8 +184,10 @@ browser keeps the already-open payment sheet visible and polls the same order ev
 | HTTP | reason             | when                                                     |
 | ---- | ------------------ | -------------------------------------------------------- |
 | 400  | (validation text)  | bad `action`, a key or hash that is not 64 hex, a `sats` field |
+| 400  | `bad_plan`         | a subscription plan is not exactly `week` or `year`      |
 | 400  | `bad_geohash`      | a pin has no geohash or uses an invalid geohash alphabet/length |
 | 400  | `bad_geohash_mode` | a pin does not choose exactly `prefix` or `exact`          |
+| 402  | `subscription_required` | a named pin or removal has no active subscription    |
 | 409  | `target_missing`   | a removal for a note the relay does not have             |
 | 409  | `target_not_owned` | a removal for a note written by a different pubkey       |
 | 409  | `already_pinned`   | the same note on the same key is already pinned and live  |
@@ -177,21 +198,21 @@ compares its author. A stranger cannot even buy a removal for your note.
 ## GET /sticky/v1/orders/{id}
 
 ```json
-{ "ok": true, "id": "03ad90da9fc3716c0dad4fd5", "action": "pin",
-  "status": "paid", "sats": 11, "paymentMethod": "BARK", "paymentMethods": ["BARK", "BTC-LN"],
+{ "ok": true, "id": "03ad90da9fc3716c0dad4fd5", "action": "subscribe",
+  "status": "paid", "sats": 10, "paymentMethod": "BARK", "paymentMethods": ["BARK", "BTC-LN"],
   "expiresAt": 1791352314,
-  "payment": { "arkAddress": "ark1…", "bolt11": "lnbc210n1…",
-               "lightningUri": "lightning:lnbc210n1…", "paymentLink": "bitcoin:…", "invoiceId": "…" },
-  "commitment": { "contentHash": "f85b33…" },
+  "payment": { "arkAddress": "ark1…", "bolt11": "lnbc100n1…",
+               "lightningUri": "lightning:lnbc100n1…", "paymentLink": "bitcoin:…", "invoiceId": "…" },
   "paid": true,
-  "publishToken": "eyJ…",
-  "publishTokenExpiresAt": 1791353214,
+  "publishToken": null,
   "publishedEventId": null }
 ```
 
-For paid orders, `publishToken` is `null` until the invoice is **Settled**. For a free
-member order it is issued immediately. It disappears from this response once used or
-expired (15 minutes after settlement or free authorization). Poll only paid orders.
+For an anonymous message order, `publishToken` is `null` until the invoice is **Settled**.
+For a subscription-covered pin or removal it is issued immediately. It disappears once
+used or expired (15 minutes after settlement or authorization). Subscription orders never
+receive one; after settlement the client refreshes `/subscription` and retries the pending
+pin or removal, which is then authorized at 0 sats.
 
 ## POST /sticky/v1/orders/{id}/publish
 
@@ -206,6 +227,7 @@ Content-Type: application/json
                       ["g","u0qj7z0y"],["g","u0qj7z0"],["g","u0qj7"],["g","u0qj"],
                       ["i","geo:u0qj7z0y1"],["k","geo"],["geohash","prefix"],
                       ["sticky","v1","yellow","0.42","0.99","-2.00","typewriter"],
+                      ["expiration","1793942494"],
                       ["alt","A sticky note pinned on satoshi.si"]],
              "content": "sticky e2e test note", "sig": "…" } }
 ```
@@ -223,7 +245,8 @@ The desk checks, in this order, **before** anything reaches the relay:
 
 Then it publishes to `wss://nostr.satoshi.si`, and reports what actually happened.
 
-**`200`** — published. The note is on the relay and the pin is live for 30 days:
+**`200`** — published. The note is on the relay until the signed NIP-40 expiration chosen
+by its author:
 
 ```json
 { "ok": true, "status": "published", "publishedEventId": "…", "action": "pin" }
@@ -412,11 +435,12 @@ GET  /sticky/v1/worker/queue?wait=20   sticky orders; ?wait is seconds, held up 
 POST /sticky/v1/worker/orders/{id}/invoice   attach the available Ark and Lightning rails
 POST /sticky/v1/worker/orders/{id}/status    paid | expired | cancelled
 GET  /sticky/v1/health                 sticky liveness and counts
-GET  /sticky/v1/config                 price, styles, bounds, 501-char limit, commitment
+GET  /sticky/v1/config                 subscription/anonymous prices, styles, bounds, 501-char limit, commitment
 ```
 
-`GET /sticky/v1/config` is the public one: a frontend should read the styles, the board
-bounds and the character limit from it rather than keeping its own copy.
+`GET /sticky/v1/config` is the public one: a frontend should read the subscription and
+anonymous prices, styles, board bounds, geohash rules, liveliness rules, mention rules,
+and character limit from it rather than keeping its own copy.
 
 
 ## Refusal codes you will actually see (pin orders and publication)
