@@ -18,7 +18,7 @@ import {
   GEOHASH_MAX_CELLS,
   normaliseGeohashes,
   makeDeletionTemplate,
-  makeStickyTemplate,
+  makeStickyTemplate, mentionFilterAvailability, mentionLabel, noteMentions, stickyTextParts,
   geohashMatchesBoard,
   geohashPrecisionForZoom,
   mapZoomForGeohashPrecision,
@@ -62,6 +62,9 @@ const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
+  mentionFilter: document.getElementById('mentionFilter'), mentionFilterStatus: document.getElementById('mentionFilterStatus'),
+  mentionMenu: document.getElementById('mentionMenu'), mentionOptions: document.getElementById('mentionOptions'),
+  mentionMenuStatus: document.getElementById('mentionMenuStatus'),
   openBoard: document.getElementById('openStickyBoard'), boardDialog: document.getElementById('boardDialog'),
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
@@ -594,6 +597,7 @@ function updateAccount() {
   }
   updateAnonymousCountdown();
   refreshPriceQuote(session);
+  refreshMentionFilter();
 }
 
 function renderQuotedPrice() {
@@ -865,7 +869,7 @@ function renderNote(sticky, event = null, temporary = false) {
   const text = document.createElement('div');
   text.className = 'sticky-note__text';
   const textContent = document.createElement('span');
-  textContent.textContent = sticky.content;
+  renderNoteContent(textContent, sticky.content);
   text.appendChild(textContent);
   note.appendChild(text);
   if (!temporary) {
@@ -893,6 +897,10 @@ function renderNote(sticky, event = null, temporary = false) {
     if (note.isConnected) fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
   });
   if (!temporary && event) noteEvents.set(sticky.id, {event, sticky, element: note});
+  // A note that arrives while the filter is on obeys it too.
+  if (!temporary && mentionFilterOn && !noteMentions(sticky, getNostrSession()?.pubkey)) {
+    note.classList.add('sticky-note--filtered-out');
+  }
   return note;
 }
 
@@ -1071,7 +1079,10 @@ function editorOverflows() {
 }
 
 function updateCapacity() {
-  const length = normaliseStickyText(elements.editor.textContent).length;
+  // Counted in the text that will be published: a mention is drawn as a name in
+  // the editor but travels as its whole npub, so what the counter shows is what
+  // the relay will hold.
+  const length = normaliseStickyText(editorContent()).length;
   const full = length >= STICKY_MAX_CHARACTERS;
   const almostFull = !full && length >= Math.floor(STICKY_MAX_CHARACTERS * .9);
   elements.draft.classList.toggle('sticky-note--dense', length > 280);
@@ -1085,8 +1096,9 @@ function updateCapacity() {
 
 function handleEditorInput() {
   const text = elements.editor.textContent;
-  elements.draft.classList.toggle('sticky-note--dense', normaliseStickyText(text).length > 280);
-  if (text.length > STICKY_MAX_CHARACTERS) {
+  const published = normaliseStickyText(editorContent());
+  elements.draft.classList.toggle('sticky-note--dense', published.length > 280);
+  if (published.length > STICKY_MAX_CHARACTERS) {
     elements.editor.textContent = lastValidEditor;
     updateCapacity();
     fitDraftTypography();
@@ -1146,7 +1158,8 @@ async function startPayment() {
       throw new Error('Choose the geohash corkboard again, then reopen the note.');
     }
     await ensureReadySigner();
-    const content = normaliseStickyText(elements.editor.textContent);
+    const mentions = editorMentions();
+    const content = normaliseStickyText(editorContent());
     if (!content) throw new Error('Write something on the note first.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
@@ -1155,7 +1168,7 @@ async function startPayment() {
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const exactGeohash = elements.exactGeohash.checked;
     const liveliness = livelinessRung().key;
-    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness,
+    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
       anonymous: session.method === 'anonymous'};
     let order;
@@ -1687,10 +1700,406 @@ function openComposer() {
   if (!pending?.orderId) elements.exactGeohash.checked = false;
   selectLiveliness(pending?.liveliness || selectedLiveliness);
   elements.pay.disabled = false;
+  closeMentionMenu();
+  loadMentionDirectory();
   showDialog(elements.composer);
   requestAnimationFrame(() => elements.editor.focus());
 }
 
+// ---------------------------------------------------------------- mentions
+// Tagging is open to anyone with a NIP-05 identity, on any domain, so the board
+// cannot hold the list of names. It looks them up instead: the satoshi.si names
+// it is served from, the profile of a key that is pasted, and the NIP-05 endpoint
+// of whatever domain a name belongs to. Only a key that answers with a name can
+// be tagged — that is why an anonymous throwaway identity has nothing to offer
+// here, and why the person button is dead for one.
+let mentionFilterOn = false;
+let mentionMenuOptions = [];
+let mentionMenuIndex = -1;
+let mentionDirectoryLoaded = false;
+let mentionProfilesTimer = null;
+const mentionDirectory = new Map();   // "name@domain", lowercase -> hex
+const mentionLabels = new Map();      // hex -> the name to draw
+const mentionProfiles = new Map();    // hex -> {name, displayName, nip05}
+const mentionProfileQueue = new Set();
+
+function ownDomain() {
+  try { return window.location.hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
+}
+
+function rememberMention(identifier, pubkey) {
+  const key = String(pubkey || '').toLowerCase();
+  const name = String(identifier || '').trim().replace(/^@/, '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(key) || !name) return;
+  mentionDirectory.set(name, key);
+  mentionDirectory.set(name.replace(/@[^@]*$/, ''), key);   // "alice" as well as "alice@domain"
+  if (!mentionLabels.has(key)) mentionLabels.set(key, name);
+}
+
+/** The names the board is served from: satoshi.si's own NIP-05 store. */
+async function loadMentionDirectory() {
+  if (mentionDirectoryLoaded) return;
+  mentionDirectoryLoaded = true;
+  try {
+    const response = await fetch('/.well-known/nostr.json', {headers: {accept: 'application/json'}});
+    if (!response.ok) return;
+    const body = await response.json();
+    Object.entries(body?.names || {}).forEach(([name, pubkey]) => rememberMention(`${name}@${ownDomain()}`, pubkey));
+  } catch {}
+}
+
+/** "name" or "name@domain" -> pubkey, by asking that domain, as NIP-05 says. */
+async function resolveMentionName(value) {
+  const identifier = String(value || '').trim().replace(/^@/, '').toLowerCase();
+  if (!identifier) return null;
+  const at = identifier.lastIndexOf('@');
+  const name = at === -1 ? identifier : identifier.slice(0, at);
+  const domain = at === -1 ? ownDomain() : identifier.slice(at + 1);
+  if (!name || !domain) return null;
+  const cached = mentionDirectory.get(`${name}@${domain}`);
+  if (cached) return cached;
+  try {
+    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`,
+      {headers: {accept: 'application/json'}});
+    if (!response.ok) return null;
+    const body = await response.json();
+    const pubkey = String(body?.names?.[name] || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(pubkey)) return null;
+    rememberMention(`${name}@${domain}`, pubkey);
+    return pubkey;
+  } catch { return null; }
+}
+
+function profileFields(event) {
+  try {
+    const source = JSON.parse(event?.content || '{}');
+    const identity = String(source.nip05 || '').trim().replace(/^https?:\/\//, '').replace(/^_@/, '');
+    return {
+      name: String(source.name || '').trim().slice(0, 80),
+      displayName: String(source.display_name || source.displayName || '').trim().slice(0, 80),
+      nip05: identity.includes('@') ? identity.slice(0, 180) : '',
+    };
+  } catch { return {name: '', displayName: '', nip05: ''}; }
+}
+
+/** One profile, now, because a pasted key cannot be tagged on trust. */
+async function fetchMentionProfile(pubkey) {
+  const key = String(pubkey || '').toLowerCase();
+  if (mentionProfiles.has(key)) return mentionProfiles.get(key);
+  try {
+    const profiles = await readAuthorProfilesFromRelay(RELAY, [key]);
+    const profile = profileFields(profiles.get(key));
+    mentionProfiles.set(key, profile);
+    if (profile.nip05) rememberMention(profile.nip05, key);
+    return profile;
+  } catch { return null; }
+}
+
+function requestMentionProfile(pubkey) {
+  const key = String(pubkey || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(key) || mentionProfiles.has(key)) return;
+  mentionProfileQueue.add(key);
+  if (mentionProfilesTimer) return;
+  mentionProfilesTimer = setTimeout(flushMentionProfiles, 150);
+}
+
+async function flushMentionProfiles() {
+  mentionProfilesTimer = null;
+  const pubkeys = [...mentionProfileQueue];
+  mentionProfileQueue.clear();
+  if (!pubkeys.length) return;
+  try {
+    const results = await Promise.allSettled([
+      readAuthorProfilesFromRelay(RELAY, pubkeys),
+      readAuthorProfilesFromRelay('wss://relay.damus.io', pubkeys),
+      readAuthorProfilesFromRelay('wss://nos.lol', pubkeys),
+    ]);
+    const newest = new Map();
+    results.filter(result => result.status === 'fulfilled').forEach(result => {
+      result.value.forEach((event, pubkey) => {
+        if (!newest.has(pubkey) || event.created_at > newest.get(pubkey).created_at) newest.set(pubkey, event);
+      });
+    });
+    pubkeys.forEach(pubkey => {
+      const profile = profileFields(newest.get(pubkey));
+      mentionProfiles.set(pubkey, profile);
+      if (profile.nip05) rememberMention(profile.nip05, pubkey);
+      updateMentionElements(pubkey, mentionLabelFor(pubkey, npubOf(pubkey)));
+    });
+  } catch {}
+}
+
+function npubOf(pubkey) {
+  try { return window.NostrTools.nip19.npubEncode(String(pubkey || '').toLowerCase()); } catch { return ''; }
+}
+
+function pubkeyOfNpub(npub) {
+  try {
+    const decoded = window.NostrTools.nip19.decode(String(npub || ''));
+    return decoded?.type === 'npub' ? String(decoded.data).toLowerCase() : '';
+  } catch { return ''; }
+}
+
+/** The name to draw for a tagged person: their profile, then their NIP-05, then the npub. */
+function mentionLabelFor(pubkey, npub) {
+  const key = String(pubkey || '').toLowerCase();
+  const profile = mentionProfiles.get(key);
+  const stored = mentionLabels.get(key) || '';
+  const label = mentionLabel([profile?.name, profile?.displayName, profile?.nip05, stored], npub);
+  return label.startsWith('@') ? label : `@${label}`;
+}
+
+function updateMentionElements(pubkey, label) {
+  const key = String(pubkey || '').toLowerCase();
+  elements.canvas.querySelectorAll('.sticky-note__mention').forEach(chip => {
+    if (chip.dataset.mentionPubkey !== key) return;
+    chip.textContent = label;
+    chip.title = label;
+  });
+}
+
+function renderNoteContent(container, content) {
+  stickyTextParts(content).forEach(part => {
+    if (part.type !== 'mention') { container.appendChild(document.createTextNode(part.text)); return; }
+    const pubkey = pubkeyOfNpub(part.npub);
+    const chip = document.createElement('span');
+    chip.className = 'sticky-note__mention';
+    chip.dataset.mentionNpub = part.npub;
+    if (pubkey) chip.dataset.mentionPubkey = pubkey;
+    chip.textContent = mentionLabelFor(pubkey, part.npub);
+    chip.title = part.npub;
+    container.appendChild(chip);
+    if (pubkey && !mentionProfiles.has(pubkey)) requestMentionProfile(pubkey);
+  });
+}
+
+// ---- the composer: "@" offers the people this writer may tag
+function caretMentionQuery() {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  if (!range.collapsed || !elements.editor.contains(range.startContainer)) return null;
+  const node = range.startContainer;
+  if (!node || node.nodeType !== 3) return null;
+  const before = node.textContent.slice(0, range.startOffset);
+  const match = before.match(/(?:^|\s)@([^\s@]*)$/);
+  if (!match) return null;
+  return {query: match[1], length: match[1].length + 1};
+}
+
+function setMentionStatus(message) {
+  elements.mentionMenuStatus.textContent = message || '';
+}
+
+function closeMentionMenu() {
+  mentionMenuOptions = [];
+  mentionMenuIndex = -1;
+  elements.mentionMenu.hidden = true;
+  elements.mentionOptions.replaceChildren();
+  setMentionStatus('');
+}
+
+function mentionEntry(pubkey, label) {
+  const key = String(pubkey || '').toLowerCase();
+  return {kind: 'entry', pubkey: key, npub: npubOf(key), label: mentionLabelFor(key, npubOf(key)),
+    name: mentionLabels.get(key) || mentionProfiles.get(key)?.nip05 || ''};
+}
+
+function suggestionsFor(query) {
+  const needle = String(query || '').toLowerCase();
+  const entries = [...mentionDirectory.entries()]
+    .filter(([identifier]) => !needle || identifier.startsWith(needle) || identifier.includes(`@${needle}`))
+    .map(([, pubkey]) => mentionEntry(pubkey));
+  const seen = new Set();
+  return entries.filter(entry => entry.pubkey && !seen.has(entry.pubkey) && seen.add(entry.pubkey)).slice(0, 8);
+}
+
+function renderMentionMenu(query, entries, {pending = false} = {}) {
+  elements.mentionOptions.replaceChildren();
+  mentionMenuOptions = entries.map(entry => ({kind: 'entry', entry}));
+  const identifier = String(query || '').trim();
+  if (identifier && !entries.length) {
+    mentionMenuOptions.push({kind: 'lookup', value: identifier});
+  }
+  mentionMenuIndex = mentionMenuOptions.length ? 0 : -1;
+  mentionMenuOptions.forEach((option, index) => {
+    const item = document.createElement('li');
+    item.className = 'mention-menu__option';
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', String(index === mentionMenuIndex));
+    const name = document.createElement('span');
+    name.className = 'mention-menu__name';
+    const short = document.createElement('span');
+    short.className = 'mention-menu__npub';
+    if (option.kind === 'lookup') {
+      name.textContent = `Tag @${identifier}`;
+      short.textContent = 'look this name up';
+    } else {
+      name.textContent = option.entry.label;
+      short.textContent = option.entry.name || `${option.entry.npub.slice(0, 12)}…`;
+    }
+    item.append(name, short);
+    item.addEventListener('mousedown', event => event.preventDefault());
+    item.addEventListener('click', () => { mentionMenuIndex = index; pickMention(); });
+    elements.mentionOptions.appendChild(item);
+  });
+  elements.mentionMenu.hidden = !mentionMenuOptions.length;
+  if (pending) setMentionStatus('Looking this name up…');
+}
+
+function updateMentionMenu() {
+  const session = getNostrSession();
+  const caret = caretMentionQuery();
+  if (!caret || !mentionFilterAvailability(session).available) { closeMentionMenu(); return; }
+  if (!mentionDirectoryLoaded) loadMentionDirectory().then(() => {
+    if (caretMentionQuery()) updateMentionMenu();
+  });
+  renderMentionMenu(caret.query, suggestionsFor(caret.query));
+}
+
+function editorContent(editor = elements.editor) {
+  let out = '';
+  editor.childNodes.forEach(node => {
+    if (node.nodeType === 3) { out += node.textContent; return; }
+    if (node.nodeType !== 1) return;
+    // A mention becomes the thing it stands for: the npub, as NIP-27 writes it.
+    if (node.dataset?.pubkey && node.dataset?.npub) out += `nostr:${node.dataset.npub}`;
+    else out += node.textContent;
+  });
+  return out;
+}
+
+function editorMentions(editor = elements.editor) {
+  const keys = [];
+  editor.querySelectorAll('.sticky-editor__mention').forEach(chip => {
+    const pubkey = String(chip.dataset.pubkey || '').toLowerCase();
+    if (/^[0-9a-f]{64}$/.test(pubkey) && !keys.includes(pubkey)) keys.push(pubkey);
+  });
+  return keys;
+}
+
+function insertMention(entry, query) {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  const node = range.startContainer;
+  if (!node || node.nodeType !== 3) return;
+  const text = node.textContent;
+  const cut = Math.max(0, range.startOffset - (query.length + 1));
+  node.textContent = `${text.slice(0, cut)}${text.slice(range.startOffset)}`;
+  const chip = document.createElement('span');
+  chip.className = 'sticky-editor__mention';
+  chip.contentEditable = 'false';
+  chip.dataset.pubkey = entry.pubkey;
+  chip.dataset.npub = entry.npub;
+  chip.textContent = entry.label;
+  const space = document.createTextNode(' ');
+  const parent = node.parentNode;
+  parent.insertBefore(chip, node.nextSibling);
+  parent.insertBefore(space, chip.nextSibling);
+  const after = document.createRange();
+  after.setStart(space, 1);
+  after.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(after);
+  closeMentionMenu();
+  handleEditorInput();
+  fitDraftTypography();
+}
+
+async function resolveMentionQuery(query) {
+  const value = String(query || '').trim().replace(/^@/, '');
+  if (!value) return null;
+  if (/^npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}$/i.test(value)) {
+    // A pasted key is taggable only when it answers with a NIP-05 name.
+    const pubkey = pubkeyOfNpub(value);
+    if (!pubkey) return null;
+    const profile = await fetchMentionProfile(pubkey);
+    const identifier = profile?.nip05 || mentionLabels.get(pubkey) || '';
+    if (!identifier) return null;
+    rememberMention(identifier, pubkey);
+    return pubkey;
+  }
+  return resolveMentionName(value);
+}
+
+async function pickMention() {
+  const caret = caretMentionQuery();
+  if (!caret) { closeMentionMenu(); return; }
+  const option = mentionMenuOptions[mentionMenuIndex];
+  if (option?.kind === 'entry') { insertMention(option.entry, caret.query); return; }
+  const value = option?.value ?? caret.query;
+  if (!value) { closeMentionMenu(); return; }
+  const index = mentionMenuIndex;
+  setMentionStatus('Looking this name up…');
+  const pubkey = await resolveMentionQuery(value);
+  if (!pubkey) {
+    mentionMenuIndex = index;
+    setMentionStatus(`No NIP-05 name like “${value}” answered, so nothing was tagged.`);
+    return;
+  }
+  insertMention(mentionEntry(pubkey), caret.query);
+}
+
+function handleMentionKeys(event) {
+  if (elements.mentionMenu.hidden) return false;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!mentionMenuOptions.length) return true;
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    mentionMenuIndex = (mentionMenuIndex + step + mentionMenuOptions.length) % mentionMenuOptions.length;
+    [...elements.mentionOptions.children].forEach((item, index) => {
+      item.setAttribute('aria-selected', String(index === mentionMenuIndex));
+    });
+    return true;
+  }
+  if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault();
+    pickMention();
+    return true;
+  }
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeMentionMenu();
+    return true;
+  }
+  return false;
+}
+
+// ---- the person button: only the notes that tag me
+function applyMentionFilter() {
+  const key = getNostrSession()?.pubkey || '';
+  elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)').forEach(note => {
+    const sticky = noteEvents.get(note.dataset.eventId)?.sticky;
+    const mine = mentionFilterOn && key ? noteMentions(sticky, key) : false;
+    note.classList.toggle('sticky-note--filtered-out', Boolean(mentionFilterOn) && !mine);
+  });
+  elements.mentionFilterStatus.hidden = !mentionFilterOn;
+  elements.mentionFilterStatus.textContent = mentionFilterOn ? 'Showing only the notes that tag you.' : '';
+}
+
+function refreshMentionFilter() {
+  const {available, reason} = mentionFilterAvailability(getNostrSession());
+  if (!available) mentionFilterOn = false;
+  elements.mentionFilter.disabled = !available;
+  elements.mentionFilter.setAttribute('aria-pressed', String(mentionFilterOn));
+  elements.mentionFilter.title = reason;
+  elements.mentionFilter.setAttribute('aria-label', reason);
+  applyMentionFilter();
+}
+
+function toggleMentionFilter() {
+  const {available, reason} = mentionFilterAvailability(getNostrSession());
+  if (!available) { elements.mentionFilterStatus.hidden = false; elements.mentionFilterStatus.textContent = reason; return; }
+  mentionFilterOn = !mentionFilterOn;
+  elements.mentionFilter.setAttribute('aria-pressed', String(mentionFilterOn));
+  applyMentionFilter();
+}
+
+elements.mentionFilter.addEventListener('click', toggleMentionFilter);
+elements.editor.addEventListener('keydown', handleMentionKeys);
+elements.editor.addEventListener('input', updateMentionMenu);
+elements.editor.addEventListener('click', updateMentionMenu);
 elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
 elements.newSticky.addEventListener('click', openComposer);
 elements.openGeohashMap.addEventListener('click', openGeohashMap);

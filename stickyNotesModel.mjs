@@ -48,6 +48,167 @@ export const STICKY_DEFAULT_LIVELINESS = '1m';
 export const STICKY_MIN_LIVELINESS_SECONDS = 86400;                 // the shortest rung
 export const STICKY_MAX_LIVELINESS_SECONDS = 365 * 86400;           // a year: the longest
 export const EXPIRATION_TAG = 'expiration';
+// NIP-27 mentions. A note may tag people who own a satoshi.si name — the only
+// keys the board's @ picker offers — and the text has to name the key's own
+// npub, which is what makes the tag more than an assertion. The desk enforces
+// the same rules, in the same order; a change here has to be made there too.
+export const MENTION_TAG = 'p';
+export const MENTION_MAX = 5;
+const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const BECH32_GENERATORS = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+
+function bech32Polymod(values) {
+  let checksum = 1;
+  for (const value of values) {
+    const top = checksum >> 25;
+    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
+    for (let index = 0; index < 5; index += 1) {
+      if ((top >> index) & 1) checksum ^= BECH32_GENERATORS[index];
+    }
+  }
+  return checksum;
+}
+
+function bech32HrpExpand(hrp) {
+  const expanded = [];
+  for (const character of hrp) expanded.push(character.charCodeAt(0) >> 5);
+  expanded.push(0);
+  for (const character of hrp) expanded.push(character.charCodeAt(0) & 31);
+  return expanded;
+}
+
+function convertBits(values, from, to, pad) {
+  let accumulator = 0;
+  let bits = 0;
+  const out = [];
+  const maxValue = (1 << to) - 1;
+  for (const value of values) {
+    if (value < 0 || value >> from !== 0) return null;
+    accumulator = (accumulator << from) | value;
+    bits += from;
+    while (bits >= to) {
+      bits -= to;
+      out.push((accumulator >> bits) & maxValue);
+    }
+  }
+  if (pad) {
+    if (bits > 0) out.push((accumulator << (to - bits)) & maxValue);
+  } else if (bits >= from || ((accumulator << (to - bits)) & maxValue)) {
+    return null;
+  }
+  return out;
+}
+
+/** hex public key -> "npub1...", or null when it is not a 64-character hex key. */
+export function npubEncode(pubkey) {
+  const hex = String(pubkey || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+  const bytes = [];
+  for (let index = 0; index < hex.length; index += 2) bytes.push(parseInt(hex.slice(index, index + 2), 16));
+  const words = convertBits(bytes, 8, 5, true);
+  if (!words) return null;
+  const checksumInput = [...bech32HrpExpand('npub'), ...words, 0, 0, 0, 0, 0, 0];
+  const polymod = bech32Polymod(checksumInput) ^ 1;
+  const checksum = [];
+  for (let index = 0; index < 6; index += 1) checksum.push((polymod >> (5 * (5 - index))) & 31);
+  return `npub1${[...words, ...checksum].map(word => BECH32_CHARSET[word]).join('')}`;
+}
+
+export function isPubkey(value) {
+  return /^[0-9a-f]{64}$/.test(String(value || '').toLowerCase());
+}
+
+/** The npub tokens a note's text names: "nostr:npub1..." or a bare npub. */
+export function mentionTokens(content) {
+  return [...new Set(mentionMatches(String(content || '')).map(match => match.npub.toLowerCase()))];
+}
+
+function mentionMatches(content) {
+  const matches = [];
+  const pattern = /(?:nostr:)?npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}/gi;
+  for (const match of content.matchAll(pattern)) {
+    const token = match[0];
+    // A bech32 character on either side makes this part of a longer word rather
+    // than a mention of its own.
+    const before = content[match.index - 1] || '';
+    const after = content[match.index + token.length] || '';
+    if (/[qpzry9x8gf2tvdw0s3jn54khce6mua7l]/i.test(before) || /[qpzry9x8gf2tvdw0s3jn54khce6mua7l]/i.test(after)) continue;
+    matches.push({ npub: token.startsWith('nostr:') ? token.slice(6) : token, index: match.index, length: token.length });
+  }
+  return matches;
+}
+
+/**
+ * A note's text, cut into the pieces the board draws: plain runs and mentions.
+ * The wire form is the npub; the label is resolved from the person's profile,
+ * falling back to their satoshi.si name, and only then to the shortened npub.
+ */
+export function stickyTextParts(content) {
+  const text = String(content || '');
+  const parts = [];
+  let cursor = 0;
+  for (const match of mentionMatches(text)) {
+    if (match.index > cursor) parts.push({type: 'text', text: text.slice(cursor, match.index)});
+    parts.push({type: 'mention', npub: match.npub, token: `nostr:${match.npub}`});
+    cursor = match.index + match.length;
+  }
+  if (cursor < text.length) parts.push({type: 'text', text: text.slice(cursor)});
+  return parts;
+}
+
+/** The people a note tags: one entry per key, in the order the tags carry them. */
+export function mentionPubkeys(tags = []) {
+  const keys = [];
+  tags.forEach(tag => {
+    if (tag?.[0] !== MENTION_TAG) return;
+    const key = String(tag[1] || '').toLowerCase();
+    if (isPubkey(key) && !keys.includes(key)) keys.push(key);
+  });
+  return keys;
+}
+
+/** Every mention in the text must be a key the note tags, and the other way round. */
+export function mentionIssue(content, mentions = []) {
+  const keys = mentions.map(key => String(key || '').toLowerCase());
+  if (keys.length > MENTION_MAX) return `A note can tag up to ${MENTION_MAX} people.`;
+  if (new Set(keys).size !== keys.length) return 'Each person can only be tagged once.';
+  const named = new Set(mentionTokens(content));
+  for (const key of keys) {
+    if (!isPubkey(key)) return 'That is not a valid Nostr public key.';
+    if (!named.has(npubEncode(key))) {
+      return 'A tagged note has to name the person: the mention is the text, the tag only marks it.';
+    }
+  }
+  return '';
+}
+
+/** Who can use the tag filter, and what to tell anyone who cannot. */
+export function mentionFilterAvailability(session) {
+  if (!session) {
+    return {available: false, reason: 'Log in to Nostr to see the notes that tag you.'};
+  }
+  if (session.anonymous || session.method === 'anonymous') {
+    return {available: false,
+      reason: 'Only people with a satoshi.si name can be tagged, so a temporary identity has nothing to filter.'};
+  }
+  return {available: true, reason: 'Show only the notes that tag you'};
+}
+
+/** Does this note tag me? */
+export function noteMentions(sticky, pubkey) {
+  const key = String(pubkey || '').toLowerCase();
+  if (!key) return false;
+  return (sticky?.mentions || []).some(mention => String(mention).toLowerCase() === key);
+}
+
+/** First usable label, in priority order: profile name, profile nip05, board name, npub. */
+export function mentionLabel(candidates, npub = '') {
+  for (const candidate of candidates) {
+    const label = String(candidate || '').trim().replace(/\s+/g, ' ');
+    if (label) return label;
+  }
+  return npub ? `@${npub.slice(0, 12)}…` : '@someone';
+}
 
 export function stickyLiveliness(key) {
   return STICKY_LIVELINESS.find(rung => rung.key === key) || null;
@@ -390,7 +551,7 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(12, Math.max(-12, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
@@ -400,6 +561,11 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   // and the desk refuses one.
   const rung = stickyLiveliness(liveliness);
   if (!rung) throw new Error('Choose how long the note should live: a day, a week, a month, six months or a year.');
+  const wanted = mentions.map(key => String(key || '').toLowerCase());
+  if (wanted.some(key => !isPubkey(key))) throw new Error('That is not a valid Nostr public key.');
+  const mentionProblem = mentionIssue(text, wanted);
+  if (mentionProblem) throw new Error(mentionProblem);
+  const mentionList = mentionPubkeys(wanted.map(key => [MENTION_TAG, key]));
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {
@@ -424,6 +590,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ['k', 'geo'],
     ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
+    ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment this note stops existing, relay-side.
     [EXPIRATION_TAG, String(createdAt + rung.seconds)],
     ['alt', 'A sticky note pinned on satoshi.si'],
@@ -475,6 +642,7 @@ export function parseStickyEvent(event) {
     exactGeohash: scope !== 'prefix',
     expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
+    mentions: mentionPubkeys(event.tags),
   };
 }
 

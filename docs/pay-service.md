@@ -292,6 +292,7 @@ the event no longer matches the paid commitment.
 | `geohash` | order's `exact` or `prefix` mode                             | exactly one |
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
 | `expiration` | unix seconds, NIP-40: the moment the note is deleted       | exactly one |
+| `p`       | the public key of somebody the note names (NIP-27)           | up to five  |
 | `alt`     | `A sticky note pinned on satoshi.si`                         | exactly one |
 | `anonymous` | `24h-local-key`                                             | anonymous orders only |
 
@@ -325,6 +326,18 @@ enforces the **range**, not the rungs, so a frontend may compute a month its own
 skew, and the moment itself must still be in the future when the note is published. The relay
 drops an event that arrives expired, never serves an expired event, and deletes expired events
 from its store, so a note published after its own moment would be paid for and lost.
+
+Mentions are the other half of what the text says. A note may tag **up to five** people, each a
+different 64-hex key, and each one has to be named in the note's own text as its **canonical npub**
+— `nostr:npub1…`, or the bare `npub1…`, standing as a whole token rather than glued to a longer
+word. The tag and the text are checked against each other, so a `["p", …]` tag cannot quietly point
+at somebody the note never mentioned; the writer's `@` picker is what puts the npub there. Tagging
+itself is open: anyone with a **NIP-05 identity, on any domain**, can be tagged, which is exactly
+why the desk does not keep the list — a name lives on its own domain and only the writer's picker
+can resolve it. Two cases tag nobody: a note signed by a **temporary anonymous identity**, because
+a throwaway key has no name for a tag to resolve to, and a **removal**, which has no note text for a
+mention to agree with. Mentions are included in whatever the pin costs; nothing is charged per
+mention.
 
 A **removal must not carry `expiration`**. The relay records the hiding in the kind-5 row; NIP-40
 cleanup deletes expired rows, so an expiring deletion would be swept away with the record of what
@@ -415,6 +428,7 @@ bounds and the character limit from it rather than keeping its own copy.
 | `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |
 | `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
 | `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
+| `bad_mention` | `publish` 400 | the note carries more than five `["p", …]` tags, the same key twice, a value that is not a 64-hex key, a tag whose npub the note's text never names, or any mention at all on a note from a temporary identity or on a removal. |
 | `bad_expiration` | `publish` 400 | the note carries no `["expiration"]`, more than one, a value that is not a positive whole number of seconds, a term outside one day to a year, or a moment that has already passed. A removal carrying one is refused with this code too. |
 
 The client tag is enforced, not decorative: exactly one `["client","satoshi.si"]` per pin, so a note
@@ -424,7 +438,8 @@ deletion has no place on the board, so there is nothing to bind.
 `GET /sticky/v1/config` additionally publishes `anonymousSats: 42`, the geohash rules
 (`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names), the
 liveliness rules (`requiredForPin`, `tag`, `standard`, `default`, the five `options` with their
-seconds, `minSeconds`, `maxSeconds`, `measuredFrom`, `removals`) and the tag map
+seconds, `minSeconds`, `maxSeconds`, `measuredFrom`, `removals`), the mention rules (`tag`,
+`standard`, `max`, `taggable`, `text`, `anonymous`, `removals`) and the tag map
 (`clientValue`, `anonymousTagValue`), so a frontend never keeps its own copy of any of it.
 
 ## The relay's half of NIP-40 (already live)

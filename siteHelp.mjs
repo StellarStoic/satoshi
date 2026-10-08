@@ -50,7 +50,8 @@ export const PAGE_HELP = Object.freeze({
     '/stickyNotes.html': {
         title: 'About Nostr sticky notes',
         description: 'Sticky notes are small public messages signed with your Nostr identity and placed on a shared'
-            + ' corkboard. Posting is a subscription: 10 sats a week, or 5 with a satoshi.si name.',
+            + ' corkboard. Tag people with @, choose how long a note lives, and post with a subscription: 10 sats a'
+            + ' week, or 5 with a satoshi.si name.',
         sections: [
             {
                 label: 'In plain words',
@@ -60,6 +61,11 @@ export const PAGE_HELP = Object.freeze({
                     + ' address, so every device draws it in the same place. A note can also cover a few cells that touch'
                     + ' when a place straddles them — a building sitting on a corner — and it is still one note on one'
                     + ' price. Everything you pin is public: anyone can read it, with or without an account.',
+                    'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
+                    + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
+                    + ' key and the board draws their name in its place. The person button at the top of the board shows'
+                    + ' only the notes that tag you, and it works for a signed-in identity that has a name of its own: a'
+                    + ' temporary anonymous identity has no name, so that button stays out of reach for one.',
                     'Every note is temporary, and you choose how temporary. A slider offers a day, a week, a month, six'
                     + ' months or a year, and it starts at a month. The note states the exact moment it will go, and the'
                     + ' relay that holds it deletes it then, so the board stays a board people walk past rather than an'
@@ -101,6 +107,13 @@ export const PAGE_HELP = Object.freeze({
                     + ' arrives expired. The relay never serves an expired event, and a cleanup deletes expired events'
                     + ' from its store every ten minutes. A removal carries no expiration on purpose: an expiring'
                     + ' deletion would be deleted itself, and the note it removed would come back.',
+                    'Mentions follow NIP-27 and are the reason a tag means something. Typing @ offers the names the'
+                    + ' board can resolve — the satoshi.si store it is served from, or any name@domain it asks directly —'
+                    + ' and only a key that answers with a NIP-05 name can be picked. What travels is the canonical form:'
+                    + ' the text carries nostr:npub1\u2026 and the event carries one ["p","<64-hex>"] tag per person, at'
+                    + ' most five, each a different key. The desk refuses a ["p", \u2026] tag whose key the text never'
+                    + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity or on'
+                    + ' a removal. Mentions cost nothing extra: one note, one price, however many people it names.',
                     'Every pin belongs to a geohash of four to nine characters: you enter one or pick it on the'
                     + ' OpenStreetMap view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'

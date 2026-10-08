@@ -126,3 +126,23 @@
 @media (prefers-color-scheme: dark) {
   .plan-button { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .22); }
 }
+
+/* Mentions: the chip in the composer, the picker under the note, and the way a
+   tagged person is drawn on a note. */
+.sticky-editor__mention { padding: 0 .18em; border-radius: 3px; background: rgba(38,35,30,.12); color: #1f4d2b; font-weight: 700; white-space: nowrap; }
+.sticky-note__mention { padding: 0 .16em; border-radius: 3px; background: rgba(38,35,30,.1); color: #1f4d2b; font-weight: 700; white-space: nowrap; }
+.mention-menu { margin: 6px 0 2px; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; background: rgba(18,19,19,.94); box-shadow: 0 10px 26px rgba(0,0,0,.32); }
+.mention-menu__list { max-height: 190px; margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
+.mention-menu__option { display: flex; align-items: baseline; gap: 8px; padding: 7px 9px; border-radius: 4px; color: #f4f4f1; cursor: pointer; }
+.mention-menu__option[aria-selected="true"], .mention-menu__option:hover { background: rgba(242,169,0,.18); }
+.mention-menu__name { font-weight: 700; }
+.mention-menu__npub { color: rgba(255,255,255,.55); font-family: var(--site-font, monospace); font-size: .72rem; }
+.mention-menu__status { padding: 6px 9px; color: rgba(255,255,255,.66); font-size: .78rem; }
+.mention-menu__status:empty { display: none; }
+
+/* The person button only means something to a signed-in, named writer. */
+.sticky-top-button[aria-pressed="true"] { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); background: rgba(242,169,0,.16); }
+.sticky-top-button:disabled { opacity: .45; cursor: not-allowed; }
+.sticky-top-button:disabled:hover { border-color: rgba(255,255,255,.24); color: #f4f4f1; }
+.sticky-note.sticky-note--filtered-out { display: none; }
+.board-filter-status { position: absolute; inset: auto auto 14px 50%; translate: -50% 0; z-index: 5; padding: 6px 12px; color: #f4f4f1; background: rgba(32,20,12,.66); border-radius: 4px; font-size: .82rem; }

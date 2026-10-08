@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -523,4 +523,125 @@ test('the composer asks how long a note lives, and the menu says when it goes', 
   // the note menu reads the term off the event, and a note without one shows no row
   assert.match(script, /elements\.noteExpiresAt\.hidden = !expiresAt/);
   assert.match(script, /tag\?\.\[0\] === 'expiration'/);
+});
+
+// ---------------------------------------------------------------- mentions
+const ALICE = 'cc'.repeat(32);
+const BOB = 'dd'.repeat(32);
+const ALICE_NPUB = npubEncode(ALICE);
+
+test('the board speaks npub too, by NIP-19\u2019s own examples', () => {
+  assert.equal(npubEncode('3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d'),
+    'npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6');
+  assert.equal(npubEncode(ALICE), ALICE_NPUB);
+  assert.equal(npubEncode('nope'), null);
+  assert.equal(npubEncode('A'.repeat(64)), npubEncode('a'.repeat(64)), 'case is not identity');
+});
+
+test('a mention is a whole npub token, not a piece of one', () => {
+  assert.deepEqual(mentionTokens(`hi nostr:${ALICE_NPUB} there`), [ALICE_NPUB]);
+  assert.deepEqual(mentionTokens(`hi ${ALICE_NPUB} there`), [ALICE_NPUB]);
+  assert.deepEqual(mentionTokens(`hi nostr:${ALICE_NPUB} ${ALICE_NPUB}`), [ALICE_NPUB], 'once, however often');
+  assert.deepEqual(mentionTokens(`nostr:${ALICE_NPUB}x`), [], 'a longer word is not a mention');
+  assert.deepEqual(mentionTokens('no mention here'), []);
+
+  const parts = stickyTextParts(`hi nostr:${ALICE_NPUB} bye`);
+  assert.deepEqual(parts.map(part => part.type), ['text', 'mention', 'text']);
+  assert.equal(parts[1].npub, ALICE_NPUB);
+  assert.equal(parts[1].token, `nostr:${ALICE_NPUB}`);
+  assert.deepEqual(stickyTextParts('plain note').map(part => part.type), ['text']);
+  assert.deepEqual(stickyTextParts('').map(part => part.type), []);
+});
+
+test('a note tags one entry per person, and only real keys', () => {
+  assert.deepEqual(mentionPubkeys([['p', ALICE], ['p', ALICE], ['p', BOB.toUpperCase()], ['t', 'other'], ['p', 'short']]),
+    [ALICE, BOB], 'the order the tags carry, deduplicated, uppercase folded');
+  assert.deepEqual(mentionPubkeys([]), []);
+});
+
+test('the text is what makes a tag true', () => {
+  assert.equal(mentionIssue(`hi nostr:${ALICE_NPUB}`, [ALICE]), '');
+  assert.match(mentionIssue('hi there', [ALICE]), /has to name the person/);
+  assert.match(mentionIssue(`hi nostr:${ALICE_NPUB}`, [ALICE, ALICE]), /only be tagged once/);
+  assert.match(mentionIssue(`hi nostr:${ALICE_NPUB}`, new Array(MENTION_MAX + 1).fill(ALICE)), /up to 5/);
+});
+
+test('a pinned note carries a ["p", …] tag per person it names', () => {
+  const content = `hi nostr:${ALICE_NPUB} and nostr:${npubEncode(BOB)}`;
+  const note = makeStickyTemplate({content, color: 'yellow', x: 0.4, y: 0.4, rotation: 0, geohash: TEST_GEOHASH,
+    mentions: [ALICE, BOB]});
+  assert.deepEqual(note.tags.filter(tag => tag[0] === MENTION_TAG), [[MENTION_TAG, ALICE], [MENTION_TAG, BOB]]);
+
+  // Nothing to tag, nothing added: a note without mentions has no ["p", …] tag.
+  const plain = makeStickyTemplate({content: 'just a note', color: 'yellow', x: 0.4, y: 0.4, rotation: 0, geohash: TEST_GEOHASH});
+  assert.equal(plain.tags.filter(tag => tag[0] === MENTION_TAG).length, 0);
+
+  // And the board refuses to build a tag the text does not back up.
+  assert.throws(() => makeStickyTemplate({content: 'nog', color: 'yellow', x: 0.4, y: 0.4, rotation: 0,
+    geohash: TEST_GEOHASH, mentions: [ALICE]}), /has to name the person/);
+  assert.throws(() => makeStickyTemplate({content, color: 'yellow', x: 0.4, y: 0.4, rotation: 0,
+    geohash: TEST_GEOHASH, mentions: ['not-a-key']}), /valid Nostr public key/);
+});
+
+test('a note read off the relay carries the people it tags', () => {
+  const event = {kind: 1, id: 'a'.repeat(64), pubkey: BOB, created_at: 1000,
+    content: `hi nostr:${ALICE_NPUB}`,
+    tags: [['t', 'satoshi-sticky'], ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
+      ['g', TEST_GEOHASH], [MENTION_TAG, ALICE], [MENTION_TAG, 'nonsense']]};
+  const sticky = parseStickyEvent(event);
+  assert.deepEqual(sticky.mentions, [ALICE]);
+  assert.equal(noteMentions(sticky, ALICE), true);
+  assert.equal(noteMentions(sticky, BOB), false);
+  assert.equal(noteMentions(sticky, ALICE.toUpperCase()), true, 'case is not identity');
+  assert.equal(noteMentions({mentions: []}, ALICE), false);
+  assert.equal(noteMentions(sticky, ''), false);
+});
+
+test('the tag filter knows who it can work for', () => {
+  assert.equal(mentionFilterAvailability(null).available, false);
+  assert.match(mentionFilterAvailability(null).reason, /Log in/);
+
+  const anon = mentionFilterAvailability({pubkey: ALICE, method: 'anonymous'});
+  assert.equal(anon.available, false, 'a throwaway identity has no name to be tagged under');
+  assert.match(anon.reason, /satoshi\.si name/);
+
+  const named = mentionFilterAvailability({pubkey: ALICE, method: 'nip07'});
+  assert.equal(named.available, true);
+  assert.match(named.reason, /tag you/);
+});
+
+test('a mention shows a name, and falls back to the npub only last', () => {
+  assert.equal(mentionLabel(['Alice', 'alice@satoshi.si', ALICE_NPUB]), 'Alice');
+  assert.equal(mentionLabel(['', '   ', 'alice@satoshi.si']), 'alice@satoshi.si');
+  assert.equal(mentionLabel([], ALICE_NPUB), `@${ALICE_NPUB.slice(0, 12)}…`);
+  assert.equal(mentionLabel([], ''), '@someone');
+});
+
+test('a note tags people by @, and the wire form is the whole npub', async () => {
+  const [script, html, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  // The composer keeps the name; the note keeps the key. A chip is not editable
+  // text, so the name cannot be rewritten without dropping the tag with it.
+  assert.match(script, /sticky-editor__mention/);
+  assert.match(script, /chip\.dataset\.pubkey = entry\.pubkey/);
+  assert.match(script, /out \+= `nostr:\$\{node\.dataset\.npub\}`/, 'the chip becomes the npub');
+  assert.match(script, /editorMentions\(\)/, 'every note carries the keys it tagged');
+  assert.match(script, /mentions,/);
+  // The picker: markup, the @ trigger, and the keyboard.
+  assert.match(html, /id="mentionMenu"/);
+  assert.match(html, /id="mentionOptions"/);
+  assert.match(script, /\/\(\?:\^\|\\s\)@\(\[\^\\s@\]\*\)\$\//, 'typing @ starts a mention');
+  assert.match(script, /handleMentionKeys/);
+  // Anyone with a NIP-05 name can be tagged, on any domain: the board asks.
+  assert.match(script, /well-known\/nostr\.json\?name=/);
+  assert.match(script, /nip05/);
+  // The person button, top right, and what it does.
+  assert.match(html, /id="mentionFilter"[^>]*>[^<]*<i class="lni lni-user-4"/, 'a person silhouette');
+  assert.match(html, /id="mentionFilter"[^>]*aria-pressed="false"[^>]*disabled/);
+  assert.match(script, /elements\.mentionFilter\.disabled = !available/);
+  assert.match(script, /noteMentions\(sticky, key\)/);
+  assert.match(css, /sticky-note--filtered-out\s*\{\s*display:\s*none/);
 });
