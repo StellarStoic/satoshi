@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v202';   // v202: the around-me sizes are named Building, Neighbourhood, City, State
+const CACHE = 'satoshi-static-v203';   // v203: a place can be kept, so a daily check is one open
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

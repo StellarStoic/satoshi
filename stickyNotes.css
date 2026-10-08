@@ -55,6 +55,8 @@
 .area-scale strong { color:var(--accent,#f2a900); font-size:.95rem; }
 .area-scale span { color:#bfc1bf; font-size:.78rem; }
 .area-scale:disabled { opacity:.55; cursor:progress; }
+.area-scale:focus-visible, .area-lock:focus-within { outline:none; }
+.area-lock { margin:14px 0 0; }
 .map-clear-action { min-height:36px; padding:6px 12px; border:1px solid #505354; border-radius:5px; background:transparent; color:#c9cbc9; font:inherit; font-size:.82rem; cursor:pointer; }.map-clear-action:hover { border-color:#8a8c8a; color:#fff; }
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }

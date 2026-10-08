@@ -129,7 +129,9 @@ export const PAGE_HELP = Object.freeze({
                     + ' into a geohash inside the page and is never sent anywhere: the board asks the relay for that'
                     + ' geohash, not for you. The size is the reader\u2019s own choice because a board is only as useful as'
                     + ' the depth it is read at, and the answer says so when the device was less accurate than the cell'
-                    + ' is tall.',
+                    + ' is tall. If it is one place you look at every day, tick to keep it: the board then opens on'
+                    + ' that cell on every visit, and the address bar keeps no board of its own — a link somebody'
+                    + ' sends you still opens the board it names.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
                     + ' extended rather than restarted when you renew early, covering any number of pins and removals while'
                     + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'

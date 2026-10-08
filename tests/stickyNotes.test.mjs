@@ -748,3 +748,29 @@ test('the four "around me" sizes really are a building, a neighbourhood, a city 
   // and each one is a depth the board accepts
   for (const precision of [8, 7, 5, 4]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
 });
+
+test('a place can be kept, and the kept place outranks the board you last browsed', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="lockToggle"[^>]*role="switch"/);
+  assert.match(html, /id="unlockButton"[^>]*hidden/);
+  assert.match(html, /id="lockCaption"/);
+  assert.match(script, /const LOCKED_PLACE_KEY = 'satoshi:sticky:locked-place:v1'/);
+  assert.match(script, /localStorage\.setItem\(LOCKED_PLACE_KEY/);
+  assert.match(script, /localStorage\.removeItem\(LOCKED_PLACE_KEY\)/);
+  // the order of precedence: a link somebody sent, then the place kept, then the board
+  // that was last open
+  const flat = script.replace(/\s+/g, ' ');
+  assert.match(flat,
+    /linkedCells\.length \? linkedCells : \(lockedCells\.length \? lockedCells : \(rememberBoard/);
+  // while a place is kept the address bar keeps no board, which is what makes the lock
+  // survive a reload; a link still arrives as a ?g= and wins
+  assert.match(script, /if \(lockedCells\.length\) boardUrl\.searchParams\.delete\('g'\)/);
+  // keeping a place also forgets the last board, so the two memories cannot disagree
+  assert.match(flat, /forgetActiveBoard\(\); updateBoardUrl\(\); renderLockControls\(\);/);
+  // and the flow really keeps it, rather than only showing the switch
+  assert.match(script, /if \(keep\) lockThisPlace\(\[cell\], precision\)/);
+  assert.match(script, /const keep = elements\.lockToggle\.checked/);
+});

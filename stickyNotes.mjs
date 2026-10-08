@@ -59,6 +59,8 @@ const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 const BOARD_CELLS_KEY = 'satoshi:sticky:geohash-cells:v1';
 const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
 const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
+// A place the reader keeps: one cell, opened on every visit, until they unlock it.
+const LOCKED_PLACE_KEY = 'satoshi:sticky:locked-place:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
@@ -77,6 +79,8 @@ const elements = {
   boardChooserStatus: document.getElementById('boardChooserStatus'),
   shareArea: document.getElementById('shareArea'), areaDialog: document.getElementById('areaDialog'),
   areaStatus: document.getElementById('areaStatus'),
+  lockToggle: document.getElementById('lockToggle'), unlockButton: document.getElementById('unlockButton'),
+  lockCaption: document.getElementById('lockCaption'),
   areaScaleList: document.getElementById('areaScaleList'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
@@ -161,10 +165,15 @@ let geohashMap = null;
 let geohashMapCells = [];
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
+let lockedCells = geohashCellsFrom(localStorage.getItem(LOCKED_PLACE_KEY));
 let rememberBoard = localStorage.getItem(BOARD_REMEMBER_KEY) !== 'false';
+// A link somebody was sent wins, then the place they locked, then the board they last
+// had open: the lock is their own habit and a link is somebody else pointing.
 let activeGeohashes = linkedCells.length
   ? linkedCells
-  : (rememberBoard ? geohashCellsFrom(localStorage.getItem(BOARD_CELLS_KEY) || localStorage.getItem(BOARD_KEY)) : []);
+  : (lockedCells.length
+    ? lockedCells
+    : (rememberBoard ? geohashCellsFrom(localStorage.getItem(BOARD_CELLS_KEY) || localStorage.getItem(BOARD_KEY)) : []));
 let activeGeohash = activeGeohashes[0] || '';
 let boardDepth = Math.max(0, Math.min(11, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
 if (activeGeohashes.length && rememberBoard) rememberActiveBoard();
@@ -234,7 +243,11 @@ function forgetActiveBoard() {
 
 function updateBoardUrl() {
   const boardUrl = new URL(location.href);
-  if (rememberBoard && activeGeohashes.length) boardUrl.searchParams.set('g', activeGeohashes.join(','));
+  // While a place is locked the URL carries no board at all: that is what lets the lock
+  // survive a reload. Writing it back would make the next visit open whatever the reader
+  // happened to browse today instead of the place they kept.
+  if (lockedCells.length) boardUrl.searchParams.delete('g');
+  else if (rememberBoard && activeGeohashes.length) boardUrl.searchParams.set('g', activeGeohashes.join(','));
   else boardUrl.searchParams.delete('g');
   history.replaceState(null, '', boardUrl);
 }
@@ -2349,7 +2362,9 @@ async function showNotesAroundMe(precision) {
   try {
     const {coords} = await readPosition(precision);
     const cell = encodeGeohash(coords.latitude, coords.longitude, precision);
+    const keep = elements.lockToggle.checked;
     elements.areaDialog.close();
+    if (keep) lockThisPlace([cell], precision);
     selectBoard(cell);
     // Say it in the reader's own terms, and say when the device was too vague for the
     // size they chose: a ±40 m fix cannot tell one building-sized cell from its neighbour.
@@ -2372,12 +2387,46 @@ async function showNotesAroundMe(precision) {
   }
 }
 
+function renderLockControls() {
+  const locked = lockedCells.length > 0;
+  elements.lockToggle.checked = locked;
+  elements.unlockButton.hidden = !locked;
+  elements.lockCaption.textContent = locked
+    ? `Kept: ${boardCellsLabel(lockedCells)} — ${areaSizeLabel(lockedCells[0].length)} across. `
+      + 'The board opens here on every visit.'
+    : 'Tick to keep this place and open it on every visit.';
+}
+
+function lockThisPlace(cells, precision) {
+  lockedCells = [...cells];
+  localStorage.setItem(LOCKED_PLACE_KEY, lockedCells.join(','));
+  // The remembered board is not a second opinion while a place is kept, and a stale ?g=
+  // in the address bar would outrank the lock on the next visit.
+  forgetActiveBoard();
+  updateBoardUrl();
+  renderLockControls();
+  const label = `${boardCellsLabel(lockedCells)} (${areaSizeLabel(precision)} across)`;
+  status(elements.areaStatus, `Kept ${label} — the board opens here on every visit.`);
+  status(elements.boardChooserStatus, `Kept ${label}. Unlock it from "Show notes around me".`);
+}
+
+function unlockThisPlace() {
+  lockedCells = [];
+  localStorage.removeItem(LOCKED_PLACE_KEY);
+  renderLockControls();
+  status(elements.areaStatus, 'Unlocked — the board will not open a place of its own.');
+  status(elements.boardChooserStatus, 'No place is kept any more. The board opens the one you choose.');
+}
+
 function openAreaDialog() {
+  renderLockControls();
   status(elements.areaStatus, '');
   showDialog(elements.areaDialog);
 }
 
 elements.shareArea.addEventListener('click', openAreaDialog);
+elements.unlockButton.addEventListener('click', () => { unlockThisPlace(); });
+renderLockControls();
 for (const button of areaScaleButtons()) {
   button.addEventListener('click', () => { showNotesAroundMe(Number.parseInt(button.dataset.areaPrecision, 10)); });
 }
