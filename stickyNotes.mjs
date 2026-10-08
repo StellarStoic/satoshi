@@ -161,6 +161,10 @@ if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.ha
 if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
 const CANVAS_WIDTH = 2600;
+// The wooden rail around the cork, in board pixels. The rail sits outside the
+// 2600x1800 board, so it never covers a note; the board is fitted with the rail
+// included, otherwise the frame would be cropped off at Fit board.
+const BOARD_FRAME_WIDTH = 90;
 const CANVAS_HEIGHT = 1800;
 
 function readPending() {
@@ -833,13 +837,25 @@ function selectBoard(geohash, closeDialog = true) {
 
 function applyBoardTransform() {
   elements.canvas.style.transform = `translate(${boardView.x}px, ${boardView.y}px) scale(${boardView.scale})`;
+  // How far the frame has to reach outside the board to cover the window: a fixed
+  // band would leave bare cork showing past it at a zoomed-out view, so it is
+  // worked out here, in board pixels, every time the board moves.
+  const rect = elements.board.getBoundingClientRect();
+  const room = Math.max(
+    (rect.width - CANVAS_WIDTH * boardView.scale) / 2,
+    (rect.height - CANVAS_HEIGHT * boardView.scale) / 2,
+    240 * boardView.scale,
+  ) / boardView.scale;
+  elements.canvas.style.setProperty('--cork-surround', `${Math.ceil(room)}px`);
   elements.board.style.backgroundSize = `${600 * boardView.scale}px ${600 * boardView.scale}px`;
   elements.board.style.backgroundPosition = `${boardView.x}px ${boardView.y}px`;
 }
 
 function fitBoard() {
   const rect = elements.board.getBoundingClientRect();
-  boardView.scale = Math.min(rect.width / CANVAS_WIDTH, rect.height / CANVAS_HEIGHT);
+  // Fit the rail too, but keep the cork itself centred exactly as before.
+  const frame = BOARD_FRAME_WIDTH * 2;
+  boardView.scale = Math.min(rect.width / (CANVAS_WIDTH + frame), rect.height / (CANVAS_HEIGHT + frame));
   boardView.x = (rect.width - CANVAS_WIDTH * boardView.scale) / 2;
   boardView.y = (rect.height - CANVAS_HEIGHT * boardView.scale) / 2;
   applyBoardTransform();
@@ -2226,6 +2242,9 @@ setInterval(() => {
 }, 1000);
 
 updateAccount();
+// One source for the rail's thickness: the stylesheet reads this variable, the
+// fitting maths reads the constant, so the frame and the fit cannot disagree.
+elements.canvas.style.setProperty('--cork-frame', `${BOARD_FRAME_WIDTH}px`);
 elements.boardDepth.value = String(boardDepth);
 elements.rememberBoard.checked = rememberBoard;
 updateBoardControl();

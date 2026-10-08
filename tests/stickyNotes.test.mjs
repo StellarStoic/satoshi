@@ -485,6 +485,39 @@ test('every note carries exactly one expiration tag, in unix seconds', () => {
     geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long the note should live/);
 });
 
+test('the corkboard has a wooden rail, and it sits outside the cork', async () => {
+  const [html, page, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(html, /<div id="corkFrame" class="cork-frame" aria-hidden="true">/,
+    'the frame is in the markup');
+  assert.equal((html.match(/cork-frame__rail cork-frame__rail--/g) || []).length, 4,
+    'a rail on each of the four edges');
+  assert.ok(html.indexOf('id="corkFrame"') < html.indexOf('cork-frame__rail--right'),
+    'the rails are inside the frame element');
+
+  // Decoration, never a target: it must not swallow clicks meant for the cork.
+  assert.match(css, /\.cork-frame \{[^}]*pointer-events: none/,
+    'the frame does not take pointer events');
+  // The rail extends outward from the board, so no note is ever covered by it.
+  assert.match(css, /\.cork-frame \{ position: absolute; inset: calc\(var\(--cork-frame, 90px\) \* -1\)/,
+    'the frame is drawn outside the cork');
+  assert.match(css, /repeating-linear-gradient/, 'the wood is drawn from gradients, with no image to fetch');
+  assert.match(css, /var\(--cork-frame, 90px\)/, 'the rail thickness comes from one variable');
+  assert.match(css, /box-shadow: 0 0 0 var\(--cork-surround, 420px\)/, 'a solid band sits outside the rail');
+  assert.match(page, /setProperty\('--cork-surround'/, 'the band is sized from the window, in board pixels');
+
+  // One source of truth for that variable, and Fit board must not crop the rail.
+  assert.match(page, /const BOARD_FRAME_WIDTH = \d+;/);
+  assert.match(page, /setProperty\('--cork-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
+    'the constant is published to the stylesheet');
+  assert.match(page, /Math\.min\(rect\.width \/ \(CANVAS_WIDTH \+ frame\), rect\.height \/ \(CANVAS_HEIGHT \+ frame\)\)/,
+    'Fit board fits the rail as well as the cork');
+});
+
 test('a note reads its expiration back, and one that names none is not drawn', () => {
   const createdAt = 1700000000;
   const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,

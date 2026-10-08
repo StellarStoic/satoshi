@@ -31,7 +31,14 @@
     </div>
 
     <section id="stickyBoard" class="sticky-board" aria-label="Geohash Nostr sticky note board">
-      <div id="stickyCanvas" class="sticky-canvas"></div>
+      <div id="stickyCanvas" class="sticky-canvas">
+        <div id="corkFrame" class="cork-frame" aria-hidden="true">
+          <span class="cork-frame__rail cork-frame__rail--top"></span>
+          <span class="cork-frame__rail cork-frame__rail--bottom"></span>
+          <span class="cork-frame__rail cork-frame__rail--left"></span>
+          <span class="cork-frame__rail cork-frame__rail--right"></span>
+        </div>
+      </div>
       <div class="board-status" id="boardStatus" role="status" aria-live="polite">Opening the board...</div>
       <div class="board-filter-status" id="mentionFilterStatus" role="status" aria-live="polite" hidden></div>
     </section>
