@@ -434,6 +434,62 @@ export function geohashBounds(value) {
   return {south, west, north, east, center: {lat: (south + north) / 2, lng: (west + east) / 2}};
 }
 
+/**
+ * How much of the world one cell of a given precision covers, in degrees.
+ */
+export function geohashCellDimensions(precision) {
+  const length = Math.max(
+    GEOHASH_MIN_LENGTH,
+    Math.min(GEOHASH_MAX_LENGTH, Number.parseInt(precision, 10) || GEOHASH_MIN_LENGTH),
+  );
+  const bits = 5 * length;
+  return {width: 360 / 2 ** Math.ceil(bits / 2), height: 180 / 2 ** Math.floor(bits / 2)};
+}
+
+/**
+ * A board is exactly as big as the area it stands on: one cell of the selected grid is one
+ * square block of cork, so a single cell is the smallest board there is, two touching cells
+ * make it twice as wide (twice as tall if they stand on each other), and a full clump of nine
+ * is the largest. The count of cells decides it, not metres: the same shape of area is the
+ * same board whether the cells are buildings or states, which is what keeps a note covering
+ * the same share of a cell on every board, so its place on the cork still means something when
+ * a reader comes back with a different area selected.
+ */
+export function boardExtentForCells(cells, cellPixels = 1) {
+  const side = Math.max(1, Number(cellPixels) || 1);
+  const smallest = {columns: 1, rows: 1, width: side, height: side};
+  // A board's cells arrive as an array from the picker, but a Set from a link or from storage, so
+  // anything iterable is walked - a string is one cell, not a list of characters.
+  const source = cells && typeof cells !== 'string' && typeof cells[Symbol.iterator] === 'function'
+    ? [...cells]
+    : [cells];
+  const list = [...new Set(source.map(cell => normaliseGeohash(cell)).filter(Boolean))];
+  if (!list.length) return smallest;
+  let minColumn = Infinity;
+  let maxColumn = -Infinity;
+  let minRow = Infinity;
+  let maxRow = -Infinity;
+  for (const cell of list) {
+    const bounds = geohashBounds(cell);
+    if (!bounds) continue;
+    // A cell's edges sit exactly on the grid of its own precision, so the division is whole and
+    // the rounding only settles floating point drift. Cells of different length each use their
+    // own grid rather than being forced onto one, which cannot happen on a real board (a clump
+    // is one precision) but must not produce a nonsense box if it ever did.
+    const {width, height} = geohashCellDimensions(cell.length);
+    const column = Math.round((bounds.west + 180) / width);
+    const row = Math.round((bounds.south + 90) / height);
+    minColumn = Math.min(minColumn, column);
+    maxColumn = Math.max(maxColumn, column);
+    minRow = Math.min(minRow, row);
+    maxRow = Math.max(maxRow, row);
+  }
+  if (!Number.isFinite(minColumn) || !Number.isFinite(minRow)) return smallest;
+  const columns = maxColumn - minColumn + 1;
+  const rows = maxRow - minRow + 1;
+  return {columns, rows, width: columns * side, height: rows * side};
+}
+
 export function geohashPrecisionForZoom(zoom) {
   const level = Math.max(0, Math.min(21, Number(zoom) || 0));
   // Shallow zooms are held at 4 characters: a 3-character cell is 100+ km across,

@@ -3,7 +3,10 @@ import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, pinColourFor,
-  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
+  boardExtentForCells,
+  geohashCellDimensions,
+} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -383,6 +386,11 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(script, /setTimeout\(resolve, MAP_LAYOUT_POLL_MS\)/);
   // and a map that failed to build is not kept for the next open
   assert.match(script, /Could not build the geohash map/);
+  // The sheet is the area's size, not a fixed 2600x1800: one cell is the smallest board and
+  // more cells make a bigger one, so no board may be sized from a constant.
+  assert.doesNotMatch(script, /CANVAS_WIDTH|CANVAS_HEIGHT/);
+  assert.match(script, /boardSize = boardExtentForCells\(cells, BOARD_CELL_PX\)/);
+  assert.match(script, /canvasWidth: boardSize\.width, canvasHeight: boardSize\.height/);
   assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
   assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
@@ -558,7 +566,7 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(page, /const BOARD_FIT_MARGIN = 0\.94;/);
   assert.match(page, /setProperty\('--cork-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
     'the constant is published to the stylesheet');
-  assert.match(page, /BOARD_FIT_MARGIN \* Math\.min\(\s*\n?\s*rect\.width \/ \(CANVAS_WIDTH \+ frame\),\s*\n?\s*rect\.height \/ \(CANVAS_HEIGHT \+ frame\),\s*\n?\s*\)/,
+  assert.match(page, /BOARD_FIT_MARGIN \* Math\.min\(\s*\n?\s*rect\.width \/ \(boardSize\.width \+ frame\),\s*\n?\s*rect\.height \/ \(boardSize\.height \+ frame\),\s*\n?\s*\)/,
     'Fit board fits the rail as well as the cork, with margin left around it');
   // The rail is also the limit: nothing may be panned into the cork that lies past it.
   assert.match(page, /clampViewToBoard\(\)/, 'the transform holds the line');
@@ -880,7 +888,7 @@ test('every pan, zoom and fit goes through the limit, and fitting leaves dayligh
   assert.match(script, /boardView\.scale = BOARD_FIT_MARGIN \* Math\.min\(/);
   // the pan gesture re-anchors at the edge, or dragging back feels stuck
   assert.match(script, /gesture\.boardX = boardView\.x;\n      gesture\.boardY = boardView\.y;/);
-  assert.match(script, /clampBoardView\(boardView, \{width: rect\.width, height: rect\.height\}, \{\n    canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, frame: BOARD_FRAME_WIDTH,/);
+  assert.match(script, /clampBoardView\(boardView, \{width: rect\.width, height: rect\.height\}, \{\n    canvasWidth: boardSize.width, canvasHeight: boardSize.height, frame: BOARD_FRAME_WIDTH,/);
 });
 
 test('opening a board keeps the wooden rail, instead of deleting it with the canvas', async () => {
@@ -987,4 +995,56 @@ test('the note is held down by a picture, and an installed board still has its p
   for (const colour of STICKY_PIN_COLOURS) {
     assert.match(worker, new RegExp(`/img/pin_${colour}\\.png'`));
   }
+});
+
+// The corkboard is as big as the area it stands on: a building's one cell is the smallest board
+// there is, two touching cells are a wider board, a full clump of nine is the largest. The count
+// of cells decides it rather than metres, so the same shape of area is the same board whatever
+// the cells are, and a note keeps covering the same share of a cell on every board.
+test('the corkboard grows with the selected area, one cell at a time', () => {
+  const centre = {lat: 46.05, lng: 14.5};
+  const {width: cellWidth, height: cellHeight} = geohashCellDimensions(5);
+  const home = encodeGeohash(centre.lat, centre.lng, 5);
+  const east = encodeGeohash(centre.lat, centre.lng + cellWidth, 5);
+  const north = encodeGeohash(centre.lat + cellHeight, centre.lng, 5);
+
+  const single = boardExtentForCells([home], 1200);
+  assert.deepEqual([single.columns, single.rows], [1, 1]);
+  assert.deepEqual([single.width, single.height], [1200, 1200]);
+
+  const across = boardExtentForCells([home, east], 1200);
+  assert.deepEqual([across.columns, across.rows], [2, 1]);
+  assert.deepEqual([across.width, across.height], [2400, 1200]);
+
+  const stacked = boardExtentForCells([home, north], 1200);
+  assert.deepEqual([stacked.columns, stacked.rows], [1, 2]);
+  assert.deepEqual([stacked.width, stacked.height], [1200, 2400]);
+
+  // A full clump of nine, built by walking the grid the way a reader selects cells. A Set is
+  // passed on purpose: the cells arrive from a link or from storage and may repeat.
+  const clump = [];
+  for (let row = 0; row < 3; row += 1) {
+    for (let column = 0; column < 3; column += 1) {
+      clump.push(encodeGeohash(centre.lat + row * cellHeight, centre.lng + column * cellWidth, 5));
+    }
+  }
+  const nine = boardExtentForCells(new Set(clump), 1200);
+  assert.deepEqual([nine.columns, nine.rows, nine.width, nine.height], [3, 3, 3600, 3600]);
+
+  // however the area is built up, a bigger area is never a smaller board
+  let previousArea = 0;
+  for (let count = 1; count <= clump.length; count += 1) {
+    const extent = boardExtentForCells(clump.slice(0, count), 1200);
+    assert.ok(extent.width * extent.height >= previousArea, 'a bigger area must not be a smaller board');
+    previousArea = extent.width * extent.height;
+  }
+
+  // the cell count decides, not the cell size: a state-sized cell is still one cell
+  assert.equal(boardExtentForCells([encodeGeohash(centre.lat, centre.lng, 4)], 1200).width, 1200);
+  assert.equal(boardExtentForCells([encodeGeohash(centre.lat, centre.lng, 8)], 1200).width, 1200);
+
+  // nothing, or nonsense, is the smallest board there is rather than a crash
+  assert.deepEqual(boardExtentForCells([], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
+  assert.deepEqual(boardExtentForCells(null, 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
+  assert.deepEqual(boardExtentForCells(['zz'], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
 });

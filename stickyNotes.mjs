@@ -35,6 +35,7 @@ import {
   stickyLiveliness,
   stickyExpiration,
   isStickyExpired,
+  boardExtentForCells,
 } from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
@@ -201,15 +202,25 @@ if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.ha
 }
 if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
-const CANVAS_WIDTH = 2600;
-// The wooden rail around the cork, in board pixels. The rail sits outside the
-// 2600x1800 board, so it never covers a note; the board is fitted with the rail
-// included, otherwise the frame would be cropped off at Fit board.
+// One cell of the selected area is one square block of cork this many board pixels across, so
+// the corkboard is exactly as big as the area it stands on: a single cell is the smallest board
+// there is, two touching cells make it twice as wide (twice as tall if they stand on each
+// other), a full clump of nine is the largest. Notes keep their size, so a note covers the same
+// share of a cell on every board and its place on the cork keeps its meaning.
+const BOARD_CELL_PX = 1200;
+// The board's own size, worked out from the selected cells every time a board is opened.
+let boardSize = boardExtentForCells([], BOARD_CELL_PX);
+// The wooden rail around the cork, in board pixels. The rail sits outside the board,
+// so it never covers a note; the board is fitted with the rail included, otherwise
+// the frame would be cropped off at Fit board.
 const BOARD_FRAME_WIDTH = 90;
 // Fitting leaves a little daylight so the rail reads as a border rather than sitting
 // flush on the window edge, which is how it went missing on a phone.
 const BOARD_FIT_MARGIN = 0.94;
-const CANVAS_HEIGHT = 1800;
+// Zoom limits. A board of nine cells fitted to a laptop screen lands near a sixth of its own
+// height, so the floor has to sit below that or the first pinch would jump the view inwards.
+const BOARD_ZOOM_MIN = 0.12;
+const BOARD_ZOOM_MAX = 2.5;
 
 function readPending() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch { return null; }
@@ -1011,6 +1022,8 @@ function selectBoard(geohash, closeDialog = true) {
   }
   activeGeohashes = cells;
   activeGeohash = cells[0];
+  boardSize = boardExtentForCells(cells, BOARD_CELL_PX);
+  applyBoardSize();
   if (rememberBoard) rememberActiveBoard();
   else forgetActiveBoard();
   updateBoardUrl();
@@ -1035,7 +1048,7 @@ function selectBoard(geohash, closeDialog = true) {
 function clampViewToBoard() {
   const rect = elements.board.getBoundingClientRect();
   const clamped = clampBoardView(boardView, {width: rect.width, height: rect.height}, {
-    canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, frame: BOARD_FRAME_WIDTH,
+    canvasWidth: boardSize.width, canvasHeight: boardSize.height, frame: BOARD_FRAME_WIDTH,
   });
   boardView.x = clamped.x;
   boardView.y = clamped.y;
@@ -1051,13 +1064,20 @@ function applyBoardTransform() {
   // worked out here, in board pixels, every time the board moves.
   const rect = elements.board.getBoundingClientRect();
   const room = Math.max(
-    (rect.width - CANVAS_WIDTH * boardView.scale) / 2,
-    (rect.height - CANVAS_HEIGHT * boardView.scale) / 2,
+    (rect.width - boardSize.width * boardView.scale) / 2,
+    (rect.height - boardSize.height * boardView.scale) / 2,
     240 * boardView.scale,
   ) / boardView.scale;
   elements.canvas.style.setProperty('--cork-surround', `${Math.ceil(room)}px`);
   elements.board.style.backgroundSize = `${600 * boardView.scale}px ${600 * boardView.scale}px`;
   elements.board.style.backgroundPosition = `${boardView.x}px ${boardView.y}px`;
+}
+
+function applyBoardSize() {
+  // The stylesheet carries a one-cell default so the sheet is never zero-sized, but the board's
+  // real size is the area's, so it is written on the element every time a board is opened.
+  elements.canvas.style.width = `${boardSize.width}px`;
+  elements.canvas.style.height = `${boardSize.height}px`;
 }
 
 function fitBoard() {
@@ -1067,11 +1087,11 @@ function fitBoard() {
   // applyBoardTransform then centres the framed sheet rather than the bare cork.
   const frame = BOARD_FRAME_WIDTH * 2;
   boardView.scale = BOARD_FIT_MARGIN * Math.min(
-    rect.width / (CANVAS_WIDTH + frame),
-    rect.height / (CANVAS_HEIGHT + frame),
+    rect.width / (boardSize.width + frame),
+    rect.height / (boardSize.height + frame),
   );
-  boardView.x = (rect.width - CANVAS_WIDTH * boardView.scale) / 2;
-  boardView.y = (rect.height - CANVAS_HEIGHT * boardView.scale) / 2;
+  boardView.x = (rect.width - boardSize.width * boardView.scale) / 2;
+  boardView.y = (rect.height - boardSize.height * boardView.scale) / 2;
   applyBoardTransform();
 }
 
@@ -1081,7 +1101,7 @@ function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2)
   const pointY = clientY - rect.top;
   const worldX = (pointX - boardView.x) / boardView.scale;
   const worldY = (pointY - boardView.y) / boardView.scale;
-  boardView.scale = Math.min(2.5, Math.max(.28, nextScale));
+  boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, nextScale));
   boardView.x = pointX - worldX * boardView.scale;
   boardView.y = pointY - worldY * boardView.scale;
   applyBoardTransform();
@@ -1512,8 +1532,8 @@ function beginPlacement() {
   placingNote?.remove();
   const board = elements.board.getBoundingClientRect();
   const placement = pending.placement || {
-    x: clampPlacement(((board.width / 2) - boardView.x) / (CANVAS_WIDTH * boardView.scale)),
-    y: clampPlacement(((board.height / 2) - boardView.y) / (CANVAS_HEIGHT * boardView.scale)),
+    x: clampPlacement(((board.width / 2) - boardView.x) / (boardSize.width * boardView.scale)),
+    y: clampPlacement(((board.height / 2) - boardView.y) / (boardSize.height * boardView.scale)),
     rotation: 0,
   };
   savePending({...pending, placement});
@@ -1585,8 +1605,8 @@ function installPlacementGestures(note) {
       setBinArmed(false);
     } else {
       setPlacement({...gesture.placement,
-        x: gesture.placement.x + (event.clientX - gesture.startX) / (CANVAS_WIDTH * boardView.scale),
-        y: gesture.placement.y + (event.clientY - gesture.startY) / (CANVAS_HEIGHT * boardView.scale)});
+        x: gesture.placement.x + (event.clientX - gesture.startX) / (boardSize.width * boardView.scale),
+        y: gesture.placement.y + (event.clientY - gesture.startY) / (boardSize.height * boardView.scale)});
       setBinArmed(isOverBin(event.clientX, event.clientY));
     }
   });
@@ -1878,7 +1898,7 @@ function installBoardNavigation() {
     if (pointers.size >= 2 && gesture.pinch) {
       const center = midpoint();
       const rect = elements.board.getBoundingClientRect();
-      boardView.scale = Math.min(2.5, Math.max(.28, gesture.scale * distance() / gesture.distance));
+      boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, gesture.scale * distance() / gesture.distance));
       boardView.x = center.x - rect.left - gesture.worldX * boardView.scale;
       boardView.y = center.y - rect.top - gesture.worldY * boardView.scale;
     } else if (gesture.id === event.pointerId) {
@@ -2733,6 +2753,11 @@ updateAccount();
 // One source for the rail's thickness: the stylesheet reads this variable, the
 // fitting maths reads the constant, so the frame and the fit cannot disagree.
 elements.canvas.style.setProperty('--cork-frame', `${BOARD_FRAME_WIDTH}px`);
+// The canvas wears its board's size from the first paint. The board the reader arrives on comes
+// from the link, the kept place or the remembered board, and that resolution does not pass
+// through selectBoard, so the size is worked out from what it settled on here as well.
+boardSize = boardExtentForCells(activeGeohashes, BOARD_CELL_PX);
+applyBoardSize();
 elements.boardDepth.value = String(boardDepth);
 elements.rememberBoard.checked = rememberBoard;
 updateBoardControl();

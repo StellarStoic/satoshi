@@ -12,7 +12,10 @@
 .primary-action, .pay-button { border-color: var(--accent, #f2a900); background: var(--accent, #f2a900); color: #111; font-weight: 700; }
 .sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background-color: #b98b63; background-image: url('/img/cork-board.png'); background-repeat: repeat; background-size: 600px 600px; box-shadow: inset 0 0 90px rgba(39, 19, 6, .46); cursor: grab; touch-action: none; }
 .sticky-board.is-panning { cursor: grabbing; }
-.sticky-canvas { position: absolute; top: 0; left: 0; width: 2600px; height: 1800px; transform-origin: 0 0; will-change: transform; }
+/* The sheet's real size is the area's and is written on the element by applyBoardSize() in
+   stickyNotes.mjs; this is only the one-cell default for the first paint, before a board is
+   opened, and it must agree with BOARD_CELL_PX there. */
+.sticky-canvas { position: absolute; top: 0; left: 0; width: 1200px; height: 1200px; transform-origin: 0 0; will-change: transform; }
 /* A wooden rail around the cork, sitting outside the 2600x1800 board so no note is
    ever covered by it. It lives inside the transformed canvas, so it pans and zooms
    with the board; --cork-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so
