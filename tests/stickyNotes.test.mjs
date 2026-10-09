@@ -303,18 +303,24 @@ test('deletion request targets one event on the satoshi relay', () => {
   assert.deepEqual(template.tags[0], ['e', eventId, 'wss://nostr.satoshi.si']);
 });
 
-test('font dropdown previews broad Bunny-hosted typeface families', async () => {
-  const [html, css] = await Promise.all([
+test('font dropdown previews the three note typefaces without breaking older notes', async () => {
+  const [html, css, theme, script] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../theme.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
   ]);
   assert.match(css, /fonts\.bunny\.net/);
-  for (const name of ['Special Elite', 'Caveat', 'Noto Sans', 'Noto Serif', 'Roboto', 'Open Sans', 'Lora']) assert.match(html, new RegExp(name));
+  for (const name of ['Special Elite', 'Caveat', 'Comfortaa']) assert.match(html, new RegExp(name));
   assert.match(html, /<select id="noteFont"/);
   assert.doesNotMatch(html, /class="font-option/);
-  assert.ok((html.match(/<option class="font-preview--/g) || []).length >= 18);
+  assert.equal((html.match(/<option class="font-preview--/g) || []).length, 3);
   assert.match(css, /font-preview--handwritten[^}]+Caveat/s);
-  assert.match(css, /font-preview--noto-sans[^}]+Noto Sans/s);
+  assert.match(css, /font-preview--comfortaa[^}]+Comfortaa/s);
+  assert.match(theme, /:not\(\.sticky-note\):not\(\.sticky-note \*\):not\(\.note-font-select\):not\(\.note-font-select \*\)/,
+    'the global site font leaves the live note and every dropdown option alone');
+  assert.match(script, /elements\.draft\.classList\.add\(`sticky-note--font-\$\{font\}`\)/,
+    'choosing a font applies it to the note being written immediately');
   assert.match(css, /#noteCapacity\.is-almost-full/);
   assert.match(css, /#noteCapacity\.is-full/);
   assert.match(css, /sticky-note--dense/);

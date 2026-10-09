@@ -129,7 +129,7 @@ html { min-height: 100%; }
 
 /* Keep the hand-drawn home animation intact; use the quote face everywhere else. */
 body:not(:has(#text1)),
-body:not(:has(#text1)) :where(*:not(i):not(#satoshisValue):not([class^="lni"]):not([class*=" lni"])) {
+body:not(:has(#text1)) :where(*:not(i):not(#satoshisValue):not([class^="lni"]):not([class*=" lni"]):not(.sticky-note):not(.sticky-note *):not(.note-font-select):not(.note-font-select *)) {
     font-family: var(--site-font) !important;
 }
 
