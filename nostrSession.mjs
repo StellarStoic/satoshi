@@ -107,11 +107,11 @@ function randomId() {
 }
 
 function amberCallback(id) {
-  // The query is where NIP-55 says a signer appends its result (`callbackUrl=…?result=`); the
-  // fragment is this page's own way of matching an answer to the request that asked for it,
-  // which several Android signers implement. Both are offered, so a signer following either
-  // convention has somewhere to put the result instead of nowhere.
-  return `${location.origin}${location.pathname}?${AMBER_RESULT_PARAM}=&${AMBER_ID_PARAM}=${id}#nostr_signer=${id}.`;
+  // NIP-55 signers append the encoded result to the callback URL verbatim. The result slot
+  // therefore has to be the final part of the URL; putting an id or fragment after it makes
+  // Amber append the answer somewhere the page cannot read as the result.
+  const params = new URLSearchParams({[AMBER_ID_PARAM]: id});
+  return `${location.origin}${location.pathname}?${params.toString()}&${AMBER_RESULT_PARAM}=`;
 }
 
 function openAmber(type, payload, id, options = {}) {

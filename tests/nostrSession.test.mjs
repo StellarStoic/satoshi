@@ -149,3 +149,32 @@ test('a signer answer is read from the query as well as the fragment', async () 
   assert.equal(storage.getItem('satoshi:nostr:amber:req9'), null, 'the request is spent');
   assert.deepEqual(replaced, ['/stickyNotes.html'], 'the answer is taken out of the URL rather than read twice');
 });
+
+test('Amber receives a callback whose final slot is the result and the round trip logs in', async () => {
+  const storage = memoryStorage();
+  const assigned = [];
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'Android'}});
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    assign: value => assigned.push(value),
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-round-trip-test=${Date.now()}`);
+  sessionModule.beginAmberLogin();
+  assert.equal(assigned.length, 1);
+  const signerUrl = new URL(assigned[0]);
+  const callback = signerUrl.searchParams.get('callbackUrl');
+  assert.ok(callback?.endsWith('&nostr_signer_result='), 'Amber appends its answer to the final callback slot');
+  assert.equal(new URL(callback).hash, '', 'nothing follows the result slot in a fragment');
+
+  const returned = new URL(callback + 'd'.repeat(64));
+  globalThis.location.search = returned.search;
+  const answer = sessionModule.resumeAmber();
+  assert.equal(answer?.action, 'login');
+  assert.equal(answer.session.pubkey, 'd'.repeat(64));
+  assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64), 'the returned Amber identity persists');
+});
