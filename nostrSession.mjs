@@ -131,7 +131,10 @@ export function beginAmberSigning(template, context = null) {
   if (!session || session.method !== 'amber') throw new Error('Connect Amber first.');
   const id = randomId();
   localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({createdAt: Date.now(), action: 'sign', template, context}));
-  openAmber('sign_event', JSON.stringify(template), id, {current_user: session.pubkey, returnType: 'event', compressionType: 'none'});
+  // Returning the whole event can turn a long note and its tags into a callback URL large
+  // enough for Android to drop. The signature is compact; the exact unsigned event is already
+  // parked above, so the page can rebuild and verify the signed event when Amber returns.
+  openAmber('sign_event', JSON.stringify(template), id, {current_user: session.pubkey, returnType: 'signature', compressionType: 'none'});
 }
 
 /**
@@ -172,8 +175,19 @@ export function resumeAmber() {
     if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
     return {action: 'login', session: saveSession(pubkey, 'amber')};
   }
-  const event = JSON.parse(result);
-  if (!tools().verifyEvent(event) || event.pubkey !== getNostrSession()?.pubkey) throw new Error('Amber returned an invalid signed event.');
+  const clean = result.trim();
+  const session = getNostrSession();
+  let event;
+  if (/^[0-9a-f]{128}$/i.test(clean)) {
+    if (!session?.pubkey || !state.template) throw new Error('The Amber signing session could not be restored. Please pin again.');
+    const unsigned = {...state.template, pubkey: session.pubkey};
+    event = {...unsigned, id: tools().getEventHash(unsigned), sig: clean.toLowerCase()};
+  } else {
+    // Full-event replies created by the previous version remain usable while their request is
+    // still inside the thirty-minute return window.
+    try { event = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
+  }
+  if (!tools().verifyEvent(event) || event.pubkey !== session?.pubkey) throw new Error('Amber returned an invalid signed event.');
   return {action: 'sign', event, context: state.context};
 }
 

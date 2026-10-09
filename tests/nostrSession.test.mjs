@@ -178,3 +178,44 @@ test('Amber receives a callback whose final slot is the result and the round tri
   assert.equal(answer.session.pubkey, 'd'.repeat(64));
   assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64), 'the returned Amber identity persists');
 });
+
+test('Amber pinning returns a compact signature and rebuilds the verified event locally', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const signature = 'b'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  const assigned = [];
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'Android'}});
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    assign: value => assigned.push(value),
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: event => {
+        assert.equal(event.pubkey, pubkey);
+        return eventId;
+      },
+      verifyEvent: event => event.id === eventId && event.sig === signature && event.pubkey === pubkey,
+    },
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-signature-test=${Date.now()}`);
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'A fairly long sticky note', tags: [['t', 'satoshi-sticky']]};
+  sessionModule.beginAmberSigning(template, {action: 'pin', orderId: 'order-21'});
+  const signerUrl = new URL(assigned[0]);
+  assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
+  const callback = signerUrl.searchParams.get('callbackUrl');
+  assert.ok(callback.endsWith('&nostr_signer_result='));
+
+  globalThis.location.search = new URL(callback + signature).search;
+  const answer = sessionModule.resumeAmber();
+  assert.equal(answer.action, 'sign');
+  assert.deepEqual(answer.context, {action: 'pin', orderId: 'order-21'});
+  assert.deepEqual(answer.event, {...template, pubkey, id: eventId, sig: signature});
+});
