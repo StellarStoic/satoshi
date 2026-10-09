@@ -45,7 +45,7 @@
     <div class="board-controls" aria-label="Board view controls">
       <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><i class="lni lni-search-minus" aria-hidden="true"></i></button>
       <button type="button" id="zoomIn" aria-label="Zoom in" title="Zoom in"><i class="lni lni-search-plus" aria-hidden="true"></i></button>
-      <button type="button" id="zoomFit" aria-label="Fit board" title="Fit board"><i class="lni lni-expand-square-4" aria-hidden="true"></i></button>
+      <button type="button" id="zoomFit" aria-label="Fill screen" title="Fill screen"><i class="lni lni-expand-square-4" aria-hidden="true"></i></button>
     </div>
   </main>
 
@@ -144,8 +144,8 @@
   </dialog>
 
   <dialog id="accountDialog" class="sticky-dialog" aria-labelledby="accountTitle">
-    <div class="dialog-inner account-card">
-      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    <form method="dialog" class="dialog-inner account-card">
+      <button type="submit" class="dialog-close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="accountTitle">Nostr account</h2>
       <div class="account-identity">
         <img id="accountPicture" alt="" hidden>
@@ -154,7 +154,7 @@
       <code id="accountNpub"></code><span id="accountMethod"></span>
       <span id="anonymousExpiry" class="anonymous-expiry" hidden></span>
       <button type="button" id="logoutNostr" class="secondary-action"><span>Log out</span></button>
-    </div>
+    </form>
   </dialog>
 
   <dialog id="composerDialog" class="sticky-dialog composer-dialog" aria-labelledby="composerTitle">

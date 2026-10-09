@@ -107,11 +107,10 @@ function randomId() {
 }
 
 function amberCallback(id) {
-  // NIP-55 signers append the encoded result to the callback URL verbatim. The result slot
-  // therefore has to be the final part of the URL; putting an id or fragment after it makes
-  // Amber append the answer somewhere the page cannot read as the result.
-  const params = new URLSearchParams({[AMBER_ID_PARAM]: id});
-  return `${location.origin}${location.pathname}?${params.toString()}&${AMBER_RESULT_PARAM}=`;
+  // Amber decodes the complete signer URI before splitting its parameters on `?` and `&`.
+  // A fragment contains neither delimiter, survives intact, and resumes an installed PWA
+  // without requiring a second page load. Amber appends its URL-encoded result after the dot.
+  return `${location.origin}${location.pathname}#nostr_signer=${id}.`;
 }
 
 function openAmber(type, payload, id, options = {}) {
@@ -157,18 +156,30 @@ export function pendingAmberRequest() {
 export function resumeAmber() {
   const params = new URLSearchParams(location.search);
   const fragment = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
-  // An answer arrives in one of two shapes: the query NIP-55 specifies, or the fragment this
-  // page used to ask for. A signer that follows only one of them must still get through.
-  const id = fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
-  const inQuery = fragment ? '' : params.get(AMBER_RESULT_PARAM);
-  if (!id || !fragment && !inQuery) return null;
+  let id = fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
+  let result = fragment?.[2] ?? params.get(AMBER_RESULT_PARAM) ?? '';
+
+  // Recover callbacks issued by the previous build. Amber truncated that callback at its
+  // embedded `&`, then appended the result directly to the id value.
+  if (id && !result) {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(AMBER_PREFIX)) continue;
+      const pendingId = key.slice(AMBER_PREFIX.length);
+      if (id.startsWith(pendingId) && id.length > pendingId.length) {
+        result = id.slice(pendingId.length);
+        id = pendingId;
+        break;
+      }
+    }
+  }
+  if (!id || !result) return null;
   // The query is dropped with the fragment: the answer must not be read twice.
   history.replaceState(null, '', location.pathname);
   const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
   localStorage.removeItem(key);
   if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
-  let result = fragment ? fragment[2] : inQuery;
   if (fragment) { try { result = decodeURIComponent(result); } catch {} }
   if (state.action === 'login') {
     const pubkey = result.trim().toLowerCase();

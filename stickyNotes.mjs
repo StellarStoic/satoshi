@@ -228,13 +228,15 @@ const BOARD_CELL_HEIGHT = 1400;
 // The board's own size, worked out from the selected cells every time a board is opened.
 let boardSize = boardExtentForCells([], BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
 let corkSurround = -1;
+let boardTransformFrame = 0;
+let pendingTransformRect = null;
+let boardViewport = null;
 // The wooden rail around the cork, in board pixels. The rail sits outside the board,
-// so it never covers a note; the board is fitted with the rail included, otherwise
-// the frame would be cropped off at Fit board.
+// so it never covers a note.
 const BOARD_FRAME_WIDTH = 52;
-// Fitting leaves a little daylight so the rail reads as a border rather than sitting
-// flush on the window edge, which is how it went missing on a phone.
-const BOARD_FIT_MARGIN = 0.94;
+// Opening a corkboard should feel like standing in front of it, not looking at a thumbnail.
+// Covering the viewport leaves cork beneath every edge while keeping the selected area centred.
+const BOARD_OPEN_COVER = 1.02;
 // Zoom limits. A board of nine cells fitted to a laptop screen lands near a sixth of its own
 // height, so the floor has to sit below that or the first pinch would jump the view inwards.
 const BOARD_ZOOM_MIN = 0.12;
@@ -1154,6 +1156,7 @@ function selectBoard(geohash, closeDialog = true) {
   elements.boardStatus.hidden = false;
   status(elements.boardStatus, `Opening corkboard ${boardCellsLabel()}...`);
   if (closeDialog) elements.boardDialog.close();
+  requestAnimationFrame(fillBoard);
   connectBoard(boardConnectionVersion);
 }
 
@@ -1165,11 +1168,9 @@ function clampViewToBoard(rect) {
   boardView.y = clamped.y;
 }
 
-function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
-  // Every pan, zoom and fit passes through here, so this is the one place that has to hold
-  // the line: the rail is the board's edge, and the board does not continue past it.
-  clampViewToBoard(rect);
-  elements.canvas.style.transform = `translate(${boardView.x}px, ${boardView.y}px) scale(${boardView.scale})`;
+function paintBoardTransform(rect) {
+  elements.canvas.style.transform = `translate3d(${boardView.x}px, ${boardView.y}px, 0) scale(${boardView.scale})`;
+  boardViewport = {width: rect.width, height: rect.height};
   // How far the frame has to reach outside the board to cover the window: a fixed
   // band would leave bare cork showing past it at a zoomed-out view, so it is
   // worked out here, in board pixels, every time the board moves.
@@ -1185,6 +1186,30 @@ function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
   }
 }
 
+function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
+  // Every pan, zoom and fit passes through here, so this is the one place that has to hold
+  // the line: the rail is the board's edge, and the board does not continue past it.
+  if (boardTransformFrame) cancelAnimationFrame(boardTransformFrame);
+  boardTransformFrame = 0;
+  pendingTransformRect = null;
+  clampViewToBoard(rect);
+  paintBoardTransform(rect);
+}
+
+function scheduleBoardTransform(rect) {
+  // Pointer and wheel events can arrive several times between screen refreshes. Keep their
+  // latest geometry, but paint only once per frame so panning does not queue stale transforms.
+  clampViewToBoard(rect);
+  pendingTransformRect = rect;
+  if (boardTransformFrame) return;
+  boardTransformFrame = requestAnimationFrame(() => {
+    boardTransformFrame = 0;
+    const nextRect = pendingTransformRect || elements.board.getBoundingClientRect();
+    pendingTransformRect = null;
+    paintBoardTransform(nextRect);
+  });
+}
+
 function applyBoardSize() {
   // The stylesheet carries a one-cell default so the sheet is never zero-sized, but the board's
   // real size is the area's, so it is written on the element every time a board is opened.
@@ -1192,23 +1217,19 @@ function applyBoardSize() {
   elements.canvas.style.height = `${boardSize.height}px`;
 }
 
-function fitBoard() {
+function fillBoard() {
   const rect = elements.board.getBoundingClientRect();
-  // Fit the rail, not just the cork, with margin left over so the border is actually
-  // visible: the framed sheet is what a reader sees, so it is what has to fit. The clamp in
-  // applyBoardTransform then centres the framed sheet rather than the bare cork.
-  const frame = BOARD_FRAME_WIDTH * 2;
-  boardView.scale = BOARD_FIT_MARGIN * Math.min(
-    rect.width / (boardSize.width + frame),
-    rect.height / (boardSize.height + frame),
-  );
+  boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, BOARD_OPEN_COVER * Math.max(
+    rect.width / boardSize.width,
+    rect.height / boardSize.height,
+  )));
   boardView.x = (rect.width - boardSize.width * boardView.scale) / 2;
   boardView.y = (rect.height - boardSize.height * boardView.scale) / 2;
   applyBoardTransform(rect);
 }
 
-function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2) {
-  const rect = elements.board.getBoundingClientRect();
+function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2, rect = null, deferred = false) {
+  rect ||= elements.board.getBoundingClientRect();
   const pointX = clientX - rect.left;
   const pointY = clientY - rect.top;
   const worldX = (pointX - boardView.x) / boardView.scale;
@@ -1216,7 +1237,8 @@ function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2)
   boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, nextScale));
   boardView.x = pointX - worldX * boardView.scale;
   boardView.y = pointY - worldY * boardView.scale;
-  applyBoardTransform(rect);
+  if (deferred) scheduleBoardTransform(rect);
+  else applyBoardTransform(rect);
 }
 
 function renderNote(sticky, event = null, temporary = false) {
@@ -1330,7 +1352,12 @@ function connectBoard(version = boardConnectionVersion) {
   });
   socket.addEventListener('close', () => {
     clearTimeout(timeout);
-    if (!document.hidden && version === boardConnectionVersion) setTimeout(() => connectBoard(version), 5000);
+    if (boardSocket === socket) boardSocket = null;
+    if (!document.hidden && version === boardConnectionVersion) {
+      setTimeout(() => {
+        if (version === boardConnectionVersion && (!boardSocket || boardSocket.readyState > WebSocket.OPEN)) connectBoard(version);
+      }, 5000);
+    }
   }, {once: true});
 }
 
@@ -1528,6 +1555,17 @@ async function buySubscriptionThen(session, notePending, statusElement) {
   pollPayment();
 }
 
+function shouldBuySubscription(error, session) {
+  return session?.method !== 'anonymous'
+    && error?.status === 402
+    && error?.reason === 'subscription_required';
+}
+
+function anonymousRemovalClassificationError(error, session) {
+  if (session?.method !== 'anonymous' || error?.status !== 402 || error?.reason !== 'subscription_required') return error;
+  return new Error('The payment service could not recognize this anonymous note, so no invoice was created. Please try again shortly.');
+}
+
 async function startPayment() {
   try {
     status(elements.paymentStatus, '');
@@ -1577,7 +1615,7 @@ async function startPayment() {
     } catch (error) {
       // 402 is the desk saying "this key is registered but has no subscription".
       // Buy one now and come back to this note; anything else is a real failure.
-      if (error.status !== 402) throw error;
+      if (!shouldBuySubscription(error, session)) throw error;
       await buySubscriptionThen(session, notePending, elements.paymentStatus);
       return;
     }
@@ -2049,7 +2087,7 @@ async function startRemovalPayment() {
         body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
       });
     } catch (error) {
-      if (error.status !== 402) throw error;
+      if (!shouldBuySubscription(error, session)) throw anonymousRemovalClassificationError(error, session);
       await buySubscriptionThen(session, notePending, elements.noteMenuStatus);
       return;
     }
@@ -2104,6 +2142,7 @@ async function publishRemoval(resumedEvent = null) {
 function installBoardNavigation() {
   const pointers = new Map();
   let gesture = null;
+  let gestureRect = null;
 
   const point = event => ({x: event.clientX, y: event.clientY});
   const distance = () => {
@@ -2116,7 +2155,7 @@ function installBoardNavigation() {
   };
   const beginPinch = () => {
     const center = midpoint();
-    const rect = elements.board.getBoundingClientRect();
+    const rect = gestureRect || elements.board.getBoundingClientRect();
     const localX = center.x - rect.left;
     const localY = center.y - rect.top;
     gesture = {
@@ -2138,6 +2177,7 @@ function installBoardNavigation() {
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, point(event));
+    gestureRect = elements.board.getBoundingClientRect();
     elements.board.classList.add('is-panning');
     if (pointers.size === 1) resetPan();
     else if (pointers.size === 2) beginPinch();
@@ -2145,10 +2185,9 @@ function installBoardNavigation() {
   elements.board.addEventListener('pointermove', event => {
     if (!pointers.has(event.pointerId) || !gesture) return;
     pointers.set(event.pointerId, point(event));
-    let rect;
+    const rect = gestureRect || elements.board.getBoundingClientRect();
     if (pointers.size >= 2 && gesture.pinch) {
       const center = midpoint();
-      rect = elements.board.getBoundingClientRect();
       boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, gesture.scale * distance() / gesture.distance));
       boardView.x = center.x - rect.left - gesture.worldX * boardView.scale;
       boardView.y = center.y - rect.top - gesture.worldY * boardView.scale;
@@ -2156,7 +2195,7 @@ function installBoardNavigation() {
       boardView.x = gesture.boardX + event.clientX - gesture.x;
       boardView.y = gesture.boardY + event.clientY - gesture.y;
     }
-    applyBoardTransform(rect);
+    scheduleBoardTransform(rect);
     // At an edge the board stops while the finger keeps going. Re-anchor every frame so
     // dragging back responds at once, instead of first retracing travel that was refused.
     if (!gesture.pinch && gesture.id === event.pointerId) {
@@ -2171,6 +2210,7 @@ function installBoardNavigation() {
     if (pointers.size === 1) resetPan();
     else if (!pointers.size) {
       gesture = null;
+      gestureRect = null;
       elements.board.classList.remove('is-panning');
     }
   };
@@ -2178,7 +2218,11 @@ function installBoardNavigation() {
   elements.board.addEventListener('pointercancel', stop);
   elements.board.addEventListener('wheel', event => {
     event.preventDefault();
-    setZoom(boardView.scale * (event.deltaY < 0 ? 1.12 : .89), event.clientX, event.clientY);
+    const rect = elements.board.getBoundingClientRect();
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? rect.height : 1;
+    const delta = Math.max(-140, Math.min(140, event.deltaY * unit));
+    setZoom(boardView.scale * Math.exp(-delta * .0016), event.clientX, event.clientY, rect, true);
   }, {passive: false});
 }
 
@@ -2979,7 +3023,13 @@ elements.shareBoard.addEventListener('click', async () => {
 });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 document.querySelectorAll('[data-login]').forEach(button => button.addEventListener('click', () => handleLogin(button.dataset.login)));
-elements.logout.addEventListener('click', () => { logoutNostr(); elements.accountDialog.close(); updateAccount(); });
+elements.logout.addEventListener('click', () => {
+  // Closing first guarantees a broken downstream session listener cannot trap the reader
+  // inside a modal. The account state is then cleared and redrawn normally.
+  if (elements.accountDialog.open) elements.accountDialog.close();
+  logoutNostr();
+  updateAccount();
+});
 elements.accountPicture.addEventListener('error', () => { elements.accountPicture.hidden = true; });
 elements.colors.addEventListener('click', event => selectColor(event.target.closest('[data-color]')?.dataset.color));
 elements.font.addEventListener('change', () => selectFont(elements.font.value));
@@ -3008,7 +3058,7 @@ elements.discardCancel.addEventListener('click', () => keepDiscardedNote());
 elements.discardDialog.addEventListener('close', () => { if (discardRestore) keepDiscardedNote(); });
 elements.zoomOut.addEventListener('click', () => setZoom(boardView.scale - .15));
 elements.zoomIn.addEventListener('click', () => setZoom(boardView.scale + .15));
-elements.zoomFit.addEventListener('click', fitBoard);
+elements.zoomFit.addEventListener('click', fillBoard);
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
 elements.removeSticky.addEventListener('click', startRemovalPayment);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
@@ -3025,7 +3075,18 @@ window.addEventListener('satoshi-nostr-session', () => {
   refreshPriceQuote(getNostrSession()).catch(() => {});
 });
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
-window.addEventListener('resize', () => { if (boardView.scale < .5) fitBoard(); });
+let boardResizeFrame = 0;
+window.addEventListener('resize', () => {
+  cancelAnimationFrame(boardResizeFrame);
+  boardResizeFrame = requestAnimationFrame(() => {
+    const rect = elements.board.getBoundingClientRect();
+    if (boardViewport) {
+      boardView.x += (rect.width - boardViewport.width) / 2;
+      boardView.y += (rect.height - boardViewport.height) / 2;
+      applyBoardTransform(rect);
+    } else fillBoard();
+  });
+});
 setInterval(() => {
   const before = elements.account.getAttribute('aria-label');
   updateAnonymousCountdown();
@@ -3047,7 +3108,7 @@ elements.boardDepth.value = String(boardDepth);
 elements.rememberBoard.checked = rememberBoard;
 updateBoardControl();
 installBoardNavigation();
-requestAnimationFrame(fitBoard);
+requestAnimationFrame(fillBoard);
 if (activeGeohash) connectBoard();
 else {
   status(elements.boardStatus, 'Choose a geohash to open its corkboard.');
@@ -3117,8 +3178,30 @@ if (!signerReturn.applied) {
 }
 // The answer can also arrive with no reload at all: the browser resumes the page it already
 // has and only the URL changes. Nothing else reads that hash, so these are where it is read.
-window.addEventListener('hashchange', () => { applySignerReturn().catch(() => {}); });
-window.addEventListener('pageshow', event => { if (event.persisted) applySignerReturn().catch(() => {}); });
+let resumeFlowRunning = false;
+async function resumeExternalFlow() {
+  if (resumeFlowRunning || document.hidden) return;
+  resumeFlowRunning = true;
+  try {
+    const signer = await applySignerReturn();
+    if (!signer.applied) {
+      if (pending?.status === 'waiting' || pending?.status === 'waiting_subscription') pollPayment();
+      else if (pending?.status === 'paid') syncPlacementWithSession();
+    }
+    // Mobile browsers commonly close sockets while a wallet or signer app is in front.
+    // A closed board must reconnect as soon as this page becomes visible again.
+    if (activeGeohash && (!boardSocket || boardSocket.readyState > WebSocket.OPEN)) {
+      connectBoard(boardConnectionVersion);
+    }
+  } finally {
+    resumeFlowRunning = false;
+  }
+}
+window.addEventListener('hashchange', () => { resumeExternalFlow().catch(() => {}); });
+window.addEventListener('pageshow', () => { resumeExternalFlow().catch(() => {}); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) resumeExternalFlow().catch(() => {});
+});
 // A note saved with no status and no order has nothing left to poll: the flow that
 // saved it ended before its order ever existed (a subscription paid after the page
 // reloaded, before the resume knew which board the note was written on). Give the

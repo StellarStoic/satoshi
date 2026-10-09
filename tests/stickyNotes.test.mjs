@@ -591,15 +591,13 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(css, /box-shadow: 0 0 0 var\(--cork-surround, 420px\)/, 'a solid band sits outside the rail');
   assert.match(page, /setProperty\('--cork-surround'/, 'the band is sized from the window, in board pixels');
 
-  // One source of truth for that variable, and Fit board must not crop the rail. The margin
-  // is what leaves the rail visible rather than flush on the window edge, which is how the
-  // border went missing on a phone.
+  // One source of truth for that variable. Opening covers the viewport rather than shrinking
+  // the whole board until its rail fits like a thumbnail.
   assert.match(page, /const BOARD_FRAME_WIDTH = \d+;/);
-  assert.match(page, /const BOARD_FIT_MARGIN = 0\.94;/);
   assert.match(page, /setProperty\('--cork-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
     'the constant is published to the stylesheet');
-  assert.match(page, /BOARD_FIT_MARGIN \* Math\.min\(\s*\n?\s*rect\.width \/ \(boardSize\.width \+ frame\),\s*\n?\s*rect\.height \/ \(boardSize\.height \+ frame\),\s*\n?\s*\)/,
-    'Fit board fits the rail as well as the cork, with margin left around it');
+  assert.match(page, /BOARD_OPEN_COVER \* Math\.max\(/,
+    'opening fills the window with cork instead of fitting the complete board');
   // The rail is also the limit: nothing may be panned into the cork that lies past it.
   assert.match(page, /clampViewToBoard\(rect\)/, 'the transform holds the line');
   assert.match(page, /frame: BOARD_FRAME_WIDTH,/);
@@ -851,14 +849,35 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // The answer is read wherever it arrives, not only while booting: a browser that resumes
   // the running page and merely changes the URL would otherwise lose it — which is a
   // sign-in that does nothing and a note that will not pin, with no error anywhere.
-  assert.match(script, /window\.addEventListener\('hashchange', \(\) => \{ applySignerReturn\(\)\.catch/);
-  assert.match(script, /window\.addEventListener\('pageshow', event => \{ if \(event\.persisted\) applySignerReturn\(\)\.catch/);
+  assert.match(script, /window\.addEventListener\('hashchange', \(\) => \{ resumeExternalFlow\(\)\.catch/);
+  assert.match(script, /window\.addEventListener\('pageshow', \(\) => \{ resumeExternalFlow\(\)\.catch/);
+  assert.match(script, /document\.addEventListener\('visibilitychange',[\s\S]{0,120}!document\.hidden\) resumeExternalFlow\(\)\.catch/);
+  assert.match(script, /pending\?\.status === 'waiting' \|\| pending\?\.status === 'waiting_subscription'/);
+  assert.match(script, /pending\?\.status === 'paid'\) syncPlacementWithSession\(\)/);
+  assert.match(script, /!boardSocket \|\| boardSocket\.readyState > WebSocket\.OPEN/);
 
   // A sign-in that lands behaves like any other login: the dialog it came from closes and
   // the reader's own note returns to the board.
   assert.match(script, /if \(elements\.login\.open\) elements\.login\.close\(\);/);
   assert.match(script, /if \(!syncPlacementWithSession\(\)\) openComposer\(\);/);
   assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
+});
+
+test('the restored board and account dialog cannot trap the reader', async () => {
+  const [markup, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(markup, /<form method="dialog" class="dialog-inner account-card">/,
+    'the account X closes natively even if page JavaScript is recovering');
+  assert.match(markup, /<button type="submit" class="dialog-close" aria-label="Close">/);
+  const logout = script.slice(script.indexOf("elements.logout.addEventListener('click'"), script.indexOf("elements.accountPicture.addEventListener"));
+  assert.ok(logout.indexOf('elements.accountDialog.close()') < logout.indexOf('logoutNostr()'),
+    'logout dismisses the modal before session listeners run');
+  assert.match(css, /\.board-status \{[^}]*pointer-events: none/,
+    'the opening message cannot block dragging the corkboard');
 });
 
 test('the X on the invoice discards it, and a settled payment is not thrown away', async () => {
@@ -931,6 +950,12 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
 
   // One place buys a subscription, and it refuses for an identity that can never use one.
   assert.match(script, /if \(session\.method === 'anonymous'\) \{\s+throw new Error\(`This temporary identity cannot hold a subscription/);
+  assert.match(script, /function shouldBuySubscription\(error, session\) \{\s+return session\?\.method !== 'anonymous'/,
+    'an anonymous identity never enters subscription checkout');
+  assert.match(script, /error\?\.reason === 'subscription_required'/,
+    'only the explicit subscription refusal starts plan checkout');
+  assert.match(script, /throw anonymousRemovalClassificationError\(error, session\)/,
+    'a misclassified anonymous removal reports the service problem instead of offering a plan');
 
   // The note records the identity it was written under, and a mismatch surviving a reload
   // is named rather than signed by whoever happens to be logged in.
@@ -1049,21 +1074,31 @@ test('the rail is the board\u2019s limit, so the view cannot leave the framed sh
   assert.equal(Math.round(small.left), Math.round(1000 - small.right), 'the margins match');
 });
 
-test('every pan, zoom and fit goes through the limit, and fitting leaves daylight', async () => {
+test('board motion is clamped, frame-batched, and opens by filling the screen', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
-  const transform = script.slice(script.indexOf('function applyBoardTransform('), script.indexOf('function fitBoard()'));
-  assert.match(transform, /clampViewToBoard\(rect\)/, 'the transform clamps before it draws');
-  assert.ok(transform.indexOf('clampViewToBoard(rect)') < transform.indexOf('elements.canvas.style.transform'),
-    'the clamp happens before the transform is written, not after');
-  assert.match(script, /const BOARD_FIT_MARGIN = 0\.94;/);
-  assert.match(script, /boardView\.scale = BOARD_FIT_MARGIN \* Math\.min\(/);
+  const paint = script.slice(script.indexOf('function paintBoardTransform('), script.indexOf('function applyBoardTransform('));
+  const transform = script.slice(script.indexOf('function applyBoardTransform('), script.indexOf('function scheduleBoardTransform('));
+  const scheduled = script.slice(script.indexOf('function scheduleBoardTransform('), script.indexOf('function applyBoardSize('));
+  assert.match(transform, /clampViewToBoard\(rect\)/, 'a direct transform clamps before it draws');
+  assert.ok(transform.indexOf('clampViewToBoard(rect)') < transform.indexOf('paintBoardTransform(rect)'),
+    'the clamp happens before the transform is painted, not after');
+  assert.match(paint, /translate3d\(/, 'the board transform is sent to the compositor');
+  assert.match(scheduled, /if \(boardTransformFrame\) return;/,
+    'several raw input events share one screen-frame paint');
+  assert.match(scheduled, /requestAnimationFrame\(/);
+  assert.match(script, /const BOARD_OPEN_COVER = 1\.02;/);
+  assert.match(script, /BOARD_OPEN_COVER \* Math\.max\(/,
+    'the opening view covers the screen instead of fitting the full board');
+  assert.match(script, /requestAnimationFrame\(fillBoard\);/);
+  assert.match(script, /Math\.exp\(-delta \* \.0016\)/,
+    'wheel zoom follows the wheel distance instead of jumping by a fixed step');
   // the pan gesture re-anchors at the edge, or dragging back feels stuck
   assert.match(script, /gesture\.boardX = boardView\.x;\n      gesture\.boardY = boardView\.y;/);
   assert.match(script, /clampBoardView\(boardView, \{width: rect\.width, height: rect\.height\}, \{\n    canvasWidth: boardSize.width, canvasHeight: boardSize.height, frame: BOARD_FRAME_WIDTH,/);
-  assert.doesNotMatch(transform, /elements\.board\.style\.background(Size|Position)/,
+  assert.doesNotMatch(paint, /elements\.board\.style\.background(Size|Position)/,
     'panning transforms the textured canvas instead of repainting the board background');
-  assert.equal((transform.match(/getBoundingClientRect/g) || []).length, 1,
-    'one geometry read happens before the transform; there is no forced read after the write');
+  assert.equal((paint.match(/getBoundingClientRect/g) || []).length, 0,
+    'painting uses cached geometry and never forces a layout read after the write');
 });
 
 test('opening a board keeps the wooden rail, instead of deleting it with the canvas', async () => {
@@ -1143,6 +1178,12 @@ test('the note is held down by a picture, and an installed board still has its p
   // the pin image must not swallow clicks: the button around it is the way into the menu
   assert.match(page, /aria-label', 'Open note details'/);
   assert.match(css, /\.sticky-note__pin-art \{[^}]*pointer-events: none/);
+  assert.match(css, /\.sticky-note__pin \{[^}]*top: -36px/,
+    'the pin head sits above the paper instead of covering the note text');
+  assert.match(css, /\.sticky-note:not\(\.draft-note\):not\(\.sticky-note--placing\) \{ overflow: visible; \}/,
+    'published notes reveal the raised pin without changing draft or placement clipping');
+  assert.match(css, /\.sticky-note__text \{[^}]*overflow: hidden/,
+    'raising the pin does not let note text escape its paper');
 
   // the painted red dot is gone
   assert.doesNotMatch(css, /#c32920/);

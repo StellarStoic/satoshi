@@ -150,7 +150,7 @@ test('a signer answer is read from the query as well as the fragment', async () 
   assert.deepEqual(replaced, ['/stickyNotes.html'], 'the answer is taken out of the URL rather than read twice');
 });
 
-test('Amber receives a callback whose final slot is the result and the round trip logs in', async () => {
+test('Amber receives a delimiter-safe callback fragment and the round trip logs in', async () => {
   const storage = memoryStorage();
   const assigned = [];
   globalThis.localStorage = storage;
@@ -168,11 +168,11 @@ test('Amber receives a callback whose final slot is the result and the round tri
   assert.equal(assigned.length, 1);
   const signerUrl = new URL(assigned[0]);
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.ok(callback?.endsWith('&nostr_signer_result='), 'Amber appends its answer to the final callback slot');
-  assert.equal(new URL(callback).hash, '', 'nothing follows the result slot in a fragment');
+  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i, 'the callback has no query delimiters for Amber to split');
+  assert.equal(new URL(callback).search, '');
 
   const returned = new URL(callback + 'd'.repeat(64));
-  globalThis.location.search = returned.search;
+  globalThis.location.hash = returned.hash;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer?.action, 'login');
   assert.equal(answer.session.pubkey, 'd'.repeat(64));
@@ -211,9 +211,9 @@ test('Amber pinning returns a compact signature and rebuilds the verified event 
   const signerUrl = new URL(assigned[0]);
   assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.ok(callback.endsWith('&nostr_signer_result='));
+  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i);
 
-  globalThis.location.search = new URL(callback + signature).search;
+  globalThis.location.hash = new URL(callback + signature).hash;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer.action, 'sign');
   assert.deepEqual(answer.context, {action: 'pin', orderId: 'order-21'});
