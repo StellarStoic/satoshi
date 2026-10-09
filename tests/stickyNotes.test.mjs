@@ -842,6 +842,30 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
 });
 
+test('the X on the invoice discards it, and a settled payment is not thrown away', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const markup = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+
+  // The X is reachable and mapped.
+  assert.match(markup, /id="closeStickyPayment" data-close-dialog aria-label="Close"/);
+  assert.match(script, /closePayment: document\.getElementById\('closeStickyPayment'\),/);
+
+  // Dismissing the invoice stops the poll, drops what belonged to the order, and keeps the
+  // reader's note — and an order the desk already paid for is left alone.
+  assert.match(script, /async function discardInvoice\(\) \{\s+if \(!pending \|\| pending\.status === 'paid'\) return;\s+const quotedOrderId = pending\.orderId;/);
+  // Money already in is not discarded with the dialog: if the desk says the order is paid, the
+  // payment is finished instead.
+  assert.match(script, /if \(order\.paid && order\.publishToken\) \{ await pollPayment\(\); return; \}/);
+  assert.match(script, /const \{orderId, sats, status: _status, publishToken, subscribeOrderId, subscribePlan, subscribeSats, \.\.\.draft\} = pending;/);
+  assert.match(script, /savePending\(draft\.action === 'pin' && draft\.content \? draft : null\);/);
+
+  // Bound to the button and to Esc, never to the close the page performs itself when a payment
+  // settles — that close is how a paid note moves on to placing.
+  assert.match(script, /elements\.closePayment\.addEventListener\('click', discardInvoice\);/);
+  assert.match(script, /elements\.paymentDialog\.addEventListener\('cancel', discardInvoice\);/);
+  assert.doesNotMatch(script, /elements\.paymentDialog\.addEventListener\('close'/);
+});
+
 test('a saved bunker connection is offered as the way back in', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   const markup = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');

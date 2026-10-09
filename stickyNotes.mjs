@@ -116,6 +116,7 @@ const elements = {
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
   paymentRails: document.getElementById('stickyPaymentRails'), paymentHint: document.getElementById('stickyPaymentHint'),
   copyPayment: document.getElementById('copyStickyPayment'),
+  closePayment: document.getElementById('closeStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   bunkerReconnect: document.getElementById('bunkerReconnect'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
@@ -1583,6 +1584,9 @@ async function startPayment() {
 
 async function pollPayment() {
   clearTimeout(paymentTimer);
+  // What this run is polling. The reader can dismiss the invoice while a request is in flight,
+  // and the answer to an order that no longer exists must not be reported over what came next.
+  const pollingOrderId = pending?.subscribeOrderId || pending?.orderId || '';
   // A subscription bought on the way to a note or a removal: when it lands, run
   // the original action again — it is covered now, so it settles on creation.
   if (pending?.subscribeOrderId) {
@@ -1614,6 +1618,7 @@ async function pollPayment() {
       else await startPayment();
       return;
     } catch (error) {
+      if ((pending?.subscribeOrderId || '') !== pollingOrderId) return;
       status(elements.paymentStatus, error.message, true);
       paymentTimer = setTimeout(pollPayment, 2500);
       return;
@@ -1640,9 +1645,57 @@ async function pollPayment() {
     if (invoicePending) elements.paymentHint.textContent = 'Preparing invoice...';
     paymentTimer = setTimeout(pollPayment, 3000);
   } catch (error) {
+    if ((pending?.orderId || '') !== pollingOrderId) return;
     status(pending?.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
   }
+}
+
+/**
+ * The X on the invoice means "I do not want this". The order is unpaid and nothing was
+ * published, so the request goes with it instead of being left running behind a closed dialog
+ * — and the note goes back to the reader. The composer behind the dialog is untouched, and a
+ * pin draft is saved as a note with no order, which the boot already knows how to hand back
+ * rather than poll.
+ *
+ * An order the desk has already paid for is not taken back here: the X cannot un-charge it,
+ * and the note it paid for is the reader's.
+ */
+async function discardInvoice() {
+  if (!pending || pending.status === 'paid') return;
+  const quotedOrderId = pending.orderId;
+  if (quotedOrderId) {
+    // The desk may have been paid in the moment before the reader dismissed this invoice: a
+    // wallet app is another app, and the poll has not looked again yet. Money that is already
+    // in must not be thrown away with the dialog, so ask once — and if it is paid, finish the
+    // payment instead of discarding it. No answer is not a reason to keep an invoice the
+    // reader has dismissed.
+    try {
+      const order = await api(`/orders/${encodeURIComponent(quotedOrderId)}`);
+      if (order.paid && order.publishToken) { await pollPayment(); return; }
+    } catch {}
+  }
+  clearTimeout(paymentTimer);
+  paymentTimer = null;
+  // Only what belonged to the order is dropped: the reader's writing stays theirs.
+  const {orderId, sats, status: _status, publishToken, subscribeOrderId, subscribePlan, subscribeSats, ...draft} = pending;
+  savePending(draft.action === 'pin' && draft.content ? draft : null);
+  elements.pay.disabled = false;
+  elements.removeSticky.disabled = false;
+  // Nothing of the discarded invoice is left on the screen to be scanned or copied.
+  elements.paymentAmount.textContent = '';
+  elements.paymentRails.hidden = true;
+  elements.paymentRails.replaceChildren();
+  elements.paymentQr.hidden = true;
+  elements.paymentQr.removeAttribute('src');
+  elements.paymentValue.textContent = '';
+  elements.paymentValue.hidden = true;
+  elements.copyPayment.hidden = true;
+  elements.paymentHint.textContent = '';
+  currentRails = [];
+  currentRailId = '';
+  currentPaymentValue = '';
+  status(elements.paymentStatus, 'Invoice discarded. Nothing was charged.');
 }
 
 function pendingBelongsToSession() {
@@ -2542,6 +2595,12 @@ elements.account.addEventListener('click', () => {
   refreshLoginDialog();
   showDialog(elements.login);
 });
+
+// The X on the invoice, and Esc on it, mean the reader does not want it. Bound here rather
+// than to the dialog's `close` event: the page closes this dialog itself when a payment
+// settles, and those closes must not throw away an order the desk has just been paid for.
+elements.closePayment.addEventListener('click', discardInvoice);
+elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {
