@@ -35,6 +35,8 @@ import {
   stickyLiveliness,
   stickyExpiration,
   isStickyExpired,
+  geohashGridFits,
+  GRID_MIN_CELL_PX,
 } from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
@@ -399,10 +401,50 @@ function drawGeohashGrid() {
   const latEnd = Math.min(Math.ceil(180 / height) - 1, Math.floor((north + 90) / height));
   const lonStart = Math.max(0, Math.floor((west + 180) / width));
   const lonEnd = Math.min(Math.ceil(360 / width) - 1, Math.floor((east + 180) / width));
+  const columns = lonEnd - lonStart + 1;
+  const rows = latEnd - latStart + 1;
   const center = geohashMap.getCenter();
   const firstCorner = geohashMap.project([center.lng, center.lat]);
   const secondCorner = geohashMap.project([center.lng + width, center.lat + height]);
+  const cellPixels = Math.min(
+    Math.abs(secondCorner.x - firstCorner.x),
+    Math.abs(secondCorner.y - firstCorner.y),
+  );
   const showLabels = Math.abs(secondCorner.x - firstCorner.x) >= 42 && Math.abs(secondCorner.y - firstCorner.y) >= 22;
+
+  // A grid of specks is worse than no grid. At a world zoom a four-character cell is a couple of
+  // pixels across, so every cell of it would be built and none of them could be read or tapped,
+  // and there are a sixth of a million of them - which stalls the map for seconds on every zoom.
+  // Four characters is the shortest geohash a board takes, so there is no coarser grid to fall
+  // back on: the grid is left out and the reader is told to come closer. What is drawn even then
+  // is the cells they have already chosen, so their own area stays visible however far out they are.
+  if (!geohashGridFits({cellPixels, columns, rows})) {
+    const chosen = [];
+    for (const cell of geohashMapCells) {
+      const box = geohashBounds(cell);
+      if (!box) continue;
+      chosen.push({
+        type: 'Feature',
+        properties: {geohash: cell, selected: 1, touchable: 0},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [box.west, box.south], [box.east, box.south],
+            [box.east, box.north], [box.west, box.north], [box.west, box.south],
+          ]],
+        },
+      });
+    }
+    source.setData({type: 'FeatureCollection', features: chosen});
+    geohashMap.setLayoutProperty(MAP_LABEL_LAYER, 'visibility', chosen.length ? 'visible' : 'none');
+    elements.geohashMapPrecision.textContent = chosen.length
+      ? `${chosen.length} cell${chosen.length === 1 ? '' : 's'} chosen`
+      : 'Grid hidden';
+    status(elements.geohashMapStatus, cellPixels < GRID_MIN_CELL_PX
+      ? 'Zoom in to pick a cell - at this distance one is smaller than the map can draw, and four characters is the shortest geohash a board takes.'
+      : 'Zoom in a little to pick cells - this view covers more of them than the grid can draw at once.', true);
+    return;
+  }
 
   elements.geohashMapPrecision.textContent = `${precision} character${precision === 1 ? '' : 's'}`;
   const features = [];
@@ -432,6 +474,8 @@ function drawGeohashGrid() {
   }
   source.setData({type: 'FeatureCollection', features});
   geohashMap.setLayoutProperty(MAP_LABEL_LAYER, 'visibility', showLabels ? 'visible' : 'none');
+  // the grid is back, so the instruction to zoom in is no longer true
+  status(elements.geohashMapStatus, '');
 }
 
 function scheduleGeohashGrid() {

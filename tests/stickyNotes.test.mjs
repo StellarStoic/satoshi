@@ -3,7 +3,9 @@ import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, pinColourFor,
-  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice} from '../stickyNotesModel.mjs';
+  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
+  geohashGridFits,
+  GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -383,6 +385,10 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(script, /setTimeout\(resolve, MAP_LAYOUT_POLL_MS\)/);
   // and a map that failed to build is not kept for the next open
   assert.match(script, /Could not build the geohash map/);
+  // A grid of specks is worse than no grid: where a cell cannot be read or tapped it is left out,
+  // and the cells already chosen are still drawn so the reader keeps sight of their own area.
+  assert.match(script, /if \(!geohashGridFits\(\{cellPixels, columns, rows\}\)\)/);
+  assert.match(script, /source\.setData\(\{type: 'FeatureCollection', features: chosen\}\)/);
   assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
   assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
@@ -987,4 +993,19 @@ test('the note is held down by a picture, and an installed board still has its p
   for (const colour of STICKY_PIN_COLOURS) {
     assert.match(worker, new RegExp(`/img/pin_${colour}\\.png'`));
   }
+});
+
+// At a world zoom a four-character cell is a couple of pixels across. Building the whole grid
+// there means a sixth of a million polygons and a map that stalls for seconds on every zoom, and
+// none of the specks could be read or tapped anyway. Four characters is the shortest geohash a
+// board takes, so there is no coarser grid to fall back on: it is simply not drawn.
+test('the cell grid is only drawn where a cell can be read and tapped', () => {
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 40, rows: 12}), true);
+  assert.equal(geohashGridFits({cellPixels: 2, columns: 999, rows: 199}), false, 'the world zoom: specks');
+  assert.equal(geohashGridFits({cellPixels: 16, columns: 40, rows: 12}), false, 'too small to tap');
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 400, rows: 400}), false, 'too many to build');
+  assert.equal(geohashGridFits({cellPixels: GRID_MIN_CELL_PX, columns: 1, rows: 1}), true, 'exactly the floor');
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 0, rows: 0}), false);
+  assert.equal(geohashGridFits({}), false);
+  assert.equal(geohashGridFits(), false);
 });

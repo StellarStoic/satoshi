@@ -434,6 +434,24 @@ export function geohashBounds(value) {
   return {south, west, north, east, center: {lat: (south + north) / 2, lng: (west + east) / 2}};
 }
 
+// A cell smaller than this cannot be read or tapped, and a grid of more cells than this blocks
+// the map while it is built. Four characters is the shortest geohash a board takes, so there is
+// no coarser grid to fall back on at a world zoom: the grid is simply not drawn there.
+export const GRID_MIN_CELL_PX = 24;
+export const GRID_MAX_CELLS = 4000;
+
+/**
+ * Whether the cell grid is worth drawing at this size: every cell big enough to tap, and few
+ * enough that building them does not stall the map. Callers keep drawing whatever is already
+ * chosen when this says no, so a reader never loses sight of their own area.
+ */
+export function geohashGridFits(candidate = {}) {
+  const pixels = Number(candidate.cellPixels) || 0;
+  const cells = (Number(candidate.columns) || 0) * (Number(candidate.rows) || 0);
+  if (!cells) return false;
+  return pixels >= GRID_MIN_CELL_PX && cells <= GRID_MAX_CELLS;
+}
+
 export function geohashPrecisionForZoom(zoom) {
   const level = Math.max(0, Math.min(21, Number(zoom) || 0));
   // Shallow zooms are held at 4 characters: a 3-character cell is 100+ km across,
