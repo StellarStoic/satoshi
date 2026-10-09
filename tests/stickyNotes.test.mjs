@@ -816,18 +816,50 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // constantly, and its announcement arrives *after* the boot's failures.
   assert.match(script, /function notice\(message\) \{/);
   assert.match(script, /elements\.boardStatus\.dataset\.notice = '1';/);
-  assert.match(script, /if \(target === elements\.boardStatus && !error\) delete target\.dataset\.notice;/);
+  assert.match(script, /if \(target === elements\.boardStatus && !error\) \{\s+delete target\.dataset\.notice;\s+noticeText = '';/);
   assert.match(script, /if \(elements\.boardStatus\.dataset\.notice\) return;\s+status\(elements\.boardStatus, 'The Nostr board is temporarily unavailable\.'/);
 
   // A returned signature is used for its own note, and anything else is named rather
   // than dropped — the note is paid for and one tap from being pinned.
   assert.match(script, /if \(amber\?\.action === 'sign' && pending\?\.orderId === amber\.context\?\.orderId\) \{/);
-  assert.match(script, /else if \(amber\?\.action === 'sign'\) \{\s+unusableReturn = 'That signature was for a different note\./);
-  assert.match(script, /unusableReturn = error\.message;/);
+  assert.match(script, /else if \(amber\?\.action === 'sign'\) \{\s+unusable = 'That signature was for a different note\./);
+  assert.match(script, /unusable = error\.message;/);
   assert.match(script, /const parkedRequest = pendingAmberRequest\(\);/);
   assert.match(script, /parkedRequest\.context\?\.orderId === pending\.orderId/);
   assert.match(script, /if \(unusableReturn\) notice\(unusableReturn\);/);
   assert.match(script, /pendingAmberRequest,\n  resumeAmber,/);
+
+  // The answer is read wherever it arrives, not only while booting: a browser that resumes
+  // the running page and merely changes the URL would otherwise lose it — which is a
+  // sign-in that does nothing and a note that will not pin, with no error anywhere.
+  assert.match(script, /window\.addEventListener\('hashchange', \(\) => \{ applySignerReturn\(\)\.catch/);
+  assert.match(script, /window\.addEventListener\('pageshow', event => \{ if \(event\.persisted\) applySignerReturn\(\)\.catch/);
+
+  // A sign-in that lands behaves like any other login: the dialog it came from closes and
+  // the reader's own note returns to the board.
+  assert.match(script, /if \(elements\.login\.open\) elements\.login\.close\(\);/);
+  assert.match(script, /if \(!syncPlacementWithSession\(\)\) openComposer\(\);/);
+  assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
+});
+
+test('an unpinned note is on the board only for the identity pinning it', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The placement refuses to exist without the note's own session...
+  assert.match(script, /function pendingBelongsToSession\(\) \{\s+const session = getNostrSession\(\);\s+if \(!session\) return false;/);
+  assert.match(script, /return !pending\?\.pubkey \|\| session\.pubkey === pending\.pubkey;/);
+  assert.match(script, /if \(!pendingBelongsToSession\(\)\) return;\s+placingNote\?\.remove\(\);/);
+  // ...and a second pass must not hand a detached node to the render's insertion anchor:
+  // the placement note is what renderNote inserts before, so the reference is cleared.
+  assert.match(script, /placingNote\?\.remove\(\);\s+\/\/ The render below inserts before the placement note[\s\S]{0,400}?placingNote = null;/);
+
+  // ...a change of identity withdraws it or brings it back...
+  assert.match(script, /function withdrawPlacement\(\) \{/);
+  assert.match(script, /function syncPlacementWithSession\(\) \{/);
+  assert.match(script, /\/\/ Signing out withdraws the unpinned note; signing in returns it\.\s+syncPlacementWithSession\(\);/);
+
+  // ...and the board's own restore path goes through the same check.
+  assert.match(script, /else syncPlacementWithSession\(\);/);
 });
 
 test('a temporary identity cannot buy a plan, and a refusal is not hidden with its dialog', async () => {

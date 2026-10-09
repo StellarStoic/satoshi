@@ -282,12 +282,19 @@ function updateBoardUrl() {
   history.replaceState(null, '', boardUrl);
 }
 
+// The notice on screen, so a return that resolves it can take it down without also hiding
+// a message that is not that notice (a publish failure is one of those).
+let noticeText = '';
+
 function status(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle('is-error', error);
   // An ordinary message replaces a notice; the board's own announcements go through
   // this same door, which is why the mark is a flag and not a class.
-  if (target === elements.boardStatus && !error) delete target.dataset.notice;
+  if (target === elements.boardStatus && !error) {
+    delete target.dataset.notice;
+    noticeText = '';
+  }
 }
 
 /**
@@ -300,6 +307,7 @@ function notice(message) {
   status(elements.boardStatus, message, true);
   elements.boardStatus.hidden = false;
   elements.boardStatus.dataset.notice = '1';
+  noticeText = message;
 }
 
 function showDialog(dialog) {
@@ -1634,9 +1642,45 @@ async function pollPayment() {
   }
 }
 
+function pendingBelongsToSession() {
+  const session = getNostrSession();
+  if (!session) return false;
+  return !pending?.pubkey || session.pubkey === pending.pubkey;
+}
+
+/** Take the unpinned note off the board, keeping the saved note itself. */
+function withdrawPlacement() {
+  placingNote?.remove();
+  placingNote = null;
+  elements.placementControls.hidden = true;
+  setBinArmed(false);
+  elements.discardBin.hidden = true;
+  if (elements.discardDialog.open) elements.discardDialog.close();
+}
+
+/**
+ * An unpinned note belongs to the identity that was pinning it, and it is not on the board
+ * while that identity is gone: nobody else can publish it, and sitting there it invites the
+ * reader to place something they cannot finish. The saved note stays, so signing back in
+ * brings it straight back.
+ */
+function syncPlacementWithSession() {
+  if (pending?.action === 'pin' && pending?.status === 'paid' && pending?.content && pendingBelongsToSession()) {
+    beginPlacement();
+    return true;
+  }
+  withdrawPlacement();
+  return false;
+}
+
 function beginPlacement() {
   if (pending?.action !== 'pin' || !pending?.content || pending.status !== 'paid') return;
+  if (!pendingBelongsToSession()) return;
   placingNote?.remove();
+  // The render below inserts before the placement note, so a reference to the node just
+  // removed would be a detached anchor and `insertBefore` throws — which is what a second
+  // pass over an existing placement did.
+  placingNote = null;
   const board = elements.board.getBoundingClientRect();
   const placement = pending.placement || {
     x: clampPlacement(((board.width / 2) - boardView.x) / (boardSize.width * boardView.scale)),
@@ -2850,6 +2894,8 @@ document.addEventListener('pointerdown', event => {
 });
 window.addEventListener('satoshi-nostr-session', () => {
   updateAccount();
+  // Signing out withdraws the unpinned note; signing in returns it.
+  syncPlacementWithSession();
   // The identity decides what the buttons mean — an anonymous one can never use a
   // subscription — so a change has to re-ask the desk and re-draw rather than only
   // relabel the account: a stale quote is what offered a plan to a temporary identity.
@@ -2885,33 +2931,71 @@ else {
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
 }
-// A signature is made in another app, so the page leaves and comes back reloaded: what the
-// reader chose has to be found again from the saved note, and a return that cannot be used
-// has to say so — the note is paid for and one tap away from being pinned.
+// A signature is made in another app, so the page leaves and comes back — reloaded, or
+// resumed exactly as it was: a browser that keeps the running page only changes the URL, and
+// then nothing would look at the answer at all. So it is read wherever it arrives.
 let resumedSigning = false;
-let unusableReturn = '';
-try {
-  const amber = resumeAmber();
-  if (amber?.action === 'login') { updateAccount(); openComposer(); }
-  if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
-    resumedSigning = true;
-    if (amber.context.action === 'remove') await publishRemoval(amber.event);
-    else await publishPinnedNote(amber.event);
-  } else if (amber?.action === 'sign') {
-    unusableReturn = 'That signature was for a different note. Your note is still here — pin it again.';
+
+/**
+ * The signer's answer, if the URL carries one. A paid note is one tap from being pinned, so
+ * a signature that cannot be used is named to the reader rather than dropped.
+ */
+async function applySignerReturn() {
+  let applied = false;
+  let unusable = '';
+  try {
+    const amber = resumeAmber();
+    if (amber?.action === 'login') {
+      applied = true;
+      updateAccount();
+      if (elements.login.open) elements.login.close();
+      // The reader's own note comes back with the identity that was pinning it.
+      if (!syncPlacementWithSession()) openComposer();
+    } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
+      applied = true;
+      if (amber.context.action === 'remove') await publishRemoval(amber.event);
+      else await publishPinnedNote(amber.event);
+    } else if (amber?.action === 'sign') {
+      unusable = 'That signature was for a different note. Your note is still here — pin it again.';
+    }
+  } catch (error) {
+    unusable = error.message;
   }
-} catch (error) {
-  unusableReturn = error.message;
+  if (unusable) {
+    notice(unusable);
+    if (!getNostrSession()) status(elements.loginStatus, unusable, true);
+  }
+  // A return that worked retires the notice it answered — a "the signer did not come back"
+  // line under a note that is now pinned reads as a second failure.
+  if (applied && noticeText && elements.boardStatus.textContent === noticeText) {
+    status(elements.boardStatus, '');
+    elements.boardStatus.hidden = true;
+  }
+  return {applied, unusable};
 }
-// The other way a round trip loses its answer: the signer never came back at all, so
-// nothing was thrown and the request is still parked. Same advice, and the note below is
-// what makes it possible to act on.
-if (!resumedSigning && pending?.status === 'paid' && pending?.action === 'pin') {
+
+const signerReturn = await applySignerReturn();
+resumedSigning = signerReturn.applied;
+// The other way a round trip loses its answer: the signer never came back at all, so nothing
+// was thrown and the request is still parked. Same advice, and the note below is what makes
+// it possible to act on.
+let unusableReturn = signerReturn.unusable;
+if (!signerReturn.applied) {
   const parkedRequest = pendingAmberRequest();
-  if (parkedRequest?.action === 'sign' && parkedRequest.context?.orderId === pending.orderId) {
+  if (parkedRequest?.action === 'sign' && pending?.status === 'paid'
+      && parkedRequest.context?.orderId === pending.orderId) {
     unusableReturn = 'The signer did not come back with a signature. Your note is still here — pin it again.';
   }
+  // A sign-in that never landed is reported where the reader will look for it: the dialog
+  // they are about to open and try again.
+  if (parkedRequest?.action === 'login' && Date.now() - parkedRequest.createdAt < 10 * 60 * 1000) {
+    status(elements.loginStatus, 'The signer did not come back. Choose a sign-in option again.', true);
+  }
 }
+// The answer can also arrive with no reload at all: the browser resumes the page it already
+// has and only the URL changes. Nothing else reads that hash, so these are where it is read.
+window.addEventListener('hashchange', () => { applySignerReturn().catch(() => {}); });
+window.addEventListener('pageshow', event => { if (event.persisted) applySignerReturn().catch(() => {}); });
 // A note saved with no status and no order has nothing left to poll: the flow that
 // saved it ended before its order ever existed (a subscription paid after the page
 // reloaded, before the resume knew which board the note was written on). Give the
@@ -2937,6 +3021,6 @@ if (!resumedSigning && (pending?.status === 'waiting' || strandedNote)) {
   pollPayment();
 } else if (!resumedSigning && pending?.status === 'paid') {
   if (pending.action === 'remove') publishRemoval();
-  else beginPlacement();
+  else syncPlacementWithSession();
   if (unusableReturn) notice(unusableReturn);
 }
