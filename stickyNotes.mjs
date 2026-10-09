@@ -2841,7 +2841,14 @@ try {
 } catch (error) {
   status(elements.boardStatus, error.message, true);
 }
-if (!resumedSigning && pending?.status === 'waiting') {
+// A note saved with no status and no order has nothing left to poll: the flow that
+// saved it ended before its order ever existed (a subscription paid after the page
+// reloaded, before the resume knew which board the note was written on). Give the
+// reader their note back so they can pin it again — with an active subscription
+// that costs nothing, and the text is theirs either way.
+const strandedNote = pending?.action === 'pin' && !pending?.status && !pending?.orderId
+  && Boolean(pending?.content);
+if (!resumedSigning && (pending?.status === 'waiting' || strandedNote)) {
   if (pending.action === 'remove') {
     status(elements.boardStatus, 'Checking your note-removal payment...');
     elements.boardStatus.hidden = false;
@@ -2853,7 +2860,8 @@ if (!resumedSigning && pending?.status === 'waiting') {
     elements.editor.textContent = pending.content;
     lastValidEditor = pending.content;
     showDialog(elements.composer);
-    status(elements.paymentStatus, 'Checking your payment...');
+    status(elements.paymentStatus,
+      strandedNote ? 'Your saved note is back — pin it again to publish it.' : 'Checking your payment...');
   }
   pollPayment();
 } else if (!resumedSigning && pending?.status === 'paid') {

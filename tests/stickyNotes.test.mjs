@@ -816,6 +816,10 @@ test('a note paid for by subscription still finishes after the page reloads', as
   assert.match(script, /selectBoard\(rest\.geohashes\.join\(','\)\)/);
   assert.match(script, /const composed = composingGeohashes\.length/);
   assert.match(script, /pending\?\.action === 'pin' && Array\.isArray\(pending\.geohashes\) \? pending\.geohashes : \[\]/);
+  // and a note left with no status and no order is handed back to the reader, not hidden
+  assert.match(script, /const strandedNote = pending\?\.action === 'pin' && !pending\?\.status && !pending\?\.orderId/);
+  assert.match(script, /\(pending\?\.status === 'waiting' \|\| strandedNote\)/);
+  assert.match(script, /Your saved note is back — pin it again to publish it\./);
 });
 
 test('a place can be kept, and the kept place outranks the board you last browsed', async () => {
