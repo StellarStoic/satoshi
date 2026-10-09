@@ -36,7 +36,6 @@ import {
   stickyLiveliness,
   stickyExpiration,
   isStickyExpired,
-  boardExtentForCells,
   geohashGridFits,
   GRID_MIN_CELL_PX,} from './stickyNotesModel.mjs';
 import {
@@ -129,6 +128,7 @@ const elements = {
   zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
+  noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
   removeSticky: document.getElementById('removeSticky'), noteMenuStatus: document.getElementById('noteMenuStatus'),
 };
 
@@ -219,27 +219,22 @@ if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.ha
 }
 if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
-// One cell of the selected area is one portrait block of cork this many board pixels across, so
-// the corkboard is exactly as big as the area it stands on: a single cell is the smallest board
-// there is, two touching cells make it twice as wide (twice as tall if they stand on each
-// other), a full clump of nine is the largest. Notes keep their size, so a note covers the same
-// share of a cell on every board and its place on the cork keeps its meaning.
-const BOARD_CELL_WIDTH = 1000;
-const BOARD_CELL_HEIGHT = 1400;
-// The board's own size, worked out from the selected cells every time a board is opened.
-let boardSize = boardExtentForCells([], BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
+// Every geohash uses the same coordinate space. Geography decides which events are fetched,
+// never how much cork the reader gets or where a normalized note position lands.
+const BOARD_SIZE = 2048;
+const boardSize = Object.freeze({width: BOARD_SIZE, height: BOARD_SIZE});
 let corkSurround = -1;
 let boardTransformFrame = 0;
 let pendingTransformRect = null;
 let boardViewport = null;
 // The wooden rail around the cork, in board pixels. The rail sits outside the board,
 // so it never covers a note.
-const BOARD_FRAME_WIDTH = 52;
+const BOARD_FRAME_WIDTH = 26;
 // Opening a corkboard should feel like standing in front of it, not looking at a thumbnail.
 // Covering the viewport leaves cork beneath every edge while keeping the selected area centred.
 const BOARD_OPEN_COVER = 1.02;
-// Zoom limits. A board of nine cells fitted to a laptop screen lands near a sixth of its own
-// height, so the floor has to sit below that or the first pinch would jump the view inwards.
+// Zoom limits leave room to inspect the whole square when requested without making the first
+// pinch jump inward from the screen-filling opening view.
 const BOARD_ZOOM_MIN = 0.12;
 const BOARD_ZOOM_MAX = 2.5;
 
@@ -1137,7 +1132,6 @@ function selectBoard(geohash, closeDialog = true) {
   }
   activeGeohashes = cells;
   activeGeohash = cells[0];
-  boardSize = boardExtentForCells(cells, BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
   applyBoardSize();
   if (rememberBoard) rememberActiveBoard();
   else forgetActiveBoard();
@@ -1212,8 +1206,7 @@ function scheduleBoardTransform(rect) {
 }
 
 function applyBoardSize() {
-  // The stylesheet carries a one-cell default so the sheet is never zero-sized, but the board's
-  // real size is the area's, so it is written on the element every time a board is opened.
+  // Keep the runtime dimensions tied to the same fixed coordinate space as the first CSS paint.
   elements.canvas.style.width = `${boardSize.width}px`;
   elements.canvas.style.height = `${boardSize.height}px`;
 }
@@ -2024,8 +2017,18 @@ async function publishPinnedNote(resumedEvent = null) {
 
 function closeNoteMenu() {
   elements.noteMenu.hidden = true;
+  elements.noteEventJsonDetails.open = false;
+  elements.noteEventJson.textContent = '';
   selectedNoteId = '';
   status(elements.noteMenuStatus, '');
+}
+
+function keepNoteMenuOnScreen() {
+  if (elements.noteMenu.hidden) return;
+  const rect = elements.noteMenu.getBoundingClientRect();
+  if (rect.bottom > innerHeight - 12) {
+    elements.noteMenu.style.top = `${Math.max(12, innerHeight - rect.height - 12)}px`;
+  }
 }
 
 function openNoteMenu(eventId, pin) {
@@ -2033,6 +2036,8 @@ function openNoteMenu(eventId, pin) {
   if (!record) return;
   selectedNoteId = eventId;
   elements.noteEventId.textContent = eventId;
+  elements.noteEventJsonDetails.open = false;
+  elements.noteEventJson.textContent = JSON.stringify(record.event, null, 2);
   elements.notePostedAt.dateTime = new Date(record.event.created_at * 1000).toISOString();
   elements.notePostedAt.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(record.event.created_at * 1000);
   // The note's own NIP-40 moment: older notes carry none and show no row.
@@ -3065,6 +3070,7 @@ elements.zoomFit.addEventListener('click', fillBoard);
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
 elements.removeSticky.addEventListener('click', startRemovalPayment);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
+elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationFrame(keepNoteMenuOnScreen));
 document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu') && !event.target.closest('.sticky-note__pin')) closeNoteMenu();
 });
@@ -3105,7 +3111,6 @@ elements.canvas.style.setProperty('--cork-frame', `${BOARD_FRAME_WIDTH}px`);
 // The canvas wears its board's size from the first paint. The board the reader arrives on comes
 // from the link, the kept place or the remembered board, and that resolution does not pass
 // through selectBoard, so the size is worked out from what it settled on here as well.
-boardSize = boardExtentForCells(activeGeohashes, BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
 applyBoardSize();
 elements.boardDepth.value = String(boardDepth);
 elements.rememberBoard.checked = rememberBoard;

@@ -6,6 +6,7 @@ const AMBER_PREFIX = 'satoshi:nostr:amber:';
 const AMBER_MAX_AGE = 30 * 60 * 1000;
 const AMBER_RESULT_PARAM = 'nostr_signer_result';
 const AMBER_ID_PARAM = 'nostr_signer_id';
+const AMBER_CALLBACK_PARAM = 'nostr_signer';
 export const ANONYMOUS_SESSION_MS = 24 * 60 * 60 * 1000;
 let privateSecret = null;
 let bunkerSigner = null;
@@ -107,10 +108,10 @@ function randomId() {
 }
 
 function amberCallback(id) {
-  // Amber decodes the complete signer URI before splitting its parameters on `?` and `&`.
-  // A fragment contains neither delimiter, survives intact, and resumes an installed PWA
-  // without requiring a second page load. Amber appends its URL-encoded result after the dot.
-  return `${location.origin}${location.pathname}#nostr_signer=${id}.`;
+  // NIP-55 web callbacks are prefixes: the signer appends its answer to the URL. Keep the
+  // request id and empty result in one final query value, exactly like the NIP's `?event=`
+  // example. A dot separates our correlation id from Amber's appended pubkey/signature.
+  return `${location.origin}${location.pathname}?${AMBER_CALLBACK_PARAM}=${id}.`;
 }
 
 function openAmber(type, payload, id, options = {}) {
@@ -156,8 +157,12 @@ export function pendingAmberRequest() {
 export function resumeAmber() {
   const params = new URLSearchParams(location.search);
   const fragment = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
-  let id = fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
-  let result = fragment?.[2] ?? params.get(AMBER_RESULT_PARAM) ?? '';
+  const callback = params.get(AMBER_CALLBACK_PARAM) || '';
+  const separator = callback.indexOf('.');
+  const callbackId = separator > 0 ? callback.slice(0, separator) : '';
+  const callbackResult = separator > 0 ? callback.slice(separator + 1) : '';
+  let id = callbackId || fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
+  let result = callbackResult || fragment?.[2] || params.get(AMBER_RESULT_PARAM) || '';
 
   // Recover callbacks issued by the previous build. Amber truncated that callback at its
   // embedded `&`, then appended the result directly to the id value.
@@ -174,8 +179,11 @@ export function resumeAmber() {
     }
   }
   if (!id || !result) return null;
-  // The query is dropped with the fragment: the answer must not be read twice.
-  history.replaceState(null, '', location.pathname);
+  // Remove only signer answers: an unrelated page query must survive the round trip.
+  params.delete(AMBER_CALLBACK_PARAM);
+  params.delete(AMBER_ID_PARAM);
+  params.delete(AMBER_RESULT_PARAM);
+  history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
   const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
   localStorage.removeItem(key);

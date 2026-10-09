@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFile} from 'node:fs/promises';
 
 function memoryStorage() {
   const values = new Map();
@@ -13,6 +14,12 @@ function memoryStorage() {
     key: index => [...values.keys()][index] ?? null,
   };
 }
+
+test('the installed PWA accepts signer callbacks in its existing window', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../site.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(manifest.scope, '/');
+  assert.equal(manifest.launch_handler?.client_mode, 'navigate-existing');
+});
 
 test('anonymous Nostr identity is local, temporary, and restores the previous session', async () => {
   const storage = memoryStorage();
@@ -150,7 +157,7 @@ test('a signer answer is read from the query as well as the fragment', async () 
   assert.deepEqual(replaced, ['/stickyNotes.html'], 'the answer is taken out of the URL rather than read twice');
 });
 
-test('Amber receives a delimiter-safe callback fragment and the round trip logs in', async () => {
+test('Amber receives a standard NIP-55 query callback and the round trip logs in', async () => {
   const storage = memoryStorage();
   const assigned = [];
   globalThis.localStorage = storage;
@@ -168,11 +175,12 @@ test('Amber receives a delimiter-safe callback fragment and the round trip logs 
   assert.equal(assigned.length, 1);
   const signerUrl = new URL(assigned[0]);
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i, 'the callback has no query delimiters for Amber to split');
-  assert.equal(new URL(callback).search, '');
+  assert.match(callback, /\?nostr_signer=[a-z0-9-]+\.$/i,
+    'the callback follows NIP-55: Amber appends its result to one query value');
+  assert.equal(new URL(callback).hash, '');
 
   const returned = new URL(callback + 'd'.repeat(64));
-  globalThis.location.hash = returned.hash;
+  globalThis.location.search = returned.search;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer?.action, 'login');
   assert.equal(answer.session.pubkey, 'd'.repeat(64));
@@ -211,9 +219,9 @@ test('Amber pinning returns a compact signature and rebuilds the verified event 
   const signerUrl = new URL(assigned[0]);
   assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i);
+  assert.match(callback, /\?nostr_signer=[a-z0-9-]+\.$/i);
 
-  globalThis.location.hash = new URL(callback + signature).hash;
+  globalThis.location.search = new URL(callback + signature).search;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer.action, 'sign');
   assert.deepEqual(answer.context, {action: 'pin', orderId: 'order-21'});
