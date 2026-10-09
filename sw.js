@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v210';   // v210: pins are the artwork's pins, shadow complete
+const CACHE = 'satoshi-static-v211';   // v211: pins are the artwork's pins, and the shadow is a real shadow
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
