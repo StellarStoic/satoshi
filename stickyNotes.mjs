@@ -1456,7 +1456,14 @@ async function startPayment() {
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
     if (composingPubkey && composingPubkey !== session.pubkey) throw new Error('Your active Nostr identity changed. Reopen the note and try again.');
-    if (!activeGeohash || composingGeohashes.join(',') !== activeGeohashes.join(',')) {
+    // The cells the note was written on: in memory while the composer is open, or
+    // read back from the saved note when the page has reloaded since — a
+    // subscription paid from a wallet app reloads the page under the reader's feet,
+    // and refusing then would strand a note they have already paid for.
+    const composed = composingGeohashes.length
+      ? composingGeohashes
+      : (pending?.action === 'pin' && Array.isArray(pending.geohashes) ? pending.geohashes : []);
+    if (!activeGeohash || composed.join(',') !== activeGeohashes.join(',')) {
       throw new Error('Choose the geohash corkboard again, then reopen the note.');
     }
     await ensureReadySigner();
@@ -1532,6 +1539,16 @@ async function pollPayment() {
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       const {subscribeOrderId, subscribePlan: plan, subscribeSats, status: _s, ...rest} = pending;
       savePending(rest);
+      // The page may have reloaded while the subscription was being paid: a wallet
+      // app is another app and a phone reclaims the tab while the reader is in it.
+      // The note remembers the board it was written on, so put that board back
+      // before finishing. Without this a fresh page has composingGeohashes empty,
+      // startPayment() refuses a note the reader has already paid for, and the
+      // message is lost with the dialog that closed behind it.
+      if (rest.action === 'pin' && Array.isArray(rest.geohashes) && rest.geohashes.length) {
+        composingGeohashes = [...rest.geohashes];
+        if (rest.geohashes.join(',') !== activeGeohashes.join(',')) selectBoard(rest.geohashes.join(','));
+      }
       const sats = stickyOrderPrice(rest, 0);
       status(elements.boardStatus, `Subscription active${plan ? ` (${plan})` : ''}. Finishing what you started...`);
       elements.boardStatus.hidden = false;

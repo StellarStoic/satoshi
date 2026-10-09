@@ -803,6 +803,21 @@ test('the five "around me" sizes really are a building, a neighbourhood, a city,
   for (const precision of [8, 7, 5, 4, 3]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
 });
 
+test('a note paid for by subscription still finishes after the page reloads', async () => {
+  // A wallet app is another app: the phone reclaims the tab and the page comes back
+  // with nothing in memory. The note itself names the board it was written on, so the
+  // resume has to put that board back rather than ask again, and the composer guard has
+  // to read the note when memory is empty. Without both, a note the reader has already
+  // paid for is stranded and the message dies with the dialog that closed behind it.
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /const \{subscribeOrderId, subscribePlan: plan, subscribeSats, status: _s, \.\.\.rest\} = pending;/);
+  assert.match(script, /if \(rest\.action === 'pin' && Array\.isArray\(rest\.geohashes\) && rest\.geohashes\.length\)/);
+  assert.match(script, /composingGeohashes = \[\.\.\.rest\.geohashes\];/);
+  assert.match(script, /selectBoard\(rest\.geohashes\.join\(','\)\)/);
+  assert.match(script, /const composed = composingGeohashes\.length/);
+  assert.match(script, /pending\?\.action === 'pin' && Array\.isArray\(pending\.geohashes\) \? pending\.geohashes : \[\]/);
+});
+
 test('a place can be kept, and the kept place outranks the board you last browsed', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
