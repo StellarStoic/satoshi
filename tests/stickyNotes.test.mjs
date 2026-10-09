@@ -6,7 +6,8 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
   boardExtentForCells,
   geohashCellDimensions,
-} from '../stickyNotesModel.mjs';
+  geohashGridFits,
+  GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -386,6 +387,10 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(script, /setTimeout\(resolve, MAP_LAYOUT_POLL_MS\)/);
   // and a map that failed to build is not kept for the next open
   assert.match(script, /Could not build the geohash map/);
+  // A grid of specks is worse than no grid: where a cell cannot be read or tapped it is left out,
+  // and the cells already chosen are still drawn so the reader keeps sight of their own area.
+  assert.match(script, /if \(!geohashGridFits\(\{cellPixels, columns, rows\}\)\)/);
+  assert.match(script, /source\.setData\(\{type: 'FeatureCollection', features: chosen\}\)/);
   // The sheet is the area's size, not a fixed 2600x1800: one cell is the smallest board and
   // more cells make a bigger one, so no board may be sized from a constant.
   assert.doesNotMatch(script, /CANVAS_WIDTH|CANVAS_HEIGHT/);
@@ -1047,4 +1052,19 @@ test('the corkboard grows with the selected area, one cell at a time', () => {
   assert.deepEqual(boardExtentForCells([], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
   assert.deepEqual(boardExtentForCells(null, 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
   assert.deepEqual(boardExtentForCells(['zz'], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
+});
+
+// At a world zoom a four-character cell is a couple of pixels across. Building the whole grid
+// there means a sixth of a million polygons and a map that stalls for seconds on every zoom, and
+// none of the specks could be read or tapped anyway. Four characters is the shortest geohash a
+// board takes, so there is no coarser grid to fall back on: it is simply not drawn.
+test('the cell grid is only drawn where a cell can be read and tapped', () => {
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 40, rows: 12}), true);
+  assert.equal(geohashGridFits({cellPixels: 2, columns: 999, rows: 199}), false, 'the world zoom: specks');
+  assert.equal(geohashGridFits({cellPixels: 16, columns: 40, rows: 12}), false, 'too small to tap');
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 400, rows: 400}), false, 'too many to build');
+  assert.equal(geohashGridFits({cellPixels: GRID_MIN_CELL_PX, columns: 1, rows: 1}), true, 'exactly the floor');
+  assert.equal(geohashGridFits({cellPixels: 32, columns: 0, rows: 0}), false);
+  assert.equal(geohashGridFits({}), false);
+  assert.equal(geohashGridFits(), false);
 });

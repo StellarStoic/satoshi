@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v213';   // v213: the corkboard is as big as the selected area
+const CACHE = 'satoshi-static-v214';   // v214: the geohash grid is only drawn where a cell can be read
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
