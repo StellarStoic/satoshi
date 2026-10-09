@@ -448,16 +448,17 @@ export function geohashCellDimensions(precision) {
 
 /**
  * A board is exactly as big as the area it stands on: one cell of the selected grid is one
- * square block of cork, so a single cell is the smallest board there is, two touching cells
+ * block of cork, so a single cell is the smallest board there is, two touching cells
  * make it twice as wide (twice as tall if they stand on each other), and a full clump of nine
  * is the largest. The count of cells decides it, not metres: the same shape of area is the
  * same board whether the cells are buildings or states, which is what keeps a note covering
  * the same share of a cell on every board, so its place on the cork still means something when
  * a reader comes back with a different area selected.
  */
-export function boardExtentForCells(cells, cellPixels = 1) {
-  const side = Math.max(1, Number(cellPixels) || 1);
-  const smallest = {columns: 1, rows: 1, width: side, height: side};
+export function boardExtentForCells(cells, cellWidth = 1, cellHeight = cellWidth) {
+  const widthPixels = Math.max(1, Number(cellWidth) || 1);
+  const heightPixels = Math.max(1, Number(cellHeight) || widthPixels);
+  const smallest = {columns: 1, rows: 1, width: widthPixels, height: heightPixels};
   // A board's cells arrive as an array from the picker, but a Set from a link or from storage, so
   // anything iterable is walked - a string is one cell, not a list of characters.
   const source = cells && typeof cells !== 'string' && typeof cells[Symbol.iterator] === 'function'
@@ -487,7 +488,7 @@ export function boardExtentForCells(cells, cellPixels = 1) {
   if (!Number.isFinite(minColumn) || !Number.isFinite(minRow)) return smallest;
   const columns = maxColumn - minColumn + 1;
   const rows = maxRow - minRow + 1;
-  return {columns, rows, width: columns * side, height: rows * side};
+  return {columns, rows, width: columns * widthPixels, height: rows * heightPixels};
 }
 
 // A cell smaller than this cannot be read or tapped, and a grid of more cells than this blocks

@@ -10,24 +10,24 @@
 .sticky-page .site-help-trigger.site-help-trigger--wide-offset { right: max(156px, calc(140px + env(safe-area-inset-right))) !important; }
 .icon-text-button, .primary-action, .secondary-action, .pay-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border: 1px solid #555; border-radius: 6px; padding: 9px 14px; color: #f6f5ef; background: #202223; font: inherit; cursor: pointer; }
 .primary-action, .pay-button { border-color: var(--accent, #f2a900); background: var(--accent, #f2a900); color: #111; font-weight: 700; }
-.sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background-color: #b98b63; background-image: url('/img/cork-board.png'); background-repeat: repeat; background-size: 600px 600px; box-shadow: inset 0 0 90px rgba(39, 19, 6, .46); cursor: grab; touch-action: none; }
+.sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background:#2b1a0d; box-shadow: inset 0 0 64px rgba(18,9,2,.42); cursor: grab; touch-action: none; }
 .sticky-board.is-panning { cursor: grabbing; }
 /* The sheet's real size is the area's and is written on the element by applyBoardSize() in
-   stickyNotes.mjs; this is only the one-cell default for the first paint, before a board is
-   opened, and it must agree with BOARD_CELL_PX there. */
-.sticky-canvas { position: absolute; top: 0; left: 0; width: 1200px; height: 1200px; transform-origin: 0 0; will-change: transform; }
-/* A wooden rail around the cork, sitting outside the 2600x1800 board so no note is
-   ever covered by it. It lives inside the transformed canvas, so it pans and zooms
+   stickyNotes.mjs; this is only the portrait-cell default for the first paint, before a board
+   is opened, and it must agree with BOARD_CELL_WIDTH / BOARD_CELL_HEIGHT there. */
+.sticky-canvas { position: absolute; top: 0; left: 0; width: 1000px; height: 1400px; transform-origin: 0 0; background-color:#b98b63; background-image:url('/img/cork-board.png'); background-repeat:repeat; background-size:600px 600px; will-change: transform; backface-visibility:hidden; }
+/* A wooden rail around the cork, sitting outside the board so no note is ever
+   covered by it. It lives inside the transformed canvas, so it pans and zooms
    with the board; --cork-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so
    the rail and the fitting maths cannot drift apart. */
 /* The band just outside the rail: without it the board's cork tiling runs on past
    the frame and the rail reads as a line drawn on a cork wall rather than as the
    board's own edge. Fades into the page, so a zoomed-out view is still the board. */
-.cork-frame { position: absolute; inset: calc(var(--cork-frame, 90px) * -1); pointer-events: none; box-shadow: 0 0 0 var(--cork-surround, 420px) #2b1a0d, 0 0 140px calc(var(--cork-surround, 420px) + 120px) rgba(12, 6, 1, .55); }
-.cork-frame::after { content: ''; position: absolute; inset: var(--cork-frame, 90px); box-shadow: inset 0 0 22px rgba(28, 14, 4, .5), inset 0 0 4px rgba(28, 14, 4, .45); }
-.cork-frame__rail { position: absolute; background-color: #86593a; box-shadow: 0 8px 22px rgba(18, 9, 2, .4); }
-.cork-frame__rail--top, .cork-frame__rail--bottom { left: 0; right: 0; height: var(--cork-frame, 90px); background-image: repeating-linear-gradient(180deg, rgba(92,57,28,.16) 0 1px, rgba(92,57,28,0) 1px 7px, rgba(255,238,208,.07) 7px 9px, rgba(92,57,28,0) 9px 34px), repeating-linear-gradient(180deg, rgba(60,34,14,.1) 0 3px, rgba(60,34,14,0) 3px 61px), linear-gradient(180deg, #b0824f 0%, #95663c 28%, #7d5330 64%, #654226 100%); }
-.cork-frame__rail--left, .cork-frame__rail--right { top: 0; bottom: 0; width: var(--cork-frame, 90px); background-image: repeating-linear-gradient(90deg, rgba(92,57,28,.16) 0 1px, rgba(92,57,28,0) 1px 7px, rgba(255,238,208,.07) 7px 9px, rgba(92,57,28,0) 9px 34px), repeating-linear-gradient(90deg, rgba(60,34,14,.1) 0 3px, rgba(60,34,14,0) 3px 61px), linear-gradient(90deg, #b0824f 0%, #95663c 28%, #7d5330 64%, #654226 100%); }
+.cork-frame { position: absolute; inset: calc(var(--cork-frame, 52px) * -1); pointer-events: none; box-shadow: 0 0 0 var(--cork-surround, 420px) #2b1a0d, 0 0 48px calc(var(--cork-surround, 420px) + 36px) rgba(12,6,1,.45); }
+.cork-frame::after { content: ''; position: absolute; inset: var(--cork-frame, 52px); box-shadow: inset 0 0 14px rgba(28,14,4,.46), inset 0 0 3px rgba(28,14,4,.4); }
+.cork-frame__rail { position: absolute; background-color: #86593a; box-shadow: 0 5px 12px rgba(18,9,2,.34); }
+.cork-frame__rail--top, .cork-frame__rail--bottom { left: 0; right: 0; height: var(--cork-frame, 52px); background-image: repeating-linear-gradient(180deg, rgba(92,57,28,.16) 0 1px, rgba(92,57,28,0) 1px 7px, rgba(255,238,208,.07) 7px 9px, rgba(92,57,28,0) 9px 28px), linear-gradient(180deg, #b0824f 0%, #95663c 30%, #7d5330 66%, #654226 100%); }
+.cork-frame__rail--left, .cork-frame__rail--right { top: 0; bottom: 0; width: var(--cork-frame, 52px); background-image: repeating-linear-gradient(90deg, rgba(92,57,28,.16) 0 1px, rgba(92,57,28,0) 1px 7px, rgba(255,238,208,.07) 7px 9px, rgba(92,57,28,0) 9px 28px), linear-gradient(90deg, #b0824f 0%, #95663c 30%, #7d5330 66%, #654226 100%); }
 .cork-frame__rail--top { top: 0; }
 .cork-frame__rail--bottom { bottom: 0; }
 .cork-frame__rail--left { left: 0; }

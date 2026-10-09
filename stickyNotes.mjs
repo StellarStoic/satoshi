@@ -209,18 +209,20 @@ if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.ha
 }
 if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
-// One cell of the selected area is one square block of cork this many board pixels across, so
+// One cell of the selected area is one portrait block of cork this many board pixels across, so
 // the corkboard is exactly as big as the area it stands on: a single cell is the smallest board
 // there is, two touching cells make it twice as wide (twice as tall if they stand on each
 // other), a full clump of nine is the largest. Notes keep their size, so a note covers the same
 // share of a cell on every board and its place on the cork keeps its meaning.
-const BOARD_CELL_PX = 1200;
+const BOARD_CELL_WIDTH = 1000;
+const BOARD_CELL_HEIGHT = 1400;
 // The board's own size, worked out from the selected cells every time a board is opened.
-let boardSize = boardExtentForCells([], BOARD_CELL_PX);
+let boardSize = boardExtentForCells([], BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
+let corkSurround = -1;
 // The wooden rail around the cork, in board pixels. The rail sits outside the board,
 // so it never covers a note; the board is fitted with the rail included, otherwise
 // the frame would be cropped off at Fit board.
-const BOARD_FRAME_WIDTH = 90;
+const BOARD_FRAME_WIDTH = 52;
 // Fitting leaves a little daylight so the rail reads as a border rather than sitting
 // flush on the window edge, which is how it went missing on a phone.
 const BOARD_FIT_MARGIN = 0.94;
@@ -1099,7 +1101,7 @@ function selectBoard(geohash, closeDialog = true) {
   }
   activeGeohashes = cells;
   activeGeohash = cells[0];
-  boardSize = boardExtentForCells(cells, BOARD_CELL_PX);
+  boardSize = boardExtentForCells(cells, BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
   applyBoardSize();
   if (rememberBoard) rememberActiveBoard();
   else forgetActiveBoard();
@@ -1122,8 +1124,7 @@ function selectBoard(geohash, closeDialog = true) {
   connectBoard(boardConnectionVersion);
 }
 
-function clampViewToBoard() {
-  const rect = elements.board.getBoundingClientRect();
+function clampViewToBoard(rect) {
   const clamped = clampBoardView(boardView, {width: rect.width, height: rect.height}, {
     canvasWidth: boardSize.width, canvasHeight: boardSize.height, frame: BOARD_FRAME_WIDTH,
   });
@@ -1131,23 +1132,24 @@ function clampViewToBoard() {
   boardView.y = clamped.y;
 }
 
-function applyBoardTransform() {
+function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
   // Every pan, zoom and fit passes through here, so this is the one place that has to hold
   // the line: the rail is the board's edge, and the board does not continue past it.
-  clampViewToBoard();
+  clampViewToBoard(rect);
   elements.canvas.style.transform = `translate(${boardView.x}px, ${boardView.y}px) scale(${boardView.scale})`;
   // How far the frame has to reach outside the board to cover the window: a fixed
   // band would leave bare cork showing past it at a zoomed-out view, so it is
   // worked out here, in board pixels, every time the board moves.
-  const rect = elements.board.getBoundingClientRect();
   const room = Math.max(
     (rect.width - boardSize.width * boardView.scale) / 2,
     (rect.height - boardSize.height * boardView.scale) / 2,
     240 * boardView.scale,
   ) / boardView.scale;
-  elements.canvas.style.setProperty('--cork-surround', `${Math.ceil(room)}px`);
-  elements.board.style.backgroundSize = `${600 * boardView.scale}px ${600 * boardView.scale}px`;
-  elements.board.style.backgroundPosition = `${boardView.x}px ${boardView.y}px`;
+  const nextSurround = Math.ceil(room);
+  if (nextSurround !== corkSurround) {
+    corkSurround = nextSurround;
+    elements.canvas.style.setProperty('--cork-surround', `${nextSurround}px`);
+  }
 }
 
 function applyBoardSize() {
@@ -1169,7 +1171,7 @@ function fitBoard() {
   );
   boardView.x = (rect.width - boardSize.width * boardView.scale) / 2;
   boardView.y = (rect.height - boardSize.height * boardView.scale) / 2;
-  applyBoardTransform();
+  applyBoardTransform(rect);
 }
 
 function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2) {
@@ -1181,7 +1183,7 @@ function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2)
   boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, nextScale));
   boardView.x = pointX - worldX * boardView.scale;
   boardView.y = pointY - worldY * boardView.scale;
-  applyBoardTransform();
+  applyBoardTransform(rect);
 }
 
 function renderNote(sticky, event = null, temporary = false) {
@@ -2102,9 +2104,10 @@ function installBoardNavigation() {
   elements.board.addEventListener('pointermove', event => {
     if (!pointers.has(event.pointerId) || !gesture) return;
     pointers.set(event.pointerId, point(event));
+    let rect;
     if (pointers.size >= 2 && gesture.pinch) {
       const center = midpoint();
-      const rect = elements.board.getBoundingClientRect();
+      rect = elements.board.getBoundingClientRect();
       boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, gesture.scale * distance() / gesture.distance));
       boardView.x = center.x - rect.left - gesture.worldX * boardView.scale;
       boardView.y = center.y - rect.top - gesture.worldY * boardView.scale;
@@ -2112,7 +2115,7 @@ function installBoardNavigation() {
       boardView.x = gesture.boardX + event.clientX - gesture.x;
       boardView.y = gesture.boardY + event.clientY - gesture.y;
     }
-    applyBoardTransform();
+    applyBoardTransform(rect);
     // At an edge the board stops while the finger keeps going. Re-anchor every frame so
     // dragging back responds at once, instead of first retracing travel that was refused.
     if (!gesture.pinch && gesture.id === event.pointerId) {
@@ -2997,7 +3000,7 @@ elements.canvas.style.setProperty('--cork-frame', `${BOARD_FRAME_WIDTH}px`);
 // The canvas wears its board's size from the first paint. The board the reader arrives on comes
 // from the link, the kept place or the remembered board, and that resolution does not pass
 // through selectBoard, so the size is worked out from what it settled on here as well.
-boardSize = boardExtentForCells(activeGeohashes, BOARD_CELL_PX);
+boardSize = boardExtentForCells(activeGeohashes, BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT);
 applyBoardSize();
 elements.boardDepth.value = String(boardDepth);
 elements.rememberBoard.checked = rememberBoard;

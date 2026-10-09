@@ -329,8 +329,10 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   assert.match(css, /url\('\/img\/cork-board\.png'\)/);
   assert.match(css, /background-repeat:\s*repeat/);
-  assert.match(script, /backgroundSize = `\$\{600 \* boardView\.scale\}px/);
-  assert.match(script, /backgroundPosition = `\$\{boardView\.x\}px \$\{boardView\.y\}px`/);
+  assert.match(css, /\.sticky-canvas[^}]+background-image:url\('\/img\/cork-board\.png'\)/,
+    'the cork texture moves with the composited canvas');
+  assert.doesNotMatch(script, /backgroundSize = `\$\{600 \* boardView\.scale\}px/);
+  assert.doesNotMatch(script, /backgroundPosition = `\$\{boardView\.x\}px \$\{boardView\.y\}px`/);
 });
 
 test('payment sheet opens during invoice creation and pinned state stays complete', async () => {
@@ -402,7 +404,7 @@ test('board chrome stays compact over the corkboard', async () => {
   // The sheet is the area's size, not a fixed 2600x1800: one cell is the smallest board and
   // more cells make a bigger one, so no board may be sized from a constant.
   assert.doesNotMatch(script, /CANVAS_WIDTH|CANVAS_HEIGHT/);
-  assert.match(script, /boardSize = boardExtentForCells\(cells, BOARD_CELL_PX\)/);
+  assert.match(script, /boardSize = boardExtentForCells\(cells, BOARD_CELL_WIDTH, BOARD_CELL_HEIGHT\)/);
   assert.match(script, /canvasWidth: boardSize\.width, canvasHeight: boardSize\.height/);
   assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
@@ -565,10 +567,10 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(css, /\.cork-frame \{[^}]*pointer-events: none/,
     'the frame does not take pointer events');
   // The rail extends outward from the board, so no note is ever covered by it.
-  assert.match(css, /\.cork-frame \{ position: absolute; inset: calc\(var\(--cork-frame, 90px\) \* -1\)/,
+  assert.match(css, /\.cork-frame \{ position: absolute; inset: calc\(var\(--cork-frame, 52px\) \* -1\)/,
     'the frame is drawn outside the cork');
   assert.match(css, /repeating-linear-gradient/, 'the wood is drawn from gradients, with no image to fetch');
-  assert.match(css, /var\(--cork-frame, 90px\)/, 'the rail thickness comes from one variable');
+  assert.match(css, /var\(--cork-frame, 52px\)/, 'the rail thickness comes from one variable');
   assert.match(css, /box-shadow: 0 0 0 var\(--cork-surround, 420px\)/, 'a solid band sits outside the rail');
   assert.match(page, /setProperty\('--cork-surround'/, 'the band is sized from the window, in board pixels');
 
@@ -582,7 +584,7 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(page, /BOARD_FIT_MARGIN \* Math\.min\(\s*\n?\s*rect\.width \/ \(boardSize\.width \+ frame\),\s*\n?\s*rect\.height \/ \(boardSize\.height \+ frame\),\s*\n?\s*\)/,
     'Fit board fits the rail as well as the cork, with margin left around it');
   // The rail is also the limit: nothing may be panned into the cork that lies past it.
-  assert.match(page, /clampViewToBoard\(\)/, 'the transform holds the line');
+  assert.match(page, /clampViewToBoard\(rect\)/, 'the transform holds the line');
   assert.match(page, /frame: BOARD_FRAME_WIDTH,/);
 });
 
@@ -1032,15 +1034,19 @@ test('the rail is the board\u2019s limit, so the view cannot leave the framed sh
 
 test('every pan, zoom and fit goes through the limit, and fitting leaves daylight', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
-  const transform = script.slice(script.indexOf('function applyBoardTransform()'), script.indexOf('function fitBoard()'));
-  assert.match(transform, /clampViewToBoard\(\)/, 'the transform clamps before it draws');
-  assert.ok(transform.indexOf('clampViewToBoard()') < transform.indexOf('elements.canvas.style.transform'),
+  const transform = script.slice(script.indexOf('function applyBoardTransform('), script.indexOf('function fitBoard()'));
+  assert.match(transform, /clampViewToBoard\(rect\)/, 'the transform clamps before it draws');
+  assert.ok(transform.indexOf('clampViewToBoard(rect)') < transform.indexOf('elements.canvas.style.transform'),
     'the clamp happens before the transform is written, not after');
   assert.match(script, /const BOARD_FIT_MARGIN = 0\.94;/);
   assert.match(script, /boardView\.scale = BOARD_FIT_MARGIN \* Math\.min\(/);
   // the pan gesture re-anchors at the edge, or dragging back feels stuck
   assert.match(script, /gesture\.boardX = boardView\.x;\n      gesture\.boardY = boardView\.y;/);
   assert.match(script, /clampBoardView\(boardView, \{width: rect\.width, height: rect\.height\}, \{\n    canvasWidth: boardSize.width, canvasHeight: boardSize.height, frame: BOARD_FRAME_WIDTH,/);
+  assert.doesNotMatch(transform, /elements\.board\.style\.background(Size|Position)/,
+    'panning transforms the textured canvas instead of repainting the board background');
+  assert.equal((transform.match(/getBoundingClientRect/g) || []).length, 1,
+    'one geometry read happens before the transform; there is no forced read after the write');
 });
 
 test('opening a board keeps the wooden rail, instead of deleting it with the canvas', async () => {
@@ -1199,6 +1205,9 @@ test('the corkboard grows with the selected area, one cell at a time', () => {
   assert.deepEqual(boardExtentForCells([], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
   assert.deepEqual(boardExtentForCells(null, 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
   assert.deepEqual(boardExtentForCells(['zz'], 1200), {columns: 1, rows: 1, width: 1200, height: 1200});
+
+  const portrait = boardExtentForCells([home], 1000, 1400);
+  assert.deepEqual(portrait, {columns: 1, rows: 1, width: 1000, height: 1400});
 });
 
 // At a world zoom a four-character cell is a couple of pixels across. Building the whole grid
