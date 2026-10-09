@@ -32,24 +32,39 @@ export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', '
 // it survives a reload, and every reader of a board sees the same pins. Nothing about the
 // colour travels in the note itself.
 export const STICKY_PIN_COLOURS = Object.freeze(['red', 'blue', 'yellow', 'green', 'white', 'purple', 'magenta', 'black']);
+export const STICKY_PIN_LEFT_MIN = 27;
+export const STICKY_PIN_LEFT_MAX = 73;
 
 const NOTE_ID_PATTERN = /^[0-9a-f]{64}$/i;
 
-export function pinColourFor(seed) {
+function pinSeedValue(seed, idSlice = -8) {
   const text = String(seed ?? '');
+  if (NOTE_ID_PATTERN.test(text)) {
+    const word = idSlice === -8 ? text.slice(-8) : text.slice(idSlice, idSlice + 8);
+    return parseInt(word, 16);
+  }
+  let value = 2166136261;                  // FNV-1a
+  for (let index = 0; index < text.length; index += 1) {
+    value = Math.imul(value ^ text.charCodeAt(index), 16777619) >>> 0;
+  }
+  return value;
+}
+
+export function pinColourFor(seed) {
   // A note's id is already a sha256, and its bytes are uniform, so they are used directly:
   // hashing a hash again only mixes it worse, and three ordinary notes were seen landing on
   // one colour that way. Anything else (the fallback seed) is hashed first.
-  let value;
-  if (NOTE_ID_PATTERN.test(text)) {
-    value = parseInt(text.slice(-8), 16);
-  } else {
-    value = 2166136261;                  // FNV-1a
-    for (let index = 0; index < text.length; index += 1) {
-      value = Math.imul(value ^ text.charCodeAt(index), 16777619) >>> 0;
-    }
-  }
+  const value = pinSeedValue(seed);
   return STICKY_PIN_COLOURS[value % STICKY_PIN_COLOURS.length];
+}
+
+/** A stable, random-looking horizontal pin position that stays clear of both paper edges. */
+export function pinLeftFor(seed) {
+  // Use a different event-id word from the colour, so a pin's colour and position do not move
+  // in lockstep. Salt fallback seeds for the same reason.
+  const text = NOTE_ID_PATTERN.test(String(seed ?? '')) ? seed : `pin-position:${String(seed ?? '')}`;
+  const value = pinSeedValue(text, -16);
+  return STICKY_PIN_LEFT_MIN + (value % (STICKY_PIN_LEFT_MAX - STICKY_PIN_LEFT_MIN + 1));
 }
 
 export const STICKY_FONTS = Object.freeze([

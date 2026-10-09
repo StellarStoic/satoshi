@@ -15,6 +15,7 @@ import {
   geohashNeighbours,
   clampBoardView,
   pinColourFor,
+  pinLeftFor,
   geohashSetIssue,
   geohashTouches,
   GEOHASH_MAX_CELLS,
@@ -1265,11 +1266,13 @@ function renderNote(sticky, event = null, temporary = false) {
     // A picture holds the note down. The colour comes from the note's own event id, so it is
     // random between notes and identical every time this note is drawn; the button keeps the
     // note menu reachable, exactly as the painted dot did.
+    const pinSeed = sticky.id || `${sticky.pubkey}:${sticky.createdAt}`;
+    pin.style.setProperty('--pin-left', `${pinLeftFor(pinSeed)}%`);
     const pinArt = document.createElement('img');
     pinArt.className = 'sticky-note__pin-art';
     pinArt.alt = '';
     pinArt.decoding = 'async';
-    pinArt.src = `/img/pin_${pinColourFor(sticky.id || `${sticky.pubkey}:${sticky.createdAt}`)}.png`;
+    pinArt.src = `/img/pin_${pinColourFor(pinSeed)}.png`;
     pin.appendChild(pinArt);
     pin.addEventListener('click', click => { click.stopPropagation(); openNoteMenu(sticky.id, pin); });
     pin.addEventListener('keydown', key => {

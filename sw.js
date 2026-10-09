@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v230';   // v230: smoother corkboard motion and a screen-filling opening view
+const CACHE = 'satoshi-static-v231';   // v231: stable varied pin positions across sticky notes
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

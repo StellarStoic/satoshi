@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, pinColourFor,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor,
   geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
   boardExtentForCells,
   geohashCellDimensions,
@@ -1164,6 +1164,16 @@ test('every note is held down by a pin whose colour comes from the note itself',
   // a note with nothing usable as a seed still gets a pin
   assert.ok(STICKY_PIN_COLOURS.includes(pinColourFor(undefined)));
   assert.ok(STICKY_PIN_COLOURS.includes(pinColourFor('')));
+
+  // Position has the same stable-random behaviour, but never approaches a paper edge.
+  assert.equal(pinLeftFor(id), pinLeftFor(id));
+  const positions = new Set();
+  for (let index = 0; index < 200; index += 1) {
+    const left = pinLeftFor(`note-${index}`);
+    assert.ok(left >= STICKY_PIN_LEFT_MIN && left <= STICKY_PIN_LEFT_MAX);
+    positions.add(left);
+  }
+  assert.ok(positions.size > 30, 'pins spread across most of the safe horizontal range');
 });
 
 test('the note is held down by a picture, and an installed board still has its pins', async () => {
@@ -1172,6 +1182,7 @@ test('the note is held down by a picture, and an installed board still has its p
   const worker = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 
   assert.match(page, /pinArt\.src = `\/img\/pin_\$\{pinColourFor\(/);
+  assert.match(page, /setProperty\('--pin-left', `\$\{pinLeftFor\(pinSeed\)\}%`\)/);
   assert.match(page, /pinArt\.className = 'sticky-note__pin-art'/);
   assert.match(page, /pinArt\.alt = ''/);
   assert.match(page, /pin\.appendChild\(pinArt\)/);
@@ -1180,6 +1191,8 @@ test('the note is held down by a picture, and an installed board still has its p
   assert.match(css, /\.sticky-note__pin-art \{[^}]*pointer-events: none/);
   assert.match(css, /\.sticky-note__pin \{[^}]*top: -36px/,
     'the pin head sits above the paper instead of covering the note text');
+  assert.match(css, /\.sticky-note__pin \{[^}]*left: var\(--pin-left, 50%\)/,
+    'each note can place its pin across the safe part of its top edge');
   assert.match(css, /\.sticky-note:not\(\.draft-note\):not\(\.sticky-note--placing\) \{ overflow: visible; \}/,
     'published notes reveal the raised pin without changing draft or placement clipping');
   assert.match(css, /\.sticky-note__text \{[^}]*overflow: hidden/,
