@@ -168,6 +168,8 @@ const MAP_LINE_LAYER = 'geohash-cells-line';
 const MAP_DASH_LAYER = 'geohash-cells-dashed';
 const MAP_LABEL_LAYER = 'geohash-cells-label';
 const MAP_TROUBLE_TEXT = 'The map tiles could not be loaded — you can still enter a geohash by hand.';
+const MAP_LAYOUT_WAIT_MS = 400;
+const MAP_LAYOUT_POLL_MS = 50;
 const MAP_MISSING_TEXT = 'The map could not load. You can still enter a geohash manually.';
 let mapLibraryPromise = null;
 let mapTroubleSaid = false;
@@ -444,12 +446,18 @@ function nextPaint() {
 async function waitForGeohashMapLayout() {
   // A modal becomes `open` before the browser has necessarily laid it out.
   // MapLibre cannot calculate its camera matrices from a zero-sized container.
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await nextPaint();
+  // requestAnimationFrame is the cheapest way to wait for a paint, but a tab that is not
+  // visible never fires one, and the picker then waited for ever and said nothing at all.
+  // A timer keeps ticking while the page is hidden, so take whichever comes first, and stop
+  // after a fixed budget instead of waiting without end.
+  const deadline = Date.now() + MAP_LAYOUT_WAIT_MS;
+  do {
     const bounds = elements.geohashMap.getBoundingClientRect();
     if (bounds.width > 0 && bounds.height > 0) return true;
-  }
-  return false;
+    await Promise.race([nextPaint(), new Promise(resolve => setTimeout(resolve, MAP_LAYOUT_POLL_MS))]);
+  } while (Date.now() < deadline);
+  const bounds = elements.geohashMap.getBoundingClientRect();
+  return bounds.width > 0 && bounds.height > 0;
 }
 
 async function initialiseGeohashMap() {
@@ -460,7 +468,11 @@ async function initialiseGeohashMap() {
     container: elements.geohashMap,
     style: MAP_STYLE_URL,
     center: [0, 20], zoom: 2, minZoom: 2, maxZoom: 21,
-    maxBounds: [[-180, -85.0511], [180, 85.0511]],
+    // No `maxBounds`. MapLibre applies bounds inside this constructor, before its transform has
+    // been sized, and the whole world as bounds is degenerate: it builds a singular matrix, the
+    // inverse comes back null, and MapLibre then reads that null — so the map never appears at
+    // all, on any screen. The world is already the limit (`renderWorldCopies: false` plus the
+    // mercator clamp), so the bounds bought nothing in the first place.
     renderWorldCopies: false,
     // A geohash picker that can be tilted or turned is a picker you can get lost
     // in: north stays up.
@@ -538,7 +550,18 @@ async function openGeohashMap() {
     return;
   }
   const existingMap = Boolean(geohashMap);
-  const map = geohashMap || await initialiseGeohashMap();
+  let map = geohashMap;
+  if (!map) {
+    try {
+      map = await initialiseGeohashMap();
+    } catch (error) {
+      // A map that threw while being built must not be kept: the picker would hand the same broken
+      // object to every later open. Clearing it lets the next attempt start from nothing.
+      console.error('Could not build the geohash map:', error);
+      geohashMap = null;
+      map = null;
+    }
+  }
   if (!map) {
     elements.geohashMap.replaceChildren(document.createTextNode(MAP_MISSING_TEXT));
     sayMapTrouble('The map could not load — the geohash can still be typed by hand.');
@@ -561,7 +584,10 @@ async function openGeohashMap() {
     if (existingMap) map.resize();
     scheduleGeohashGrid();
   } catch (error) {
+    // Same reasoning: whatever failed here left a map that cannot be driven, so let the next open
+    // build a fresh one rather than reusing this one.
     console.error('Could not open the geohash map:', error);
+    geohashMap = null;
     sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
   }
 }

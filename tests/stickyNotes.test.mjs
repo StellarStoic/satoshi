@@ -372,6 +372,18 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(script, /customAttribution/);
   assert.match(script, /href="https:\/\/openfreemap\.org\/"/);
   assert.match(script, /openstreetmap\.org\/copyright/);
+  // MapLibre applies maxBounds inside the constructor, before its transform has been sized, and
+  // the whole world as bounds is degenerate: it builds a singular matrix, the inverse comes back
+  // null and it reads that null — so the map never appears. The world is already the limit.
+  // the comment explaining the reason names the option too, so check the code and not the prose
+  assert.doesNotMatch(script.replace(/^\s*\/\/.*$/gm, ''), /maxBounds/);
+  // A tab that is not visible never fires requestAnimationFrame, so waiting for the dialog's
+  // layout has to be able to end on a timer as well.
+  assert.match(script, /MAP_LAYOUT_WAIT_MS/);
+  assert.match(script, /setTimeout\(resolve, MAP_LAYOUT_POLL_MS\)/);
+  // and a map that failed to build is not kept for the next open
+  assert.match(script, /Could not build the geohash map/);
+  assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
   assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
   assert.match(script, /BOARD_REMEMBER_KEY/);
