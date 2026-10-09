@@ -154,17 +154,19 @@ test('map coordinates round-trip through geohash cells up to precision 9', () =>
   assert.ok(bounds.south <= 46.0569 && bounds.north >= 46.0569);
   assert.ok(bounds.west <= 14.5058 && bounds.east >= 14.5058);
   assert.equal(encodeGeohash(bounds.center.lat, bounds.center.lng, 9), hash);
-  assert.equal(geohashPrecisionForZoom(2), 4, 'a shallower zoom than 4 characters is not offered');
-  assert.equal(geohashPrecisionForZoom(9), 4);
+  assert.equal(geohashPrecisionForZoom(2), 3, 'shallow zooms go out to the country scale');
+  assert.equal(geohashPrecisionForZoom(6), 3);
+  assert.equal(geohashPrecisionForZoom(9), 4, 'and stop at 4 once a cell is readable');
   assert.equal(geohashPrecisionForZoom(20), 8);
   assert.equal(geohashPrecisionForZoom(21), 9);
   assert.equal(mapZoomForGeohashPrecision(9), 21);
-  assert.equal(mapZoomForGeohashPrecision(2), mapZoomForGeohashPrecision(4), 'zoom for 4 is the floor');
+  assert.equal(mapZoomForGeohashPrecision(2), mapZoomForGeohashPrecision(3), 'zoom for 3 is the floor');
 });
 
-test('a geohash code is 4 to 9 characters', () => {
-  assert.equal(normaliseGeohash('u4p'), '', '3 characters is a region, not a place');
-  assert.equal(normaliseGeohash('u4pr'), 'u4pr', '4 is the shallowest code');
+test('a geohash code is 3 to 9 characters', () => {
+  assert.equal(normaliseGeohash('u4p'), 'u4p', '3 is the shallowest code');
+  assert.equal(normaliseGeohash('u4'), '', '2 characters is a region, not a place');
+  assert.equal(normaliseGeohash('u4pr'), 'u4pr', '4 is a place inside it');
   assert.equal(normaliseGeohash('u4pr7z0y1'), 'u4pr7z0y1', '9 is the deepest');
   assert.equal(normaliseGeohash('u4pr7z0y1x'), '', '10 is deeper than the grid goes');
   assert.equal(normaliseGeohash('u4pr7z0i'), '', 'i is not in the geohash alphabet');
@@ -196,7 +198,7 @@ test('a board may be a clump of touching cells, within the rules', () => {
   assert.equal(geohashSetIssue([cell, 'u4pr7z00']), 'Cells have to stick together — pick ones that touch.');
   assert.equal(geohashSetIssue([cell, '9q8yyk8y']), 'Cells have to stick together — pick ones that touch.');
   assert.equal(geohashSetIssue([]), 'Choose at least one cell.');
-  assert.equal(geohashSetIssue('u4p'), 'A geohash is 4 to 9 characters from 0-9 and b-h, j, k, m, n, p-z.');
+  assert.equal(geohashSetIssue('u4'), 'A geohash is 3 to 9 characters from 0-9 and b-h, j, k, m, n, p-z.');
 });
 
 test('a clump may reach out two steps, but not fall apart', () => {
@@ -753,13 +755,13 @@ test('the board can start from where the reader is', async () => {
   assert.match(html, /id="shareArea"/);
   assert.match(html, /id="areaDialog"/);
   assert.match(html, /id="areaStatus"[^>]*aria-live="polite"/);
-  assert.match(script, /const AREA_SCALES = \[8, 7, 5, 4\]/);
+  assert.match(script, /const AREA_SCALES = \[8, 7, 5, 4, 3\]/);
   const offered = [...html.matchAll(/data-area-precision="(\d+)"/g)].map(match => match[1]);
-  assert.deepEqual(offered, ['8', '7', '5', '4'], 'the markup offers exactly the sizes the script lists');
-  for (const label of ['Building', 'Neighbourhood', 'City', 'State']) assert.match(html, new RegExp(`>${label}<`));
-  // every size is a depth the board accepts: shorter than four is a region, not a place
+  assert.deepEqual(offered, ['8', '7', '5', '4', '3'], 'the markup offers exactly the sizes the script lists');
+  for (const label of ['Building', 'Neighbourhood', 'City', 'State', 'Country']) assert.match(html, new RegExp(`>${label}<`));
+  // every size is a depth the board accepts: shorter than three is a region, not a place
   for (const precision of offered) {
-    assert.ok(Number(precision) >= 4 && Number(precision) <= 9, `${precision} is a board depth`);
+    assert.ok(Number(precision) >= 3 && Number(precision) <= 9, `${precision} is a board depth`);
   }
   // the position is read from the device, used in the page, and never sent
   assert.match(script, /navigator\.geolocation\.getCurrentPosition/);
@@ -780,23 +782,25 @@ test('the board can start from where the reader is', async () => {
   assert.match(css, /\.area-scale\b/);
 });
 
-test('the four "around me" sizes really are a building, a neighbourhood, a city and a state', () => {
+test('the five "around me" sizes really are a building, a neighbourhood, a city, a state and a country', () => {
   // The page quotes a cell's height in metres. Measure the depths it offers through the
   // model's own bounds instead of trusting the page's arithmetic: at Ljubljana's latitude
-  // the four choices must land on the scales they are named after.
-  const heights = [8, 7, 5, 4].map(precision => {
+  // the five choices must land on the scales they are named after.
+  const heights = [8, 7, 5, 4, 3].map(precision => {
     const cell = encodeGeohash(46.0569, 14.5058, precision);
     const {south, north} = geohashBounds(cell);
     return (north - south) * 111320;
   });
-  const [building, neighbourhood, city, state] = heights;
+  const [building, neighbourhood, city, state, country] = heights;
   assert.ok(building >= 15 && building <= 25, `a building-sized cell is about 19 m, got ${Math.round(building)}`);
   assert.ok(neighbourhood >= 120 && neighbourhood <= 190,
     `a neighbourhood-sized cell is about 153 m, got ${Math.round(neighbourhood)}`);
   assert.ok(city >= 4000 && city <= 6000, `a city-sized cell is about 4.9 km, got ${Math.round(city)}`);
   assert.ok(state >= 15000 && state <= 25000, `a state-sized cell is about 20 km, got ${Math.round(state)}`);
+  assert.ok(country >= 140000 && country <= 170000,
+    `a country-sized cell is about 156 km, got ${Math.round(country)}`);
   // and each one is a depth the board accepts
-  for (const precision of [8, 7, 5, 4]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
+  for (const precision of [8, 7, 5, 4, 3]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
 });
 
 test('a place can be kept, and the kept place outranks the board you last browsed', async () => {

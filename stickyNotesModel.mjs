@@ -256,7 +256,7 @@ export function isStickyExpired(note, now = Math.floor(Date.now() / 1000)) {
 // be a clump of touching cells, which is what lets one note cover a building
 // that straddles two or three cells — a cell is what a note is pinned to, and
 // a clump is still one note on one price.
-export const GEOHASH_MIN_LENGTH = 4;
+export const GEOHASH_MIN_LENGTH = 3;
 export const GEOHASH_MAX_LENGTH = 9;
 export const GEOHASH_MAX_CELLS = 9;
 export const GEOHASH_PATTERN = new RegExp(`^[0123456789bcdefghjkmnpqrstuvwxyz]{${GEOHASH_MIN_LENGTH},${GEOHASH_MAX_LENGTH}}$`);
@@ -510,9 +510,12 @@ export function geohashGridFits(candidate = {}) {
 
 export function geohashPrecisionForZoom(zoom) {
   const level = Math.max(0, Math.min(21, Number(zoom) || 0));
-  // Shallow zooms are held at 4 characters: a 3-character cell is 100+ km across,
-  // and no code below 4 is a place anyone pins a note to.
-  if (level <= 10) return GEOHASH_MIN_LENGTH;
+  // A three-character cell is about 109 x 156 km at Slovenia's latitude — the country
+  // scale, and the shortest code a board now takes. Shallow zooms go there;
+  // geohashGridFits still refuses any grid whose cells are too small to read, so
+  // zooming further out leaves the chosen cell alone instead of drawing a mush.
+  if (level <= 6) return 3;
+  if (level <= 10) return 4;
   if (level <= 12) return 5;
   if (level <= 14) return 6;
   if (level <= 17) return 7;
@@ -714,7 +717,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   // An exact note names only the cells it sits on; otherwise the boards above each
   // of them are named too, so the note is findable on the wider boards as well.
   // Parents shallower than the shallowest code are not boards and are not named:
-  // below four characters a code is a region, and the desk refuses one outright.
+  // below three characters a code is a region, and the desk refuses one outright.
   const namedCells = exactGeohash
     ? cells
     : [...new Set(cells.flatMap(cell => geohashPrefixes(cell)))]

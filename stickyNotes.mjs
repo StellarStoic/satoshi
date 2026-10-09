@@ -2470,7 +2470,7 @@ elements.rememberBoard.addEventListener('change', () => {
 // page. A geohash board is only as useful as the depth it is read at, so the reader
 // picks how much ground to cover instead of being handed one guess. The coordinate
 // is never sent anywhere: what the board asks the relay for is the geohash it became.
-const AREA_SCALES = [8, 7, 5, 4];
+const AREA_SCALES = [8, 7, 5, 4, 3];
 // geohashCellDimensions() answers in degrees; a reader thinks in metres. A degree of
 // latitude is within half a percent of this everywhere, which is what makes a cell's
 // height the honest size to quote (its width narrows towards the poles).
@@ -2490,7 +2490,7 @@ function areaScaleButtons() {
 }
 
 function renderAreaScales() {
-  // The sizes come from AREA_SCALES, and a test pins the markup's four buttons to the
+  // The sizes come from AREA_SCALES, and a test pins the markup's five buttons to the
   // same list, so the two cannot drift into offering a size that is not listed.
   const sizes = new Map(AREA_SCALES.map(precision => [String(precision), areaSizeLabel(precision)]));
   for (const button of areaScaleButtons()) {
