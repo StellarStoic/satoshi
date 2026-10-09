@@ -48,7 +48,9 @@ import {
   logoutNostr,
   parkedSession,
   pendingAmberRequest,
+  reconnectBunker,
   resumeAmber,
+  savedBunker,
   shortNpub,
   signNostrEvent,
   signerReady,
@@ -115,6 +117,7 @@ const elements = {
   paymentRails: document.getElementById('stickyPaymentRails'), paymentHint: document.getElementById('stickyPaymentHint'),
   copyPayment: document.getElementById('copyStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
+  bunkerReconnect: document.getElementById('bunkerReconnect'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
@@ -2082,12 +2085,24 @@ function installBoardNavigation() {
   }, {passive: false});
 }
 
+/**
+ * What the login dialog can honestly offer. A saved bunker connection is the way back in for a
+ * reader whose signer is a mobile app: the link they pasted is usually a one-use invitation,
+ * so the page must not need it a second time to let them sign in again.
+ */
+function refreshLoginDialog() {
+  const saved = savedBunker();
+  elements.bunkerReconnect.hidden = !saved;
+  if (saved && !elements.bunker.value) elements.bunker.value = saved.url;
+}
+
 async function handleLogin(method) {
   try {
     status(elements.loginStatus, 'Connecting...');
     if (method === 'extension') await loginWithExtension();
     else if (method === 'amber') { beginAmberLogin(); return; }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
+    else if (method === 'bunker-saved') await reconnectBunker();
     else if (method === 'anonymous') loginAnonymously();
     else if (method === 'private') {
       loginWithPrivateKey(elements.privateKey.value);
@@ -2521,7 +2536,12 @@ elements.mentionFilter.addEventListener('click', toggleMentionFilter);
 elements.editor.addEventListener('keydown', handleMentionKeys);
 elements.editor.addEventListener('input', updateMentionMenu);
 elements.editor.addEventListener('click', updateMentionMenu);
-elements.account.addEventListener('click', () => getNostrSession() ? showDialog(elements.accountDialog) : showDialog(elements.login));
+elements.account.addEventListener('click', () => {
+  if (getNostrSession()) { showDialog(elements.accountDialog); return; }
+  // A way back in is put on screen before the reader has to wonder what happened.
+  refreshLoginDialog();
+  showDialog(elements.login);
+});
 elements.newSticky.addEventListener('click', openComposer);
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {

@@ -111,3 +111,41 @@ test('a signing request that was never answered is readable, and a stale one is 
   storage.removeItem('satoshi:nostr:amber:req1');
   assert.equal(sessionModule.pendingAmberRequest(), null);
 });
+
+test('signing out keeps the bunker connection, so there is a way back in', async () => {
+  const storage = memoryStorage();
+  const bunker = {url: `bunker://${'d'.repeat(64)}?relay=wss%3A%2F%2Frelay.example`, clientSecret: 'e'.repeat(64)};
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey: 'f'.repeat(64), method: 'bunker', npub: `npub1${'f'.repeat(58)}`}));
+  storage.setItem('satoshi:nostr:bunker:v1', JSON.stringify(bunker));
+  globalThis.localStorage = storage;
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
+
+  const sessionModule = await import(`../nostrSession.mjs?bunker-kept-test=${Date.now()}`);
+  assert.equal(sessionModule.savedBunker()?.url, bunker.url, 'the saved connection is what the page can come back with');
+  assert.equal(sessionModule.savedBunker()?.clientSecret, bunker.clientSecret, 'the authorized client keypair is part of it');
+
+  sessionModule.logoutNostr();
+  assert.equal(sessionModule.getNostrSession(), null, 'signing out does end the session');
+  // The link is usually a one-use invitation and the client keypair cannot be re-created by
+  // hand, so deleting this is deleting the reader's only way back in.
+  assert.equal(sessionModule.savedBunker()?.url, bunker.url, 'signing out must not delete the way back in');
+  assert.equal(sessionModule.savedBunker()?.clientSecret, bunker.clientSecret);
+});
+
+test('a signer answer is read from the query as well as the fragment', async () => {
+  const storage = memoryStorage();
+  storage.setItem('satoshi:nostr:amber:req9', JSON.stringify({createdAt: Date.now(), action: 'login'}));
+  globalThis.localStorage = storage;
+  const replaced = [];
+  globalThis.history = {replaceState: (...args) => replaced.push(args[2])};
+  globalThis.location = {search: `?nostr_signer_result=${'c'.repeat(64)}&nostr_signer_id=req9`, hash: '', pathname: '/stickyNotes.html'};
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-query-test=${Date.now()}`);
+  const answer = sessionModule.resumeAmber();
+  assert.equal(answer?.action, 'login', 'NIP-55 has the signer append its result to the callback query');
+  assert.equal(answer.session.pubkey, 'c'.repeat(64));
+  assert.equal(sessionModule.getNostrSession().pubkey, 'c'.repeat(64));
+  assert.equal(storage.getItem('satoshi:nostr:amber:req9'), null, 'the request is spent');
+  assert.deepEqual(replaced, ['/stickyNotes.html'], 'the answer is taken out of the URL rather than read twice');
+});

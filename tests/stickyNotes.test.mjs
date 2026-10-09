@@ -827,7 +827,7 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /const parkedRequest = pendingAmberRequest\(\);/);
   assert.match(script, /parkedRequest\.context\?\.orderId === pending\.orderId/);
   assert.match(script, /if \(unusableReturn\) notice\(unusableReturn\);/);
-  assert.match(script, /pendingAmberRequest,\n  resumeAmber,/);
+  assert.match(script, /pendingAmberRequest,\n  reconnectBunker,\n  resumeAmber,/);
 
   // The answer is read wherever it arrives, not only while booting: a browser that resumes
   // the running page and merely changes the URL would otherwise lose it — which is a
@@ -840,6 +840,21 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /if \(elements\.login\.open\) elements\.login\.close\(\);/);
   assert.match(script, /if \(!syncPlacementWithSession\(\)\) openComposer\(\);/);
   assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
+});
+
+test('a saved bunker connection is offered as the way back in', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const markup = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+
+  // The button exists in the markup, is mapped (an unmapped element kills the whole page),
+  // and is revealed only when there is a connection to come back with.
+  assert.match(markup, /data-login="bunker-saved" id="bunkerReconnect" hidden/);
+  assert.match(script, /bunkerReconnect: document\.getElementById\('bunkerReconnect'\),/);
+  assert.match(script, /function refreshLoginDialog\(\) \{\s+const saved = savedBunker\(\);\s+elements\.bunkerReconnect\.hidden = !saved;/);
+  assert.match(script, /else if \(method === 'bunker-saved'\) await reconnectBunker\(\);/);
+
+  // ...and it is on screen before the reader has to wonder what happened.
+  assert.match(script, /refreshLoginDialog\(\);\s+showDialog\(elements\.login\);/);
 });
 
 test('an unpinned note is on the board only for the identity pinning it', async () => {

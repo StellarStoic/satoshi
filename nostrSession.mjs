@@ -4,6 +4,8 @@ const ANONYMOUS_KEY = 'satoshi:nostr:anonymous:v1';
 const PREVIOUS_SESSION_KEY = 'satoshi:nostr:previous-session:v1';
 const AMBER_PREFIX = 'satoshi:nostr:amber:';
 const AMBER_MAX_AGE = 30 * 60 * 1000;
+const AMBER_RESULT_PARAM = 'nostr_signer_result';
+const AMBER_ID_PARAM = 'nostr_signer_id';
 export const ANONYMOUS_SESSION_MS = 24 * 60 * 60 * 1000;
 let privateSecret = null;
 let bunkerSigner = null;
@@ -105,7 +107,11 @@ function randomId() {
 }
 
 function amberCallback(id) {
-  return `${location.origin}${location.pathname}#nostr_signer=${id}.`;
+  // The query is where NIP-55 says a signer appends its result (`callbackUrl=…?result=`); the
+  // fragment is this page's own way of matching an answer to the request that asked for it,
+  // which several Android signers implement. Both are offered, so a signer following either
+  // convention has somewhere to put the result instead of nowhere.
+  return `${location.origin}${location.pathname}?${AMBER_RESULT_PARAM}=&${AMBER_ID_PARAM}=${id}#nostr_signer=${id}.`;
 }
 
 function openAmber(type, payload, id, options = {}) {
@@ -146,15 +152,21 @@ export function pendingAmberRequest() {
 }
 
 export function resumeAmber() {
-  const match = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
-  if (!match) return null;
-  history.replaceState(null, '', location.pathname + location.search);
-  const key = AMBER_PREFIX + match[1];
+  const params = new URLSearchParams(location.search);
+  const fragment = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
+  // An answer arrives in one of two shapes: the query NIP-55 specifies, or the fragment this
+  // page used to ask for. A signer that follows only one of them must still get through.
+  const id = fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
+  const inQuery = fragment ? '' : params.get(AMBER_RESULT_PARAM);
+  if (!id || !fragment && !inQuery) return null;
+  // The query is dropped with the fragment: the answer must not be read twice.
+  history.replaceState(null, '', location.pathname);
+  const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
   localStorage.removeItem(key);
   if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
-  let result = match[2];
-  try { result = decodeURIComponent(result); } catch {}
+  let result = fragment ? fragment[2] : inQuery;
+  if (fragment) { try { result = decodeURIComponent(result); } catch {} }
   if (state.action === 'login') {
     const pubkey = result.trim().toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
@@ -199,6 +211,29 @@ export async function loginWithBunker(url) {
   saved.url = await persistentBunkerUrl(clean);
   localStorage.setItem(BUNKER_KEY, JSON.stringify(saved));
   return saveSession(pubkey, 'bunker');
+}
+
+/**
+ * The bunker connection this browser saved, or null. It carries the client keypair the
+ * service authorized, which is what makes connecting again possible without the link.
+ */
+export function savedBunker() {
+  const saved = readJson(localStorage, BUNKER_KEY);
+  if (!saved?.url || !/^[0-9a-f]{64}$/.test(String(saved.clientSecret || ''))) return null;
+  return saved;
+}
+
+/**
+ * Come back in with the bunker this browser already knows. A bunker:// link is usually a
+ * one-use invitation, and the client keypair the service authorized is the saved one — so a
+ * reader who signs out must not lose the ability to connect, because the page may never be
+ * handed that link a second time.
+ */
+export async function reconnectBunker() {
+  const saved = savedBunker();
+  if (!saved) throw new Error('No bunker connection is saved in this browser.');
+  const signer = await connectBunker(saved);
+  return saveSession(await signer.getPublicKey(), 'bunker');
 }
 
 export async function signerReady() {
@@ -262,7 +297,10 @@ export function logoutNostr() {
     return;
   }
   localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(BUNKER_KEY);
+  // The bunker connection stays. It holds the client keypair the service authorized — a
+  // connection that cannot simply be re-created — and the link is usually a one-use
+  // invitation, so signing out must not cost the reader their way back in. Connecting a
+  // different bunker replaces it.
   localStorage.removeItem(PREVIOUS_SESSION_KEY);
   window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: null}));
 }

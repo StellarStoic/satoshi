@@ -133,6 +133,7 @@
       </div>
       <p class="login-note">That is a temporary key: it cannot hold a name or a subscription, and posting with it costs 42 sats a note. Your current login is kept, and logging out returns to it.</p>
       <label class="login-field"><span>Bunker</span><input id="bunkerInput" type="text" inputmode="url" autocomplete="off" placeholder="bunker://..."><button type="button" data-login="bunker">Connect</button></label>
+        <button type="button" class="bunker-reconnect" data-login="bunker-saved" id="bunkerReconnect" hidden><i class="lni lni-mobile" aria-hidden="true"></i><span>Reconnect your bunker</span></button>
       <details class="private-key-login">
         <summary>Private key</summary>
         <p>Not recommended. The key stays in memory and is never saved, but a signer is safer.</p>
