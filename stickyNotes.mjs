@@ -47,6 +47,7 @@ import {
   loginWithPrivateKey,
   logoutNostr,
   parkedSession,
+  pendingAmberRequest,
   resumeAmber,
   shortNpub,
   signNostrEvent,
@@ -284,6 +285,21 @@ function updateBoardUrl() {
 function status(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle('is-error', error);
+  // An ordinary message replaces a notice; the board's own announcements go through
+  // this same door, which is why the mark is a flag and not a class.
+  if (target === elements.boardStatus && !error) delete target.dataset.notice;
+}
+
+/**
+ * A message the reader has to act on. The board keeps talking on its own — "Opening the
+ * board...", then "The Nostr board is temporarily unavailable." a second later — and those
+ * arrive *after* the boot's failures, so a plain status line about a note that would not
+ * pin is on screen for under a second and reads as nothing having happened.
+ */
+function notice(message) {
+  status(elements.boardStatus, message, true);
+  elements.boardStatus.hidden = false;
+  elements.boardStatus.dataset.notice = '1';
 }
 
 function showDialog(dialog) {
@@ -1260,6 +1276,9 @@ function connectBoard(version = boardConnectionVersion) {
   });
   socket.addEventListener('error', () => {
     clearTimeout(timeout);
+    // A notice outranks this: a reader who has a note to pin must not lose the reason
+    // to a board that is merely unreachable.
+    if (elements.boardStatus.dataset.notice) return;
     status(elements.boardStatus, 'The Nostr board is temporarily unavailable.', true);
   });
   socket.addEventListener('close', () => {
@@ -2866,7 +2885,11 @@ else {
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
 }
+// A signature is made in another app, so the page leaves and comes back reloaded: what the
+// reader chose has to be found again from the saved note, and a return that cannot be used
+// has to say so — the note is paid for and one tap away from being pinned.
 let resumedSigning = false;
+let unusableReturn = '';
 try {
   const amber = resumeAmber();
   if (amber?.action === 'login') { updateAccount(); openComposer(); }
@@ -2874,9 +2897,20 @@ try {
     resumedSigning = true;
     if (amber.context.action === 'remove') await publishRemoval(amber.event);
     else await publishPinnedNote(amber.event);
+  } else if (amber?.action === 'sign') {
+    unusableReturn = 'That signature was for a different note. Your note is still here — pin it again.';
   }
 } catch (error) {
-  status(elements.boardStatus, error.message, true);
+  unusableReturn = error.message;
+}
+// The other way a round trip loses its answer: the signer never came back at all, so
+// nothing was thrown and the request is still parked. Same advice, and the note below is
+// what makes it possible to act on.
+if (!resumedSigning && pending?.status === 'paid' && pending?.action === 'pin') {
+  const parkedRequest = pendingAmberRequest();
+  if (parkedRequest?.action === 'sign' && parkedRequest.context?.orderId === pending.orderId) {
+    unusableReturn = 'The signer did not come back with a signature. Your note is still here — pin it again.';
+  }
 }
 // A note saved with no status and no order has nothing left to poll: the flow that
 // saved it ended before its order ever existed (a subscription paid after the page
@@ -2904,4 +2938,5 @@ if (!resumedSigning && (pending?.status === 'waiting' || strandedNote)) {
 } else if (!resumedSigning && pending?.status === 'paid') {
   if (pending.action === 'remove') publishRemoval();
   else beginPlacement();
+  if (unusableReturn) notice(unusableReturn);
 }

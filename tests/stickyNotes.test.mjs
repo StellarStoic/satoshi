@@ -809,6 +809,27 @@ test('the five "around me" sizes really are a building, a neighbourhood, a city,
   for (const precision of [8, 7, 5, 4, 3]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
 });
 
+test('a signature that cannot be used says so, and the board does not talk over it', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The notice is a flag on the element rather than a class: the board announces itself
+  // constantly, and its announcement arrives *after* the boot's failures.
+  assert.match(script, /function notice\(message\) \{/);
+  assert.match(script, /elements\.boardStatus\.dataset\.notice = '1';/);
+  assert.match(script, /if \(target === elements\.boardStatus && !error\) delete target\.dataset\.notice;/);
+  assert.match(script, /if \(elements\.boardStatus\.dataset\.notice\) return;\s+status\(elements\.boardStatus, 'The Nostr board is temporarily unavailable\.'/);
+
+  // A returned signature is used for its own note, and anything else is named rather
+  // than dropped — the note is paid for and one tap from being pinned.
+  assert.match(script, /if \(amber\?\.action === 'sign' && pending\?\.orderId === amber\.context\?\.orderId\) \{/);
+  assert.match(script, /else if \(amber\?\.action === 'sign'\) \{\s+unusableReturn = 'That signature was for a different note\./);
+  assert.match(script, /unusableReturn = error\.message;/);
+  assert.match(script, /const parkedRequest = pendingAmberRequest\(\);/);
+  assert.match(script, /parkedRequest\.context\?\.orderId === pending\.orderId/);
+  assert.match(script, /if \(unusableReturn\) notice\(unusableReturn\);/);
+  assert.match(script, /pendingAmberRequest,\n  resumeAmber,/);
+});
+
 test('a temporary identity cannot buy a plan, and a refusal is not hidden with its dialog', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
 

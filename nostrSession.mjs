@@ -128,6 +128,23 @@ export function beginAmberSigning(template, context = null) {
   openAmber('sign_event', JSON.stringify(template), id, {current_user: session.pubkey, returnType: 'event', compressionType: 'none'});
 }
 
+/**
+ * A signing request that was never answered, or null. A round trip that does not come back
+ * — the signer app reopened instead of returned to — leaves its request parked and throws
+ * nothing, so this is how the page knows a signature was asked for and never arrived.
+ */
+export function pendingAmberRequest() {
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key || !key.startsWith(AMBER_PREFIX)) continue;
+    const state = readJson(localStorage, key);
+    if (!state || !Number.isFinite(state.createdAt)) continue;
+    if (Date.now() - state.createdAt > AMBER_MAX_AGE) continue;
+    return state;
+  }
+  return null;
+}
+
 export function resumeAmber() {
   const match = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
   if (!match) return null;
