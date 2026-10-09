@@ -139,6 +139,7 @@ let pending = readPending();
 let placingNote = null;
 let discardRestore = null;
 let paymentTimer = null;
+let invoiceMessageTimer = null;
 let boardSocket = null;
 let boardConnectionVersion = 0;
 const rendered = new Set();
@@ -163,6 +164,14 @@ let currentRailId = '';
 let profileFetchPubkey = '';
 let composingPubkey = '';
 let composingGeohashes = [];
+const INVOICE_WAIT_MESSAGES = Object.freeze([
+  'Creating your invoice...',
+  'Waking up the invoice machine...',
+  'Tiny gears are clanking...',
+  'The sats are forming an orderly queue...',
+  'Almost there; one sat forgot its hat...',
+  'Still working. Apparently invoices enjoy suspense...',
+]);
 // The picker is the one part of this page that needs an outside library and an
 // outside network. Both are fetched the first time somebody opens it, so the
 // board itself never pays for the map, and if either fails the footer says so
@@ -905,12 +914,15 @@ function renderQuotedPrice() {
   if (elements.planPicker) {
     // The picker is only useful when there is a subscription to choose: an active
     // one already covers everything, and an anonymous identity can never take one.
-    elements.planPicker.hidden = !session || anonymous || actionInfo.active;
+    const plansAvailable = Boolean(session && !anonymous && !actionInfo.active);
+    elements.planPicker.hidden = !plansAvailable;
+    elements.planPicker.inert = !plansAvailable;
     for (const button of elements.planPicker.querySelectorAll('[data-plan]')) {
       const plan = button.dataset.plan === 'year' ? 'year' : 'week';
       const amount = button.querySelector('b');
       const price = stickySubscriptionPrice(plan, {member: actionInfo.member});
       if (amount && Number.isInteger(price)) amount.textContent = String(price);
+      button.disabled = !plansAvailable;
       button.classList.toggle('is-active', plan === subscribePlan);
       button.setAttribute('aria-pressed', plan === subscribePlan ? 'true' : 'false');
     }
@@ -971,6 +983,26 @@ async function api(path, options = {}) {
 }
 
 let qrPromise = null;
+
+function stopInvoiceMessages() {
+  clearInterval(invoiceMessageTimer);
+  invoiceMessageTimer = null;
+}
+
+function startInvoiceMessages() {
+  if (invoiceMessageTimer) return;
+  let index = 0;
+  elements.paymentHint.textContent = INVOICE_WAIT_MESSAGES[index];
+  invoiceMessageTimer = setInterval(() => {
+    if (!elements.paymentDialog.open || currentRails.length) {
+      stopInvoiceMessages();
+      return;
+    }
+    index = (index + 1) % INVOICE_WAIT_MESSAGES.length;
+    elements.paymentHint.textContent = INVOICE_WAIT_MESSAGES[index];
+  }, 3000);
+}
+
 function loadQr() {
   if (!qrPromise) {
     qrPromise = new Promise(resolve => {
@@ -990,9 +1022,10 @@ async function renderPayment(order) {
   if (!rails.length) {
     elements.paymentQr.hidden = true;
     elements.paymentValue.textContent = '';
-    elements.paymentHint.textContent = 'Preparing invoice...';
+    startInvoiceMessages();
     return false;
   }
+  stopInvoiceMessages();
   const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_SUB_WEEK_SATS);
   currentRails = rails;
   elements.paymentAmount.textContent = rails.length > 1 ? `Pay ${sats} sats` : `Pay ${sats} sats with ${rails[0].label}`;
@@ -1055,8 +1088,8 @@ function showPaymentPreparing(sats = quotedPrice) {
   elements.paymentQr.removeAttribute('src');
   elements.paymentValue.hidden = true;
   elements.copyPayment.hidden = true;
-  elements.paymentHint.textContent = 'Preparing invoice...';
   showDialog(elements.paymentDialog);
+  startInvoiceMessages();
 }
 
 async function copyPayment() {
@@ -1554,6 +1587,7 @@ async function startPayment() {
       // Covered by the subscription the desk just confirmed: nothing to pay, and
       // the publish token is already there, so the note goes straight to placing.
       if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this note. No note was published.');
+      stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({...notePending, orderId: order.id, sats, status: 'paid', publishToken: order.publishToken});
       if (elements.composer.open) elements.composer.close();
@@ -1570,6 +1604,7 @@ async function startPayment() {
     status(elements.paymentStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
+    stopInvoiceMessages();
     const closedOverMessage = elements.paymentDialog.open && !pending?.orderId;
     if (closedOverMessage) elements.paymentDialog.close();
     status(elements.paymentStatus, error.message, true);
@@ -1600,6 +1635,7 @@ async function pollPayment() {
         return;
       }
       await refreshSubscription();
+      stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       const {subscribeOrderId, subscribePlan: plan, subscribeSats, status: _s, ...rest} = pending;
       savePending(rest);
@@ -1631,6 +1667,7 @@ async function pollPayment() {
     const order = await api(`/orders/${encodeURIComponent(pending.orderId)}`);
     if (pending.action === 'pin' && pending.sats > 0) await renderPayment(order);
     if (order.paid && order.publishToken) {
+      stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({...pending, status: 'paid', publishToken: order.publishToken});
       if (pending.action === 'remove') await publishRemoval();
@@ -1644,10 +1681,11 @@ async function pollPayment() {
     const invoicePending = String(order.status || '').toLowerCase() === 'awaiting_invoice' || !order.payment;
     status(pending.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus,
       invoicePending ? 'Preparing invoice...' : 'Waiting for payment...');
-    if (invoicePending) elements.paymentHint.textContent = 'Preparing invoice...';
+    if (invoicePending) startInvoiceMessages();
     paymentTimer = setTimeout(pollPayment, 3000);
   } catch (error) {
     if ((pending?.orderId || '') !== pollingOrderId) return;
+    stopInvoiceMessages();
     status(pending?.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
   }
@@ -1679,6 +1717,7 @@ async function discardInvoice() {
   }
   clearTimeout(paymentTimer);
   paymentTimer = null;
+  stopInvoiceMessages();
   // Only what belonged to the order is dropped: the reader's writing stays theirs.
   const {orderId, sats, status: _status, publishToken, subscribeOrderId, subscribePlan, subscribeSats, ...draft} = pending;
   savePending(draft.action === 'pin' && draft.content ? draft : null);
@@ -2017,6 +2056,7 @@ async function startRemovalPayment() {
     const sats = stickyOrderPrice(order);
     if (sats === 0) {
       if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this removal. The note was not removed.');
+      stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'paid', publishToken: order.publishToken});
       await publishRemoval();
@@ -2029,6 +2069,7 @@ async function startRemovalPayment() {
     status(elements.noteMenuStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
+    stopInvoiceMessages();
     if (elements.paymentDialog.open && !pending?.orderId) elements.paymentDialog.close();
     status(elements.noteMenuStatus, error.message, true);
     elements.removeSticky.disabled = false;

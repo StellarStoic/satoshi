@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v224';   // v224: Amber returns compact signatures for sticky-note pins
+const CACHE = 'satoshi-static-v226';   // v226: slow sticky-note invoices get rotating progress messages
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

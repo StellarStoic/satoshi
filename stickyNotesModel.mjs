@@ -567,6 +567,9 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
   const year = (Number.isInteger(prices.yearSats) ? prices.yearSats : null) ?? stickySubscriptionPrice('year', { member });
   const active = Boolean(subscription?.active);
   const until = stickyDay(subscription?.expiresAt);
+  const discount = member
+    ? 'Your satoshi.si NIP-05 discount is applied: 50% off.'
+    : 'Satoshi.si NIP-05 owners get 50% off.';
 
   if (anonymous) {
     return {
@@ -587,7 +590,7 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
   if (active) {
     return {
       label: `${action === 'remove' ? 'Remove' : 'Pin it'} · included`,
-      state: `Subscription active${until ? ` until ${until}` : ''}. Posting and removals are included.`,
+      state: `Subscription active${until ? ` until ${until}` : ''}. Posting and removals are included. ${discount}`,
       needsSubscription: false,
       price: 0,
       active: true,
@@ -600,9 +603,7 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
   const price = stickySubscriptionPrice(plan, { member });
   return {
     label: `Subscribe & ${action === 'remove' ? 'remove' : 'pin'} · ${price} sats`,
-    state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year`
-      + (member ? ', half price with your satoshi.si name' : '')
-      + '.',
+    state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year. ${discount}`,
     needsSubscription: true,
     price,
     active: false,

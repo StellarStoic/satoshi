@@ -54,10 +54,11 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(off.needsSubscription, true);
   assert.equal(off.label, 'Subscribe & pin · 10 sats');
   assert.match(off.state, /10 sats a week or 411 sats a year/);
+  assert.match(off.state, /NIP-05 owners get 50% off/);
 
   const half = describeStickyAction({subscription: member, plan: 'year'});
   assert.equal(half.label, 'Subscribe & pin · 205 sats');
-  assert.match(half.state, /half price with your satoshi\.si name/);
+  assert.match(half.state, /NIP-05 discount is applied: 50% off/);
 
   const on = describeStickyAction({subscription: covered});
   assert.equal(on.needsSubscription, false);
@@ -341,6 +342,16 @@ test('payment sheet opens during invoice creation and pinned state stays complet
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
   ]);
   assert.match(script, /showPaymentPreparing\(quotedPrice\)/);
+  assert.match(script, /const INVOICE_WAIT_MESSAGES = Object\.freeze\(\[/);
+  assert.match(script, /Tiny gears are clanking/);
+  assert.match(script, /one sat forgot its hat/);
+  assert.match(script, /setInterval\(\(\) => \{/);
+  assert.match(script, /\}, 3000\)/);
+  assert.match(script, /if \(!elements\.paymentDialog\.open \|\| currentRails\.length\)/);
+  const paymentRender = script.slice(script.indexOf('async function renderPayment('), script.indexOf('async function selectRail('));
+  assert.ok(paymentRender.indexOf('stopInvoiceMessages()') > paymentRender.indexOf("if (!rails.length)"));
+  assert.ok(paymentRender.indexOf('stopInvoiceMessages()') < paymentRender.indexOf('currentRails = rails'),
+    'the waiting copy stops as soon as a usable invoice arrives');
   assert.match(script, /setTimeout\(pollPayment, 3000\)/);
   assert.match(script, /textContent = 'Pinned'/);
   assert.match(script, /elements\.pin\.disabled = published/);
@@ -428,14 +439,20 @@ test('published notes resolve a readable author label in relay batches', async (
 });
 
 test('anonymous posting and signed-in profile details are present', async () => {
-  const [html, script, session] = await Promise.all([
+  const [html, script, session, css] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../nostrSession.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
   assert.match(html, /Post anonymously · 42 sats/);
   for (const id of ['accountPicture', 'accountNip05', 'anonymousExpiry']) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(script, /anonymousCountdown/);
+  assert.match(css, /\.plan-picker\[hidden\]\s*\{\s*display:\s*none/,
+    'the author display rule must not override the hidden attribute');
+  assert.match(script, /const plansAvailable = Boolean\(session && !anonymous && !actionInfo\.active\)/);
+  assert.match(script, /elements\.planPicker\.inert = !plansAvailable/);
+  assert.match(script, /button\.disabled = !plansAvailable/);
   assert.match(script, /kinds: \[0\]/);
   assert.match(session, /ANONYMOUS_SESSION_MS = 24 \* 60 \* 60 \* 1000/);
   assert.match(session, /generateSecretKey\(\)/);
