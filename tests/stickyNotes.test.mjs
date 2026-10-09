@@ -954,6 +954,23 @@ test('the note is held down by a picture, and an installed board still has its p
   // the sprite sits inside the note, which clips what is inside it
   assert.match(css, /\.sticky-note__pin \{[^}]*overflow: visible/);
 
+  // The sprite is the artwork's pin: head, needle and the shadow it casts. A sprite that is
+  // roughly as tall as it is wide has lost the needle and the shadow.
+  for (const colour of STICKY_PIN_COLOURS) {
+    const png = await readFile(new URL(`../img/pin_${colour}.png`, import.meta.url));
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    assert.ok(height / width > 1.5,
+      `pin_${colour}.png keeps the needle and shadow (${width}x${height})`);
+  }
+  // the CSS must show the sprite at the width it was cut to, or the pins come out the wrong size
+  assert.match(css, /\.sticky-note__pin-art \{[^}]*width: 48px/);
+  // a global img { max-width: 100% } caps the art at the button's 40px and pulls the head off
+  // centre, so the art has to opt out of it
+  assert.match(css, /\.sticky-note__pin-art \{[^}]*max-width: none/);
+  // the artwork's shadow IS the shadow: a CSS drop-shadow would double it
+  assert.doesNotMatch(css, /\.sticky-note__pin-art \{[^}]*drop-shadow/);
+
   // every sprite is precached, or an installed board shows notes with no pins
   for (const colour of STICKY_PIN_COLOURS) {
     assert.match(worker, new RegExp(`/img/pin_${colour}\\.png'`));
