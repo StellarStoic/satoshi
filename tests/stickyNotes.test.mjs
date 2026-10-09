@@ -73,6 +73,12 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(anon.label, 'Post anonymously · 42 sats');
   assert.match(anon.state, /never applies/);
 
+  // A temporary identity is the one case that has to name its way back, because the
+  // identity it replaced is the only place a subscription can live.
+  const anonParked = describeStickyAction({anonymous: true, subscription: covered, parked: 'Alice'});
+  assert.match(anonParked.state, /Log out to switch back to Alice\./);
+  assert.doesNotMatch(anon.state, /switch back/, 'nothing parked means nothing to name');
+
   // Nothing from the desk yet: the base prices are shown, never "free".
   assert.equal(describeStickyAction({}).label, 'Subscribe & pin · 10 sats');
   assert.equal(describeStickyAction({}).price, 10);
@@ -801,6 +807,32 @@ test('the five "around me" sizes really are a building, a neighbourhood, a city,
     `a country-sized cell is about 156 km, got ${Math.round(country)}`);
   // and each one is a depth the board accepts
   for (const precision of [8, 7, 5, 4, 3]) assert.ok(precision >= GEOHASH_MIN_LENGTH && precision <= 9);
+});
+
+test('a temporary identity cannot buy a plan, and a refusal is not hidden with its dialog', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The identity decides what the buttons mean, so a session change re-asks the desk and
+  // re-draws: relabelling the account alone is what left a plan offered to a temporary
+  // identity, at the previous identity's price.
+  assert.match(script, /addEventListener\('satoshi-nostr-session', \(\) => \{\s+updateAccount\(\);\s+[\s\S]{0,400}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
+  assert.match(script, /composingGeohashes = \[\.\.\.activeGeohashes\];\s+[\s\S]{0,300}refreshPriceQuote\(session\)\.catch/);
+
+  // One place buys a subscription, and it refuses for an identity that can never use one.
+  assert.match(script, /if \(session\.method === 'anonymous'\) \{\s+throw new Error\(`This temporary identity cannot hold a subscription/);
+
+  // The note records the identity it was written under, and a mismatch surviving a reload
+  // is named rather than signed by whoever happens to be logged in.
+  assert.match(script, /pubkey: session\.pubkey, anonymous: session\.method === 'anonymous'\}/);
+  assert.match(script, /pending\?\.action === 'pin' \? String\(pending\.pubkey \|\| ''\) : ''\)/);
+  assert.match(script, /error\.code = 'identity_changed';/);
+
+  // A refusal the reader has to act on outlives the dialog it was reported in.
+  assert.match(script, /if \(closedOverMessage\) \{\s+status\(elements\.boardStatus, error\.message, true\);/);
+
+  // And the sentence under the buttons names the way back when there is one.
+  assert.match(script, /const parkedName = parked \? sessionLabel\(parked\) : '';/);
+  assert.match(script, /describeStickyAction\(\{anonymous, subscription, plan: subscribePlan, parked: parkedName\}\)/);
 });
 
 test('a note paid for by subscription still finishes after the page reloads', async () => {

@@ -556,9 +556,10 @@ export function stickyDay(seconds) {
  *
  * `anonymous` is the identity mode in play, and `plan` is the plan the picker is
  * on — a buyer with no subscription is offered "subscribe and post" as one action
- * rather than a detour they have to repeat.
+ * rather than a detour they have to repeat. `parked` names the identity waiting behind
+ * a temporary one, which is the only way back the anonymous case has.
  */
-export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week' } = {}) {
+export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week', parked = '' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
   const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { member });
@@ -571,7 +572,8 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
       label: action === 'remove'
         ? `Remove · ${STICKY_ANONYMOUS_PRICE_SATS} sats`
         : `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
-      state: `Anonymous identity: ${STICKY_ANONYMOUS_PRICE_SATS} sats per message. A subscription never applies to it.`,
+      state: `Anonymous identity: ${STICKY_ANONYMOUS_PRICE_SATS} sats per message. A subscription never applies to it.`
+        + (parked ? ` Log out to switch back to ${parked}.` : ''),
       needsSubscription: false,
       price: STICKY_ANONYMOUS_PRICE_SATS,
       active: false,

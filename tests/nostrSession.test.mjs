@@ -47,3 +47,39 @@ test('anonymous Nostr identity is local, temporary, and restores the previous se
   assert.deepEqual(sessionModule.getNostrSession(), previous);
   assert.equal(storage.getItem('satoshi:nostr:anonymous:v1'), null);
 });
+
+test('the identity parked behind a temporary one is readable, and only when it can sign', async () => {
+  const storage = memoryStorage();
+  const real = {pubkey: 'b'.repeat(64), method: 'bunker', npub: `npub1${'b'.repeat(58)}`, profile: {name: 'Alice'}};
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify(real));
+
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      generateSecretKey: () => Uint8Array.from({length: 32}, (_, index) => index + 1),
+      getPublicKey: () => 'a'.repeat(64),
+      nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`},
+      finalizeEvent: template => ({...template, pubkey: 'a'.repeat(64), id: 'c'.repeat(64), sig: 'd'.repeat(128)}),
+    },
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?parked-test=${Date.now()}`);
+  assert.equal(sessionModule.parkedSession(), null, 'nothing is parked while a real identity is in use');
+
+  sessionModule.loginAnonymously();
+  assert.deepEqual(sessionModule.parkedSession(), real, 'a temporary identity parks the one it replaced');
+
+  sessionModule.logoutNostr();
+  assert.deepEqual(sessionModule.getNostrSession(), real, 'logging out of the temporary one returns to it');
+  assert.equal(sessionModule.parkedSession(), null, 'and the slot is spent');
+
+  // A half-written slot is not an identity: the page must not offer to switch back to
+  // something that cannot sign.
+  sessionModule.loginAnonymously();
+  storage.setItem('satoshi:nostr:previous-session:v1', JSON.stringify({pubkey: 'not-a-key', method: 'bunker'}));
+  assert.equal(sessionModule.parkedSession(), null);
+  storage.setItem('satoshi:nostr:previous-session:v1', JSON.stringify({pubkey: 'b'.repeat(64)}));
+  assert.equal(sessionModule.parkedSession(), null, 'a method is what makes it signable');
+});

@@ -46,6 +46,7 @@ import {
   loginWithExtension,
   loginWithPrivateKey,
   logoutNostr,
+  parkedSession,
   resumeAmber,
   shortNpub,
   signNostrEvent,
@@ -855,8 +856,13 @@ function updateAccount() {
 function renderQuotedPrice() {
   const session = getNostrSession();
   const anonymous = session?.method === 'anonymous';
-  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
-  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan});
+  // A temporary identity is the one case where the way back has to be named: it can
+  // never use a subscription, so the sentence under the buttons says which identity is
+  // waiting behind it and that logging out returns to it.
+  const parked = anonymous ? parkedSession() : null;
+  const parkedName = parked ? sessionLabel(parked) : '';
+  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan, parked: parkedName});
+  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan, parked: parkedName});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
   quotedPrice = session ? actionInfo.price : STICKY_SUB_WEEK_SATS;
@@ -1435,6 +1441,12 @@ async function ensureReadySigner() {
  * flow survive a reload mid-payment.
  */
 async function buySubscriptionThen(session, notePending, statusElement) {
+  // The one place a subscription is bought, so the one place to refuse it for an
+  // identity that can never use it: a throwaway key cannot hold a name, the desk prices
+  // it per message, and a plan bought here would be sats spent on nothing.
+  if (session.method === 'anonymous') {
+    throw new Error(`This temporary identity cannot hold a subscription. Post anonymously for ${STICKY_ANONYMOUS_PRICE_SATS} sats a note, or log in with your own key to use one.`);
+  }
   const member = Boolean(actionInfo.member);
   const order = await api('/orders', {
     method: 'POST',
@@ -1455,7 +1467,15 @@ async function startPayment() {
     status(elements.paymentStatus, '');
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
-    if (composingPubkey && composingPubkey !== session.pubkey) throw new Error('Your active Nostr identity changed. Reopen the note and try again.');
+    // The identity the note belongs to: in memory while the composer is open, or read
+    // back from the saved note when the page has reloaded since. Signing it with a
+    // different key would publish a note its writer cannot remove again.
+    const authorKey = composingPubkey || (pending?.action === 'pin' ? String(pending.pubkey || '') : '');
+    if (authorKey && authorKey !== session.pubkey) {
+      const error = new Error('This note was written by a different Nostr identity. Log out to switch back to the one that wrote it, then pin the note again.');
+      error.code = 'identity_changed';
+      throw error;
+    }
     // The cells the note was written on: in memory while the composer is open, or
     // read back from the saved note when the page has reloaded since — a
     // subscription paid from a wallet app reloads the page under the reader's feet,
@@ -1479,7 +1499,7 @@ async function startPayment() {
     const liveliness = livelinessRung().key;
     const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
-      anonymous: session.method === 'anonymous'};
+      pubkey: session.pubkey, anonymous: session.method === 'anonymous'};
     let order;
     try {
       order = await api('/orders', {
@@ -1517,8 +1537,16 @@ async function startPayment() {
     status(elements.paymentStatus, `Waiting for the ${sats}-sat payment...`);
     pollPayment();
   } catch (error) {
-    if (elements.paymentDialog.open && !pending?.orderId) elements.paymentDialog.close();
+    const closedOverMessage = elements.paymentDialog.open && !pending?.orderId;
+    if (closedOverMessage) elements.paymentDialog.close();
     status(elements.paymentStatus, error.message, true);
+    // A refusal the reader has to act on must outlive the dialog it was reported in:
+    // closing the dialog over the message is how a stranded note looked like nothing had
+    // happened at all.
+    if (closedOverMessage) {
+      status(elements.boardStatus, error.message, true);
+      elements.boardStatus.hidden = false;
+    }
     elements.pay.disabled = false;
   }
 }
@@ -2024,6 +2052,9 @@ function openComposer() {
   if (!session) { showDialog(elements.login); return; }
   composingPubkey = session.pubkey;
   composingGeohashes = [...activeGeohashes];
+  // Opening on a stale quote is how the buttons came to describe the wrong identity, so
+  // the composer asks again every time it opens.
+  refreshPriceQuote(session).catch(() => {});
   if (!pending?.orderId) elements.exactGeohash.checked = false;
   selectLiveliness(pending?.liveliness || selectedLiveliness);
   elements.pay.disabled = false;
@@ -2798,7 +2829,13 @@ document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu
 document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu') && !event.target.closest('.sticky-note__pin')) closeNoteMenu();
 });
-window.addEventListener('satoshi-nostr-session', updateAccount);
+window.addEventListener('satoshi-nostr-session', () => {
+  updateAccount();
+  // The identity decides what the buttons mean — an anonymous one can never use a
+  // subscription — so a change has to re-ask the desk and re-draw rather than only
+  // relabel the account: a stale quote is what offered a plan to a temporary identity.
+  refreshPriceQuote(getNostrSession()).catch(() => {});
+});
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 window.addEventListener('resize', () => { if (boardView.scale < .5) fitBoard(); });
 setInterval(() => {

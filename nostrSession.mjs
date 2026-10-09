@@ -52,6 +52,18 @@ export function getNostrSession() {
   return session;
 }
 
+/**
+ * The session parked while a temporary identity is in use, or null. Logging out of the
+ * temporary identity restores it, so this is what a "switch back" affordance names — and
+ * that a real signer is waiting behind a throwaway one is something the page has to say
+ * out loud rather than discover at the next payment.
+ */
+export function parkedSession() {
+  const session = readJson(localStorage, PREVIOUS_SESSION_KEY);
+  if (!session || !/^[0-9a-f]{64}$/.test(session.pubkey) || !session.method) return null;
+  return session;
+}
+
 export function loginAnonymously() {
   const current = getNostrSession();
   if (current?.method === 'anonymous' && current.expiresAt > Date.now()) return current;

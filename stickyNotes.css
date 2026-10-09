@@ -88,6 +88,7 @@
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }
+.login-note { margin: -4px 0 14px; color: #bbb; font-size: .84rem; }
 .private-key-login { margin-top: 18px; color: #bbb; }.private-key-login summary { color: #ddd; cursor: pointer; }.private-key-login p { font-size: .84rem; }
 .inline-status { min-height: 1.4em; margin-top: 12px; color: #c6c8c6; font-size: .88rem; text-align: center; }
 .inline-status.is-error { color: #ff7b75; }
