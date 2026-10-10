@@ -48,21 +48,23 @@ export const PAGE_HELP = Object.freeze({
         description: 'Buy a name like yourname@satoshi.si with Lightning, on-chain bitcoin, or Ark. It goes live after payment, has no renewal fee, allows one name per public key, and can be used with the satoshi.si Nostr relay.'
     },
     '/stickyNotes.html': {
-        title: 'About Nostr sticky notes',
-        description: 'Sticky notes are small public messages signed with your Nostr identity and placed on a shared'
+        title: 'About Pinstr',
+        description: 'Pinstr notes are small public messages signed with your Nostr identity and placed on a shared'
             + ' corkboard. Tag people with @, choose how long a note lives, and post with a subscription: 10 sats a'
             + ' week, or 5 with a satoshi.si name.',
         sections: [
             {
                 label: 'In plain words',
                 paragraphs: [
-                    'Sticky notes are small public messages, signed with your Nostr identity or a random anonymous one,'
+                    'Pinstr notes are small public messages, signed with your Nostr identity or a random anonymous one,'
                     + ' and placed on a shared corkboard. Choose where the note will be visible, and choose how long it'
                     + ' lives. Perfect for small areas and groups pinning notes to each other.',
                     'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
                     + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
                     + ' key and the board draws their name in its place. Open the sort button to show only notes that'
                     + ' tag you. That view works for a signed-in identity, but not for a temporary anonymous one.',
+                    'Add up to three optional hashtags in the separate field. Type words separated by commas; Pinstr'
+                    + ' adds the # for you. Spaces around commas are fine, but each hashtag itself must be one word.',
                     'The sort button can keep the board focused on the newest 5 or 15 notes, the last day, the last'
                     + ' week, or notes that mention you. Signed-in Nostr users can also keep on “Notes from my follows”'
                     + ' to limit any of those views to people they follow. That choice stays in this browser. A green'
@@ -74,18 +76,18 @@ export const PAGE_HELP = Object.freeze({
                     + ' archive of everything ever written. You cannot extend a note after it is pinned — pin it again'
                     + ' if you need it for longer — and a year is the longest this board offers.',
                     'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
-                    + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like and'
-                    + ' remove your own, with no per-note price. If you own a satoshi.si name such as yourname@satoshi.si,'
+                    + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like.'
+                    + ' If you own a satoshi.si name such as yourname@satoshi.si,'
                     + ' the same pass costs half: 5 sats a week or 205 a year.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
                     'Not signed in? An anonymous note costs 69 sats. Your browser creates a one-time key that can pin one'
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
-                    + ' so you can finish or remove that note. Leave anonymous mode and the key is deleted; returning'
+                    + ' so an interrupted payment or publication can finish. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
-                    'When a pass runs out, it does not remove notes you already pinned. They remain until the lifetime'
-                    + ' you chose for each note ends; only new notes and removals need another pass.',
+                    'When a pass runs out, it does not change notes you already pinned. They remain until the lifetime'
+                    + ' you chose for each note ends; only new notes need another pass.',
                     'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
                     + ' private key or controls your wallet. The payment service receives only the quoted payment and'
                     + ' keeps a record of the pass that the board checks when you post.',
@@ -96,7 +98,8 @@ export const PAGE_HELP = Object.freeze({
                 paragraphs: [
                     'A note is one kind 1 Nostr event signed by your own signer: a browser extension, a bunker, or a key'
                     + ' pasted for a single visit. The text is the event content and everything else travels in tags:'
-                    + ' ["t","satoshi-sticky"], ["client","satoshi.si"], one ["sticky","v1",color,x,y,rotation,font] whose x'
+                    + ' ["t","pinstr"], up to three additional hashtag t tags, ["client","satoshi.si"], and one'
+                    + ' ["sticky","v1",color,x,y,rotation,font] whose x'
                     + ' and y coordinates are fractions of the board and whose rotation is in degrees, and ["alt",…].'
                     + ' Colours are yellow, pink, blue, green, orange, and the text is capped at 501 characters. Before you'
                     + ' pay, the content is hashed with sha256 over the string v1, the colour, the font and the text, each on its'
@@ -109,8 +112,8 @@ export const PAGE_HELP = Object.freeze({
                     + ' service refuses a pin without that tag, one whose term falls outside the ladder, and one whose'
                     + ' moment has already passed by the time it is published, because the relay drops an event that'
                     + ' arrives expired. The relay never serves an expired event, and a cleanup deletes expired events'
-                    + ' from its store every ten minutes. A removal carries no expiration on purpose: an expiring'
-                    + ' deletion would be deleted itself, and the note it removed would come back. A note on the'
+                    + ' from its store every ten minutes. The note menu shows the exact moment and a live countdown.'
+                    + ' A note on the'
                     + ' relay that names no expiration at all is not drawn either: this board shows only notes that'
                     + ' say when they go, so a note written past the desk is invisible here rather than permanent.',
                     'Mentions follow NIP-27 and are the reason a tag means something. Typing @ offers the names the'
@@ -118,8 +121,8 @@ export const PAGE_HELP = Object.freeze({
                     + ' and only a key that answers with a NIP-05 name can be picked. What travels is the canonical form:'
                     + ' the text carries nostr:npub1\u2026 and the event carries one ["p","<64-hex>"] tag per person, at'
                     + ' most five, each a different key. The desk refuses a ["p", \u2026] tag whose key the text never'
-                    + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity or on'
-                    + ' a removal. Mentions cost nothing extra: one note, one price, however many people it names.',
+                    + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity.'
+                    + ' Mentions cost nothing extra: one note, one price, however many people it names.',
                     'Sorting is local: the board first reads its ordinary note events, then filters what is drawn in this'
                     + ' browser. “Notes from my follows” reads the signed-in account’s latest NIP-02 kind 3 contact-list'
                     + ' event from public relays and matches the note author against its p tags. The contact list is not'
@@ -151,21 +154,18 @@ export const PAGE_HELP = Object.freeze({
                     + ' recognise, and the name and its geohash wait there in this browser. Tapping one opens that'
                     + ' board; nothing is sent anywhere and no name ever leaves the device.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
-                    + ' extended rather than restarted when you renew early, covering any number of pins and removals while'
+                    + ' extended rather than restarted when you renew early, covering any number of pins while'
                     + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'
                     + ' a name, 5 × 52 = 260 → 205).',
                     'A pin from a key with no active pass is refused with a subscription-required answer; the board then'
                     + ' buys the pass and repeats the same action, which the second time comes back already settled at zero'
                     + ' sats along with its publish token.',
-                    'A removal is a kind 5 deletion event signed by the same identity as the note, carrying ["e",<event'
-                    + ' id>] with a relay hint and ["k","1"]. Only the author can order one: the service reads the target'
-                    + ' note from the relay and compares its author before it prices anything.',
                     'The publish token is bound to the note content hash, its geohash and its identity mode, lives 15'
                     + ' minutes and is spent once, so a token bought for one note cannot publish a different one in another'
                     + ' cell. The service verifies the event id and signature before the relay sees the event, and the relay'
                     + ' admits a write only for the exact event id that was paid for. An anonymous key pays 69 sats and may'
-                    + ' publish one pin only; it cannot buy a subscription. It may pay 42 sats to remove that one note while'
-                    + ' its local key remains available. An anonymous note must carry the ["anonymous","24h-local-key"] marker; a named'
+                    + ' publish one pin only; it cannot buy a subscription. An anonymous note must carry the'
+                    + ' ["anonymous","24h-local-key"] marker; a named'
                     + ' note must not.',
                     'Payments are in sats over Lightning or Ark, for the amount the service calculated for that order,'
                     + ' and a rail asking for any other amount is refused. Reading is always free: the relay serves every'

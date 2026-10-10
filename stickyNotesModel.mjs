@@ -1,8 +1,9 @@
 export const STICKY_EVENT_KIND = 1;
-export const STICKY_TOPIC = 'satoshi-sticky';
+export const STICKY_TOPIC = 'pinstr';
+export const STICKY_HASHTAG_MAX = 3;
 export const STICKY_VERSION = 'v1';
 // Posting is what a subscription buys. There is no per-note price for a
-// registered key any more: while a subscription is active, pins and removals are
+// registered key any more: while a subscription is active, pins are
 // included, and a note it covers is created already settled, so the board never
 // shows a payment step for one. The only per-note price left is the single-use
 // anonymous identity's, which can never subscribe.
@@ -14,13 +15,11 @@ export const STICKY_SUB_WEEKS_PER_YEAR = 52;
 export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
 export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
 export const STICKY_ANONYMOUS_PRICE_SATS = 69;
-export const STICKY_ANONYMOUS_REMOVAL_SATS = 42;
 
 /** All prices this service charges, so nothing else can be displayed as one. */
 export const STICKY_KNOWN_PRICES = Object.freeze([
   0,
   STICKY_ANONYMOUS_PRICE_SATS,
-  STICKY_ANONYMOUS_REMOVAL_SATS,
   STICKY_SUB_WEEK_SATS,
   STICKY_SUB_YEAR_SATS,
   STICKY_SUB_MEMBER_WEEK_SATS,
@@ -289,6 +288,21 @@ export function isStickyExpired(note, now = Math.floor(Date.now() / 1000)) {
   return Number.isFinite(note?.expiration) && note.expiration > 0 && note.expiration <= now;
 }
 
+export function stickyExpiryCountdown(expiration, now = Date.now() / 1000) {
+  const remaining = Math.max(0, Math.ceil(Number(expiration) - Number(now)));
+  if (!Number.isFinite(remaining) || remaining <= 0) return '[expired]';
+  const days = Math.floor(remaining / 86400);
+  const hours = Math.floor((remaining % 86400) / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  const seconds = remaining % 60;
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (days || hours) parts.push(`${hours}h`);
+  if (days || hours || minutes) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+  return `[${parts.join(' ')} left]`;
+}
+
 // Codes are 3 to 9 characters: below 3 the cell is a region rather than a
 // useful board, and 9 is as deep as the grid is useful. Within that range a board may
 // be a clump of touching cells, which is what lets one note cover a building
@@ -546,13 +560,13 @@ export function stickyDay(seconds) {
 
 /**
  * What the composer's buttons say. Kept as a pure function of the desk's
- * /sticky/v1/subscription answer so the wording can be tested without a DOM.
+ * /pinstr/v1/subscription answer so the wording can be tested without a DOM.
  *
  * `anonymous` is the identity mode in play, and `plan` is the plan the picker is
  * on — a buyer with no subscription is offered "subscribe and post" as one action
  * rather than a detour they have to repeat.
  */
-export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week' } = {}) {
+export function describeStickyAction({ anonymous = false, subscription = null, plan = 'week' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
   const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { member });
@@ -564,14 +578,11 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
     : 'Satoshi.si NIP-05 owners get 50% off.';
 
   if (anonymous) {
-    const price = action === 'remove' ? STICKY_ANONYMOUS_REMOVAL_SATS : STICKY_ANONYMOUS_PRICE_SATS;
     return {
-      label: action === 'remove'
-        ? `Remove · ${STICKY_ANONYMOUS_REMOVAL_SATS} sats`
-        : `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
+      label: `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
       state: `Anonymous post: ${STICKY_ANONYMOUS_PRICE_SATS} sats. One key can post one note and cannot buy a weekly or yearly subscription.`,
       needsSubscription: false,
-      price,
+      price: STICKY_ANONYMOUS_PRICE_SATS,
       active: false,
       member: false,
       week,
@@ -581,8 +592,8 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
 
   if (active) {
     return {
-      label: action === 'remove' ? 'Remove note' : 'Place your note',
-      state: `Subscription active${until ? ` until ${until}` : ''}. Posting and removals are included. ${discount}`,
+      label: 'Place your note',
+      state: `Subscription active${until ? ` until ${until}` : ''}. Posting is included. ${discount}`,
       needsSubscription: false,
       price: 0,
       active: true,
@@ -594,7 +605,7 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
 
   const price = stickySubscriptionPrice(plan, { member });
   return {
-    label: action === 'remove' ? `Remove · ${price} sats` : `Subscribe & pin · ${price} sats`,
+    label: `Subscribe & pin · ${price} sats`,
     state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year. ${discount}`,
     needsSubscription: true,
     price,
@@ -688,7 +699,33 @@ export function clampRotation(value) {
   return Number.isFinite(number) ? Math.min(ROTATION_MAX, Math.max(ROTATION_MIN, number)) : 0;
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
+function hashtagParts(input) {
+  return Array.isArray(input) ? input.map(String) : String(input || '').split(',');
+}
+
+/** Why a comma-separated hashtag field cannot publish, or an empty string when it can. */
+export function stickyHashtagIssue(input) {
+  const tags = [];
+  for (const raw of hashtagParts(input)) {
+    const tag = raw.trim().replaceAll('#', '').trim();
+    if (!tag) continue;
+    if (/\s/u.test(tag)) return `“${tag}” has spaces. Use one word for each hashtag.`;
+    if (!/^[\p{L}\p{N}_-]+$/u.test(tag)) return `“${tag}” can only use letters, numbers, hyphens, or underscores.`;
+    const lower = tag.toLowerCase();
+    if (lower !== STICKY_TOPIC && !tags.includes(lower)) tags.push(lower);
+  }
+  return tags.length > STICKY_HASHTAG_MAX ? `Use no more than ${STICKY_HASHTAG_MAX} hashtags.` : '';
+}
+
+/** Clean, unique Nostr t-tag values. Call stickyHashtagIssue() before using the result. */
+export function normaliseStickyHashtags(input) {
+  if (stickyHashtagIssue(input)) return [];
+  return [...new Set(hashtagParts(input)
+    .map(raw => raw.trim().replaceAll('#', '').trim().toLowerCase())
+    .filter(tag => tag && tag !== STICKY_TOPIC))];
+}
+
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
@@ -703,6 +740,9 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   const mentionProblem = mentionIssue(text, wanted);
   if (mentionProblem) throw new Error(mentionProblem);
   const mentionList = mentionPubkeys(wanted.map(key => [MENTION_TAG, key]));
+  const hashtagProblem = stickyHashtagIssue(hashtags);
+  if (hashtagProblem) throw new Error(hashtagProblem);
+  const hashtagList = normaliseStickyHashtags(hashtags);
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {
@@ -721,6 +761,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
       .sort((left, right) => right.length - left.length);
   const tags = [
     ['t', STICKY_TOPIC],
+    ...hashtagList.map(tag => ['t', tag]),
     ['client', 'satoshi.si'],
     ...namedCells.map(prefix => ['g', prefix]),
     ['i', `geo:${primary}`],
@@ -730,7 +771,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment this note stops existing, relay-side.
     [EXPIRATION_TAG, String(createdAt + rung.seconds)],
-    ['alt', 'A sticky note pinned on satoshi.si'],
+    ['alt', 'A Pinstr note pinned on satoshi.si'],
   ];
   if (anonymous) tags.push(['anonymous', '24h-local-key']);
   return {
@@ -743,7 +784,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
 
 export function parseStickyEvent(event) {
   if (!event || event.kind !== STICKY_EVENT_KIND || typeof event.content !== 'string') return null;
-  if (!event.tags?.some(tag => tag?.[0] === 't' && tag[1] === STICKY_TOPIC)) return null;
+  if (event.tags?.filter(tag => tag?.[0] === 't' && tag[1] === STICKY_TOPIC).length !== 1) return null;
   const sticky = event.tags.find(tag => tag?.[0] === 'sticky' && tag[1] === STICKY_VERSION);
   if (!sticky || !STICKY_COLORS.includes(sticky[2])) return null;
   const font = sticky[6] || 'typewriter';
@@ -783,6 +824,9 @@ export function parseStickyEvent(event) {
     expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
     mentions: mentionPubkeys(event.tags),
+    hashtags: [...new Set(event.tags.filter(tag => tag?.[0] === 't')
+      .map(tag => String(tag[1] || '').toLowerCase())
+      .filter(tag => tag && tag !== STICKY_TOPIC))].slice(0, STICKY_HASHTAG_MAX),
   };
 }
 
@@ -792,19 +836,4 @@ export async function stickyContentHash(content, color, font = 'typewriter', cry
   const bytes = new TextEncoder().encode(`${STICKY_VERSION}\n${color}\n${font}\n${text}`);
   const digest = await cryptoObject.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-export function makeDeletionTemplate({eventId, createdAt = Math.floor(Date.now() / 1000)}) {
-  if (!/^[0-9a-f]{64}$/.test(String(eventId || ''))) throw new Error('The note ID is invalid.');
-  return {
-    kind: 5,
-    created_at: createdAt,
-    content: 'Remove sticky note',
-    tags: [
-      ['e', eventId, 'wss://nostr.satoshi.si'],
-      ['k', '1'],
-      ['t', 'satoshi-sticky-delete'],
-      ['alt', 'A request to remove a sticky note from satoshi.si'],
-    ],
-  };
 }

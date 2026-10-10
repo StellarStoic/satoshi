@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101112">
-  <meta name="description" content="Subscribe in sats or post anonymously, then sign and pin a temporary Nostr note to a public geohash corkboard.">
-  <title>Nostr Sticky Notes | Satoshi.si</title>
+  <meta name="description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash corkboards.">
+  <title>Pinstr | Satoshi.si</title>
   <link rel="icon" href="/favicon-32x32.png">
   <link rel="manifest" href="/site.webmanifest">
   <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet">
@@ -21,8 +21,8 @@
   <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
 
   <main class="sticky-shell">
-    <h1 class="sticky-page-title">Nostr sticky notes</h1>
-    <div class="sticky-top-actions" aria-label="Sticky note controls">
+    <h1 class="sticky-page-title">Pinstr</h1>
+    <div class="sticky-top-actions" aria-label="Pinstr controls">
       <span class="sticky-help-slot" aria-hidden="true"></span>
       <button type="button" id="stickySettings" class="sticky-top-button" aria-label="Board settings are coming later" title="Board settings are coming later" disabled><i class="lni lni-gear-1" aria-hidden="true"></i></button>
       <button type="button" id="noteSort" class="sticky-top-button note-sort-button" aria-label="Sort and filter notes" title="Sort and filter notes" aria-pressed="false"><i class="lni lni-asana" aria-hidden="true"></i></button>
@@ -32,7 +32,7 @@
       <button type="button" id="newSticky" class="sticky-top-button" aria-label="New note" title="New note"><i class="lni lni-plus" aria-hidden="true"></i></button>
     </div>
 
-    <section id="stickyBoard" class="sticky-board" aria-label="Geohash Nostr sticky note board">
+    <section id="stickyBoard" class="sticky-board" aria-label="Pinstr geohash Nostr board">
       <div id="stickyCanvas" class="sticky-canvas">
         <div id="corkFrame" class="cork-frame" aria-hidden="true">
           <span class="cork-frame__rail cork-frame__rail--top"></span>
@@ -169,7 +169,7 @@
       </details>
       <div class="anonymous-login-block">
         <button type="button" class="anonymous-login" data-login="anonymous"><i class="lni lni-user-4" aria-hidden="true"></i><span>Post anonymously · 69 sats</span></button>
-        <p class="login-note">A new one-time key is created for one note. It remains available for up to 24 hours so you can finish or remove that note. Leaving anonymous mode deletes it. It cannot buy a weekly or yearly subscription.</p>
+        <p class="login-note">A new one-time key is created for one note. It remains available for up to 24 hours so you can finish publishing. Leaving anonymous mode deletes it. It cannot buy a weekly or yearly subscription.</p>
       </div>
       <hr class="login-status-divider">
       <div id="loginStatus" class="inline-status" role="status" aria-live="polite"></div>
@@ -209,6 +209,8 @@
         <button type="button" class="swatch swatch--orange" data-color="orange" aria-label="Orange"></button>
       </div>
       <label class="font-choice" for="noteFont"><span>Font</span><select id="noteFont" class="note-font-select note-font-select--typewriter" aria-label="Note font"><option class="font-preview--typewriter" value="typewriter">Special Elite</option><option class="font-preview--handwritten" value="handwritten">Caveat · Handwritten</option><option class="font-preview--comfortaa" value="comfortaa">Comfortaa · Rounded</option></select></label>
+      <label class="hashtag-field" for="noteHashtags"><span>Hashtags <small>up to 3, separated by commas</small></span><input id="noteHashtags" type="text" maxlength="100" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mountains, quote, #sausage" aria-describedby="hashtagStatus"></label>
+      <div id="hashtagStatus" class="hashtag-status" role="status" aria-live="polite"></div>
       <label class="note-scope-toggle" title="Hide this note from broader parent boards"><input id="exactGeohashNote" type="checkbox"><span>Show only on this exact geohash</span></label>
       <div class="liveliness" role="group" aria-labelledby="livelinessLabel">
         <div class="liveliness__head"><span id="livelinessLabel">Disappears after</span><output id="noteLivelinessValue" for="noteLiveliness">1 month</output></div>
@@ -264,13 +266,12 @@
     </div>
   </dialog>
 
-  <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Sticky note details">
+  <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Pinstr note details">
     <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
     <span>Event ID</span><code id="noteEventId"></code>
     <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
     <span>Posted</span><time id="notePostedAt"></time>
-    <span id="noteExpiresLabel" hidden>Disappears</span><time id="noteExpiresAt" hidden></time>
-    <button type="button" id="removeSticky" class="remove-note" hidden><i class="lni lni-trash-3" aria-hidden="true"></i><span>Remove note</span></button>
+    <span id="noteExpiresLabel" hidden>Disappears</span><div id="noteExpirationValue" class="note-menu__expiration" hidden><time id="noteExpiresAt"></time><span id="noteExpiryCountdown" class="note-expiry-countdown" aria-live="off"></span></div>
     <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
     <details id="noteEventJsonDetails" class="note-event-json">
       <summary>Show JSON</summary>

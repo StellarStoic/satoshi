@@ -2,16 +2,56 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_ANONYMOUS_REMOVAL_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor,
-  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+  geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashCellDimensions,
   geohashGridFits,
   GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
-test('sticky notes accept up to 501 characters', () => {
+test('Pinstr notes accept up to 501 characters', () => {
   assert.equal(STICKY_MAX_CHARACTERS, 501);
+});
+
+test('Pinstr cleans up to three one-word hashtags and always carries its reserved topic', () => {
+  assert.equal(STICKY_TOPIC, 'pinstr');
+  assert.equal(STICKY_HASHTAG_MAX, 3);
+  assert.equal(stickyHashtagIssue(' mountains, quote, #sausage '), '');
+  assert.deepEqual(normaliseStickyHashtags(' mountains, quote, #sausage '), ['mountains', 'quote', 'sausage']);
+  assert.deepEqual(normaliseStickyHashtags('#Mountains, mountains, pinstr'), ['mountains']);
+  assert.deepEqual(normaliseStickyHashtags('slow,   friyay'), ['slow', 'friyay']);
+  assert.match(stickyHashtagIssue('slow, flying above, friyay'), /flying above.*spaces/i);
+  assert.match(stickyHashtagIssue('one,two,three,four'), /no more than 3/i);
+  assert.match(stickyHashtagIssue('okay, not!okay'), /letters, numbers/i);
+
+  const template = makeStickyTemplate({content:'hello', color:'yellow', x:.5, y:.5, rotation:0,
+    geohash:TEST_GEOHASH, hashtags:' mountains, quote, #sausage '});
+  assert.deepEqual(template.tags.filter(tag => tag[0] === 't'), [
+    ['t', 'pinstr'], ['t', 'mountains'], ['t', 'quote'], ['t', 'sausage'],
+  ]);
+  const parsed = parseStickyEvent({...template, id:'a'.repeat(64), pubkey:'b'.repeat(64)});
+  assert.deepEqual(parsed.hashtags, ['mountains', 'quote', 'sausage']);
+  assert.equal(parseStickyEvent({...template, id:'a'.repeat(64), pubkey:'b'.repeat(64),
+    tags: template.tags.filter(tag => tag[0] !== 't')}), null, 'a note without pinstr is not a Pinstr event');
+  assert.equal(parseStickyEvent({...template, id:'a'.repeat(64), pubkey:'b'.repeat(64),
+    tags: [...template.tags, ['t', 'pinstr']]}), null, 'the reserved topic must occur exactly once');
+  assert.throws(() => makeStickyTemplate({content:'hello', color:'yellow', x:.5, y:.5, rotation:0,
+    geohash:TEST_GEOHASH, hashtags:'slow, flying above, friyay'}), /spaces/i);
+});
+
+test('the Pinstr composer blocks payment for invalid hashtags and restores valid ones', async () => {
+  const [html, page] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="noteHashtags"/);
+  assert.match(html, /id="hashtagStatus"[^>]*aria-live="polite"/);
+  assert.match(page, /const \{issue: hashtagProblem, tags: hashtags\} = validateHashtags\(\);\s+if \(hashtagProblem\) throw new Error\(hashtagProblem\);/);
+  assert.match(page, /hashtags,\s+geohash: activeGeohash/);
+  assert.match(page, /elements\.hashtags\.value = \(pending\.hashtags \|\| \[\]\)\.join\(', '\);/);
+  assert.match(page, /'#t': \[STICKY_TOPIC\]/, 'only the Pinstr topic is queried');
+  assert.doesNotMatch(page, /kinds: \[5\]/, 'the board does not query deletion events');
 });
 
 test('prices are the subscription plans, and nothing else counts as one', () => {
@@ -20,7 +60,6 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(STICKY_SUB_MEMBER_WEEK_SATS, 5);
   assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, 205);
   assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 69);
-  assert.equal(STICKY_ANONYMOUS_REMOVAL_SATS, 42);
 
   assert.equal(stickySubscriptionPrice('week'), 10);
   assert.equal(stickySubscriptionPrice('week', {member: true}), 5);
@@ -40,7 +79,7 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(stickyOrderPrice({sats: 411}), 411);
   assert.equal(stickyOrderPrice({sats: 0}), 0, 'a covered note costs nothing');
   assert.equal(stickyOrderPrice({sats: 69}), 69);
-  assert.equal(stickyOrderPrice({sats: 42}), 42, 'anonymous removal keeps its existing price');
+  assert.equal(stickyOrderPrice({sats: 42}), STICKY_SUB_WEEK_SATS, 'a retired removal price is not displayed');
   assert.equal(stickyOrderPrice({sats: 11}), STICKY_SUB_WEEK_SATS, 'the retired per-note price is not shown');
   assert.equal(stickyOrderPrice({sats: 10.5}), STICKY_SUB_WEEK_SATS);
   assert.equal(stickyOrderPrice({sats: 70}), STICKY_SUB_WEEK_SATS);
@@ -66,9 +105,6 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(on.price, 0, 'a covered note is never given a price');
   assert.equal(on.label, 'Place your note');
   assert.match(on.state, /Subscription active until 2027-01-15/);
-  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).label, 'Remove note');
-  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).price, 0);
-  assert.equal(describeStickyAction({subscription: stranger, action: 'remove'}).label, 'Remove · 10 sats');
 
   const anon = describeStickyAction({anonymous: true, subscription: covered});
   assert.equal(anon.needsSubscription, false);
@@ -76,9 +112,6 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(anon.label, 'Post anonymously · 69 sats');
   assert.match(anon.state, /One key can post one note/);
   assert.match(anon.state, /cannot buy a weekly or yearly subscription/);
-  const anonRemoval = describeStickyAction({anonymous: true, action: 'remove'});
-  assert.equal(anonRemoval.label, 'Remove · 42 sats');
-  assert.equal(anonRemoval.price, 42);
 
   // A parked named account is an implementation detail, not a promise that an anonymous
   // key will return or survive leaving anonymous mode.
@@ -299,13 +332,6 @@ test('single-rail and pending orders do not show unusable payment tabs', () => {
   assert.deepEqual(stickyPaymentRails({payment: {bolt11: 'lnbc110n1y'}}),
     [{id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc110n1y', copyValue: 'lnbc110n1y'}]);
   assert.deepEqual(stickyPaymentRails({payment: null}), []);
-});
-
-test('deletion request targets one event on the satoshi relay', () => {
-  const eventId = 'f'.repeat(64);
-  const template = makeDeletionTemplate({eventId, createdAt: 123});
-  assert.equal(template.kind, 5);
-  assert.deepEqual(template.tags[0], ['e', eventId, 'wss://nostr.satoshi.si']);
 });
 
 test('the note menu can reveal the complete signed Nostr event as JSON', async () => {
@@ -695,7 +721,15 @@ test('a note reads its expiration back, and one that names none is not drawn', (
   assert.equal(isStickyExpired(null), false, 'a missing note is not an expired one');
 });
 
-test('the composer asks how long a note lives, and the menu says when it goes', async () => {
+test('note expiry countdown remains compact from days through the final second', () => {
+  assert.equal(stickyExpiryCountdown(700000, 100000), '[6d 22h 40m 0s left]');
+  assert.equal(stickyExpiryCountdown(103661, 100000), '[1h 1m 1s left]');
+  assert.equal(stickyExpiryCountdown(100061, 100000), '[1m 1s left]');
+  assert.equal(stickyExpiryCountdown(100001, 100000), '[1s left]');
+  assert.equal(stickyExpiryCountdown(100000, 100000), '[expired]');
+});
+
+test('the composer asks how long a note lives, and the menu counts down until it goes', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
@@ -706,13 +740,16 @@ test('the composer asks how long a note lives, and the menu says when it goes', 
   assert.match(html, /id="noteLivelinessHint"/);
   assert.match(html, /Disappears after/);
   assert.match(html, /id="noteExpiresAt"/, 'the note menu shows when a note goes');
+  assert.match(html, /id="noteExpiryCountdown"/, 'the note menu shows time remaining');
+  assert.doesNotMatch(html, /id="removeSticky"/, 'natural expiration replaces early deletion');
   assert.match(script, /elements\.liveliness\.addEventListener\('input'/);
   assert.match(script, /liveliness: pending\.liveliness \|\| STICKY_DEFAULT_LIVELINESS/,
     'the published note carries the term the writer chose');
   assert.match(script, /isStickyExpired\(sticky\)/, 'an expired note is not drawn');
   assert.match(script, /renderLiveliness\(\)/, 'the slider is built from the ladder, not from markup');
   // the note menu reads the term off the event, and a note without one shows no row
-  assert.match(script, /elements\.noteExpiresAt\.hidden = !expiresAt/);
+  assert.match(script, /elements\.noteExpirationValue\.hidden = !expiresAt/);
+  assert.match(script, /noteExpiryTimer = setInterval\(tick, 1000\)/);
   assert.match(script, /tag\?\.\[0\] === 'expiration'/);
 });
 
@@ -777,7 +814,7 @@ test('a pinned note carries a ["p", …] tag per person it names', () => {
 test('a note read off the relay carries the people it tags', () => {
   const event = {kind: 1, id: 'a'.repeat(64), pubkey: BOB, created_at: 1000,
     content: `hi nostr:${ALICE_NPUB}`,
-    tags: [['t', 'satoshi-sticky'], ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
+    tags: [['t', 'pinstr'], ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
       ['g', TEST_GEOHASH], ['expiration', '1794044775'], [MENTION_TAG, ALICE], [MENTION_TAG, 'nonsense']]};
   const sticky = parseStickyEvent(event);
   assert.deepEqual(sticky.mentions, [ALICE]);
@@ -1048,7 +1085,7 @@ test('an unpinned note is on the board only for the identity pinning it', async 
   assert.match(script, /\/\/ Signing out withdraws the unpinned note; signing in returns it\.\s+syncPlacementWithSession\(\);/);
 
   // ...and the board's own restore path goes through the same check.
-  assert.match(script, /else syncPlacementWithSession\(\);/);
+  assert.match(script, /else if \(!resumedSigning && pending\?\.status === 'paid'\) \{\s+syncPlacementWithSession\(\);/);
 });
 
 test('a temporary identity cannot buy a plan, and a refusal is not hidden with its dialog', async () => {
@@ -1067,8 +1104,10 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
     'an anonymous identity never enters subscription checkout');
   assert.match(script, /error\?\.reason === 'subscription_required'/,
     'only the explicit subscription refusal starts plan checkout');
-  assert.match(script, /throw anonymousRemovalClassificationError\(error, session\)/,
-    'a misclassified anonymous removal reports the service problem instead of offering a plan');
+  assert.match(script, /if \(pending\?\.action === 'remove'\) \{\s+savePending\(null\);\s+pending = null;/,
+    'a stale removal from an older frontend is not resumed');
+  assert.doesNotMatch(script, /function startRemovalPayment|function publishRemoval/,
+    'the note menu no longer exposes a deletion purchase path');
 
   // The note records the identity it was written under, and a mismatch surviving a reload
   // is named rather than signed by whoever happens to be logged in.

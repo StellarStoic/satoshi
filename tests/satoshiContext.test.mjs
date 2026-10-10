@@ -17,7 +17,7 @@ test('AI context maps every documented page to one URL', () => {
   assert.equal(parsed.pages.get('/converter.html')?.name, 'Converter');
   assert.equal(parsed.pages.get('/nip05store.html')?.name, 'NIP-05 name store');
   assert.equal(parsed.pages.get('/bitcoinTxCost.html')?.name, 'Bitcoin and Ark Transaction Cost');
-  assert.equal(parsed.pages.get('/stickyNotes.html')?.name, 'Nostr Sticky Notes');
+  assert.equal(parsed.pages.get('/stickyNotes.html')?.name, 'Pinstr');
 });
 
 test('every documented page exists in the site root', async () => {

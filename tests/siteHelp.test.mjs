@@ -34,9 +34,9 @@ test('home resolves with and without an explicit filename', () => {
     assert.deepEqual(helpForPath('/index.html'), PAGE_HELP['/index.html']);
 });
 
-test('sticky notes help explains its signed Nostr layout without backend details', () => {
+test('Pinstr help explains its signed Nostr layout without backend details', () => {
     const copy = helpCopy(PAGE_HELP['/stickyNotes.html']);
-    for (const term of ['Nostr event', 'signer', 'public key', 'coordinates', 'deletion event']) assert.match(copy, new RegExp(term, 'i'));
+    for (const term of ['Nostr event', 'signer', 'public key', 'coordinates', 'expiration']) assert.match(copy, new RegExp(term, 'i'));
     assert.doesNotMatch(copy, /API|payment server|write policy|attestation/i);
 });
 
@@ -77,7 +77,7 @@ test('page-specific top controls do not restore viewport-fixed positioning', asy
     }
 });
 
-test('sticky notes help has a plain view and a technical one', () => {
+test('Pinstr help has a plain view and a technical one', () => {
     const sections = helpSections(PAGE_HELP['/stickyNotes.html']);
     assert.equal(sections.length, 2, 'two views');
     assert.deepEqual(sections.map(section => section.label), ['In plain words', 'Technical']);
@@ -88,9 +88,11 @@ test('sticky notes help has a plain view and a technical one', () => {
     assert.doesNotMatch(plain, /sha256|kind 1|geohash/i);
     // The technical view is where the wire format lives.
     const technical = sections[1].paragraphs.join(' ');
-    for (const term of ['kind 1', 'sha256', 'geohash', 'publish token']) {
-        assert.match(technical, new RegExp(term, 'i'));
-    }
+  for (const term of ['kind 1', 'sha256', 'geohash', 'publish token']) {
+    assert.match(technical, new RegExp(term, 'i'));
+  }
+  assert.match(technical, /\["t","pinstr"\]/);
+  assert.match(plain, /three optional hashtags/i);
     assert.match(technical, /three to nine characters/i);
     assert.doesNotMatch(technical, /four to nine characters/i);
     assert.doesNotMatch(technical, /NaN/, 'every help paragraph remains text');
@@ -105,7 +107,6 @@ test('the explainer states the prices the board actually charges, and no retired
         model.STICKY_SUB_MEMBER_WEEK_SATS,
         model.STICKY_SUB_MEMBER_YEAR_SATS,
         model.STICKY_ANONYMOUS_PRICE_SATS,
-        model.STICKY_ANONYMOUS_REMOVAL_SATS,
     ];
     for (const price of live) {
         assert.match(copy, new RegExp(`\\b${price}\\b`), `the explainer should state ${price} sats`);
@@ -113,6 +114,7 @@ test('the explainer states the prices the board actually charges, and no retired
     // There is no per-note price for a signed-in writer any more, so the modal must
     // not advertise one.
     assert.doesNotMatch(copy, /\b11 sats\b|\b21 sats\b/);
+    assert.doesNotMatch(copy, /remove note|kind 5 deletion|42 sats/i);
 });
 
 test('a flat details list still renders as one unlabelled view', () => {

@@ -111,7 +111,7 @@ const MENU_ITEMS = [
     {label: 'Nostr', children: [
         {label: 'NIP-05', href: '/nip05.html'},
         {label: 'NIP-05 name store', href: '/nip05store.html'},
-        {label: 'Sticky notes', href: '/stickyNotes.html'},
+        {label: 'Pinstr', href: '/stickyNotes.html'},
     ]},
     {label: 'Games', children: [
         {label: 'Game39 Multi Player', href: '/game39.html'},

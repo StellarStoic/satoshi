@@ -2,13 +2,14 @@ import {
   STICKY_COLORS,
   STICKY_FONTS,
   STICKY_ANONYMOUS_PRICE_SATS,
-  STICKY_ANONYMOUS_REMOVAL_SATS,
   STICKY_MAX_CHARACTERS,
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
   describeStickyAction,
   stickySubscriptionPrice,
   STICKY_TOPIC,
+  normaliseStickyHashtags,
+  stickyHashtagIssue,
   clampPlacement,
   clampRotation,
   encodeGeohash,
@@ -21,7 +22,6 @@ import {
   geohashTouches,
   GEOHASH_MAX_CELLS,
   normaliseGeohashes,
-  makeDeletionTemplate,
   makeStickyTemplate, mentionFilterAvailability, mentionLabel, stickyTextParts, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashMatchesBoard,
   geohashPrecisionForZoom,
@@ -36,6 +36,7 @@ import {
   STICKY_DEFAULT_LIVELINESS,
   stickyLiveliness,
   stickyExpiration,
+  stickyExpiryCountdown,
   isStickyExpired,
   geohashGridFits,
   GRID_MIN_CELL_PX,} from './stickyNotesModel.mjs';
@@ -59,7 +60,7 @@ import {
 } from './nostrSession.mjs';
 import {payServiceUrl} from './paymentService.mjs';
 
-const API = document.querySelector('meta[name="sticky-api"]')?.content || payServiceUrl('sticky');
+const API = document.querySelector('meta[name="pinstr-api"]')?.content || payServiceUrl('pinstr');
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const FLOW_SYNC_KEY = 'satoshi:sticky:flow-sync:v1';
@@ -113,6 +114,7 @@ const elements = {
   anonymousExpiry: document.getElementById('anonymousExpiry'), logout: document.getElementById('logoutNostr'),
   composer: document.getElementById('composerDialog'), editor: document.getElementById('stickyEditor'),
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
+  hashtags: document.getElementById('noteHashtags'), hashtagStatus: document.getElementById('hashtagStatus'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
@@ -130,13 +132,14 @@ const elements = {
   exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
   livelinessTicks: document.getElementById('noteLivelinessTicks'), livelinessHint: document.getElementById('noteLivelinessHint'),
-  noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpiresAt: document.getElementById('noteExpiresAt'),
+  noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpirationValue: document.getElementById('noteExpirationValue'),
+  noteExpiresAt: document.getElementById('noteExpiresAt'), noteExpiryCountdown: document.getElementById('noteExpiryCountdown'),
   zoomOut: document.getElementById('zoomOut'), zoomIn: document.getElementById('zoomIn'),
   zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
-  removeSticky: document.getElementById('removeSticky'), noteMenuStatus: document.getElementById('noteMenuStatus'),
+  noteMenuStatus: document.getElementById('noteMenuStatus'),
 };
 
 let selectedColor = 'yellow';
@@ -144,7 +147,14 @@ let selectedFont = 'typewriter';
 let selectedLiveliness = STICKY_DEFAULT_LIVELINESS;
 let lastValidEditor = '';
 let pending = readPending();
+// Early note deletion is no longer a Pinstr action. Do not resume a stale removal
+// left by an older frontend; published deletion events are still read from the relay.
+if (pending?.action === 'remove') {
+  savePending(null);
+  pending = null;
+}
 let placingNote = null;
+let noteExpiryTimer = null;
 let discardRestore = null;
 let paymentTimer = null;
 let invoiceMessageTimer = null;
@@ -152,7 +162,6 @@ let boardSocket = null;
 let boardConnectionVersion = 0;
 const rendered = new Set();
 const noteEvents = new Map();
-const pendingDeletions = new Map();
 const authorLabels = new Map();
 const authorProfileQueue = new Set();
 const authorProfilesLoading = new Set();
@@ -169,7 +178,7 @@ let revealedFilteredNoteTimer = null;
 let placementGestureController = null;
 let quotedPrice = STICKY_SUB_WEEK_SATS;
 let quotedPubkey = '';
-// The desk's answer to GET /sticky/v1/subscription for the signed-in key, and the
+// The desk's answer to GET /pinstr/v1/subscription for the signed-in key, and the
 // plan the picker is on. `actionInfo` is the pure description of what the buttons
 // say, rebuilt whenever any of those change.
 let subscription = null;
@@ -940,14 +949,12 @@ function renderQuotedPrice() {
   const anonymous = session?.method === 'anonymous';
   const checkingSubscription = Boolean(session && !anonymous && !subscriptionResolved);
   actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
-  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
   quotedPrice = session && !checkingSubscription ? actionInfo.price : 0;
   elements.pay.querySelector('span').textContent = session
     ? (checkingSubscription ? 'Place your note' : actionInfo.label)
     : 'Sign in to post';
-  elements.removeSticky.querySelector('span').textContent = session && !checkingSubscription ? removeInfo.label : 'Remove note';
   if (elements.subscriptionState) {
     elements.subscriptionState.textContent = session ? actionInfo.state : '';
     // An active subscription needs no sales copy. The composer becomes one clear action.
@@ -1197,7 +1204,6 @@ function selectBoard(geohash, closeDialog = true) {
   rendered.clear();
   clearRevealedFilteredNote();
   noteEvents.clear();
-  pendingDeletions.clear();
   // The wooden rail is markup inside this canvas, so a bare replaceChildren() deleted the
   // board's own edge every time a board was opened - which is why the border was missing on
   // a phone, where a board almost always gets chosen before the board is looked at. Keep it.
@@ -1415,10 +1421,7 @@ function connectBoard(version = boardConnectionVersion) {
     // A board of several cells asks the relay for all of them at once: "any of
     // these" is what the filter means, and the notes decide the rest.
     const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [...activeGeohashes], limit: 500};
-    socket.send(JSON.stringify(['REQ', subscription,
-      noteFilter,
-      {kinds: [5], '#t': ['satoshi-sticky-delete'], limit: 500},
-    ]));
+    socket.send(JSON.stringify(['REQ', subscription, noteFilter]));
   });
   socket.addEventListener('message', message => {
     try {
@@ -1431,16 +1434,10 @@ function connectBoard(version = boardConnectionVersion) {
       }
       if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])) return;
       const event = data[2];
-      if (event.kind === 5) {
-        processDeletion(event);
-        return;
-      }
       const sticky = parseStickyEvent(event);
       // NIP-40: an expired note is gone. The relay should not be sending one at
       // all, and a note that expires between the send and this line is dropped here.
       if (!sticky || isStickyExpired(sticky) || !noteBelongsToBoard(sticky)) return;
-      const deletion = pendingDeletions.get(sticky.id);
-      if (deletion?.pubkey === sticky.pubkey) return;
       renderNote(sticky, event);
     } catch {}
   });
@@ -1460,22 +1457,6 @@ function connectBoard(version = boardConnectionVersion) {
       }, 5000);
     }
   }, {once: true});
-}
-
-function processDeletion(event) {
-  const target = event.tags?.find(tag => tag?.[0] === 'e')?.[1];
-  if (!/^[0-9a-f]{64}$/.test(target || '')) return;
-  const existing = noteEvents.get(target);
-  if (existing && existing.event.pubkey === event.pubkey) {
-    if (revealedFilteredNoteId === target) clearRevealedFilteredNote();
-    existing.element.remove();
-    noteEvents.delete(target);
-    rendered.delete(target);
-    applyNoteFilters();
-    if (selectedNoteId === target) closeNoteMenu();
-  } else {
-    pendingDeletions.set(target, event);
-  }
 }
 
 function selectColor(color) {
@@ -1624,6 +1605,17 @@ function handleEditorInput() {
   updateCapacity();
 }
 
+function validateHashtags() {
+  const issue = stickyHashtagIssue(elements.hashtags.value);
+  elements.hashtags.classList.toggle('is-invalid', Boolean(issue));
+  elements.hashtags.setAttribute('aria-invalid', String(Boolean(issue)));
+  elements.hashtagStatus.classList.toggle('is-error', Boolean(issue));
+  const tags = normaliseStickyHashtags(elements.hashtags.value);
+  elements.hashtagStatus.textContent = issue || (tags.length ? tags.map(tag => `#${tag}`).join(' · ') : '');
+  elements.pay.disabled = Boolean(issue);
+  return {issue, tags};
+}
+
 async function ensureReadySigner() {
   if (await signerReady().catch(() => false)) return true;
   showDialog(elements.login);
@@ -1664,14 +1656,11 @@ function shouldBuySubscription(error, session) {
     && error?.reason === 'subscription_required';
 }
 
-function anonymousRemovalClassificationError(error, session) {
-  if (session?.method !== 'anonymous' || error?.status !== 402 || error?.reason !== 'subscription_required') return error;
-  return new Error('The payment service could not recognize this anonymous note, so no invoice was created. Please try again shortly.');
-}
-
 async function startPayment() {
   try {
     status(elements.paymentStatus, '');
+    const {issue: hashtagProblem, tags: hashtags} = validateHashtags();
+    if (hashtagProblem) throw new Error(hashtagProblem);
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
     if (session.method === 'anonymous' && session.noteEventId) {
@@ -1707,7 +1696,7 @@ async function startPayment() {
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
     const exactGeohash = elements.exactGeohash.checked;
     const liveliness = livelinessRung().key;
-    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions,
+    const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions, hashtags,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
       pubkey: session.pubkey, anonymous: session.method === 'anonymous'};
     let order;
@@ -1767,7 +1756,7 @@ async function startPayment() {
       status(elements.boardStatus, error.message, true);
       elements.boardStatus.hidden = false;
     }
-    elements.pay.disabled = false;
+    validateHashtags();
   }
 }
 
@@ -1804,8 +1793,7 @@ async function pollPayment() {
       const sats = stickyOrderPrice(rest, 0);
       status(elements.boardStatus, `Subscription active${plan ? ` (${plan})` : ''}. Finishing what you started...`);
       elements.boardStatus.hidden = false;
-      if (rest.action === 'remove') await startRemovalPayment();
-      else await startPayment();
+      await startPayment();
       return;
     } catch (error) {
       if ((pending?.subscribeOrderId || '') !== pollingOrderId) return;
@@ -1817,28 +1805,24 @@ async function pollPayment() {
   if (!pending?.orderId) return;
   try {
     const order = await api(`/orders/${encodeURIComponent(pending.orderId)}`);
-    if (pending.action === 'pin' && pending.sats > 0) await renderPayment(order);
+    if (pending.sats > 0) await renderPayment(order);
     if (order.paid && order.publishToken) {
       stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
       savePending({...pending, status: 'paid', publishToken: order.publishToken});
-      if (pending.action === 'remove') await publishRemoval();
-      else {
-        if (elements.composer.open) elements.composer.close();
-        beginPlacement();
-      }
+      if (elements.composer.open) elements.composer.close();
+      beginPlacement();
       return;
     }
     if (['expired', 'invalid', 'cancelled'].includes(String(order.status || '').toLowerCase())) throw new Error('The invoice expired. Start again when you are ready.');
     const invoicePending = String(order.status || '').toLowerCase() === 'awaiting_invoice' || !order.payment;
-    status(pending.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus,
-      invoicePending ? 'Preparing invoice...' : 'Waiting for payment...');
+    status(elements.paymentStatus, invoicePending ? 'Preparing invoice...' : 'Waiting for payment...');
     if (invoicePending) startInvoiceMessages();
     paymentTimer = setTimeout(pollPayment, 3000);
   } catch (error) {
     if ((pending?.orderId || '') !== pollingOrderId) return;
     stopInvoiceMessages();
-    status(pending?.action === 'remove' ? elements.noteMenuStatus : elements.paymentStatus, error.message, true);
+    status(elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
   }
 }
@@ -1874,7 +1858,6 @@ async function discardInvoice() {
   const {orderId, sats, status: _status, publishToken, subscribeOrderId, subscribePlan, subscribeSats, ...draft} = pending;
   savePending(draft.action === 'pin' && draft.content ? draft : null);
   elements.pay.disabled = false;
-  elements.removeSticky.disabled = false;
   // Nothing of the discarded invoice is left on the screen to be scanned or copied.
   elements.paymentAmount.textContent = '';
   elements.paymentRails.hidden = true;
@@ -1903,6 +1886,8 @@ function restoreSavedDraft() {
   selectColor(pending.color);
   selectFont(pending.font || 'typewriter');
   elements.exactGeohash.checked = Boolean(pending.exactGeohash);
+  elements.hashtags.value = (pending.hashtags || []).join(', ');
+  validateHashtags();
   selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
   elements.editor.textContent = pending.content;
   lastValidEditor = pending.content;
@@ -2140,6 +2125,8 @@ function discardPendingNote() {
   savePending(null);
   if (elements.discardDialog.open) elements.discardDialog.close();
   elements.editor.textContent = '';
+  elements.hashtags.value = '';
+  validateHashtags();
   lastValidEditor = '';
   elements.pay.disabled = false;
   updateCapacity();
@@ -2177,6 +2164,8 @@ async function publishPinnedNote(resumedEvent = null) {
     signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
     savePending(null);
     elements.editor.textContent = '';
+    elements.hashtags.value = '';
+    validateHashtags();
     lastValidEditor = '';
     elements.pay.disabled = false;
     published = true;
@@ -2208,11 +2197,24 @@ async function publishPinnedNote(resumedEvent = null) {
 }
 
 function closeNoteMenu() {
+  clearInterval(noteExpiryTimer);
+  noteExpiryTimer = null;
   elements.noteMenu.hidden = true;
   elements.noteEventJsonDetails.open = false;
   elements.noteEventJson.textContent = '';
   selectedNoteId = '';
   status(elements.noteMenuStatus, '');
+}
+
+function startNoteExpiryCountdown(expiresAt) {
+  clearInterval(noteExpiryTimer);
+  noteExpiryTimer = null;
+  if (!expiresAt) return;
+  const tick = () => {
+    elements.noteExpiryCountdown.textContent = stickyExpiryCountdown(expiresAt / 1000);
+  };
+  tick();
+  noteExpiryTimer = setInterval(tick, 1000);
 }
 
 function keepNoteMenuOnScreen() {
@@ -2236,12 +2238,12 @@ function openNoteMenu(eventId, pin) {
   const expiresTag = Number(record.event.tags?.find(tag => tag?.[0] === 'expiration')?.[1]);
   const expiresAt = Number.isFinite(expiresTag) && expiresTag > 0 ? expiresTag * 1000 : 0;
   elements.noteExpiresLabel.hidden = !expiresAt;
-  elements.noteExpiresAt.hidden = !expiresAt;
+  elements.noteExpirationValue.hidden = !expiresAt;
   if (expiresAt) {
     elements.noteExpiresAt.dateTime = new Date(expiresAt).toISOString();
     elements.noteExpiresAt.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(expiresAt);
   }
-  elements.removeSticky.hidden = getNostrSession()?.pubkey !== record.event.pubkey;
+  startNoteExpiryCountdown(expiresAt);
   elements.noteMenu.hidden = false;
   const pinRect = pin.getBoundingClientRect();
   const menuRect = elements.noteMenu.getBoundingClientRect();
@@ -2267,78 +2269,6 @@ async function copySelectedNoteId() {
     setTimeout(() => { elements.copyNoteId.querySelector('span').textContent = 'Copy ID'; }, 1800);
   } catch {
     status(elements.noteMenuStatus, 'Could not copy the event ID.', true);
-  }
-}
-
-async function startRemovalPayment() {
-  try {
-    const record = noteEvents.get(selectedNoteId);
-    const session = getNostrSession();
-    if (!record || !session || record.event.pubkey !== session.pubkey) throw new Error('Only the note author can remove it.');
-    await ensureReadySigner();
-    elements.removeSticky.disabled = true;
-    status(elements.noteMenuStatus, actionInfo.active ? 'Removing the note...' : 'Preparing invoice...');
-    if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
-    const notePending = {action: 'remove', targetEventId: selectedNoteId};
-    let order;
-    try {
-      order = await api('/orders', {
-        method: 'POST',
-        body: JSON.stringify({pubkey: session.pubkey, action: 'remove', targetEventId: selectedNoteId}),
-      });
-    } catch (error) {
-      if (!shouldBuySubscription(error, session)) throw anonymousRemovalClassificationError(error, session);
-      await buySubscriptionThen(session, notePending, elements.noteMenuStatus);
-      return;
-    }
-    if (session.method === 'anonymous' && Number(order?.sats) !== STICKY_ANONYMOUS_REMOVAL_SATS) {
-      throw new Error(`Anonymous removal expected ${STICKY_ANONYMOUS_REMOVAL_SATS} sats from the payment service. No invoice was shown.`);
-    }
-    const sats = stickyOrderPrice(order);
-    if (sats === 0) {
-      if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this removal. The note was not removed.');
-      stopInvoiceMessages();
-      if (elements.paymentDialog.open) elements.paymentDialog.close();
-      savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'paid', publishToken: order.publishToken});
-      await publishRemoval();
-      return;
-    }
-    savePending({orderId: order.id, action: 'remove', targetEventId: selectedNoteId, sats, status: 'waiting'});
-    if (!elements.paymentDialog.open) showPaymentPreparing(sats);
-    const railReady = await renderPayment(order);
-    if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);
-    status(elements.noteMenuStatus, `Waiting for the ${sats}-sat payment...`);
-    pollPayment();
-  } catch (error) {
-    stopInvoiceMessages();
-    if (elements.paymentDialog.open && !pending?.orderId) elements.paymentDialog.close();
-    status(elements.noteMenuStatus, error.message, true);
-    elements.removeSticky.disabled = false;
-  }
-}
-
-async function publishRemoval(resumedEvent = null) {
-  try {
-    if (!resumedEvent) await ensureReadySigner();
-    const template = makeDeletionTemplate({eventId: pending.targetEventId});
-    const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'remove'});
-    if (!event) return;
-    if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid deletion event.');
-    const result = await api(`/orders/${encodeURIComponent(pending.orderId)}/publish`, {
-      method: 'POST', headers: {authorization: `Bearer ${pending.publishToken}`}, body: JSON.stringify({event}),
-    });
-    processDeletion(event);
-    savePending(null);
-    closeNoteMenu();
-    status(elements.boardStatus, result.message || 'Your note was removed.');
-    elements.boardStatus.hidden = false;
-    setTimeout(() => { elements.boardStatus.hidden = true; }, 3500);
-  } catch (error) {
-    const target = elements.noteMenu.hidden ? elements.boardStatus : elements.noteMenuStatus;
-    status(target, error.message, true);
-    if (target === elements.boardStatus) elements.boardStatus.hidden = false;
-  } finally {
-    elements.removeSticky.disabled = false;
   }
 }
 
@@ -2460,8 +2390,7 @@ async function handleLogin(method) {
     status(elements.loginStatus, '');
     elements.login.close();
     if (pending?.status === 'paid') {
-      if (pending.action === 'remove') await publishRemoval();
-      else beginPlacement();
+      beginPlacement();
     } else {
       showLoginConfirmation(getNostrSession());
     }
@@ -2491,8 +2420,9 @@ function openComposer() {
   // the composer asks again every time it opens.
   refreshPriceQuote(session).catch(() => {});
   if (!restoredDraft && !pending?.orderId) elements.exactGeohash.checked = false;
+  if (!restoredDraft && !pending?.orderId) elements.hashtags.value = '';
   if (!restoredDraft) selectLiveliness(pending?.liveliness || selectedLiveliness);
-  elements.pay.disabled = false;
+  validateHashtags();
   closeMentionMenu();
   loadMentionDirectory();
   showDialog(elements.composer);
@@ -3358,6 +3288,7 @@ renderLiveliness();
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
 elements.editor.addEventListener('input', handleEditorInput);
 elements.editor.addEventListener('paste', event => { event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain')); });
+elements.hashtags.addEventListener('input', validateHashtags);
 elements.pay.addEventListener('click', startPayment);
 elements.planPicker?.addEventListener('click', event => {
   const button = event.target.closest('[data-plan]');
@@ -3380,7 +3311,6 @@ elements.zoomOut.addEventListener('click', () => setZoom(boardView.scale - .15))
 elements.zoomIn.addEventListener('click', () => setZoom(boardView.scale + .15));
 elements.zoomFit.addEventListener('click', fillBoard);
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
-elements.removeSticky.addEventListener('click', startRemovalPayment);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
 elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationFrame(keepNoteMenuOnScreen));
 document.addEventListener('pointerdown', event => {
@@ -3508,8 +3438,7 @@ async function applySignerReturn() {
     } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
       applied = true;
       signalStickyFlow('signed', {orderId: pending.orderId});
-      if (amber.context.action === 'remove') await publishRemoval(amber.event);
-      else await publishPinnedNote(amber.event);
+      await publishPinnedNote(amber.event);
     } else if (amber?.action === 'sign') {
       unusable = 'That signature was for a different note. Your note is still here — pin it again.';
     }
@@ -3587,13 +3516,12 @@ document.addEventListener('visibilitychange', () => {
 const strandedNote = isStrandedPinDraft();
 if (strandedNote && pending?.anonymous && !pendingBelongsToSession()) savePending(null);
 if (!resumedSigning && pending?.status === 'waiting') {
-  if (pending.action === 'remove') {
-    status(elements.boardStatus, 'Checking your note-removal payment...');
-    elements.boardStatus.hidden = false;
-  } else if (pendingBelongsToSession()) {
+  if (pendingBelongsToSession()) {
     selectColor(pending.color);
     selectFont(pending.font || 'typewriter');
     elements.exactGeohash.checked = Boolean(pending.exactGeohash);
+    elements.hashtags.value = (pending.hashtags || []).join(', ');
+    validateHashtags();
     selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
     elements.editor.textContent = pending.content;
     lastValidEditor = pending.content;
@@ -3606,7 +3534,6 @@ if (!resumedSigning && pending?.status === 'waiting') {
   elements.boardStatus.hidden = false;
   setTimeout(() => { elements.boardStatus.hidden = true; }, 4500);
 } else if (!resumedSigning && pending?.status === 'paid') {
-  if (pending.action === 'remove') publishRemoval();
-  else syncPlacementWithSession();
+  syncPlacementWithSession();
   if (unusableReturn) notice(unusableReturn);
 }

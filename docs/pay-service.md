@@ -32,13 +32,17 @@ place: the page should read it from a single constant.
 
 ---
 
-# 1. Sticky notes
+# 1. Pinstr
 
-A sticky note is a temporary public Nostr event pinned to one geohash cell or a connected
+Pinstr publishes a temporary public Nostr event pinned to one geohash cell or a connected
 clump of cells. A named Nostr identity posts through a time-limited subscription. A
 browser-generated anonymous key cannot subscribe, pays **69 sats**, and may pin exactly
-one note. Its local 24-hour limit exists only to finish or remove that note. Paid orders
+one note. Its local 24-hour limit exists only to finish publishing that note. Paid orders
 are payable over Ark and Lightning.
+
+Every Pinstr event uses exactly one reserved `pinstr` topic marker plus up to three optional
+hashtag `t` tags. Deploy publisher validation and relay policy for this contract before
+releasing the matching frontend. No previous topic marker is accepted or queried.
 
 ## Price
 
@@ -47,16 +51,14 @@ are payable over Ark and Lightning.
 | one-week subscription | 10 sats          | 5 sats                      | unavailable        |
 | one-year subscription | 411 sats         | 205 sats                    | unavailable        |
 | pin                            | included while subscribed | included while subscribed | 69 sats |
-| remove                         | included while subscribed | included while subscribed | 42 sats |
 
 The yearly price is 52 weekly periods less 21%, rounded to a whole satoshi. Prices and
 membership eligibility are fixed server-side. The desk checks its authoritative NIP-05
 records using the order pubkey; it never trusts a browser claim, a submitted NIP-05 string,
 or a kind-0 profile. Renewing early extends the existing expiry instead of discarding the
-remaining time. For removal, the desk also reads the target event: its signed `anonymous`
-marker determines whether the 42-sat anonymous removal path applies.
+remaining time.
 
-## GET /sticky/v1/subscription?pubkey={64-hex-key}
+## GET /pinstr/v1/subscription?pubkey={64-hex-key}
 
 Returns whether the named identity is currently covered and the authoritative prices to
 display. A verified satoshi.si NIP-05 owner without an active subscription receives:
@@ -80,17 +82,17 @@ them.
 ```
 subscribe ─► awaiting_invoice ─► awaiting_payment ─► paid ─► subscription active
                                                                   │
-pin/remove with active subscription ─► paid at 0 sats ────────────┴─► published
+pin with active subscription ─► paid at 0 sats ───────────────────┴─► published
 
-anonymous one-note pin (69 sats) / remove (42 sats) ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
+anonymous one-note pin (69 sats) ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
 ```
 
 For a subscription or paid anonymous order, `paid` means BTCPay reports the invoice
-**Settled**; `Processing` does not count. A pin or removal covered by an active subscription
+**Settled**; `Processing` does not count. A pin covered by an active subscription
 starts in `paid` at 0 sats, creates no invoice or worker job, and returns its short-lived
 publish token immediately. `published` means the signed event was accepted by the relay.
 
-## POST /sticky/v1/orders
+## POST /pinstr/v1/orders
 
 Create an order. Unauthenticated by design; the pubkey is the identity.
 
@@ -111,16 +113,10 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "geohashMode": "prefix" }
 ```
 
-```json
-{ "action": "remove",
-  "pubkey": "a127e1254181099aa2891a9b0a15823777a2e0ce666ba618d53a07b890de56af",
-  "targetEventId": "3afcf930479f3f1f4a9b614423ba9e83938efea78849ee111717e0d0c664eeef" }
-```
-
-`action` is exactly `subscribe`, `pin`, or `remove`. Every action requires a 64-character
+`action` is exactly `subscribe` or `pin`. Every action requires a 64-character
 lowercase-hex `pubkey`. A subscription also requires `plan` to be exactly `week` or `year`
-and accepts no note fields. Pin `contentHash` and removal `targetEventId` values are likewise
-64-character lowercase hex. Every pin requires a lowercase geohash of **4 through 9**
+and accepts no note fields. Pin `contentHash` values are likewise 64-character lowercase
+hex. Every pin requires a lowercase geohash of **4 through 9**
 characters from the geohash alphabet: below 4 a cell is a region rather than a place, and
 9 is as deep as the grid is useful.
 
@@ -136,17 +132,16 @@ tag names. A clump remains one note: an active subscription includes it, while a
 anonymous identity pays the same 69 sats whether that note covers one or several cells.
 
 `geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
-is optional and valid only for `pin`; it selects the fixed 69-sat path. A named pin or
-removal without an active subscription is refused with `402 subscription_required`, after
+is optional and valid only for `pin`; it selects the fixed 69-sat path. A named pin
+without an active subscription is refused with `402 subscription_required`, after
 which the client may buy a subscription and retry the same action. The created pin order
 binds every cell of the clump, geohash mode and identity mode alongside the pubkey and
 commitment; the publish token is derived from all of them.
 
 An anonymous pubkey may own only one pin. Retrying its existing unpaid or paid order is
 idempotent, so a reload cannot strand a payment, but creating a second anonymous pin after
-the first was published is refused with `409 anonymous_key_used`. The same key may still
-sign a removal of that one event while its local 24-hour access window remains. It can never
-create a weekly or yearly subscription.
+the first was published is refused with `409 anonymous_key_used`. It can never create a
+weekly or yearly subscription.
 
 **response — `201`**
 
@@ -171,7 +166,7 @@ create a weekly or yearly subscription.
 
 The response above is a pin covered by an active subscription. It must return the publish
 token in the creation response because there is nothing to poll or settle. Subscription
-orders use 10, 411, 5, or 205 sats; an anonymous pin uses 69 sats and its removal uses 42 sats. Those paid orders
+orders use 10, 411, 5, or 205 sats; an anonymous pin uses 69 sats. Those paid orders
 keep the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails. A paid
 subscription activates the pass but has no Nostr event and therefore no publish token.
 
@@ -195,15 +190,10 @@ browser keeps the already-open payment sheet visible and polls the same order ev
 | 400  | `bad_plan`         | a subscription plan is not exactly `week` or `year`      |
 | 400  | `bad_geohash`      | a pin has no geohash or uses an invalid geohash alphabet/length |
 | 400  | `bad_geohash_mode` | a pin does not choose exactly `prefix` or `exact`          |
-| 402  | `subscription_required` | a named pin or removal has no active subscription    |
-| 409  | `target_missing`   | a removal for a note the relay does not have             |
-| 409  | `target_not_owned` | a removal for a note written by a different pubkey       |
+| 402  | `subscription_required` | a named pin has no active subscription               |
 | 409  | `already_pinned`   | the same note on the same key is already pinned and live  |
 
-A removal is checked **before** it is priced: the desk reads the note from the relay and
-compares its author. A stranger cannot even buy a removal for your note.
-
-## GET /sticky/v1/orders/{id}
+## GET /pinstr/v1/orders/{id}
 
 ```json
 { "ok": true, "id": "03ad90da9fc3716c0dad4fd5", "action": "subscribe",
@@ -217,27 +207,28 @@ compares its author. A stranger cannot even buy a removal for your note.
 ```
 
 For an anonymous message order, `publishToken` is `null` until the invoice is **Settled**.
-For a subscription-covered pin or removal it is issued immediately. It disappears once
+For a subscription-covered pin it is issued immediately. It disappears once
 used or expired (15 minutes after settlement or authorization). Subscription orders never
 receive one; after settlement the client refreshes `/subscription` and retries the pending
-pin or removal, which is then authorized at 0 sats.
+pin, which is then authorized at 0 sats.
 
-## POST /sticky/v1/orders/{id}/publish
+## POST /pinstr/v1/orders/{id}/publish
 
 ```http
-POST /sticky/v1/orders/03ad90da9fc3716c0dad4fd5/publish
+POST /pinstr/v1/orders/03ad90da9fc3716c0dad4fd5/publish
 Authorization: Bearer eyJ…
 Content-Type: application/json
 
 { "event": { "id": "…", "pubkey": "…", "created_at": 1791350494, "kind": 1,
-             "tags": [["t","satoshi-sticky"],["client","satoshi.si"],
+             "tags": [["t","pinstr"],["t","mountains"],["t","quote"],
+                      ["client","satoshi.si"],
                       ["g","u0qj7z0y1"],["g","u0qj7z0z1"],
                       ["g","u0qj7z0y"],["g","u0qj7z0"],["g","u0qj7"],["g","u0qj"],
                       ["i","geo:u0qj7z0y1"],["k","geo"],["geohash","prefix"],
                       ["sticky","v1","yellow","0.42","0.99","-2.00","typewriter"],
                       ["expiration","1793942494"],
-                      ["alt","A sticky note pinned on satoshi.si"]],
-             "content": "sticky e2e test note", "sig": "…" } }
+                      ["alt","A Pinstr note pinned on satoshi.si"]],
+             "content": "Pinstr e2e test note", "sig": "…" } }
 ```
 
 The token may go in the header (preferred) or in the body as `publishToken`.
@@ -248,8 +239,7 @@ The desk checks, in this order, **before** anything reaches the relay:
 2. the event — id matches its contents, and the BIP-340 signature verifies;
 3. the signer equals the pubkey that ordered the note;
 4. freshness — signed at most an hour before publishing, not stamped more than 5 minutes into the future;
-5. the shape for the action (see below);
-6. for a removal, that the target note exists on the relay and was written by the same pubkey.
+5. the pin shape described below.
 
 Then it publishes to `wss://nostr.satoshi.si`, and reports what actually happened.
 
@@ -274,17 +264,16 @@ fix the problem and retry with the same token:
 | 400  | `wrong_signer`        | signed by a key other than the one that paid                |
 | 400  | `stale_event`         | signed more than an hour before the order                   |
 | 400  | `future_event`        | timestamp too far ahead                                     |
-| 400  | `wrong_kind`          | pin must be kind 1, removal kind 5                          |
+| 400  | `wrong_kind`          | a Pinstr event must be kind 1                               |
 | 400  | `too_long`            | content over 501 characters                                 |
-| 400  | `bad_marker`          | missing, duplicated or wrong `satoshi-sticky` marker        |
+| 400  | `bad_marker`          | missing, duplicated or wrong `pinstr` marker                |
+| 400  | `bad_hashtag`         | more than three custom tags, a duplicate, or an invalid tag |
 | 400  | `bad_sticky_tag`      | missing sticky tag or unknown format version                |
 | 400  | `bad_color` / `bad_font` | appearance is not in the allowed list                    |
 | 400  | `bad_placement` / `bad_rotation` | placement is outside its allowed range             |
 | 400  | `empty_note`          | the note carries no text                                    |
 | 400  | `geohash_mismatch`    | required geo tags do not match the paid order               |
 | 400  | `fingerprint_mismatch`| the note does not hash to the commitment that was paid      |
-| 400  | `wrong_target`        | the deletion does not reference the paid `targetEventId`     |
-| 400  | `target_missing` / `target_not_owned` / `target_mismatch` | as above    |
 | 502  | `relay_rejected`      | the relay refused the write; `error` carries its reason     |
 
 `502 relay_rejected` deserves a sentence in the UI rather than a generic failure. A paid
@@ -315,7 +304,8 @@ the event no longer matches the paid commitment.
 
 | tag       | value                                                        | rule        |
 | --------- | ------------------------------------------------------------ | ----------- |
-| `t`       | `satoshi-sticky`                                             | exactly one |
+| `t`       | `pinstr`                                                     | exactly one |
+| `t`       | a lowercase hashtag using letters, numbers, `_`, or `-`      | up to three |
 | `client`  | `satoshi.si`                                                 | exactly one |
 | `g`       | every cell the order paid for, and in `prefix` mode the boards above them | exact set |
 | `i`       | `geo:` followed by one of the paid cells                     | exactly one |
@@ -324,7 +314,7 @@ the event no longer matches the paid commitment.
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
 | `expiration` | unix seconds, NIP-40: the moment the note is deleted       | exactly one |
 | `p`       | the public key of somebody the note names (NIP-27)           | up to five  |
-| `alt`     | `A sticky note pinned on satoshi.si`                         | exactly one |
+| `alt`     | `A Pinstr note pinned on satoshi.si`                          | exactly one |
 | `anonymous` | `24h-local-key`                                             | anonymous orders only |
 
 Colors are `yellow`, `pink`, `blue`, `green`, or `orange`. Allowed font keys are
@@ -365,28 +355,17 @@ word. The tag and the text are checked against each other, so a `["p", …]` tag
 at somebody the note never mentioned; the writer's `@` picker is what puts the npub there. Tagging
 itself is open: anyone with a **NIP-05 identity, on any domain**, can be tagged, which is exactly
 why the desk does not keep the list — a name lives on its own domain and only the writer's picker
-can resolve it. Two cases tag nobody: a note signed by a **temporary anonymous identity**, because
-a throwaway key has no name for a tag to resolve to, and a **removal**, which has no note text for a
-mention to agree with. Mentions are included in whatever the pin costs; nothing is charged per
-mention.
-
-A **removal must not carry `expiration`**. The relay records the hiding in the kind-5 row; NIP-40
-cleanup deletes expired rows, so an expiring deletion would be swept away with the record of what
-it hid and the note would come back.
+can resolve it. A note signed by a **temporary anonymous identity** tags nobody because a throwaway
+key has no name for a tag to resolve to. Mentions are included in whatever the pin costs; nothing
+is charged per mention.
 
 `content` is the note text: **at most 501 characters**, counted as the UI counts them
 (Unicode code points, so one emoji is one character).
 
-### remove — kind `5` (NIP-09)
-
-One `["e", "<targetEventId>"]` tag referencing the note being removed. Only the author
-of that note can order the removal, and the desk checks that against the relay before
-pricing it. `content` may hold a short reason.
-
 ## Paying
 
 * Price: posting is a **subscription** — **10 sats a week** or **411 a year** (52 weeks less
-  21%), **5 / 205** with a satoshi.si NIP-05 name — and while it runs, every pin and removal is
+  21%), **5 / 205** with a satoshi.si NIP-05 name — and while it runs, every pin is
   included, so a covered note is created already settled at 0 sats. A registered key with no
   subscription gets `subscription_required` (402). A temporary anonymous identity cannot
   subscribe, pays **69 sats**, and may pin one note with that key.
@@ -408,7 +387,7 @@ pricing it. `content` may hold a short reason.
 authors, including temporary anonymous identities, must never be added to the relay's
 general pubkey whitelist. The payment service validates the signed event and registers
 only its exact event ID with a fail-closed admission service. That one-time grant permits
-the original user-signed pin or deletion and nothing else from the same key. Existing
+the original user-signed pin and nothing else from the same key. Existing
 authorized satoshi.si NIP-05 writers retain their normal relay access.
 
 ---
@@ -439,14 +418,14 @@ GET  /nip05/v1/worker/queue            orders needing an invoice or a status che
 POST /nip05/v1/worker/names            publish the names snapshot
 POST /nip05/v1/worker/orders/{id}/invoice    attach the payment rails
 POST /nip05/v1/worker/orders/{id}/status     new | paid | expired | conflict
-GET  /sticky/v1/worker/queue?wait=20   sticky orders; ?wait is seconds, held up to 25 s when empty
-POST /sticky/v1/worker/orders/{id}/invoice   attach the available Ark and Lightning rails
-POST /sticky/v1/worker/orders/{id}/status    paid | expired | cancelled
-GET  /sticky/v1/health                 sticky liveness and counts
-GET  /sticky/v1/config                 subscription/anonymous prices, styles, bounds, 501-char limit, commitment
+GET  /pinstr/v1/worker/queue?wait=20   Pinstr orders; ?wait is seconds, held up to 25 s when empty
+POST /pinstr/v1/worker/orders/{id}/invoice   attach the available Ark and Lightning rails
+POST /pinstr/v1/worker/orders/{id}/status    paid | expired | cancelled
+GET  /pinstr/v1/health                 Pinstr liveness and counts
+GET  /pinstr/v1/config                 subscription/anonymous prices, styles, bounds, 501-char limit, commitment
 ```
 
-`GET /sticky/v1/config` is the public one: a frontend should read the subscription and
+`GET /pinstr/v1/config` is the public one: a frontend should read the subscription and
 anonymous prices, styles, board bounds, geohash rules, liveliness rules, mention rules,
 and character limit from it rather than keeping its own copy.
 
@@ -455,24 +434,24 @@ and character limit from it rather than keeping its own copy.
 
 | Code | Where | Means |
 | --- | --- | --- |
-| `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 3–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. A `remove` that sends either field is refused the same way. |
-| `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean, or was sent for a `remove`. |
+| `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 3–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. |
+| `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean. |
 | `anonymous_key_used` | `POST /orders` 409 | this anonymous pubkey already published its one permitted note |
 | `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |
 | `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
-| `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
-| `bad_mention` | `publish` 400 | the note carries more than five `["p", …]` tags, the same key twice, a value that is not a 64-hex key, a tag whose npub the note's text never names, or any mention at all on a note from a temporary identity or on a removal. |
-| `bad_expiration` | `publish` 400 | the note carries no `["expiration"]`, more than one, a value that is not a positive whole number of seconds, a term outside one day to a year, or a moment that has already passed. A removal carrying one is refused with this code too. |
+| `bad_marker` | `publish` 400 | the `["t","pinstr"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
+| `bad_hashtag` | `publish` 400 | more than three extra `t` tags, a duplicate, a reserved marker, or a tag containing anything except lowercase Unicode letters, numbers, `_`, or `-`. |
+| `bad_mention` | `publish` 400 | the note carries more than five `["p", …]` tags, the same key twice, a value that is not a 64-hex key, a tag whose npub the note's text never names, or any mention at all on a note from a temporary identity. |
+| `bad_expiration` | `publish` 400 | the note carries no `["expiration"]`, more than one, a value that is not a positive whole number of seconds, a term outside one day to a year, or a moment that has already passed. |
 
 The client tag is enforced, not decorative: exactly one `["client","satoshi.si"]` per pin, so a note
-that reached the relay some other way can be told apart. Removals stay geohash-free — a NIP-09
-deletion has no place on the board, so there is nothing to bind.
+that reached the relay some other way can be told apart.
 
-`GET /sticky/v1/config` additionally publishes `anonymousSats: 69` and `anonymousRemovalSats: 42`, the geohash rules
+`GET /pinstr/v1/config` additionally publishes `anonymousSats: 69`, the geohash rules
 (`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names), the
 liveliness rules (`requiredForPin`, `tag`, `standard`, `default`, the five `options` with their
-seconds, `minSeconds`, `maxSeconds`, `measuredFrom`, `removals`), the mention rules (`tag`,
-`standard`, `max`, `taggable`, `text`, `anonymous`, `removals`) and the tag map
+seconds, `minSeconds`, `maxSeconds`, `measuredFrom`), the mention rules (`tag`,
+`standard`, `max`, `taggable`, `text`, `anonymous`) and the tag map
 (`clientValue`, `anonymousTagValue`), so a frontend never keeps its own copy of any of it.
 
 ## The relay's half of NIP-40 (already live)
@@ -491,9 +470,7 @@ after the fact:
 So a note that reaches its moment stops being readable immediately and leaves the
 database within the next cleanup. That is why the desk refuses a note whose moment has
 already passed rather than letting the relay silently drop it: by then it has been paid
-for. It is also why a **removal carries no expiration** — the relay records the hiding in
-the kind-5 row itself, and the cleanup would delete that row along with everything else
-that expired.
+for.
 
 ## Relay write access — how it is actually enforced
 

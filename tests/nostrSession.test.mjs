@@ -227,7 +227,7 @@ test('Amber pinning returns a compact signature and rebuilds the verified event 
   };
 
   const sessionModule = await import(`../nostrSession.mjs?amber-signature-test=${Date.now()}`);
-  const template = {kind: 1, created_at: 1_700_000_000, content: 'A fairly long sticky note', tags: [['t', 'satoshi-sticky']]};
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'A fairly long Pinstr note', tags: [['t', 'pinstr']]};
   sessionModule.beginAmberSigning(template, {action: 'pin', orderId: 'order-21'});
   const signerUrl = new URL(assigned[0]);
   assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
