@@ -268,8 +268,8 @@ export function isStickyExpired(note, now = Math.floor(Date.now() / 1000)) {
   return Number.isFinite(note?.expiration) && note.expiration > 0 && note.expiration <= now;
 }
 
-// Codes are 4 to 9 characters: below 4 the cell is a region rather than a
-// place, and 9 is as deep as the grid is useful. Within that range a board may
+// Codes are 3 to 9 characters: below 3 the cell is a region rather than a
+// useful board, and 9 is as deep as the grid is useful. Within that range a board may
 // be a clump of touching cells, which is what lets one note cover a building
 // that straddles two or three cells — a cell is what a note is pinned to, and
 // a clump is still one note on one price.
@@ -464,7 +464,7 @@ export function geohashCellDimensions(precision) {
 }
 
 // A cell smaller than this cannot be read or tapped, and a grid of more cells than this blocks
-// the map while it is built. Four characters is the shortest geohash a board takes, so there is
+// the map while it is built. Three characters is the shortest geohash a board takes, so there is
 // no coarser grid to fall back on at a world zoom: the grid is simply not drawn there.
 export const GRID_MIN_CELL_PX = 24;
 export const GRID_MAX_CELLS = 4000;
@@ -573,7 +573,7 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
 
   const price = stickySubscriptionPrice(plan, { member });
   return {
-    label: `Subscribe & ${action === 'remove' ? 'remove' : 'pin'} · ${price} sats`,
+    label: action === 'remove' ? `Remove · ${price} sats` : `Subscribe & pin · ${price} sats`,
     state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year. ${discount}`,
     needsSubscription: true,
     price,

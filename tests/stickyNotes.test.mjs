@@ -68,6 +68,7 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.match(on.state, /Subscription active until 2027-01-15/);
   assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).label, 'Remove note');
   assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).price, 0);
+  assert.equal(describeStickyAction({subscription: stranger, action: 'remove'}).label, 'Remove · 10 sats');
 
   const anon = describeStickyAction({anonymous: true, subscription: covered});
   assert.equal(anon.needsSubscription, false);
@@ -141,7 +142,7 @@ test('a board geohash is required and carries searchable Nostr geo tags', () => 
   assert.deepEqual(template.tags.find(tag => tag[0] === 'g'), ['g', TEST_GEOHASH]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'i'), ['i', `geo:${TEST_GEOHASH}`]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'k'), ['k', 'geo']);
-  // Every parent that is still a code: the chain stops at 4 characters, because a
+  // Every parent that is still a code: the chain stops at 3 characters, because a
   // shorter code is a region rather than a board.
   assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]),
     geohashPrefixes(TEST_GEOHASH).filter(prefix => prefix.length >= GEOHASH_MIN_LENGTH));
@@ -535,7 +536,9 @@ test('a board may be one cell or a clump of touching ones', async () => {
   ]);
   // the chooser takes a list, and says how long a code may be
   assert.match(html, /id="boardGeohash"[^>]*maxlength="95"/);
-  assert.match(html, /4 to 9 characters/);
+  assert.match(html, /3 to 9 characters/);
+  assert.match(html, /class="board-depth-help"[\s\S]{0,300}lni-question-mark-circle/);
+  assert.match(html, /Each deeper level also includes notes from more precise geohashes inside it/);
   assert.match(html, /u0qj7z0y,u0qj7z0z/);
   // the map picks cells, and shows which ones may be added to the area
   assert.match(script, /function toggleMapCell\(cell\)/);
@@ -1298,9 +1301,9 @@ test('every geohash board uses the same 2048 by 2048 coordinate space', async ()
   assert.match(css, /\.sticky-canvas \{[^}]*width: 2048px; height: 2048px/);
 });
 
-// At a world zoom a four-character cell is a couple of pixels across. Building the whole grid
-// there means a sixth of a million polygons and a map that stalls for seconds on every zoom, and
-// none of the specks could be read or tapped anyway. Four characters is the shortest geohash a
+// At a world zoom even a three-character cell can be too small to tap. Building the whole grid
+// there means many polygons and a map that stalls on every zoom, while none of the specks can be
+// read or tapped anyway. Three characters is the shortest geohash a
 // board takes, so there is no coarser grid to fall back on: it is simply not drawn.
 test('the cell grid is only drawn where a cell can be read and tapped', () => {
   assert.equal(geohashGridFits({cellPixels: 32, columns: 40, rows: 12}), true);

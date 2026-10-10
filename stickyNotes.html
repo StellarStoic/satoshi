@@ -54,13 +54,19 @@
     <form id="boardChooser" class="dialog-inner board-chooser">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="boardDialogTitle">Choose a corkboard</h2>
-      <p>Enter the geohash shared by your group or workplace: 4 to 9 characters. A longer code covers a smaller area, and 9 is precise enough for a building. A place that straddles two or three cells can be written as a list, <code>u0qj7z0y,u0qj7z0z</code>, as long as those cells touch.</p>
+      <p>Enter the geohash shared by your group or workplace: 3 to 9 characters. A longer code covers a smaller area, and 9 is precise enough for a building. A place that straddles two or three cells can be written as a list, <code>u0qj7z0y,u0qj7z0z</code>, as long as those cells touch.</p>
       <label for="boardGeohash">Geohash</label>
       <div class="geohash-field">
         <input id="boardGeohash" type="text" maxlength="95" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="u0qj7z0y or u0qj7z0y,u0qj7z0z">
         <button type="button" id="openGeohashMap" aria-label="Choose geohash on a map" title="Choose on map"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
       </div>
-      <label for="boardDepth">Include child boards</label>
+      <div class="board-depth-heading">
+        <label for="boardDepth">Include child boards</label>
+        <details class="board-depth-help">
+          <summary aria-label="What does board depth mean?" title="What does board depth mean?"><i class="lni lni-question-mark-circle" aria-hidden="true"></i></summary>
+          <p><strong>Exact</strong> shows this geohash only. Each deeper level also includes notes from more precise geohashes inside it. For example, one level on <code>u24</code> includes child boards such as <code>u24j</code>.</p>
+        </details>
+      </div>
       <select id="boardDepth">
         <option value="0">Exact board only</option>
         <option value="1">1 level deeper</option>
@@ -113,7 +119,7 @@
         <div id="savedPlaceStatus" class="inline-status" role="status" aria-live="polite"></div>
       </details>
       <footer class="geohash-map-selection">
-        <span>Grid: <strong id="geohashMapPrecision">4 characters</strong></span>
+        <span>Grid: <strong id="geohashMapPrecision">Loading…</strong></span>
         <span>Selected: <code id="geohashMapSelection">None</code></span>
         <div id="geohashMapStatus" class="inline-status geohash-map-selection__status" role="status" aria-live="polite"></div>
         <button type="button" id="clearGeohashSelection" class="map-clear-action">Clear</button>

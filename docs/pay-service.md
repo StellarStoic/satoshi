@@ -336,7 +336,7 @@ through 75 degrees.
 
 Relay tag matching is exact, not a string-prefix search. In `prefix` mode a note on the
 cell `u24jed` carries `g` tags for `u24jed`, `u24je`, `u24j`, and `u24` — every parent that
-is still a code, so the chain stops at four characters rather than walking up to `u2` and
+is still a code, so the chain stops at three characters rather than walking up to `u2` and
 `u`, which are regions and are not boards. In `exact` mode it carries only `u24jed`. For a
 clump, every paid cell is named, and in `prefix` mode so is each of their parent boards.
 
@@ -455,7 +455,7 @@ and character limit from it rather than keeping its own copy.
 
 | Code | Where | Means |
 | --- | --- | --- |
-| `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 4–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. A `remove` that sends either field is refused the same way. |
+| `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 3–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. A `remove` that sends either field is refused the same way. |
 | `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean, or was sent for a `remove`. |
 | `anonymous_key_used` | `POST /orders` 409 | this anonymous pubkey already published its one permitted note |
 | `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |

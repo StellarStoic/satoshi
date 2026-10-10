@@ -75,15 +75,16 @@ export const PAGE_HELP = Object.freeze({
                     + ' the same pass costs half: 5 sats a week or 205 a year.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
-                    + ' of the pass the button simply says that posting is included.',
+                    + ' of the pass the button simply says Place your note.',
                     'Not signed in? An anonymous note costs 69 sats. Your browser creates a one-time key that can pin one'
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
                     + ' so you can finish or remove that note. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
-                    'When a pass runs out, nothing you already pinned disappears. Your notes stay on the board for'
-                    + ' everyone to read; only new notes and removals need a pass.',
+                    'When a pass runs out, it does not remove notes you already pinned. They remain until the lifetime'
+                    + ' you chose for each note ends; only new notes and removals need another pass.',
                     'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
-                    + ' private key and never holds your sats; the pass is a record the board checks when you post.',
+                    + ' private key or controls your wallet. The payment service receives only the quoted payment and'
+                    + ' keeps a record of the pass that the board checks when you post.',
                 ]
             },
             {
@@ -115,7 +116,7 @@ export const PAGE_HELP = Object.freeze({
                     + ' most five, each a different key. The desk refuses a ["p", \u2026] tag whose key the text never'
                     + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity or on'
                     + ' a removal. Mentions cost nothing extra: one note, one price, however many people it names.',
-                    'Every pin belongs to a geohash of four to nine characters: you enter one or pick it on the'
+                    'Every pin belongs to a geohash of three to nine characters: you enter one or pick it on the'
                     + ' map view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'
                     + ' touch (along an edge or at a corner) and there are no more than nine: one note, one price. The note'
@@ -133,7 +134,7 @@ export const PAGE_HELP = Object.freeze({
                     + ' is tall. If it is one place you look at every day, tick to keep it: the board then opens on'
                     + ' that cell on every visit, and the address bar keeps no board of its own — a link somebody'
                     + ' sends you still opens the board it names.',
-                    + ' The map in the board chooser also keeps **saved places**: tap cells, give them a name you will'
+                    'The map in the board chooser also keeps **saved places**: tap cells, give them a name you will'
                     + ' recognise, and the name and its geohash wait there in this browser. Tapping one opens that'
                     + ' board; nothing is sent anywhere and no name ever leaves the device.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'

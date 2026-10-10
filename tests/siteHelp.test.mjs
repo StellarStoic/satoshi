@@ -91,6 +91,9 @@ test('sticky notes help has a plain view and a technical one', () => {
     for (const term of ['kind 1', 'sha256', 'geohash', 'publish token']) {
         assert.match(technical, new RegExp(term, 'i'));
     }
+    assert.match(technical, /three to nine characters/i);
+    assert.doesNotMatch(technical, /four to nine characters/i);
+    assert.doesNotMatch(technical, /NaN/, 'every help paragraph remains text');
 });
 
 test('the explainer states the prices the board actually charges, and no retired ones', async () => {

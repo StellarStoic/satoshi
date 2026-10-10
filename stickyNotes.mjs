@@ -492,10 +492,10 @@ function drawGeohashGrid() {
   );
   const showLabels = Math.abs(secondCorner.x - firstCorner.x) >= 42 && Math.abs(secondCorner.y - firstCorner.y) >= 22;
 
-  // A grid of specks is worse than no grid. At a world zoom a four-character cell is a couple of
+  // A grid of specks is worse than no grid. At a world zoom a three-character cell is still too
   // pixels across, so every cell of it would be built and none of them could be read or tapped,
   // and there are a sixth of a million of them - which stalls the map for seconds on every zoom.
-  // Four characters is the shortest geohash a board takes, so there is no coarser grid to fall
+  // Three characters is the shortest geohash a board takes, so there is no coarser grid to fall
   // back on: the grid is left out and the reader is told to come closer. What is drawn even then
   // is the cells they have already chosen, so their own area stays visible however far out they are.
   if (!geohashGridFits({cellPixels, columns, rows})) {
@@ -521,7 +521,7 @@ function drawGeohashGrid() {
       ? `${chosen.length} cell${chosen.length === 1 ? '' : 's'} chosen`
       : 'Grid hidden';
     status(elements.geohashMapStatus, cellPixels < GRID_MIN_CELL_PX
-      ? 'Zoom in to pick a cell - at this distance one is smaller than the map can draw, and four characters is the shortest geohash a board takes.'
+      ? 'Zoom in to pick a cell - at this distance one is smaller than the map can draw, and three characters is the shortest geohash a board takes.'
       : 'Zoom in a little to pick cells - this view covers more of them than the grid can draw at once.', true);
     return;
   }
@@ -2834,7 +2834,7 @@ elements.boardChooser.addEventListener('submit', event => {
     const issue = geohashIssueFrom(value);
     status(elements.boardChooserStatus,
       issue === 'Choose at least one cell.'
-        ? 'Enter a geohash of 4 to 9 characters using 0-9 and b-h, j, k, m, n, p-z.'
+        ? 'Enter a geohash of 3 to 9 characters using 0-9 and b-h, j, k, m, n, p-z.'
         : issue, true);
     return;
   }
