@@ -990,7 +990,7 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
   // The identity decides what the buttons mean, so a session change re-asks the desk and
   // re-draws: relabelling the account alone is what left a plan offered to a temporary
   // identity, at the previous identity's price.
-  assert.match(script, /function handleNostrSessionChange\(\) \{\s+updateAccount\(\);\s+[\s\S]{0,500}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
+  assert.match(script, /function handleNostrSessionChange\(\) \{\s+updateAccount\(\);\s+[\s\S]{0,900}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
   assert.match(script, /addEventListener\('satoshi-nostr-session', handleNostrSessionChange\)/);
   assert.match(script, /composingGeohashes = \[\.\.\.activeGeohashes\];\s+[\s\S]{0,300}refreshPriceQuote\(session\)\.catch/);
 
@@ -1033,10 +1033,14 @@ test('a note paid for by subscription still finishes after the page reloads', as
   assert.match(script, /selectBoard\(rest\.geohashes\.join\(','\)\)/);
   assert.match(script, /const composed = composingGeohashes\.length/);
   assert.match(script, /pending\?\.action === 'pin' && Array\.isArray\(pending\.geohashes\) \? pending\.geohashes : \[\]/);
-  // and a note left with no status and no order is handed back to the reader, not hidden
-  assert.match(script, /const strandedNote = pending\?\.action === 'pin' && !pending\?\.status && !pending\?\.orderId/);
-  assert.match(script, /\(pending\?\.status === 'waiting' \|\| strandedNote\)/);
-  assert.match(script, /Your saved note is back — pin it again to publish it\./);
+  // An unpaid draft waits for its original signer and for an explicit tap on +; merely
+  // opening a board must not expose it or throw the reader into the composer.
+  assert.match(script, /function isStrandedPinDraft\(value = pending\)/);
+  assert.match(script, /function restoreSavedDraft\(\) \{\s+if \(!isStrandedPinDraft\(\) \|\| !pendingBelongsToSession\(\)\) return false;/);
+  assert.match(script, /const restoredDraft = restoreSavedDraft\(\);/);
+  assert.match(script, /Your saved note is ready\. Tap \+ when you want to continue\./);
+  assert.doesNotMatch(script, /Your saved note is back — pin it again to publish it\./);
+  assert.match(script, /if \(strandedNote && pending\?\.anonymous && !pendingBelongsToSession\(\)\) savePending\(null\);/);
 });
 
 test('a place can be kept, and the kept place outranks the board you last browsed', async () => {

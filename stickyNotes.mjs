@@ -250,6 +250,10 @@ function savePending(value) {
   else localStorage.removeItem(PENDING_KEY);
 }
 
+function isStrandedPinDraft(value = pending) {
+  return value?.action === 'pin' && !value?.status && !value?.orderId && Boolean(value?.content);
+}
+
 /**
  * The cells a board covers, from whatever the reader or a link gave us: one code,
  * a comma-separated clump, or an array. Invalid sets come back empty, and
@@ -1798,6 +1802,24 @@ function pendingBelongsToSession() {
   return !pending?.pubkey || session.pubkey === pending.pubkey;
 }
 
+/** Put a saved, unpaid draft back into the editor only for the identity that wrote it. */
+function restoreSavedDraft() {
+  if (!isStrandedPinDraft() || !pendingBelongsToSession()) return false;
+  selectColor(pending.color);
+  selectFont(pending.font || 'typewriter');
+  elements.exactGeohash.checked = Boolean(pending.exactGeohash);
+  selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
+  elements.editor.textContent = pending.content;
+  lastValidEditor = pending.content;
+  composingPubkey = pending.pubkey;
+  composingGeohashes = Array.isArray(pending.geohashes) && pending.geohashes.length
+    ? [...pending.geohashes]
+    : [...activeGeohashes];
+  handleEditorInput();
+  status(elements.paymentStatus, 'Your saved note is ready.');
+  return true;
+}
+
 /** Take the unpinned note off the board, keeping the saved note itself. */
 function withdrawPlacement() {
   placingNote?.remove();
@@ -2306,13 +2328,16 @@ function openComposer() {
     elements.boardStatus.hidden = false;
     return;
   }
-  composingPubkey = session.pubkey;
-  composingGeohashes = [...activeGeohashes];
+  const restoredDraft = restoreSavedDraft();
+  if (!restoredDraft) {
+    composingPubkey = session.pubkey;
+    composingGeohashes = [...activeGeohashes];
+  }
   // Opening on a stale quote is how the buttons came to describe the wrong identity, so
   // the composer asks again every time it opens.
   refreshPriceQuote(session).catch(() => {});
-  if (!pending?.orderId) elements.exactGeohash.checked = false;
-  selectLiveliness(pending?.liveliness || selectedLiveliness);
+  if (!restoredDraft && !pending?.orderId) elements.exactGeohash.checked = false;
+  if (!restoredDraft) selectLiveliness(pending?.liveliness || selectedLiveliness);
   elements.pay.disabled = false;
   closeMentionMenu();
   loadMentionDirectory();
@@ -3108,6 +3133,11 @@ function handleNostrSessionChange() {
   if (getNostrSession() && elements.login.open) elements.login.close();
   // Signing out withdraws the unpinned note; signing in returns it.
   syncPlacementWithSession();
+  if (isStrandedPinDraft() && pendingBelongsToSession()) {
+    status(elements.boardStatus, 'Your saved note is ready. Tap + when you want to continue.');
+    elements.boardStatus.hidden = false;
+    setTimeout(() => { elements.boardStatus.hidden = true; }, 4500);
+  }
   // The identity decides what the buttons mean — an anonymous one can never use a
   // subscription — so a change has to re-ask the desk and re-draw rather than only
   // relabel the account: a stale quote is what offered a plan to a temporary identity.
@@ -3256,18 +3286,16 @@ window.addEventListener('focus', () => { resumeExternalFlow().catch(() => {}); }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) resumeExternalFlow().catch(() => {});
 });
-// A note saved with no status and no order has nothing left to poll: the flow that
-// saved it ended before its order ever existed (a subscription paid after the page
-// reloaded, before the resume knew which board the note was written on). Give the
-// reader their note back so they can pin it again — with an active subscription
-// that costs nothing, and the text is theirs either way.
-const strandedNote = pending?.action === 'pin' && !pending?.status && !pending?.orderId
-  && Boolean(pending?.content);
-if (!resumedSigning && (pending?.status === 'waiting' || strandedNote)) {
+// An unpaid saved draft is not a reason to interrupt somebody opening a board. It waits
+// for its original signer and returns only when that person deliberately opens the editor.
+// A temporary draft cannot outlive its anonymous key: there is then nobody who can sign it.
+const strandedNote = isStrandedPinDraft();
+if (strandedNote && pending?.anonymous && !pendingBelongsToSession()) savePending(null);
+if (!resumedSigning && pending?.status === 'waiting') {
   if (pending.action === 'remove') {
     status(elements.boardStatus, 'Checking your note-removal payment...');
     elements.boardStatus.hidden = false;
-  } else {
+  } else if (pendingBelongsToSession()) {
     selectColor(pending.color);
     selectFont(pending.font || 'typewriter');
     elements.exactGeohash.checked = Boolean(pending.exactGeohash);
@@ -3275,10 +3303,13 @@ if (!resumedSigning && (pending?.status === 'waiting' || strandedNote)) {
     elements.editor.textContent = pending.content;
     lastValidEditor = pending.content;
     showDialog(elements.composer);
-    status(elements.paymentStatus,
-      strandedNote ? 'Your saved note is back — pin it again to publish it.' : 'Checking your payment...');
+    status(elements.paymentStatus, 'Checking your payment...');
   }
   pollPayment();
+} else if (!resumedSigning && isStrandedPinDraft() && pendingBelongsToSession()) {
+  status(elements.boardStatus, 'Your saved note is ready. Tap + when you want to continue.');
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 4500);
 } else if (!resumedSigning && pending?.status === 'paid') {
   if (pending.action === 'remove') publishRemoval();
   else syncPlacementWithSession();
