@@ -897,13 +897,15 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /pending\?\.status === 'paid'\) syncPlacementWithSession\(\)/);
   assert.match(script, /!boardSocket \|\| boardSocket\.readyState > WebSocket\.OPEN/);
 
-  // A sign-in that lands behaves like any other login: the dialog it came from closes and
-  // the reader's own note returns to the board.
+  // A sign-in that lands closes its dialog and identifies the account without assuming the
+  // reader wants to write. Only an already-paid note resumes automatically.
   assert.match(script, /if \(elements\.login\.open\) elements\.login\.close\(\);/);
   assert.match(script, /event\.key === 'satoshi:nostr:session:v1'\) handleNostrSessionChange\(\)/);
-  assert.match(script, /if \(!syncPlacementWithSession\(\)\) openComposer\(\);/);
-  assert.match(script, /Amber returned without an account\. Tap Amber to try again\./);
-  assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
+  assert.match(script, /if \(!syncPlacementWithSession\(\)\) showLoginConfirmation\(amber\.session\);/);
+  assert.match(script, /elements\.loginConfirmation\.textContent = `Logged in as \$\{signedInLabel\(session\)\}`/);
+  assert.doesNotMatch(script, /Amber returned without an account/);
+  assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\.\.\.'\);/);
+  assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\. Tap Amber again if no answer arrives\.'\);/);
 });
 
 test('the restored board and account dialog cannot trap the reader', async () => {

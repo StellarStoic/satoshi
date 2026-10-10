@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v237';   // v237: Amber-safe fragment callbacks and signer return recovery
+const CACHE = 'satoshi-static-v238';   // v238: race-free Amber login and reader-first Nostr sign-in
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

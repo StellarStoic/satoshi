@@ -76,6 +76,7 @@ const SAVED_PLACES_MAX = 24;
 const SAVED_PLACE_NAME_MAX = 40;
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
+  loginConfirmation: document.getElementById('loginConfirmation'),
   corkFrame: document.getElementById('corkFrame'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   mentionFilter: document.getElementById('mentionFilter'), mentionFilterStatus: document.getElementById('mentionFilterStatus'),
@@ -299,6 +300,7 @@ function updateBoardUrl() {
 // The notice on screen, so a return that resolves it can take it down without also hiding
 // a message that is not that notice (a publish failure is one of those).
 let noticeText = '';
+let loginConfirmationTimer = 0;
 
 function status(target, message, error = false) {
   target.textContent = message;
@@ -322,6 +324,21 @@ function notice(message) {
   elements.boardStatus.hidden = false;
   elements.boardStatus.dataset.notice = '1';
   noticeText = message;
+}
+
+function signedInLabel(session) {
+  const name = String(session?.profile?.display_name || session?.profile?.name || '').trim();
+  const nip05 = String(session?.profile?.nip05 || '').trim();
+  if (name && nip05) return `${name} · ${nip05}`;
+  return name || nip05 || (session?.npub ? shortNpub(session.npub) : 'your Nostr account');
+}
+
+function showLoginConfirmation(session) {
+  if (!session || !elements.loginConfirmation) return;
+  clearTimeout(loginConfirmationTimer);
+  elements.loginConfirmation.textContent = `Logged in as ${signedInLabel(session)}`;
+  elements.loginConfirmation.hidden = false;
+  loginConfirmationTimer = window.setTimeout(() => { elements.loginConfirmation.hidden = true; }, 5000);
 }
 
 function showDialog(dialog) {
@@ -837,6 +854,7 @@ async function loadAccountProfile(session) {
       picture: safeProfilePicture(source.picture),
     };
     updateNostrProfile(session.pubkey, profile);
+    if (!elements.loginConfirmation.hidden) showLoginConfirmation(getNostrSession());
   } catch {}
 }
 
@@ -2263,12 +2281,13 @@ async function handleLogin(method) {
       elements.privateKey.value = '';
     }
     updateAccount();
+    status(elements.loginStatus, '');
     elements.login.close();
     if (pending?.status === 'paid') {
       if (pending.action === 'remove') await publishRemoval();
       else beginPlacement();
     } else {
-      openComposer();
+      showLoginConfirmation(getNostrSession());
     }
   } catch (error) { status(elements.loginStatus, error.message, true); }
 }
@@ -3158,9 +3177,10 @@ async function applySignerReturn() {
     if (amber?.action === 'login') {
       applied = true;
       updateAccount();
+      status(elements.loginStatus, '');
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
-      if (!syncPlacementWithSession()) openComposer();
+      if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
     } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
       applied = true;
       if (amber.context.action === 'remove') await publishRemoval(amber.event);
@@ -3196,16 +3216,15 @@ if (!signerReturn.applied) {
       && parkedRequest.context?.orderId === pending.orderId) {
     unusableReturn = 'The signer did not come back with a signature. Your note is still here — pin it again.';
   }
-  // A sign-in that never landed is reported where the reader will look for it: the dialog
-  // they are about to open and try again.
+  // A browser may reload before Android appends the callback. A parked request is therefore
+  // still waiting, not a failed login; the reader can retry from the same dialog if needed.
   if (parkedRequest?.action === 'login' && Date.now() - parkedRequest.createdAt < 10 * 60 * 1000) {
-    status(elements.loginStatus, 'The signer did not come back. Choose a sign-in option again.', true);
+    status(elements.loginStatus, 'Waiting for Amber. Tap Amber again if no answer arrives.');
   }
 }
 // The answer can also arrive with no reload at all: the browser resumes the page it already
 // has and only the URL changes. Nothing else reads that hash, so these are where it is read.
 let resumeFlowRunning = false;
-let missingAmberTimer = 0;
 async function resumeExternalFlow() {
   if (resumeFlowRunning || document.hidden) return;
   resumeFlowRunning = true;
@@ -3215,17 +3234,12 @@ async function resumeExternalFlow() {
       if (pending?.status === 'waiting' || pending?.status === 'waiting_subscription') pollPayment();
       else if (pending?.status === 'paid') syncPlacementWithSession();
     }
-    clearTimeout(missingAmberTimer);
     const parked = pendingAmberRequest();
     if (!signer.applied && !signer.unusable && parked?.action === 'login') {
-      // Some Android/browser combinations resume the old page before following Amber's
-      // callback. Give that navigation a moment; if it never arrives, stop the spinner and
-      // leave a useful retry action in the already-open login dialog.
-      missingAmberTimer = window.setTimeout(() => {
-        if (pendingAmberRequest()?.action === 'login' && !getNostrSession()) {
-          status(elements.loginStatus, 'Amber returned without an account. Tap Amber to try again.', true);
-        }
-      }, 1800);
+      // Android commonly focuses the browser before Amber follows the callback URL. Focus is
+      // not a failed sign-in: leave the request parked and let hashchange/pageshow consume the
+      // public key when the callback lands.
+      status(elements.loginStatus, 'Waiting for Amber...');
     }
     // Mobile browsers commonly close sockets while a wallet or signer app is in front.
     // A closed board must reconnect as soon as this page becomes visible again.
