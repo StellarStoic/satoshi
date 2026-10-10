@@ -102,6 +102,7 @@ test('the explainer states the prices the board actually charges, and no retired
         model.STICKY_SUB_MEMBER_WEEK_SATS,
         model.STICKY_SUB_MEMBER_YEAR_SATS,
         model.STICKY_ANONYMOUS_PRICE_SATS,
+        model.STICKY_ANONYMOUS_REMOVAL_SATS,
     ];
     for (const price of live) {
         assert.match(copy, new RegExp(`\\b${price}\\b`), `the explainer should state ${price} sats`);

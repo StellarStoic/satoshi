@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v236';   // v236: standards-compliant Amber callback plus square corkboards
+const CACHE = 'satoshi-static-v237';   // v237: Amber-safe fragment callbacks and signer return recovery
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
@@ -36,6 +36,15 @@ const CORE = [
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE);
+        const version = CACHE.slice(CACHE.lastIndexOf('v'));
+        let releasedAt = '';
+        try {
+            const response = await fetch('/pwa-release.json', {cache: 'no-store'});
+            const release = response.ok ? await response.json() : null;
+            if (release?.version === version && Number.isFinite(Date.parse(release.updatedAt))) {
+                releasedAt = release.updatedAt;
+            }
+        } catch { /* Local development and older deployments use the install-time fallback. */ }
         // Per file, not cache.addAll(CORE): addAll rejects as a unit, so a single 404 or a
         // dropped connection used to abort the whole install before the metadata below was
         // written — and Settings, which reads only that metadata, lost its "updated ..." line
@@ -52,8 +61,10 @@ self.addEventListener('install', event => {
         }));
         if (failed.length) console.warn('sw: cached everything but', failed.length, 'of', CORE.length, failed.join(', '));
         await cache.put(CACHE_METADATA_URL, new Response(JSON.stringify({
-            version: CACHE.slice(CACHE.lastIndexOf('v')),
-            updatedAt: new Date().toISOString()
+            version,
+            // Production receives the commit time of the worker that introduced this version.
+            // The fallback exists for localhost, where the Pages build does not run.
+            updatedAt: releasedAt || new Date().toISOString()
         }), {headers: {'content-type': 'application/json'}}));
         await self.skipWaiting();
     })());

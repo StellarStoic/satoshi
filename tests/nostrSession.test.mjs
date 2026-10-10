@@ -46,6 +46,13 @@ test('anonymous Nostr identity is local, temporary, and restores the previous se
   assert.equal(await sessionModule.signerReady(), true);
   assert.equal((await sessionModule.signNostrEvent({kind: 1, content: '', tags: [], created_at: 1})).pubkey, anonymous.pubkey);
 
+  const publishedId = 'e'.repeat(64);
+  sessionModule.markAnonymousNotePublished(publishedId);
+  assert.equal(sessionModule.getNostrSession().noteEventId, publishedId, 'the key records its only note');
+  assert.equal(JSON.parse(storage.getItem('satoshi:nostr:anonymous:v1')).noteEventId, publishedId);
+  assert.equal(sessionModule.loginAnonymously().noteEventId, publishedId,
+    'clicking anonymous again does not silently mint another key before logout');
+
   sessionModule.logoutNostr();
   assert.deepEqual(sessionModule.getNostrSession(), previous);
   assert.equal(storage.getItem('satoshi:nostr:anonymous:v1'), null);
@@ -157,15 +164,16 @@ test('a signer answer is read from the query as well as the fragment', async () 
   assert.deepEqual(replaced, ['/stickyNotes.html'], 'the answer is taken out of the URL rather than read twice');
 });
 
-test('Amber receives a standard NIP-55 query callback and the round trip logs in', async () => {
+test('Amber receives a callback its current web parser preserves and the round trip logs in', async () => {
   const storage = memoryStorage();
   const assigned = [];
+  const replaced = [];
   globalThis.localStorage = storage;
   globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
   Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'Android'}});
-  globalThis.history = {replaceState() {}};
+  globalThis.history = {replaceState: (...args) => replaced.push(args[2])};
   globalThis.location = {
-    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '?g=u24jed', hash: '',
     assign: value => assigned.push(value),
   };
   globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
@@ -175,16 +183,21 @@ test('Amber receives a standard NIP-55 query callback and the round trip logs in
   assert.equal(assigned.length, 1);
   const signerUrl = new URL(assigned[0]);
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.match(callback, /\?nostr_signer=[a-z0-9-]+\.$/i,
-    'the callback follows NIP-55: Amber appends its result to one query value');
-  assert.equal(new URL(callback).hash, '');
+  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i,
+    'the callback survives Amber URL-decoding the whole signer request');
+  assert.equal(new URL(callback).search, '', 'Amber must not receive a nested query delimiter');
+  const amberParameters = decodeURIComponent(assigned[0]).split('?').slice(1).flatMap(part => part.split('&'));
+  const parsedByAmber = amberParameters.find(parameter => parameter.startsWith('callbackUrl='))?.slice('callbackUrl='.length);
+  assert.equal(parsedByAmber, callback, 'Amber still reads the complete fragment callback after decoding the signer URI');
 
   const returned = new URL(callback + 'd'.repeat(64));
-  globalThis.location.search = returned.search;
+  globalThis.location.search = '';
+  globalThis.location.hash = returned.hash;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer?.action, 'login');
   assert.equal(answer.session.pubkey, 'd'.repeat(64));
   assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64), 'the returned Amber identity persists');
+  assert.deepEqual(replaced, ['/stickyNotes.html?g=u24jed'], 'the board open before Amber is restored');
 });
 
 test('Amber pinning returns a compact signature and rebuilds the verified event locally', async () => {
@@ -219,9 +232,9 @@ test('Amber pinning returns a compact signature and rebuilds the verified event 
   const signerUrl = new URL(assigned[0]);
   assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
   const callback = signerUrl.searchParams.get('callbackUrl');
-  assert.match(callback, /\?nostr_signer=[a-z0-9-]+\.$/i);
+  assert.match(callback, /#nostr_signer=[a-z0-9-]+\.$/i);
 
-  globalThis.location.search = new URL(callback + signature).search;
+  globalThis.location.hash = new URL(callback + signature).hash;
   const answer = sessionModule.resumeAmber();
   assert.equal(answer.action, 'sign');
   assert.deepEqual(answer.context, {action: 'pin', orderId: 'order-21'});

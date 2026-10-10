@@ -2,6 +2,7 @@ import {
   STICKY_COLORS,
   STICKY_FONTS,
   STICKY_ANONYMOUS_PRICE_SATS,
+  STICKY_ANONYMOUS_REMOVAL_SATS,
   STICKY_MAX_CHARACTERS,
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
@@ -46,7 +47,7 @@ import {
   loginWithExtension,
   loginWithPrivateKey,
   logoutNostr,
-  parkedSession,
+  markAnonymousNotePublished,
   pendingAmberRequest,
   reconnectBunker,
   resumeAmber,
@@ -854,7 +855,7 @@ function updateAnonymousCountdown() {
     return;
   }
   elements.anonymousExpiry.hidden = false;
-  elements.anonymousExpiry.innerHTML = `Local access expires in <strong>${anonymousCountdown(session.expiresAt)}</strong>`;
+  elements.anonymousExpiry.innerHTML = `One-note key expires in <strong>${anonymousCountdown(session.expiresAt)}</strong>`;
 }
 
 function updateAccount() {
@@ -893,13 +894,8 @@ function updateAccount() {
 function renderQuotedPrice() {
   const session = getNostrSession();
   const anonymous = session?.method === 'anonymous';
-  // A temporary identity is the one case where the way back has to be named: it can
-  // never use a subscription, so the sentence under the buttons says which identity is
-  // waiting behind it and that logging out returns to it.
-  const parked = anonymous ? parkedSession() : null;
-  const parkedName = parked ? sessionLabel(parked) : '';
-  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan, parked: parkedName});
-  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan, parked: parkedName});
+  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
+  const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
   quotedPrice = session ? actionInfo.price : STICKY_SUB_WEEK_SATS;
@@ -1532,7 +1528,7 @@ async function ensureReadySigner() {
 async function buySubscriptionThen(session, notePending, statusElement) {
   // The one place a subscription is bought, so the one place to refuse it for an
   // identity that can never use it: a throwaway key cannot hold a name, the desk prices
-  // it per message, and a plan bought here would be sats spent on nothing.
+  // its one note directly, and a plan bought here would be sats spent on nothing.
   if (session.method === 'anonymous') {
     throw new Error(`This temporary identity cannot hold a subscription. Post anonymously for ${STICKY_ANONYMOUS_PRICE_SATS} sats a note, or log in with your own key to use one.`);
   }
@@ -1567,6 +1563,9 @@ async function startPayment() {
     status(elements.paymentStatus, '');
     const session = getNostrSession();
     if (!session) { showDialog(elements.login); return; }
+    if (session.method === 'anonymous' && session.noteEventId) {
+      throw new Error('This anonymous key already posted its one note. Leave anonymous mode, then start again for a fresh key.');
+    }
     // The identity the note belongs to: in memory while the composer is open, or read
     // back from the saved note when the page has reloaded since. Signing it with a
     // different key would publish a note its writer cannot remove again.
@@ -1615,8 +1614,10 @@ async function startPayment() {
       await buySubscriptionThen(session, notePending, elements.paymentStatus);
       return;
     }
+    if (session.method === 'anonymous' && Number(order?.sats) !== STICKY_ANONYMOUS_PRICE_SATS) {
+      throw new Error(`Anonymous posting is waiting for the ${STICKY_ANONYMOUS_PRICE_SATS}-sat price update on the payment service. No invoice was shown.`);
+    }
     const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_SUB_WEEK_SATS);
-    if (session.method === 'anonymous' && sats !== STICKY_ANONYMOUS_PRICE_SATS) throw new Error('Anonymous posting is not ready on the payment service yet. No note was published.');
     if (sats === 0) {
       // Covered by the subscription the desk just confirmed: nothing to pay, and
       // the publish token is already there, so the note goes straight to placing.
@@ -1993,6 +1994,7 @@ async function publishPinnedNote(resumedEvent = null) {
       method: 'POST', headers: {authorization: `Bearer ${pending.publishToken}`}, body: JSON.stringify({event}),
     });
     const sticky = parseStickyEvent(event);
+    if (pending.anonymous) markAnonymousNotePublished(event.id);
     placingNote?.remove(); placingNote = null;
     if (sticky) renderNote(sticky, event);
     elements.placementControls.hidden = true;
@@ -2098,6 +2100,9 @@ async function startRemovalPayment() {
       if (!shouldBuySubscription(error, session)) throw anonymousRemovalClassificationError(error, session);
       await buySubscriptionThen(session, notePending, elements.noteMenuStatus);
       return;
+    }
+    if (session.method === 'anonymous' && Number(order?.sats) !== STICKY_ANONYMOUS_REMOVAL_SATS) {
+      throw new Error(`Anonymous removal expected ${STICKY_ANONYMOUS_REMOVAL_SATS} sats from the payment service. No invoice was shown.`);
     }
     const sats = stickyOrderPrice(order);
     if (sats === 0) {
@@ -2277,6 +2282,11 @@ function openComposer() {
   }
   const session = getNostrSession();
   if (!session) { showDialog(elements.login); return; }
+  if (session.method === 'anonymous' && session.noteEventId) {
+    status(elements.boardStatus, 'This one-time key already posted its note. Leave anonymous mode, then start again for a fresh key.');
+    elements.boardStatus.hidden = false;
+    return;
+  }
   composingPubkey = session.pubkey;
   composingGeohashes = [...activeGeohashes];
   // Opening on a stale quote is how the buttons came to describe the wrong identity, so
@@ -3074,14 +3084,22 @@ elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationF
 document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu') && !event.target.closest('.sticky-note__pin')) closeNoteMenu();
 });
-window.addEventListener('satoshi-nostr-session', () => {
+function handleNostrSessionChange() {
   updateAccount();
+  if (getNostrSession() && elements.login.open) elements.login.close();
   // Signing out withdraws the unpinned note; signing in returns it.
   syncPlacementWithSession();
   // The identity decides what the buttons mean — an anonymous one can never use a
   // subscription — so a change has to re-ask the desk and re-draw rather than only
   // relabel the account: a stale quote is what offered a plan to a temporary identity.
   refreshPriceQuote(getNostrSession()).catch(() => {});
+}
+window.addEventListener('satoshi-nostr-session', handleNostrSessionChange);
+// Amber commonly opens its HTTPS callback in a browser tab even when the request came from
+// the installed PWA. Both contexts share origin storage; let the original page see the login
+// completed instead of leaving its older dialog on "Connecting".
+window.addEventListener('storage', event => {
+  if (event.key === 'satoshi:nostr:session:v1') handleNostrSessionChange();
 });
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 let boardResizeFrame = 0;
@@ -3187,6 +3205,7 @@ if (!signerReturn.applied) {
 // The answer can also arrive with no reload at all: the browser resumes the page it already
 // has and only the URL changes. Nothing else reads that hash, so these are where it is read.
 let resumeFlowRunning = false;
+let missingAmberTimer = 0;
 async function resumeExternalFlow() {
   if (resumeFlowRunning || document.hidden) return;
   resumeFlowRunning = true;
@@ -3195,6 +3214,18 @@ async function resumeExternalFlow() {
     if (!signer.applied) {
       if (pending?.status === 'waiting' || pending?.status === 'waiting_subscription') pollPayment();
       else if (pending?.status === 'paid') syncPlacementWithSession();
+    }
+    clearTimeout(missingAmberTimer);
+    const parked = pendingAmberRequest();
+    if (!signer.applied && !signer.unusable && parked?.action === 'login') {
+      // Some Android/browser combinations resume the old page before following Amber's
+      // callback. Give that navigation a moment; if it never arrives, stop the spinner and
+      // leave a useful retry action in the already-open login dialog.
+      missingAmberTimer = window.setTimeout(() => {
+        if (pendingAmberRequest()?.action === 'login' && !getNostrSession()) {
+          status(elements.loginStatus, 'Amber returned without an account. Tap Amber to try again.', true);
+        }
+      }, 1800);
     }
     // Mobile browsers commonly close sockets while a wallet or signer app is in front.
     // A closed board must reconnect as soon as this page becomes visible again.
@@ -3207,6 +3238,7 @@ async function resumeExternalFlow() {
 }
 window.addEventListener('hashchange', () => { resumeExternalFlow().catch(() => {}); });
 window.addEventListener('pageshow', () => { resumeExternalFlow().catch(() => {}); });
+window.addEventListener('focus', () => { resumeExternalFlow().catch(() => {}); });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) resumeExternalFlow().catch(() => {});
 });

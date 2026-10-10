@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_ANONYMOUS_REMOVAL_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor,
   geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
   geohashCellDimensions,
   geohashGridFits,
@@ -19,7 +19,8 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(STICKY_SUB_YEAR_SATS, 411);
   assert.equal(STICKY_SUB_MEMBER_WEEK_SATS, 5);
   assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, 205);
-  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 42);
+  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 69);
+  assert.equal(STICKY_ANONYMOUS_REMOVAL_SATS, 42);
 
   assert.equal(stickySubscriptionPrice('week'), 10);
   assert.equal(stickySubscriptionPrice('week', {member: true}), 5);
@@ -38,10 +39,11 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(stickyOrderPrice({sats: 10}), 10);
   assert.equal(stickyOrderPrice({sats: 411}), 411);
   assert.equal(stickyOrderPrice({sats: 0}), 0, 'a covered note costs nothing');
-  assert.equal(stickyOrderPrice({sats: 42}), 42);
+  assert.equal(stickyOrderPrice({sats: 69}), 69);
+  assert.equal(stickyOrderPrice({sats: 42}), 42, 'anonymous removal keeps its existing price');
   assert.equal(stickyOrderPrice({sats: 11}), STICKY_SUB_WEEK_SATS, 'the retired per-note price is not shown');
   assert.equal(stickyOrderPrice({sats: 10.5}), STICKY_SUB_WEEK_SATS);
-  assert.equal(stickyOrderPrice({sats: 43}), STICKY_SUB_WEEK_SATS);
+  assert.equal(stickyOrderPrice({sats: 70}), STICKY_SUB_WEEK_SATS);
 });
 
 test('the composer says what posting costs, and what a subscription changes', () => {
@@ -69,15 +71,18 @@ test('the composer says what posting costs, and what a subscription changes', ()
 
   const anon = describeStickyAction({anonymous: true, subscription: covered});
   assert.equal(anon.needsSubscription, false);
-  assert.equal(anon.price, 42, 'an anonymous message is priced even while a subscription runs');
-  assert.equal(anon.label, 'Post anonymously · 42 sats');
-  assert.match(anon.state, /never applies/);
+  assert.equal(anon.price, 69, 'an anonymous note is priced even while a subscription runs');
+  assert.equal(anon.label, 'Post anonymously · 69 sats');
+  assert.match(anon.state, /One key can post one note/);
+  assert.match(anon.state, /cannot buy a weekly or yearly subscription/);
+  const anonRemoval = describeStickyAction({anonymous: true, action: 'remove'});
+  assert.equal(anonRemoval.label, 'Remove · 42 sats');
+  assert.equal(anonRemoval.price, 42);
 
-  // A temporary identity is the one case that has to name its way back, because the
-  // identity it replaced is the only place a subscription can live.
+  // A parked named account is an implementation detail, not a promise that an anonymous
+  // key will return or survive leaving anonymous mode.
   const anonParked = describeStickyAction({anonymous: true, subscription: covered, parked: 'Alice'});
-  assert.match(anonParked.state, /Log out to switch back to Alice\./);
-  assert.doesNotMatch(anon.state, /switch back/, 'nothing parked means nothing to name');
+  assert.doesNotMatch(anonParked.state, /switch back|Alice/);
 
   // Nothing from the desk yet: the base prices are shown, never "free".
   assert.equal(describeStickyAction({}).label, 'Subscribe & pin · 10 sats');
@@ -468,7 +473,14 @@ test('anonymous posting and signed-in profile details are present', async () => 
     readFile(new URL('../nostrSession.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
-  assert.match(html, /Post anonymously · 42 sats/);
+  assert.match(html, /Post anonymously · 69 sats/);
+  assert.ok(html.indexOf('class="private-key-login"') < html.indexOf('data-login="anonymous"'),
+    'anonymous posting belongs below private-key login');
+  assert.ok(html.indexOf('class="login-status-divider"') < html.indexOf('id="loginStatus"'),
+    'the divider separates login choices from their progress');
+  assert.match(html, /Your private key stays only in this open page's memory\. It is not saved and is forgotten when you reload or close the page\./);
+  assert.match(html, /Use Amber, a browser extension, or a bunker instead\./);
+  assert.match(css, /\.private-key-login \.private-key-warning\s*\{[^}]*color:\s*#ff7b75/s);
   for (const id of ['accountPicture', 'accountNip05', 'anonymousExpiry']) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(script, /anonymousCountdown/);
   assert.match(css, /\.plan-picker\[hidden\]\s*\{\s*display:\s*none/,
@@ -480,6 +492,10 @@ test('anonymous posting and signed-in profile details are present', async () => 
   assert.match(session, /ANONYMOUS_SESSION_MS = 24 \* 60 \* 60 \* 1000/);
   assert.match(session, /generateSecretKey\(\)/);
   assert.match(session, /localStorage\.removeItem\(ANONYMOUS_KEY\)/);
+  assert.match(script, /session\.method === 'anonymous' && session\.noteEventId/,
+    'a used one-note key cannot open or pay for another note');
+  assert.match(script, /markAnonymousNotePublished\(event\.id\)/,
+    'the key is marked used only after its note is published');
 });
 
 test('dragging a paid note onto the bin asks before discarding it', async () => {
@@ -875,6 +891,7 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // sign-in that does nothing and a note that will not pin, with no error anywhere.
   assert.match(script, /window\.addEventListener\('hashchange', \(\) => \{ resumeExternalFlow\(\)\.catch/);
   assert.match(script, /window\.addEventListener\('pageshow', \(\) => \{ resumeExternalFlow\(\)\.catch/);
+  assert.match(script, /window\.addEventListener\('focus', \(\) => \{ resumeExternalFlow\(\)\.catch/);
   assert.match(script, /document\.addEventListener\('visibilitychange',[\s\S]{0,120}!document\.hidden\) resumeExternalFlow\(\)\.catch/);
   assert.match(script, /pending\?\.status === 'waiting' \|\| pending\?\.status === 'waiting_subscription'/);
   assert.match(script, /pending\?\.status === 'paid'\) syncPlacementWithSession\(\)/);
@@ -883,7 +900,9 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // A sign-in that lands behaves like any other login: the dialog it came from closes and
   // the reader's own note returns to the board.
   assert.match(script, /if \(elements\.login\.open\) elements\.login\.close\(\);/);
+  assert.match(script, /event\.key === 'satoshi:nostr:session:v1'\) handleNostrSessionChange\(\)/);
   assert.match(script, /if \(!syncPlacementWithSession\(\)\) openComposer\(\);/);
+  assert.match(script, /Amber returned without an account\. Tap Amber to try again\./);
   assert.match(script, /status\(elements\.loginStatus, 'The signer did not come back\. Choose a sign-in option again\.', true\);/);
 });
 
@@ -969,7 +988,8 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
   // The identity decides what the buttons mean, so a session change re-asks the desk and
   // re-draws: relabelling the account alone is what left a plan offered to a temporary
   // identity, at the previous identity's price.
-  assert.match(script, /addEventListener\('satoshi-nostr-session', \(\) => \{\s+updateAccount\(\);\s+[\s\S]{0,400}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
+  assert.match(script, /function handleNostrSessionChange\(\) \{\s+updateAccount\(\);\s+[\s\S]{0,500}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
+  assert.match(script, /addEventListener\('satoshi-nostr-session', handleNostrSessionChange\)/);
   assert.match(script, /composingGeohashes = \[\.\.\.activeGeohashes\];\s+[\s\S]{0,300}refreshPriceQuote\(session\)\.catch/);
 
   // One place buys a subscription, and it refuses for an identity that can never use one.
@@ -990,9 +1010,12 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
   // A refusal the reader has to act on outlives the dialog it was reported in.
   assert.match(script, /if \(closedOverMessage\) \{\s+status\(elements\.boardStatus, error\.message, true\);/);
 
-  // And the sentence under the buttons names the way back when there is one.
-  assert.match(script, /const parkedName = parked \? sessionLabel\(parked\) : '';/);
-  assert.match(script, /describeStickyAction\(\{anonymous, subscription, plan: subscribePlan, parked: parkedName\}\)/);
+  // A temporary key is one-use: once its note is published, neither the composer nor
+  // the payment path can quietly reuse it for another note.
+  assert.match(script, /if \(session\.method === 'anonymous' && session\.noteEventId\) \{\s+throw new Error\('This anonymous key already posted its one note/);
+  assert.match(script, /if \(session\.method === 'anonymous' && session\.noteEventId\) \{\s+status\(elements\.boardStatus, 'This one-time key already posted its note/);
+  assert.match(script, /if \(pending\.anonymous\) markAnonymousNotePublished\(event\.id\);/);
+  assert.doesNotMatch(script, /describeStickyAction\(\{anonymous, subscription, plan: subscribePlan, parked:/);
 });
 
 test('a note paid for by subscription still finishes after the page reloads', async () => {

@@ -4,7 +4,7 @@ export const STICKY_VERSION = 'v1';
 // Posting is what a subscription buys. There is no per-note price for a
 // registered key any more: while a subscription is active, pins and removals are
 // included, and a note it covers is created already settled, so the board never
-// shows a payment step for one. The only per-message price left is the 24-hour
+// shows a payment step for one. The only per-note price left is the single-use
 // anonymous identity's, which can never subscribe.
 export const STICKY_SUB_WEEK_SATS = 10;
 export const STICKY_SUB_YEAR_SATS = 411;
@@ -13,12 +13,14 @@ export const STICKY_SUB_MEMBER_YEAR_SATS = 205;
 export const STICKY_SUB_WEEKS_PER_YEAR = 52;
 export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
 export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
-export const STICKY_ANONYMOUS_PRICE_SATS = 42;
+export const STICKY_ANONYMOUS_PRICE_SATS = 69;
+export const STICKY_ANONYMOUS_REMOVAL_SATS = 42;
 
 /** All prices this service charges, so nothing else can be displayed as one. */
 export const STICKY_KNOWN_PRICES = Object.freeze([
   0,
   STICKY_ANONYMOUS_PRICE_SATS,
+  STICKY_ANONYMOUS_REMOVAL_SATS,
   STICKY_SUB_WEEK_SATS,
   STICKY_SUB_YEAR_SATS,
   STICKY_SUB_MEMBER_WEEK_SATS,
@@ -527,10 +529,9 @@ export function stickyDay(seconds) {
  *
  * `anonymous` is the identity mode in play, and `plan` is the plan the picker is
  * on — a buyer with no subscription is offered "subscribe and post" as one action
- * rather than a detour they have to repeat. `parked` names the identity waiting behind
- * a temporary one, which is the only way back the anonymous case has.
+ * rather than a detour they have to repeat.
  */
-export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week', parked = '' } = {}) {
+export function describeStickyAction({ action = 'pin', anonymous = false, subscription = null, plan = 'week' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
   const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { member });
@@ -542,14 +543,14 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
     : 'Satoshi.si NIP-05 owners get 50% off.';
 
   if (anonymous) {
+    const price = action === 'remove' ? STICKY_ANONYMOUS_REMOVAL_SATS : STICKY_ANONYMOUS_PRICE_SATS;
     return {
       label: action === 'remove'
-        ? `Remove · ${STICKY_ANONYMOUS_PRICE_SATS} sats`
+        ? `Remove · ${STICKY_ANONYMOUS_REMOVAL_SATS} sats`
         : `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
-      state: `Anonymous identity: ${STICKY_ANONYMOUS_PRICE_SATS} sats per message. A subscription never applies to it.`
-        + (parked ? ` Log out to switch back to ${parked}.` : ''),
+      state: `Anonymous post: ${STICKY_ANONYMOUS_PRICE_SATS} sats. One key can post one note and cannot buy a weekly or yearly subscription.`,
       needsSubscription: false,
-      price: STICKY_ANONYMOUS_PRICE_SATS,
+      price,
       active: false,
       member: false,
       week,

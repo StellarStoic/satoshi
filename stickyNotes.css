@@ -83,12 +83,16 @@
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }
 .login-methods button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #505354; border-radius: 6px; background: #242627; color: #f1f1ee; font: inherit; cursor: pointer; }
-.login-methods .anonymous-login { grid-column: 1 / -1; border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); }
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }
-.login-note { margin: -4px 0 14px; color: #bbb; font-size: .84rem; }
+.login-note { margin: 8px 0 0; color: #bbb; font-size: .84rem; line-height: 1.45; }
 .private-key-login { margin-top: 18px; color: #bbb; }.private-key-login summary { color: #ddd; cursor: pointer; }.private-key-login p { font-size: .84rem; }
+.private-key-login .private-key-warning { color: #ff7b75; line-height: 1.48; }
+.private-key-warning strong { color: #ff9a94; }
+.anonymous-login-block { margin-top: 18px; }
+.anonymous-login { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:50px; border:1px solid var(--accent,#f2a900); border-radius:6px; background:#242627; color:var(--accent,#f2a900); font:inherit; cursor:pointer; }
+.login-status-divider { height:1px; margin:18px 0 0; border:0; background:#414445; }
 .inline-status { min-height: 1.4em; margin-top: 12px; color: #c6c8c6; font-size: .88rem; text-align: center; }
 .inline-status.is-error { color: #ff7b75; }
 .account-card { display: grid; gap: 10px; }.account-card code { overflow: hidden; color: #aaa; text-overflow: ellipsis; }.account-card .secondary-action { margin-top: 10px; }

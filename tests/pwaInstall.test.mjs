@@ -34,6 +34,7 @@ test('the manifest covers every page and Settings exposes installation', async (
 test('one bad file cannot cost the install, and the panel still finds a time', async () => {
   const worker = await read('sw.js');
   const settingsScript = await read('settings.js');
+  const workflow = await read('.github/workflows/history.yml');
 
   // the install no longer rejects as a unit, so the metadata below it is always written
   assert.doesNotMatch(worker, /await cache\.addAll\(/, 'cache.addAll is all-or-nothing');
@@ -42,6 +43,15 @@ test('one bad file cannot cost the install, and the panel still finds a time', a
   assert.ok(install.indexOf('CACHE_METADATA_URL') > install.indexOf('CORE.map'),
     'the metadata must be written after the files, not instead of them');
   assert.match(install, /if \(response\.ok\) await cache\.put\(path, response\)/);
+
+  // Every device must describe the same release. The Pages artifact records the commit that
+  // last changed the worker, while daily data-only commits leave that timestamp alone.
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /git log -1 --format=%cI -- sw\.js/);
+  assert.match(workflow, /> \/tmp\/satoshi-pages\/pwa-release\.json/);
+  assert.match(worker, /fetch\('\/pwa-release\.json', \{cache: 'no-store'\}\)/);
+  assert.match(worker, /release\?\.version === version/);
+  assert.match(worker, /updatedAt: releasedAt \|\| new Date\(\)\.toISOString\(\)/);
 
   // the picker's library is precached; Leaflet has not been used by any page since the port
   assert.match(worker, /'\/vendor\/maplibre\/maplibre-gl\.js'/);

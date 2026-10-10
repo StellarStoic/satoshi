@@ -35,9 +35,10 @@ place: the page should read it from a single constant.
 # 1. Sticky notes
 
 A sticky note is a temporary public Nostr event pinned to one geohash cell or a connected
-clump of cells. A named Nostr identity posts through a time-limited subscription; a
-browser-generated 24-hour anonymous identity cannot subscribe and pays **42 sats per
-message**. Paid orders are payable over Ark and Lightning.
+clump of cells. A named Nostr identity posts through a time-limited subscription. A
+browser-generated anonymous key cannot subscribe, pays **69 sats**, and may pin exactly
+one note. Its local 24-hour limit exists only to finish or remove that note. Paid orders
+are payable over Ark and Lightning.
 
 ## Price
 
@@ -45,14 +46,15 @@ message**. Paid orders are payable over Ark and Lightning.
 | ------------------ | -------------------- | --------------------------- | ------------------ |
 | one-week subscription | 10 sats          | 5 sats                      | unavailable        |
 | one-year subscription | 411 sats         | 205 sats                    | unavailable        |
-| pin or remove while subscribed | included | included                  | 42 sats per message |
+| pin                            | included while subscribed | included while subscribed | 69 sats |
+| remove                         | included while subscribed | included while subscribed | 42 sats |
 
 The yearly price is 52 weekly periods less 21%, rounded to a whole satoshi. Prices and
 membership eligibility are fixed server-side. The desk checks its authoritative NIP-05
 records using the order pubkey; it never trusts a browser claim, a submitted NIP-05 string,
 or a kind-0 profile. Renewing early extends the existing expiry instead of discarding the
 remaining time. For removal, the desk also reads the target event: its signed `anonymous`
-marker determines whether the 42-sat per-message path applies.
+marker determines whether the 42-sat anonymous removal path applies.
 
 ## GET /sticky/v1/subscription?pubkey={64-hex-key}
 
@@ -80,10 +82,10 @@ subscribe ─► awaiting_invoice ─► awaiting_payment ─► paid ─► sub
                                                                   │
 pin/remove with active subscription ─► paid at 0 sats ────────────┴─► published
 
-anonymous pin/remove ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
+anonymous one-note pin (69 sats) / remove (42 sats) ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
 ```
 
-For a subscription or 42-sat anonymous order, `paid` means BTCPay reports the invoice
+For a subscription or paid anonymous order, `paid` means BTCPay reports the invoice
 **Settled**; `Processing` does not count. A pin or removal covered by an active subscription
 starts in `paid` at 0 sats, creates no invoice or worker job, and returns its short-lived
 publish token immediately. `published` means the signed event was accepted by the relay.
@@ -131,14 +133,20 @@ clump: every cell cut to the **same depth**, each cell listed **once**, no more 
 clump is one connected piece. Any violation is `bad_geohash`, before anything is priced.
 The first cell is the *primary*: the one the note is written on, and the one the `["i"]`
 tag names. A clump remains one note: an active subscription includes it, while an
-anonymous identity pays the same 42 sats whether that note covers one or several cells.
+anonymous identity pays the same 69 sats whether that note covers one or several cells.
 
 `geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
-is optional and valid only for `pin`; it selects the fixed 42-sat path. A named pin or
+is optional and valid only for `pin`; it selects the fixed 69-sat path. A named pin or
 removal without an active subscription is refused with `402 subscription_required`, after
 which the client may buy a subscription and retry the same action. The created pin order
 binds every cell of the clump, geohash mode and identity mode alongside the pubkey and
 commitment; the publish token is derived from all of them.
+
+An anonymous pubkey may own only one pin. Retrying its existing unpaid or paid order is
+idempotent, so a reload cannot strand a payment, but creating a second anonymous pin after
+the first was published is refused with `409 anonymous_key_used`. The same key may still
+sign a removal of that one event while its local 24-hour access window remains. It can never
+create a weekly or yearly subscription.
 
 **response — `201`**
 
@@ -163,7 +171,7 @@ commitment; the publish token is derived from all of them.
 
 The response above is a pin covered by an active subscription. It must return the publish
 token in the creation response because there is nothing to poll or settle. Subscription
-orders use 10, 411, 5, or 205 sats; anonymous message orders use 42 sats. Those paid orders
+orders use 10, 411, 5, or 205 sats; an anonymous pin uses 69 sats and its removal uses 42 sats. Those paid orders
 keep the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails. A paid
 subscription activates the pass but has no Nostr event and therefore no publish token.
 
@@ -381,7 +389,7 @@ pricing it. `content` may hold a short reason.
   21%), **5 / 205** with a satoshi.si NIP-05 name — and while it runs, every pin and removal is
   included, so a covered note is created already settled at 0 sats. A registered key with no
   subscription gets `subscription_required` (402). A temporary anonymous identity cannot
-  subscribe and pays **42 sats per message**.
+  subscribe, pays **69 sats**, and may pin one note with that key.
 * Free orders never create a BTCPay invoice or enter the invoice worker queue. The service
   marks them paid and returns their short-lived publish token directly.
 * Paid rails: **Ark and Lightning**. The invoice requests `BARK` and `BTC-LN`; on-chain is
@@ -449,6 +457,7 @@ and character limit from it rather than keeping its own copy.
 | --- | --- | --- |
 | `bad_geohash` | `POST /orders` 400 | a pin with no cells, a cell outside `[0123456789bcdefghjkmnpqrstuvwxyz]` or outside 4–9 characters, cells of mixed depth, a repeated cell, more than nine cells, cells that do not touch, or a `geohash` that disagrees with the first entry of `geohashes`. A `remove` that sends either field is refused the same way. |
 | `bad_anonymous` | `POST /orders` 400 | `anonymous` was not a boolean, or was sent for a `remove`. |
+| `anonymous_key_used` | `POST /orders` 409 | this anonymous pubkey already published its one permitted note |
 | `geohash_mismatch` | `publish` 400 | the note does not carry one `["g", <cell>]` for every cell the order paid for (and, in `exact` mode, nothing else), `["i","geo:<cell>"]` naming one of those cells, and `["k","geo"]`. A missing cell, a duplicate, or a cell nobody paid for — all the same refusal, because the note would otherwise land in a cell that was not bought. |
 | `identity_mismatch` | `publish` 400 | an anonymous order published a note without `["anonymous","24h-local-key"]`, or a named order published one carrying it. |
 | `bad_marker` | `publish` 400 | the `["t","satoshi-sticky"]` marker or the `["client","satoshi.si"]` tag is missing, duplicated or wrong. |
@@ -459,7 +468,7 @@ The client tag is enforced, not decorative: exactly one `["client","satoshi.si"]
 that reached the relay some other way can be told apart. Removals stay geohash-free — a NIP-09
 deletion has no place on the board, so there is nothing to bind.
 
-`GET /sticky/v1/config` additionally publishes `anonymousSats: 42`, the geohash rules
+`GET /sticky/v1/config` additionally publishes `anonymousSats: 69` and `anonymousRemovalSats: 42`, the geohash rules
 (`requiredForPin`, `alphabet`, `minLength`, `maxLength`, `maxCells`, the three tag names), the
 liveliness rules (`requiredForPin`, `tag`, `standard`, `default`, the five `options` with their
 seconds, `minSeconds`, `maxSeconds`, `measuredFrom`, `removals`), the mention rules (`tag`,

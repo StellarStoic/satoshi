@@ -129,16 +129,19 @@
       <div class="login-methods">
         <button type="button" data-login="extension"><i class="lni lni-extension" aria-hidden="true"></i><span>Browser extension</span></button>
         <button type="button" data-login="amber"><i class="lni lni-mobile" aria-hidden="true"></i><span>Amber</span></button>
-        <button type="button" class="anonymous-login" data-login="anonymous"><i class="lni lni-user-4" aria-hidden="true"></i><span>Post anonymously · 42 sats</span></button>
       </div>
-      <p class="login-note">That is a temporary key: it cannot hold a name or a subscription, and posting with it costs 42 sats a note. Your current login is kept, and logging out returns to it.</p>
       <label class="login-field"><span>Bunker</span><input id="bunkerInput" type="text" inputmode="url" autocomplete="off" placeholder="bunker://..."><button type="button" data-login="bunker">Connect</button></label>
         <button type="button" class="bunker-reconnect" data-login="bunker-saved" id="bunkerReconnect" hidden><i class="lni lni-mobile" aria-hidden="true"></i><span>Reconnect your bunker</span></button>
       <details class="private-key-login">
         <summary>Private key</summary>
-        <p>Not recommended. The key stays in memory and is never saved, but a signer is safer.</p>
+        <p class="private-key-warning"><strong>Not recommended.</strong> Your private key stays only in this open page's memory. It is not saved and is forgotten when you reload or close the page. Use Amber, a browser extension, or a bunker instead.</p>
         <label class="login-field"><span>nsec</span><input id="privateKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="nsec1..."><button type="button" data-login="private">Use once</button></label>
       </details>
+      <div class="anonymous-login-block">
+        <button type="button" class="anonymous-login" data-login="anonymous"><i class="lni lni-user-4" aria-hidden="true"></i><span>Post anonymously · 69 sats</span></button>
+        <p class="login-note">A new one-time key is created for one note. It remains available for up to 24 hours so you can finish or remove that note. Leaving anonymous mode deletes it. It cannot buy a weekly or yearly subscription.</p>
+      </div>
+      <hr class="login-status-divider">
       <div id="loginStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>

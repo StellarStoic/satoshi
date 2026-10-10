@@ -76,9 +76,10 @@ export const PAGE_HELP = Object.freeze({
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says that posting is included.',
-                    'Not signed in? An anonymous note costs 42 sats each. Your browser invents a temporary identity for'
-                    + ' that note, keeps its key only on this device, and forgets it after 24 hours. A pass never applies to'
-                    + ' an anonymous note: each one costs 42 sats.',
+                    'Not signed in? An anonymous note costs 69 sats. Your browser creates a one-time key that can pin one'
+                    + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
+                    + ' so you can finish or remove that note. Leave anonymous mode and the key is deleted; returning'
+                    + ' creates a new one.',
                     'When a pass runs out, nothing you already pinned disappears. Your notes stay on the board for'
                     + ' everyone to read; only new notes and removals need a pass.',
                     'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
@@ -148,8 +149,10 @@ export const PAGE_HELP = Object.freeze({
                     'The publish token is bound to the note content hash, its geohash and its identity mode, lives 15'
                     + ' minutes and is spent once, so a token bought for one note cannot publish a different one in another'
                     + ' cell. The service verifies the event id and signature before the relay sees the event, and the relay'
-                    + ' admits a write only for the exact event id that was paid for. An anonymous note must carry the'
-                    + ' ["anonymous","24h-local-key"] marker; a named note must not.',
+                    + ' admits a write only for the exact event id that was paid for. An anonymous key pays 69 sats and may'
+                    + ' publish one pin only; it cannot buy a subscription. It may pay 42 sats to remove that one note while'
+                    + ' its local key remains available. An anonymous note must carry the ["anonymous","24h-local-key"] marker; a named'
+                    + ' note must not.',
                     'Payments are in sats over Lightning or Ark, for the amount the service calculated for that order,'
                     + ' and a rail asking for any other amount is refused. Reading is always free: the relay serves every'
                     + ' published note to anyone, and an expired pass deletes, hides and rewrites nothing.',

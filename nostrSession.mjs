@@ -79,6 +79,19 @@ export function loginAnonymously() {
   return saveSession(pubkey, 'anonymous', {name: 'Anonymous'}, {expiresAt});
 }
 
+/** Mark the single note this temporary key published without discarding removal access yet. */
+export function markAnonymousNotePublished(eventId) {
+  const session = readJson(localStorage, SESSION_KEY);
+  const saved = readJson(localStorage, ANONYMOUS_KEY);
+  const id = String(eventId || '').toLowerCase();
+  if (session?.method !== 'anonymous' || saved?.pubkey !== session.pubkey || !/^[0-9a-f]{64}$/.test(id)) {
+    return null;
+  }
+  const nextSaved = {...saved, noteEventId: id};
+  localStorage.setItem(ANONYMOUS_KEY, JSON.stringify(nextSaved));
+  return saveSession(session.pubkey, 'anonymous', session.profile, {expiresAt: session.expiresAt, noteEventId: id});
+}
+
 export function updateNostrProfile(pubkey, profile) {
   const session = getNostrSession();
   if (!session || session.pubkey !== pubkey || session.method === 'anonymous') return session;
@@ -108,21 +121,39 @@ function randomId() {
 }
 
 function amberCallback(id) {
-  // NIP-55 web callbacks are prefixes: the signer appends its answer to the URL. Keep the
-  // request id and empty result in one final query value, exactly like the NIP's `?event=`
-  // example. A dot separates our correlation id from Amber's appended pubkey/signature.
-  return `${location.origin}${location.pathname}?${AMBER_CALLBACK_PARAM}=${id}.`;
+  // Amber decodes the complete signer URI before it reads its parameters. In current builds,
+  // a `?` inside callbackUrl is consequently mistaken for another signer-URI separator and
+  // everything after it is lost. A fragment has no such delimiter, survives that parser, and
+  // also keeps the returned identity/signature out of HTTP access logs.
+  return `${location.origin}${location.pathname}#${AMBER_CALLBACK_PARAM}=${id}.`;
 }
 
 function openAmber(type, payload, id, options = {}) {
-  const params = new URLSearchParams({type, callbackUrl: amberCallback(id), ...options});
+  const params = new URLSearchParams({type, callbackUrl: amberCallback(id), appName: 'satoshi.si', ...options});
   location.assign(`nostrsigner:${encodeURIComponent(payload)}?${params.toString()}`);
+}
+
+function parkAmberRequest(id, state) {
+  // A retry supersedes an unanswered request of the same kind. Keeping old requests around
+  // makes a later visibility event report the wrong attempt and can leave the UI "Connecting".
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(AMBER_PREFIX)) continue;
+    const parked = readJson(localStorage, key);
+    const expired = !parked || !Number.isFinite(parked.createdAt) || Date.now() - parked.createdAt > AMBER_MAX_AGE;
+    if (expired || parked.action === state.action) localStorage.removeItem(key);
+  }
+  localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({
+    ...state,
+    createdAt: Date.now(),
+    returnPath: `${location.pathname}${location.search || ''}`,
+  }));
 }
 
 export function beginAmberLogin() {
   if (!/Android/i.test(navigator.userAgent || '')) throw new Error('Amber login is available on Android.');
   const id = randomId();
-  localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({createdAt: Date.now(), action: 'login'}));
+  parkAmberRequest(id, {action: 'login'});
   openAmber('get_public_key', '', id, {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])});
 }
 
@@ -130,7 +161,7 @@ export function beginAmberSigning(template, context = null) {
   const session = getNostrSession();
   if (!session || session.method !== 'amber') throw new Error('Connect Amber first.');
   const id = randomId();
-  localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({createdAt: Date.now(), action: 'sign', template, context}));
+  parkAmberRequest(id, {action: 'sign', template, context});
   // Returning the whole event can turn a long note and its tags into a callback URL large
   // enough for Android to drop. The signature is compact; the exact unsigned event is already
   // parked above, so the page can rebuild and verify the signed event when Amber returns.
@@ -143,15 +174,19 @@ export function beginAmberSigning(template, context = null) {
  * nothing, so this is how the page knows a signature was asked for and never arrived.
  */
 export function pendingAmberRequest() {
+  let newest = null;
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
     if (!key || !key.startsWith(AMBER_PREFIX)) continue;
     const state = readJson(localStorage, key);
-    if (!state || !Number.isFinite(state.createdAt)) continue;
-    if (Date.now() - state.createdAt > AMBER_MAX_AGE) continue;
-    return state;
+    if (!state || !Number.isFinite(state.createdAt) || Date.now() - state.createdAt > AMBER_MAX_AGE) {
+      localStorage.removeItem(key);
+      index -= 1;
+      continue;
+    }
+    if (!newest || state.createdAt > newest.createdAt) newest = state;
   }
-  return null;
+  return newest;
 }
 
 export function resumeAmber() {
@@ -179,16 +214,21 @@ export function resumeAmber() {
     }
   }
   if (!id || !result) return null;
-  // Remove only signer answers: an unrelated page query must survive the round trip.
-  params.delete(AMBER_CALLBACK_PARAM);
-  params.delete(AMBER_ID_PARAM);
-  params.delete(AMBER_RESULT_PARAM);
-  history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
   const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
   localStorage.removeItem(key);
   if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
-  if (fragment) { try { result = decodeURIComponent(result); } catch {} }
+  // Restore the board URL that was open before Android took over. The callback itself cannot
+  // carry a query string because of Amber's parser, so it is parked with the request instead.
+  params.delete(AMBER_CALLBACK_PARAM);
+  params.delete(AMBER_ID_PARAM);
+  params.delete(AMBER_RESULT_PARAM);
+  const fallbackPath = `${location.pathname}${params.size ? `?${params}` : ''}`;
+  const returnPath = typeof state.returnPath === 'string' && /^\/[\w./~%-]*(?:\?[^#]*)?$/.test(state.returnPath)
+    ? state.returnPath
+    : fallbackPath;
+  history.replaceState(null, '', returnPath);
+  try { result = decodeURIComponent(result); } catch {}
   if (state.action === 'login') {
     const pubkey = result.trim().toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
