@@ -906,6 +906,9 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.doesNotMatch(script, /Amber returned without an account/);
   assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\.\.\.'\);/);
   assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\. Tap Amber again if no answer arrives\.'\);/);
+  assert.match(script, /control\.href = beginAmberLogin\(\{navigate: false\}\);/);
+  assert.match(script, /control\.addEventListener\('pointerdown',/);
+  assert.match(script, /following click is an ordinary link navigation/);
 });
 
 test('the restored board and account dialog cannot trap the reader', async () => {

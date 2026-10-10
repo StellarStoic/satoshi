@@ -128,9 +128,15 @@ function amberCallback(id) {
   return `${location.origin}${location.pathname}#${AMBER_CALLBACK_PARAM}=${id}.`;
 }
 
-function openAmber(type, payload, id, options = {}) {
+function amberRequestUrl(type, payload, id, options = {}) {
   const params = new URLSearchParams({type, callbackUrl: amberCallback(id), appName: 'satoshi.si', ...options});
-  location.assign(`nostrsigner:${encodeURIComponent(payload)}?${params.toString()}`);
+  return `nostrsigner:${encodeURIComponent(payload)}?${params.toString()}`;
+}
+
+function openAmber(type, payload, id, options = {}) {
+  const url = amberRequestUrl(type, payload, id, options);
+  location.assign(url);
+  return url;
 }
 
 function parkAmberRequest(id, state) {
@@ -150,11 +156,13 @@ function parkAmberRequest(id, state) {
   }));
 }
 
-export function beginAmberLogin() {
+export function beginAmberLogin({navigate = true} = {}) {
   if (!/Android/i.test(navigator.userAgent || '')) throw new Error('Amber login is available on Android.');
   const id = randomId();
   parkAmberRequest(id, {action: 'login'});
-  openAmber('get_public_key', '', id, {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])});
+  const options = {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])};
+  if (navigate) return openAmber('get_public_key', '', id, options);
+  return amberRequestUrl('get_public_key', '', id, options);
 }
 
 export function beginAmberSigning(template, context = null) {

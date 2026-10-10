@@ -3059,7 +3059,32 @@ elements.shareBoard.addEventListener('click', async () => {
   }
 });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
-document.querySelectorAll('[data-login]').forEach(button => button.addEventListener('click', () => handleLogin(button.dataset.login)));
+document.querySelectorAll('[data-login]').forEach(control => {
+  if (control.dataset.login === 'amber') {
+    const prepareAmberLink = () => {
+      status(elements.loginStatus, 'Opening Amber...');
+      control.href = beginAmberLogin({navigate: false});
+      control.dataset.amberRequestReady = '1';
+    };
+    // Prepare on the physical press so the following click is an ordinary link navigation.
+    // Keyboard activation has no pointerdown, so click retains the same preparation fallback.
+    control.addEventListener('pointerdown', () => {
+      try { prepareAmberLink(); }
+      catch (error) { status(elements.loginStatus, error.message, true); }
+    });
+    control.addEventListener('click', event => {
+      try {
+        if (control.dataset.amberRequestReady !== '1') prepareAmberLink();
+        delete control.dataset.amberRequestReady;
+      } catch (error) {
+        event.preventDefault();
+        status(elements.loginStatus, error.message, true);
+      }
+    });
+    return;
+  }
+  control.addEventListener('click', () => handleLogin(control.dataset.login));
+});
 elements.logout.addEventListener('click', () => {
   // Closing first guarantees a broken downstream session listener cannot trap the reader
   // inside a modal. The account state is then cleared and redrawn normally.
