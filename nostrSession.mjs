@@ -216,7 +216,6 @@ export function resumeAmber() {
   if (!id || !result) return null;
   const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
-  localStorage.removeItem(key);
   if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
   // Restore the board URL that was open before Android took over. The callback itself cannot
   // carry a query string because of Amber's parser, so it is parked with the request instead.
@@ -232,7 +231,9 @@ export function resumeAmber() {
   if (state.action === 'login') {
     const pubkey = result.trim().toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
-    return {action: 'login', session: saveSession(pubkey, 'amber')};
+    const session = saveSession(pubkey, 'amber');
+    localStorage.removeItem(key);
+    return {action: 'login', session};
   }
   const clean = result.trim();
   const session = getNostrSession();
@@ -247,6 +248,9 @@ export function resumeAmber() {
     try { event = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
   }
   if (!tools().verifyEvent(event) || event.pubkey !== session?.pubkey) throw new Error('Amber returned an invalid signed event.');
+  // Spend the request only after the return has been rebuilt and verified. Android can open
+  // the callback in a second browser/PWA context; a half-read return must not consume it.
+  localStorage.removeItem(key);
   return {action: 'sign', event, context: state.context};
 }
 

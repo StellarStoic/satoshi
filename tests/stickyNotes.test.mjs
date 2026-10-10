@@ -64,9 +64,9 @@ test('the composer says what posting costs, and what a subscription changes', ()
   const on = describeStickyAction({subscription: covered});
   assert.equal(on.needsSubscription, false);
   assert.equal(on.price, 0, 'a covered note is never given a price');
-  assert.equal(on.label, 'Pin it · included');
+  assert.equal(on.label, 'Place your note');
   assert.match(on.state, /Subscription active until 2027-01-15/);
-  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).label, 'Remove · included');
+  assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).label, 'Remove note');
   assert.equal(describeStickyAction({subscription: covered, action: 'remove'}).price, 0);
 
   const anon = describeStickyAction({anonymous: true, subscription: covered});
@@ -485,7 +485,11 @@ test('anonymous posting and signed-in profile details are present', async () => 
   assert.match(script, /anonymousCountdown/);
   assert.match(css, /\.plan-picker\[hidden\]\s*\{\s*display:\s*none/,
     'the author display rule must not override the hidden attribute');
-  assert.match(script, /const plansAvailable = Boolean\(session && !anonymous && !actionInfo\.active\)/);
+  assert.match(script, /const plansAvailable = Boolean\(session && !anonymous && subscriptionResolved && !actionInfo\.active\)/);
+  assert.match(script, /elements\.subscriptionState\.hidden = !session \|\| checkingSubscription \|\| actionInfo\.active/,
+    'an active subscriber sees no plan or subscription sales copy');
+  assert.match(script, /checkingSubscription \? 'Place your note' : actionInfo\.label/,
+    'the composer stays a single neutral action until the service answers');
   assert.match(script, /elements\.planPicker\.inert = !plansAvailable/);
   assert.match(script, /button\.disabled = !plansAvailable/);
   assert.match(script, /kinds: \[0\]/);
@@ -885,6 +889,10 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /parkedRequest\.context\?\.orderId === pending\.orderId/);
   assert.match(script, /if \(unusableReturn\) notice\(unusableReturn\);/);
   assert.match(script, /pendingAmberRequest,\n  reconnectBunker,\n  resumeAmber,/);
+  assert.match(script, /signalStickyFlow\('signed', \{orderId: pending\.orderId\}\)/);
+  assert.match(script, /signalStickyFlow\('published', \{orderId, event,/);
+  assert.match(script, /event\.key !== FLOW_SYNC_KEY/,
+    'the page that launched Amber hears when its callback finishes in another context');
 
   // The answer is read wherever it arrives, not only while booting: a browser that resumes
   // the running page and merely changes the URL would otherwise lose it — which is a

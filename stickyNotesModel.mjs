@@ -560,7 +560,7 @@ export function describeStickyAction({ action = 'pin', anonymous = false, subscr
 
   if (active) {
     return {
-      label: `${action === 'remove' ? 'Remove' : 'Pin it'} · included`,
+      label: action === 'remove' ? 'Remove note' : 'Place your note',
       state: `Subscription active${until ? ` until ${until}` : ''}. Posting and removals are included. ${discount}`,
       needsSubscription: false,
       price: 0,

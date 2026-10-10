@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v240';   // v240: signer-owned saved drafts without automatic composer popups
+const CACHE = 'satoshi-static-v241';   // v241: reliable cross-window Amber pin completion and subscription-only composer
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',

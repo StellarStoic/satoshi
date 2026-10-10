@@ -62,6 +62,7 @@ import {payServiceUrl} from './paymentService.mjs';
 const API = document.querySelector('meta[name="sticky-api"]')?.content || payServiceUrl('sticky');
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
+const FLOW_SYNC_KEY = 'satoshi:sticky:flow-sync:v1';
 const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 // A board can cover several cells that touch, so what is remembered is the whole
 // clump; BOARD_KEY keeps the first cell for links and older visitors.
@@ -159,6 +160,7 @@ let quotedPubkey = '';
 // plan the picker is on. `actionInfo` is the pure description of what the buttons
 // say, rebuilt whenever any of those change.
 let subscription = null;
+let subscriptionResolved = false;
 let subscribePlan = 'week';
 let actionInfo = describeStickyAction({});
 let currentPaymentValue = '';
@@ -248,6 +250,14 @@ function savePending(value) {
   pending = value;
   if (value) localStorage.setItem(PENDING_KEY, JSON.stringify(value));
   else localStorage.removeItem(PENDING_KEY);
+}
+
+function signalStickyFlow(type, detail = {}) {
+  try {
+    localStorage.setItem(FLOW_SYNC_KEY, JSON.stringify({
+      type, ...detail, at: Date.now(), nonce: crypto.randomUUID?.() || Math.random(),
+    }));
+  } catch {}
 }
 
 function isStrandedPinDraft(value = pending) {
@@ -916,21 +926,25 @@ function updateAccount() {
 function renderQuotedPrice() {
   const session = getNostrSession();
   const anonymous = session?.method === 'anonymous';
+  const checkingSubscription = Boolean(session && !anonymous && !subscriptionResolved);
   actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
   const removeInfo = describeStickyAction({action: 'remove', anonymous, subscription, plan: subscribePlan});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
-  quotedPrice = session ? actionInfo.price : STICKY_SUB_WEEK_SATS;
-  elements.pay.querySelector('span').textContent = session ? actionInfo.label : 'Sign in to post';
-  elements.removeSticky.querySelector('span').textContent = session ? removeInfo.label : 'Remove note';
+  quotedPrice = session && !checkingSubscription ? actionInfo.price : 0;
+  elements.pay.querySelector('span').textContent = session
+    ? (checkingSubscription ? 'Place your note' : actionInfo.label)
+    : 'Sign in to post';
+  elements.removeSticky.querySelector('span').textContent = session && !checkingSubscription ? removeInfo.label : 'Remove note';
   if (elements.subscriptionState) {
     elements.subscriptionState.textContent = session ? actionInfo.state : '';
-    elements.subscriptionState.hidden = !session;
+    // An active subscription needs no sales copy. The composer becomes one clear action.
+    elements.subscriptionState.hidden = !session || checkingSubscription || actionInfo.active;
   }
   if (elements.planPicker) {
     // The picker is only useful when there is a subscription to choose: an active
     // one already covers everything, and an anonymous identity can never take one.
-    const plansAvailable = Boolean(session && !anonymous && !actionInfo.active);
+    const plansAvailable = Boolean(session && !anonymous && subscriptionResolved && !actionInfo.active);
     elements.planPicker.hidden = !plansAvailable;
     elements.planPicker.inert = !plansAvailable;
     for (const button of elements.planPicker.querySelectorAll('[data-plan]')) {
@@ -949,27 +963,35 @@ async function refreshPriceQuote(session) {
   if (!session) {
     quotedPubkey = '';
     subscription = null;
+    subscriptionResolved = false;
     renderQuotedPrice();
     return;
   }
   if (session.method === 'anonymous') {
     quotedPubkey = session.pubkey;
     subscription = null;
+    subscriptionResolved = true;
     renderQuotedPrice();
     return;
   }
-  if (quotedPubkey === session.pubkey && subscription) return;
+  if (quotedPubkey === session.pubkey && subscriptionResolved) return;
+  if (quotedPubkey !== session.pubkey) subscription = null;
   quotedPubkey = session.pubkey;
+  subscriptionResolved = false;
   renderQuotedPrice();
   try {
     // One call answers both halves: whether this key may post, and what the plans
     // cost it. The created order is still authoritative — this only draws buttons.
     const state = await api(`/subscription?pubkey=${encodeURIComponent(session.pubkey)}`);
     if (getNostrSession()?.pubkey !== session.pubkey) return;
-    if (state && state.ok !== false) subscription = state;
+    if (state && state.ok !== false) {
+      subscription = state;
+      subscriptionResolved = true;
+    }
     renderQuotedPrice();
   } catch {
     // The created order remains authoritative; a missing preview never blocks checkout.
+    if (getNostrSession()?.pubkey === session.pubkey) renderQuotedPrice();
   }
 }
 
@@ -993,6 +1015,7 @@ async function api(path, options = {}) {
     // failure, so the status and the reason code travel with the error.
     error.status = response.status;
     error.reason = body.reason || '';
+    error.body = body;
     throw error;
   }
   return body;
@@ -1633,6 +1656,12 @@ async function startPayment() {
       // 402 is the desk saying "this key is registered but has no subscription".
       // Buy one now and come back to this note; anything else is a real failure.
       if (!shouldBuySubscription(error, session)) throw error;
+      if (!subscriptionResolved) {
+        subscription = {active: false, prices: error.body?.prices || {}};
+        subscriptionResolved = true;
+        renderQuotedPrice();
+        throw new Error('Choose weekly or yearly, then tap Subscribe & place.');
+      }
       await buySubscriptionThen(session, notePending, elements.paymentStatus);
       return;
     }
@@ -2030,9 +2059,11 @@ async function publishPinnedNote(resumedEvent = null) {
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     if (!event) return;
     if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid event.');
+    signalStickyFlow('signed', {orderId: pending.orderId});
     const result = await api(`/orders/${encodeURIComponent(pending.orderId)}/publish`, {
       method: 'POST', headers: {authorization: `Bearer ${pending.publishToken}`}, body: JSON.stringify({event}),
     });
+    const orderId = pending.orderId;
     const sticky = parseStickyEvent(event);
     if (pending.anonymous) markAnonymousNotePublished(event.id);
     placingNote?.remove(); placingNote = null;
@@ -2040,6 +2071,9 @@ async function publishPinnedNote(resumedEvent = null) {
     elements.placementControls.hidden = true;
     setBinArmed(false);
     elements.discardBin.hidden = true;
+    // Signal before clearing the shared draft. Amber may have returned into a browser tab
+    // while the installed PWA is still visible; this lets that original board finish too.
+    signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
     savePending(null);
     elements.editor.textContent = '';
     lastValidEditor = '';
@@ -2050,6 +2084,21 @@ async function publishPinnedNote(resumedEvent = null) {
     elements.boardStatus.hidden = false;
     setTimeout(() => { elements.boardStatus.hidden = true; }, 3500);
   } catch (error) {
+    // A second Android context can finish while the first is resuming. The publish endpoint
+    // is authoritative: an already-published answer means this paid note is complete.
+    if (resumedEvent && ['already_pinned', 'already_published'].includes(error.reason)) {
+      signalStickyFlow('published', {orderId: pending?.orderId || '', event: resumedEvent, message: 'Your note is pinned.'});
+      savePending(null);
+      placingNote?.remove(); placingNote = null;
+      elements.placementControls.hidden = true;
+      elements.discardBin.hidden = true;
+      elements.pin.querySelector('span').textContent = 'Pinned';
+      status(elements.boardStatus, 'Your note is pinned.');
+      elements.boardStatus.hidden = false;
+      published = true;
+      if (activeGeohash) connectBoard();
+      return;
+    }
     status(elements.boardStatus, error.message, true);
     elements.boardStatus.hidden = false;
   } finally {
@@ -3149,6 +3198,32 @@ window.addEventListener('satoshi-nostr-session', handleNostrSessionChange);
 // completed instead of leaving its older dialog on "Connecting".
 window.addEventListener('storage', event => {
   if (event.key === 'satoshi:nostr:session:v1') handleNostrSessionChange();
+  if (event.key !== FLOW_SYNC_KEY || !event.newValue) return;
+  let flow;
+  try { flow = JSON.parse(event.newValue); } catch { return; }
+  if (!pending?.orderId || flow.orderId !== pending.orderId) return;
+  if (flow.type === 'signed') {
+    elements.pin.disabled = true;
+    elements.pin.querySelector('span').textContent = 'Publishing...';
+    status(elements.boardStatus, 'Signature received. Publishing your note...');
+    elements.boardStatus.hidden = false;
+    return;
+  }
+  if (flow.type !== 'published' || !flow.event) return;
+  const sticky = parseStickyEvent(flow.event);
+  if (pending.anonymous) markAnonymousNotePublished(flow.event.id);
+  placingNote?.remove(); placingNote = null;
+  if (sticky) renderNote(sticky, flow.event);
+  elements.placementControls.hidden = true;
+  setBinArmed(false);
+  elements.discardBin.hidden = true;
+  savePending(null);
+  elements.editor.textContent = '';
+  lastValidEditor = '';
+  elements.pin.disabled = true;
+  elements.pin.querySelector('span').textContent = 'Pinned';
+  status(elements.boardStatus, flow.message || 'Your note is pinned.');
+  elements.boardStatus.hidden = false;
 });
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 let boardResizeFrame = 0;
@@ -3213,6 +3288,7 @@ async function applySignerReturn() {
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
     } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
       applied = true;
+      signalStickyFlow('signed', {orderId: pending.orderId});
       if (amber.context.action === 'remove') await publishRemoval(amber.event);
       else await publishPinnedNote(amber.event);
     } else if (amber?.action === 'sign') {
