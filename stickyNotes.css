@@ -83,7 +83,7 @@
 .map-clear-action { min-height:36px; padding:6px 12px; border:1px solid #505354; border-radius:5px; background:transparent; color:#c9cbc9; font:inherit; font-size:.82rem; cursor:pointer; }.map-clear-action:hover { border-color:#8a8c8a; color:#fff; }
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }
-.login-methods button, .login-methods a { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #505354; border-radius: 6px; background: #242627; color: #f1f1ee; font: inherit; text-decoration:none; cursor: pointer; }
+.login-methods button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #505354; border-radius: 6px; background: #242627; color: #f1f1ee; font: inherit; cursor: pointer; }
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }

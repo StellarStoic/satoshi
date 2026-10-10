@@ -200,25 +200,6 @@ test('Amber receives a callback its current web parser preserves and the round t
   assert.deepEqual(replaced, ['/stickyNotes.html?g=u24jed'], 'the board open before Amber is restored');
 });
 
-test('Amber login can be handed to Android as a direct user-activated link', async () => {
-  const storage = memoryStorage();
-  const assigned = [];
-  globalThis.localStorage = storage;
-  Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'Android'}});
-  globalThis.location = {
-    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
-    assign: value => assigned.push(value),
-  };
-  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
-
-  const sessionModule = await import(`../nostrSession.mjs?amber-link-test=${Date.now()}`);
-  const href = sessionModule.beginAmberLogin({navigate: false});
-  assert.match(href, /^nostrsigner:\?type=get_public_key&/);
-  assert.match(href, /callbackUrl=/);
-  assert.equal(assigned.length, 0, 'the browser follows the link itself after the click handler returns');
-  assert.equal(sessionModule.pendingAmberRequest()?.action, 'login', 'the exact link still has matching callback state');
-});
-
 test('Amber pinning returns a compact signature and rebuilds the verified event locally', async () => {
   const storage = memoryStorage();
   const pubkey = 'a'.repeat(64);
