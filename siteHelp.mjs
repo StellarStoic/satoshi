@@ -61,9 +61,13 @@ export const PAGE_HELP = Object.freeze({
                     + ' lives. Perfect for small areas and groups pinning notes to each other.',
                     'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
                     + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
-                    + ' key and the board draws their name in its place. The person button at the top of the board shows'
-                    + ' only the notes that tag you, and it works for a signed-in identity that has a name of its own: a'
-                    + ' temporary anonymous identity has no name, so that button stays out of reach for one.',
+                    + ' key and the board draws their name in its place. Open the sort button to show only notes that'
+                    + ' tag you. That view works for a signed-in identity, but not for a temporary anonymous one.',
+                    'The sort button can keep the board focused on the newest 5 or 15 notes, the last day, the last'
+                    + ' week, or notes that mention you. Signed-in Nostr users can also keep on “Notes from my follows”'
+                    + ' to limit any of those views to people they follow. That choice stays in this browser. A green'
+                    + ' outline around the sort button means a filter is active. Filtered notes become faint blank paper'
+                    + ' with no pin: hold the paper for four seconds to reveal one note for a minute.',
                     'Every note is temporary, and you choose how temporary. A slider offers a day, a week, a month, six'
                     + ' months or a year, and it starts at a month. The note states the exact moment it will go, and the'
                     + ' relay that holds it deletes it then, so the board stays a board people walk past rather than an'
@@ -116,6 +120,15 @@ export const PAGE_HELP = Object.freeze({
                     + ' most five, each a different key. The desk refuses a ["p", \u2026] tag whose key the text never'
                     + ' names, a sixth, a repeated key, and any mention at all on a note from a temporary identity or on'
                     + ' a removal. Mentions cost nothing extra: one note, one price, however many people it names.',
+                    'Sorting is local: the board first reads its ordinary note events, then filters what is drawn in this'
+                    + ' browser. “Notes from my follows” reads the signed-in account’s latest NIP-02 kind 3 contact-list'
+                    + ' event from public relays and matches the note author against its p tags. The contact list is not'
+                    + ' sent to satoshi.si or written into a note; only the toggle preference is kept in local storage.',
+                    'While placing a paid note, the whole corkboard is the gesture surface. One finger moves the note.'
+                    + ' Two fingers rotate the note and zoom the corkboard together around their midpoint, so the paper'
+                    + ' stays under control even when the fingers begin away from it.',
+                    'Once notes are pinned, they are part of the board surface: dragging or pinching over ordinary paper'
+                    + ' pans and zooms the corkboard just like touching bare cork. Pins remain buttons for note details.',
                     'Every pin belongs to a geohash of three to nine characters: you enter one or pick it on the'
                     + ' map view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'

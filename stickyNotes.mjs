@@ -22,7 +22,7 @@ import {
   GEOHASH_MAX_CELLS,
   normaliseGeohashes,
   makeDeletionTemplate,
-  makeStickyTemplate, mentionFilterAvailability, mentionLabel, noteMentions, stickyTextParts,
+  makeStickyTemplate, mentionFilterAvailability, mentionLabel, stickyTextParts, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashMatchesBoard,
   geohashPrecisionForZoom,
   mapZoomForGeohashPrecision,
@@ -63,6 +63,8 @@ const API = document.querySelector('meta[name="sticky-api"]')?.content || paySer
 const RELAY = 'wss://nostr.satoshi.si';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const FLOW_SYNC_KEY = 'satoshi:sticky:flow-sync:v1';
+const NOTE_VIEW_KEY = 'satoshi:sticky:note-view:v1';
+const FOLLOWS_FILTER_KEY = 'satoshi:sticky:follows-only:v1';
 const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 // A board can cover several cells that touch, so what is remembered is the whole
 // clump; BOARD_KEY keeps the first cell for links and older visitors.
@@ -80,7 +82,9 @@ const elements = {
   loginConfirmation: document.getElementById('loginConfirmation'),
   corkFrame: document.getElementById('corkFrame'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
-  mentionFilter: document.getElementById('mentionFilter'), mentionFilterStatus: document.getElementById('mentionFilterStatus'),
+  noteSort: document.getElementById('noteSort'), noteSortDialog: document.getElementById('noteSortDialog'),
+  noteViewOptions: document.getElementById('noteViewOptions'), followsOnly: document.getElementById('followsOnly'),
+  followsOnlyRow: document.getElementById('followsOnlyRow'), noteSortStatus: document.getElementById('noteSortStatus'),
   mentionMenu: document.getElementById('mentionMenu'), mentionOptions: document.getElementById('mentionOptions'),
   mentionMenuStatus: document.getElementById('mentionMenuStatus'),
   openBoard: document.getElementById('openStickyBoard'), boardDialog: document.getElementById('boardDialog'),
@@ -154,6 +158,15 @@ const authorProfileQueue = new Set();
 const authorProfilesLoading = new Set();
 let authorProfileTimer = null;
 let selectedNoteId = '';
+let noteView = STICKY_NOTE_VIEWS.includes(localStorage.getItem(NOTE_VIEW_KEY)) ? localStorage.getItem(NOTE_VIEW_KEY) : 'all';
+let followsOnlyPreference = localStorage.getItem(FOLLOWS_FILTER_KEY) === '1';
+let followedPubkeys = new Set();
+let followsLoadedFor = '';
+let followsLoadingFor = '';
+let revealedFilteredNoteId = '';
+let revealedFilteredNoteUntil = 0;
+let revealedFilteredNoteTimer = null;
+let placementGestureController = null;
 let quotedPrice = STICKY_SUB_WEEK_SATS;
 let quotedPubkey = '';
 // The desk's answer to GET /sticky/v1/subscription for the signed-in key, and the
@@ -227,7 +240,6 @@ const boardView = {scale: .6, x: 0, y: 0};
 // never how much cork the reader gets or where a normalized note position lands.
 const BOARD_SIZE = 2048;
 const boardSize = Object.freeze({width: BOARD_SIZE, height: BOARD_SIZE});
-let corkSurround = -1;
 let boardTransformFrame = 0;
 let pendingTransformRect = null;
 let boardViewport = null;
@@ -920,7 +932,7 @@ function updateAccount() {
   }
   updateAnonymousCountdown();
   refreshPriceQuote(session);
-  refreshMentionFilter();
+  refreshNoteSortControls();
 }
 
 function renderQuotedPrice() {
@@ -1183,6 +1195,7 @@ function selectBoard(geohash, closeDialog = true) {
   try { boardSocket?.close(); } catch {}
   boardSocket = null;
   rendered.clear();
+  clearRevealedFilteredNote();
   noteEvents.clear();
   pendingDeletions.clear();
   // The wooden rail is markup inside this canvas, so a bare replaceChildren() deleted the
@@ -1207,19 +1220,6 @@ function clampViewToBoard(rect) {
 function paintBoardTransform(rect) {
   elements.canvas.style.transform = `translate3d(${boardView.x}px, ${boardView.y}px, 0) scale(${boardView.scale})`;
   boardViewport = {width: rect.width, height: rect.height};
-  // How far the frame has to reach outside the board to cover the window: a fixed
-  // band would leave bare cork showing past it at a zoomed-out view, so it is
-  // worked out here, in board pixels, every time the board moves.
-  const room = Math.max(
-    (rect.width - boardSize.width * boardView.scale) / 2,
-    (rect.height - boardSize.height * boardView.scale) / 2,
-    240 * boardView.scale,
-  ) / boardView.scale;
-  const nextSurround = Math.ceil(room);
-  if (nextSurround !== corkSurround) {
-    corkSurround = nextSurround;
-    elements.canvas.style.setProperty('--cork-surround', `${nextSurround}px`);
-  }
 }
 
 function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
@@ -1276,6 +1276,66 @@ function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2,
   else applyBoardTransform(rect);
 }
 
+function clearRevealedFilteredNote() {
+  clearInterval(revealedFilteredNoteTimer);
+  revealedFilteredNoteTimer = null;
+  if (revealedFilteredNoteId) {
+    const note = noteEvents.get(revealedFilteredNoteId)?.element;
+    note?.classList.remove('sticky-note--filter-revealed');
+    note?.querySelector('.sticky-note__reveal-countdown')?.remove();
+  }
+  revealedFilteredNoteId = '';
+  revealedFilteredNoteUntil = 0;
+}
+
+function revealFilteredNote(id) {
+  const note = noteEvents.get(id)?.element;
+  if (!note?.classList.contains('sticky-note--filtered-out')) return;
+  if (revealedFilteredNoteId !== id) clearRevealedFilteredNote();
+  revealedFilteredNoteId = id;
+  revealedFilteredNoteUntil = Date.now() + 60000;
+  note.classList.add('sticky-note--filter-revealed');
+  let countdown = note.querySelector('.sticky-note__reveal-countdown');
+  if (!countdown) {
+    countdown = document.createElement('span');
+    countdown.className = 'sticky-note__reveal-countdown';
+    note.appendChild(countdown);
+  }
+  const tick = () => {
+    if (revealedFilteredNoteId !== id) return;
+    const seconds = Math.max(0, Math.ceil((revealedFilteredNoteUntil - Date.now()) / 1000));
+    countdown.textContent = `${seconds}s`;
+    countdown.setAttribute('aria-label', `Temporarily revealed for ${seconds} more seconds`);
+    if (!seconds) clearRevealedFilteredNote();
+  };
+  clearInterval(revealedFilteredNoteTimer);
+  tick();
+  revealedFilteredNoteTimer = setInterval(tick, 1000);
+}
+
+function installFilteredNoteLongPress(note, id) {
+  let timer = null;
+  let origin = null;
+  const cancel = () => { clearTimeout(timer); timer = null; origin = null; };
+  note.addEventListener('pointerdown', event => {
+    if (!note.classList.contains('sticky-note--filtered-out') || event.button > 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    note.setPointerCapture(event.pointerId);
+    origin = {x: event.clientX, y: event.clientY};
+    timer = setTimeout(() => {
+      revealFilteredNote(id);
+      navigator.vibrate?.(35);
+      timer = null;
+    }, 4000);
+  });
+  note.addEventListener('pointermove', event => {
+    if (origin && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 12) cancel();
+  });
+  note.addEventListener('pointerup', cancel);
+  note.addEventListener('pointercancel', cancel);
+}
+
 function renderNote(sticky, event = null, temporary = false) {
   if (!temporary && rendered.has(sticky.id)) return null;
   if (!temporary) rendered.add(sticky.id);
@@ -1292,6 +1352,7 @@ function renderNote(sticky, event = null, temporary = false) {
   text.appendChild(textContent);
   note.appendChild(text);
   if (!temporary) {
+    installFilteredNoteLongPress(note, sticky.id);
     const pin = document.createElement('span');
     pin.className = 'sticky-note__pin';
     pin.setAttribute('role', 'button');
@@ -1308,7 +1369,11 @@ function renderNote(sticky, event = null, temporary = false) {
     pinArt.decoding = 'async';
     pinArt.src = `/img/pin_${pinColourFor(pinSeed)}.png`;
     pin.appendChild(pinArt);
-    pin.addEventListener('click', click => { click.stopPropagation(); openNoteMenu(sticky.id, pin); });
+    pin.addEventListener('click', click => {
+      click.stopPropagation();
+      if (note.classList.contains('sticky-note--filtered-out') && !note.classList.contains('sticky-note--filter-revealed')) return;
+      openNoteMenu(sticky.id, pin);
+    });
     pin.addEventListener('keydown', key => {
       if (key.key === 'Enter' || key.key === ' ') { key.preventDefault(); openNoteMenu(sticky.id, pin); }
     });
@@ -1327,10 +1392,8 @@ function renderNote(sticky, event = null, temporary = false) {
     if (note.isConnected) fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
   });
   if (!temporary && event) noteEvents.set(sticky.id, {event, sticky, element: note});
-  // A note that arrives while the filter is on obeys it too.
-  if (!temporary && mentionFilterOn && !noteMentions(sticky, getNostrSession()?.pubkey)) {
-    note.classList.add('sticky-note--filtered-out');
-  }
+  // Limits such as "last 5" must be recalculated whenever a newer note arrives.
+  if (!temporary) applyNoteFilters();
   return note;
 }
 
@@ -1363,6 +1426,7 @@ function connectBoard(version = boardConnectionVersion) {
       if (data[0] === 'EOSE' && data[1] === subscription) {
         clearTimeout(timeout);
         elements.boardStatus.hidden = true;
+        applyNoteFilters();
         return;
       }
       if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])) return;
@@ -1403,9 +1467,11 @@ function processDeletion(event) {
   if (!/^[0-9a-f]{64}$/.test(target || '')) return;
   const existing = noteEvents.get(target);
   if (existing && existing.event.pubkey === event.pubkey) {
+    if (revealedFilteredNoteId === target) clearRevealedFilteredNote();
     existing.element.remove();
     noteEvents.delete(target);
     rendered.delete(target);
+    applyNoteFilters();
     if (selectedNoteId === target) closeNoteMenu();
   } else {
     pendingDeletions.set(target, event);
@@ -1912,6 +1978,9 @@ function setPlacement(next) {
 }
 
 function installPlacementGestures(note) {
+  placementGestureController?.abort();
+  placementGestureController = new AbortController();
+  const {signal} = placementGestureController;
   const pointers = new Map();
   let gesture = null;
   // Where the note sat before this drag, so a declined discard can put it back.
@@ -1922,32 +1991,64 @@ function installPlacementGestures(note) {
     const [first, second] = [...pointers.values()];
     return Math.atan2(second.y - first.y, second.x - first.x) * 180 / Math.PI;
   };
+  const distanceBetween = () => {
+    const [first, second] = [...pointers.values()];
+    return Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+  };
+  const midpoint = () => {
+    const [first, second] = [...pointers.values()];
+    return {x:(first.x + second.x) / 2, y:(first.y + second.y) / 2};
+  };
   const resetSinglePointer = () => {
     const [remaining] = pointers.entries();
     if (!remaining) { gesture = null; return; }
     gesture = {id: remaining[0], startX: remaining[1].x, startY: remaining[1].y, placement: {...currentPlacement()}, rotate: false};
   };
 
-  note.addEventListener('pointerdown', event => {
+  const beginTwoFingerGesture = () => {
+    const center = midpoint();
+    const rect = elements.board.getBoundingClientRect();
+    const localX = center.x - rect.left;
+    const localY = center.y - rect.top;
+    gesture = {
+      twoFinger:true,
+      angle:angleBetween(),
+      distance:distanceBetween(),
+      scale:boardView.scale,
+      worldX:(localX - boardView.x) / boardView.scale,
+      worldY:(localY - boardView.y) / boardView.scale,
+      placement:{...currentPlacement()},
+    };
+    dragOrigin = null;
+  };
+
+  elements.board.addEventListener('pointerdown', event => {
+    if (placingNote !== note || event.button > 0) return;
     event.preventDefault();
-    note.setPointerCapture(event.pointerId);
+    elements.board.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, point(event));
     if (pointers.size === 1) {
       gesture = {id: event.pointerId, startX: event.clientX, startY: event.clientY, placement: {...currentPlacement()}, rotate: event.shiftKey};
       dragOrigin = {...gesture.placement};
     } else if (pointers.size === 2) {
-      gesture = {angle: angleBetween(), placement: {...currentPlacement()}, twoFinger: true};
-      dragOrigin = null;
+      beginTwoFingerGesture();
     }
-  });
-  note.addEventListener('pointermove', event => {
+  }, {signal});
+  elements.board.addEventListener('pointermove', event => {
     if (!pointers.has(event.pointerId) || !gesture) return;
     pointers.set(event.pointerId, point(event));
     if (pointers.size >= 2 && gesture.twoFinger) {
+      const center = midpoint();
+      const rect = elements.board.getBoundingClientRect();
+      boardView.scale = Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN,
+        gesture.scale * distanceBetween() / gesture.distance));
+      boardView.x = center.x - rect.left - gesture.worldX * boardView.scale;
+      boardView.y = center.y - rect.top - gesture.worldY * boardView.scale;
       let difference = angleBetween() - gesture.angle;
       if (difference > 180) difference -= 360;
       if (difference < -180) difference += 360;
       setPlacement({...gesture.placement, rotation: gesture.placement.rotation + difference});
+      scheduleBoardTransform(rect);
       setBinArmed(false);
       return;
     }
@@ -1961,13 +2062,13 @@ function installPlacementGestures(note) {
         y: gesture.placement.y + (event.clientY - gesture.startY) / (boardSize.height * boardView.scale)});
       setBinArmed(isOverBin(event.clientX, event.clientY));
     }
-  });
+  }, {signal});
   const release = event => {
     pointers.delete(event.pointerId);
     if (pointers.size === 1) resetSinglePointer();
     else if (!pointers.size) gesture = null;
   };
-  note.addEventListener('pointerup', event => {
+  elements.board.addEventListener('pointerup', event => {
     const dropped = Boolean(dragOrigin) && Boolean(gesture) && !gesture.twoFinger && !gesture.rotate
       && gesture.id === event.pointerId && isOverBin(event.clientX, event.clientY);
     const origin = dragOrigin;
@@ -1975,8 +2076,8 @@ function installPlacementGestures(note) {
     release(event);
     setBinArmed(false);
     if (dropped) openDiscardDialog(origin);
-  });
-  note.addEventListener('pointercancel', event => { dragOrigin = null; setBinArmed(false); release(event); });
+  }, {signal});
+  elements.board.addEventListener('pointercancel', event => { dragOrigin = null; setBinArmed(false); release(event); }, {signal});
   note.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault();
@@ -1989,7 +2090,7 @@ function installPlacementGestures(note) {
         x: placement.x + (event.key === 'ArrowLeft' ? -.01 : event.key === 'ArrowRight' ? .01 : 0),
         y: placement.y + (event.key === 'ArrowUp' ? -.01 : event.key === 'ArrowDown' ? .01 : 0)});
     }
-  });
+  }, {signal});
 }
 
 function isOverBin(clientX, clientY) {
@@ -2275,7 +2376,11 @@ function installBoardNavigation() {
   };
 
   elements.board.addEventListener('pointerdown', event => {
-    if (event.target.closest('.sticky-note')) return;
+    if (placingNote) return;
+    // Ordinary paper is part of the board surface: dragging or pinching on it must move
+    // the board too. A pin remains a button, while concealed paper owns a four-second hold.
+    if (event.target.closest('.sticky-note__pin')
+        || event.target.closest('.sticky-note--filtered-out:not(.sticky-note--filter-revealed)')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, point(event));
@@ -2401,7 +2506,6 @@ function openComposer() {
 // of whatever domain a name belongs to. Only a key that answers with a name can
 // be tagged — that is why an anonymous throwaway identity has nothing to offer
 // here, and why the person button is dead for one.
-let mentionFilterOn = false;
 let mentionMenuOptions = [];
 let mentionMenuIndex = -1;
 let mentionDirectoryLoaded = false;
@@ -2754,37 +2858,142 @@ function handleMentionKeys(event) {
   return false;
 }
 
-// ---- the person button: only the notes that tag me
-function applyMentionFilter() {
-  const key = getNostrSession()?.pubkey || '';
-  elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)').forEach(note => {
-    const sticky = noteEvents.get(note.dataset.eventId)?.sticky;
-    const mine = mentionFilterOn && key ? noteMentions(sticky, key) : false;
-    note.classList.toggle('sticky-note--filtered-out', Boolean(mentionFilterOn) && !mine);
+// ---- board sorting and filters
+function readContactListFromRelay(url, pubkey) {
+  return new Promise(resolve => {
+    const socket = new WebSocket(url);
+    const subscription = `sticky-follows-${crypto.randomUUID?.() || Date.now()}`;
+    let newest = null;
+    let finished = false;
+    const finish = reachedRelay => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { socket.close(); } catch {}
+      resolve({event: newest, reachedRelay: Boolean(reachedRelay)});
+    };
+    const timer = setTimeout(() => finish(false), 4000);
+    socket.addEventListener('open', () => socket.send(JSON.stringify([
+      'REQ', subscription, {authors: [pubkey], kinds: [3], limit: 5},
+    ])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE' && data[1] === subscription) { finish(true); return; }
+      const event = data[2];
+      if (data[0] !== 'EVENT' || data[1] !== subscription || event?.kind !== 3
+          || event.pubkey !== pubkey || !window.NostrTools.verifyEvent(event)) return;
+      if (!newest || event.created_at > newest.created_at) newest = event;
+    });
+    socket.addEventListener('error', () => finish(false));
+    socket.addEventListener('close', () => finish(false));
   });
-  elements.mentionFilterStatus.hidden = !mentionFilterOn;
-  elements.mentionFilterStatus.textContent = mentionFilterOn ? 'Showing only the notes that tag you.' : '';
 }
 
-function refreshMentionFilter() {
-  const {available, reason} = mentionFilterAvailability(getNostrSession());
-  if (!available) mentionFilterOn = false;
-  elements.mentionFilter.disabled = !available;
-  elements.mentionFilter.setAttribute('aria-pressed', String(mentionFilterOn));
-  elements.mentionFilter.title = reason;
-  elements.mentionFilter.setAttribute('aria-label', reason);
-  applyMentionFilter();
+function namedNostrSession() {
+  const session = getNostrSession();
+  return session && session.method !== 'anonymous' ? session : null;
 }
 
-function toggleMentionFilter() {
-  const {available, reason} = mentionFilterAvailability(getNostrSession());
-  if (!available) { elements.mentionFilterStatus.hidden = false; elements.mentionFilterStatus.textContent = reason; return; }
-  mentionFilterOn = !mentionFilterOn;
-  elements.mentionFilter.setAttribute('aria-pressed', String(mentionFilterOn));
-  applyMentionFilter();
+async function loadFollowList(session = namedNostrSession()) {
+  if (!session || followsLoadedFor === session.pubkey || followsLoadingFor === session.pubkey) return;
+  followsLoadingFor = session.pubkey;
+  status(elements.noteSortStatus, 'Loading your Nostr follows...');
+  const results = await Promise.allSettled([
+    readContactListFromRelay(RELAY, session.pubkey),
+    readContactListFromRelay('wss://relay.damus.io', session.pubkey),
+    readContactListFromRelay('wss://nos.lol', session.pubkey),
+    readContactListFromRelay('wss://relay.ditto.pub', session.pubkey),
+  ]);
+  if (getNostrSession()?.pubkey !== session.pubkey) {
+    if (followsLoadingFor === session.pubkey) followsLoadingFor = '';
+    return;
+  }
+  const responses = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+  const newest = responses.filter(response => response.event)
+    .map(response => response.event)
+    .sort((left, right) => right.created_at - left.created_at)[0];
+  if (!newest && !responses.some(response => response.reachedRelay)) {
+    followsLoadingFor = '';
+    throw new Error('No follow-list relay answered.');
+  }
+  followedPubkeys = new Set((newest?.tags || [])
+    .filter(tag => tag?.[0] === 'p' && /^[0-9a-f]{64}$/.test(String(tag[1] || '').toLowerCase()))
+    .map(tag => String(tag[1]).toLowerCase()));
+  followsLoadedFor = session.pubkey;
+  followsLoadingFor = '';
+  status(elements.noteSortStatus, newest
+    ? `${followedPubkeys.size} follow${followedPubkeys.size === 1 ? '' : 's'} loaded.`
+    : 'No Nostr follow list was found for this account.');
+  applyNoteFilters();
 }
 
-elements.mentionFilter.addEventListener('click', toggleMentionFilter);
+function noteViewLabel(view) {
+  return ({last5: 'the last 5 notes', last15: 'the last 15 notes', day: 'notes from the last 24 hours',
+    week: 'notes from the last 7 days', mentions: 'notes that mention you'})[view] || 'all notes';
+}
+
+function applyNoteFilters() {
+  const session = getNostrSession();
+  const named = namedNostrSession();
+  const followsActive = Boolean(followsOnlyPreference && named && followsLoadedFor === named.pubkey);
+  const visible = new Set(stickyVisibleNoteIds(
+    [...noteEvents.values()].map(record => record.sticky),
+    {view: noteView, pubkey: session?.pubkey, followsOnly: followsActive, follows: followedPubkeys},
+  ));
+  noteEvents.forEach((record, id) => record.element.classList.toggle('sticky-note--filtered-out', !visible.has(id)));
+  const filtered = noteView !== 'all' || Boolean(followsOnlyPreference && named);
+  elements.noteSort.classList.toggle('has-active-filter', filtered);
+  elements.noteSort.setAttribute('aria-pressed', String(filtered));
+  elements.noteSort.title = filtered
+    ? `Filtering ${noteViewLabel(noteView)}${followsActive ? ' from people you follow' : ''}`
+    : 'Sort and filter notes';
+  elements.noteSort.setAttribute('aria-label', elements.noteSort.title);
+  const revealed = noteEvents.get(revealedFilteredNoteId)?.element;
+  if (revealed && !revealed.classList.contains('sticky-note--filtered-out')) clearRevealedFilteredNote();
+}
+
+function refreshNoteSortControls() {
+  const session = getNostrSession();
+  const named = namedNostrSession();
+  const mention = mentionFilterAvailability(session);
+  const mentionInput = elements.noteViewOptions.querySelector('input[value="mentions"]');
+  mentionInput.disabled = !mention.available;
+  if (noteView === 'mentions' && !mention.available) noteView = 'all';
+  elements.noteViewOptions.querySelectorAll('input[name="noteView"]').forEach(input => {
+    input.checked = input.value === noteView;
+  });
+  elements.followsOnlyRow.hidden = !named;
+  elements.followsOnly.checked = followsOnlyPreference;
+  if (named && followsOnlyPreference) loadFollowList(named).catch(() => {
+    status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
+  });
+  applyNoteFilters();
+}
+
+function openNoteSort() {
+  refreshNoteSortControls();
+  showDialog(elements.noteSortDialog);
+  if (namedNostrSession()) loadFollowList().catch(() => {
+    status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
+  });
+}
+
+elements.noteSort.addEventListener('click', openNoteSort);
+elements.noteViewOptions.addEventListener('change', event => {
+  if (!event.target.matches('input[name="noteView"]') || !STICKY_NOTE_VIEWS.includes(event.target.value)) return;
+  noteView = event.target.value;
+  localStorage.setItem(NOTE_VIEW_KEY, noteView);
+  applyNoteFilters();
+});
+elements.followsOnly.addEventListener('change', () => {
+  followsOnlyPreference = elements.followsOnly.checked;
+  localStorage.setItem(FOLLOWS_FILTER_KEY, followsOnlyPreference ? '1' : '0');
+  if (followsOnlyPreference) loadFollowList().catch(() => {
+    status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
+  });
+  applyNoteFilters();
+});
 elements.editor.addEventListener('keydown', handleMentionKeys);
 elements.editor.addEventListener('input', updateMentionMenu);
 elements.editor.addEventListener('click', updateMentionMenu);
@@ -3178,8 +3387,14 @@ document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu') && !event.target.closest('.sticky-note__pin')) closeNoteMenu();
 });
 function handleNostrSessionChange() {
+  const session = getNostrSession();
+  if (!session || session.method === 'anonymous' || followsLoadedFor !== session.pubkey) {
+    followedPubkeys = new Set();
+    followsLoadedFor = '';
+    followsLoadingFor = '';
+  }
   updateAccount();
-  if (getNostrSession() && elements.login.open) elements.login.close();
+  if (session && elements.login.open) elements.login.close();
   // Signing out withdraws the unpinned note; signing in returns it.
   syncPlacementWithSession();
   if (isStrandedPinDraft() && pendingBelongsToSession()) {
@@ -3190,7 +3405,7 @@ function handleNostrSessionChange() {
   // The identity decides what the buttons mean — an anonymous one can never use a
   // subscription — so a change has to re-ask the desk and re-draw rather than only
   // relabel the account: a stale quote is what offered a plan to a temporary identity.
-  refreshPriceQuote(getNostrSession()).catch(() => {});
+  refreshPriceQuote(session).catch(() => {});
 }
 window.addEventListener('satoshi-nostr-session', handleNostrSessionChange);
 // Amber commonly opens its HTTPS callback in a browser tab even when the request came from
@@ -3245,6 +3460,10 @@ setInterval(() => {
   const after = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
   if (before !== after) updateAccount();
 }, 1000);
+
+setInterval(() => {
+  if (noteView === 'day' || noteView === 'week') applyNoteFilters();
+}, 60000);
 
 updateAccount();
 // One source for the rail's thickness: the stylesheet reads this variable, the

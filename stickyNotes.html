@@ -23,11 +23,13 @@
   <main class="sticky-shell">
     <h1 class="sticky-page-title">Nostr sticky notes</h1>
     <div class="sticky-top-actions" aria-label="Sticky note controls">
+      <span class="sticky-help-slot" aria-hidden="true"></span>
+      <button type="button" id="stickySettings" class="sticky-top-button" aria-label="Board settings are coming later" title="Board settings are coming later" disabled><i class="lni lni-gear-1" aria-hidden="true"></i></button>
+      <button type="button" id="noteSort" class="sticky-top-button note-sort-button" aria-label="Sort and filter notes" title="Sort and filter notes" aria-pressed="false"><i class="lni lni-asana" aria-hidden="true"></i></button>
       <button type="button" id="openStickyBoard" class="sticky-top-button" aria-label="Choose corkboard" title="Choose corkboard"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
-      <button type="button" id="shareArea" class="sticky-top-button" aria-label="Show the notes around me" title="Show the notes around me"><i class="lni lni-target-user" aria-hidden="true"></i></button>
+      <button type="button" id="shareArea" class="sticky-top-button" aria-label="Show the notes around me" title="Show the notes around me"><i class="lni lni-cerebras" aria-hidden="true"></i></button>
+      <button type="button" id="nostrAccount" class="sticky-top-button" aria-label="Log in to Nostr" title="Log in to Nostr"><i class="lni lni-user-4" aria-hidden="true"></i></button>
       <button type="button" id="newSticky" class="sticky-top-button" aria-label="New note" title="New note"><i class="lni lni-plus" aria-hidden="true"></i></button>
-      <button type="button" id="mentionFilter" class="sticky-top-button" aria-label="Show only the notes that tag you" title="Show only the notes that tag you" aria-pressed="false" disabled><i class="lni lni-user-4" aria-hidden="true"></i></button>
-      <button type="button" id="nostrAccount" class="sticky-top-button" aria-label="Log in to Nostr" title="Log in to Nostr"><i class="lni lni-gear-1" aria-hidden="true"></i></button>
     </div>
 
     <section id="stickyBoard" class="sticky-board" aria-label="Geohash Nostr sticky note board">
@@ -41,7 +43,6 @@
       </div>
       <div class="board-status" id="boardStatus" role="status" aria-live="polite">Opening the board...</div>
       <div class="login-confirmation" id="loginConfirmation" role="status" aria-live="polite" hidden></div>
-      <div class="board-filter-status" id="mentionFilterStatus" role="status" aria-live="polite" hidden></div>
     </section>
     <div class="board-controls" aria-label="Board view controls">
       <button type="button" id="zoomOut" aria-label="Zoom out" title="Zoom out"><i class="lni lni-search-minus" aria-hidden="true"></i></button>
@@ -49,6 +50,28 @@
       <button type="button" id="zoomFit" aria-label="Fill screen" title="Fill screen"><i class="lni lni-expand-square-4" aria-hidden="true"></i></button>
     </div>
   </main>
+
+  <dialog id="noteSortDialog" class="sticky-dialog note-sort-dialog" aria-labelledby="noteSortTitle">
+    <div class="dialog-inner note-sort-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="noteSortTitle">Sort and filter notes</h2>
+      <fieldset id="noteViewOptions" class="note-view-options">
+        <legend>Show</legend>
+        <label><input type="radio" name="noteView" value="all" checked><span>All notes</span></label>
+        <label><input type="radio" name="noteView" value="last5"><span>Last 5 notes</span></label>
+        <label><input type="radio" name="noteView" value="last15"><span>Last 15 notes</span></label>
+        <label><input type="radio" name="noteView" value="day"><span>Notes from the last 24 hours</span></label>
+        <label><input type="radio" name="noteView" value="week"><span>Notes from the last 7 days</span></label>
+        <label data-note-view="mentions"><input type="radio" name="noteView" value="mentions"><span>Notes I’m mentioned in</span></label>
+      </fieldset>
+      <label id="followsOnlyRow" class="note-filter-toggle" for="followsOnly">
+        <span><strong>Notes from my follows</strong><small>Always show notes only from people you follow.</small></span>
+        <input id="followsOnly" type="checkbox" role="switch">
+        <span class="note-filter-toggle__track" aria-hidden="true"></span>
+      </label>
+      <div id="noteSortStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
 
   <dialog id="boardDialog" class="sticky-dialog" aria-labelledby="boardDialogTitle">
     <form id="boardChooser" class="dialog-inner board-chooser">

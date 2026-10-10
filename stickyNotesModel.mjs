@@ -244,6 +244,27 @@ export function noteMentions(sticky, pubkey) {
   return (sticky?.mentions || []).some(mention => String(mention).toLowerCase() === key);
 }
 
+export const STICKY_NOTE_VIEWS = Object.freeze(['all', 'last5', 'last15', 'day', 'week', 'mentions']);
+
+/** IDs visible under the board's local view and optional Nostr follow filter. */
+export function stickyVisibleNoteIds(notes = [], options = {}) {
+  const view = STICKY_NOTE_VIEWS.includes(options.view) ? options.view : 'all';
+  const pubkey = String(options.pubkey || '').toLowerCase();
+  const follows = new Set([...(options.follows || [])].map(key => String(key || '').toLowerCase()));
+  const now = Number.isFinite(options.now) ? options.now : Math.floor(Date.now() / 1000);
+  let visible = [...notes]
+    .filter(note => note && typeof note.id === 'string')
+    .sort((left, right) => Number(right.createdAt || 0) - Number(left.createdAt || 0));
+
+  if (options.followsOnly) visible = visible.filter(note => follows.has(String(note.pubkey || '').toLowerCase()));
+  if (view === 'mentions') visible = visible.filter(note => noteMentions(note, pubkey));
+  else if (view === 'day') visible = visible.filter(note => Number(note.createdAt || 0) >= now - 86400);
+  else if (view === 'week') visible = visible.filter(note => Number(note.createdAt || 0) >= now - 7 * 86400);
+  else if (view === 'last5') visible = visible.slice(0, 5);
+  else if (view === 'last15') visible = visible.slice(0, 15);
+  return visible.map(note => note.id);
+}
+
 /** First usable label, in priority order: profile name, profile nip05, board name, npub. */
 export function mentionLabel(candidates, npub = '') {
   for (const candidate of candidates) {

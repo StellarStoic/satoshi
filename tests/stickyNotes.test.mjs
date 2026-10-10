@@ -3,7 +3,7 @@ import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_ANONYMOUS_REMOVAL_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor,
-  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice,
+  geohashSetIssue, geohashTouches, makeDeletionTemplate, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashCellDimensions,
   geohashGridFits,
   GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
@@ -356,6 +356,14 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   ]);
   assert.match(script, /gesture\.scale \* distance\(\) \/ gesture\.distance/);
   assert.match(script, /rotation: gesture\.placement\.rotation \+ difference/);
+  const placementGestures = script.slice(script.indexOf('function installPlacementGestures'), script.indexOf('function isOverBin'));
+  assert.match(placementGestures, /elements\.board\.addEventListener\('pointerdown'/,
+    'placement gestures use the whole corkboard, not only the paper');
+  assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
+  assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
+    'one two-finger gesture zooms the board and rotates the note');
+  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin'\)[\s\S]{0,180}return;/,
+    'ordinary note paper no longer blocks board navigation');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   assert.match(css, /url\('\/img\/cork-board\.png'\)/);
   assert.match(css, /background-repeat:\s*repeat/);
@@ -398,8 +406,16 @@ test('board chrome stays compact over the corkboard', async () => {
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
   ]);
   assert.doesNotMatch(html, /class="sticky-header"/);
-  assert.match(html, /id="nostrAccount"[\s\S]{0,180}lni-gear-1/);
+  assert.match(html, /id="stickySettings"[\s\S]{0,180}lni-gear-1/);
+  assert.match(html, /id="stickySettings"[^>]*disabled/);
+  assert.match(html, /id="nostrAccount"[\s\S]{0,180}lni-user-4/);
+  assert.match(html, /class="sticky-help-slot"[\s\S]{0,180}id="stickySettings"[\s\S]{0,180}lni-gear-1[\s\S]{0,180}id="noteSort"[\s\S]{0,180}lni-asana[\s\S]{0,180}id="openStickyBoard"[\s\S]{0,180}lni-map-marker-1[\s\S]{0,180}id="shareArea"[\s\S]{0,180}lni-cerebras[\s\S]{0,180}id="nostrAccount"[\s\S]{0,180}lni-user-4[\s\S]{0,180}id="newSticky"[\s\S]{0,180}lni-plus/,
+    'top controls follow the requested question, gear, sort, map, nearby, account, plus order');
   assert.match(html, /id="newSticky"[\s\S]{0,180}lni-plus/);
+  assert.doesNotMatch(html, /id="noteFilterStatus"/);
+  assert.match(html, /id="noteSort"[^>]+aria-pressed="false"/);
+  assert.match(css, /\.note-sort-button\.has-active-filter[^}]+border-color:#7cfc00/);
+  assert.match(script, /elements\.noteSort\.classList\.toggle\('has-active-filter', filtered\)/);
   assert.match(html, /lni-search-minus/);
   assert.match(html, /lni-search-plus/);
   assert.doesNotMatch(html, /id="zoomLevel"/);
@@ -413,6 +429,10 @@ test('board chrome stays compact over the corkboard', async () => {
   assert.match(html, /id="exactGeohashNote"/);
   assert.match(html, /id="openGeohashMap"/);
   assert.match(script, /waitForGeohashMapLayout/);
+  assert.match(html, /id="followsOnly"[^>]+role="switch"/);
+  assert.match(script, /kinds: \[3\]/, 'NIP-02 contact lists are requested');
+  assert.match(script, /tag\?\.\[0\] === 'p'/, 'followed public keys come from p tags');
+  assert.match(script, /session\.method !== 'anonymous'/, 'temporary identities cannot use follows');
   assert.match(script, /if \(existingMap\) map\.resize\(\)/);
   assert.match(script, /openGeohashMap\(\)\.catch/);
   assert.match(html, /id="geohashMapDialog"/);
@@ -635,8 +655,10 @@ test('the corkboard has a wooden rail, and it sits outside the cork', async () =
   assert.match(css, /repeating-linear-gradient/, 'the wood is drawn from gradients, with no image to fetch');
   assert.match(css, /radial-gradient/, 'small irregular knots break up the synthetic grain');
   assert.match(css, /var\(--cork-frame, 26px\)/, 'the thinner rail thickness comes from one variable');
-  assert.match(css, /box-shadow: 0 0 0 var\(--cork-surround, 420px\)/, 'a solid band sits outside the rail');
-  assert.match(page, /setProperty\('--cork-surround'/, 'the band is sized from the window, in board pixels');
+  assert.match(css, /\.sticky-board \{[^}]*background:transparent/,
+    'space outside the rail lets the selected site theme show through');
+  assert.doesNotMatch(css, /--cork-surround/, 'no hard-coded brown band covers the themed space');
+  assert.doesNotMatch(page, /setProperty\('--cork-surround'/);
 
   // One source of truth for that variable. Opening covers the viewport rather than shrinking
   // the whole board until its rail fits like a thumbnail.
@@ -779,6 +801,31 @@ test('the tag filter knows who it can work for', () => {
   assert.match(named.reason, /tag you/);
 });
 
+test('note views sort newest first and combine with the follow filter', () => {
+  const now = 2_000_000;
+  const notes = Array.from({length: 18}, (_, index) => ({
+    id: `note-${index}`,
+    createdAt: now - index * 3600,
+    pubkey: index % 2 ? BOB : ALICE,
+    mentions: index === 3 || index === 9 ? [BOB] : [],
+  }));
+  assert.deepEqual(STICKY_NOTE_VIEWS, ['all', 'last5', 'last15', 'day', 'week', 'mentions']);
+  assert.deepEqual(stickyVisibleNoteIds(notes, {view: 'last5', now}), notes.slice(0, 5).map(note => note.id));
+  assert.equal(stickyVisibleNoteIds(notes, {view: 'last15', now}).length, 15);
+  assert.equal(stickyVisibleNoteIds(notes, {view: 'day', now}).length, 18);
+  assert.deepEqual(stickyVisibleNoteIds(notes, {view: 'mentions', pubkey: BOB, now}), ['note-3', 'note-9']);
+  assert.deepEqual(stickyVisibleNoteIds(notes, {
+    view: 'mentions', pubkey: BOB, followsOnly: true, follows: [BOB], now,
+  }), ['note-3', 'note-9']);
+  assert.deepEqual(stickyVisibleNoteIds(notes, {
+    view: 'last5', followsOnly: true, follows: [BOB], now,
+  }), ['note-1', 'note-3', 'note-5', 'note-7', 'note-9']);
+  assert.deepEqual(stickyVisibleNoteIds([
+    {id: 'old', createdAt: now - 8 * 86400, pubkey: ALICE, mentions: []},
+    ...notes,
+  ], {view: 'week', now}).includes('old'), false);
+});
+
 test('a mention shows a name, and falls back to the npub only last', () => {
   assert.equal(mentionLabel(['Alice', 'alice@satoshi.si', ALICE_NPUB]), 'Alice');
   assert.equal(mentionLabel(['', '   ', 'alice@satoshi.si']), 'alice@satoshi.si');
@@ -807,12 +854,21 @@ test('a note tags people by @, and the wire form is the whole npub', async () =>
   // Anyone with a NIP-05 name can be tagged, on any domain: the board asks.
   assert.match(script, /well-known\/nostr\.json\?name=/);
   assert.match(script, /nip05/);
-  // The person button, top right, and what it does.
-  assert.match(html, /id="mentionFilter"[^>]*>[^<]*<i class="lni lni-user-4"/, 'a person silhouette');
-  assert.match(html, /id="mentionFilter"[^>]*aria-pressed="false"[^>]*disabled/);
-  assert.match(script, /elements\.mentionFilter\.disabled = !available/);
-  assert.match(script, /noteMentions\(sticky, key\)/);
-  assert.match(css, /sticky-note--filtered-out\s*\{\s*display:\s*none/);
+  // Mentions now live with the other board views instead of occupying a top-level button.
+  assert.match(html, /id="noteSort"[^>]*>[\s\S]{0,100}<i class="lni lni-asana"/);
+  assert.match(html, /name="noteView" value="mentions"/);
+  assert.doesNotMatch(html, /id="mentionFilter"/);
+  assert.match(script, /mentionFilterAvailability\(session\)/);
+  assert.match(script, /stickyVisibleNoteIds/);
+  assert.match(css, /sticky-note--filtered-out:not\(\.sticky-note--filter-revealed\)/);
+  assert.match(css, /sticky-note--filtered-out[^}]+opacity:\.16/);
+  assert.match(css, /sticky-note--filtered-out[^}]+\.sticky-note__pin[^}]+display:none/);
+  assert.match(script, /function installFilteredNoteLongPress\(note, id\)/,
+    'the concealed paper, rather than its pin, owns the hold gesture');
+  assert.match(script, /setTimeout\(\(\) => \{[\s\S]{0,180}revealFilteredNote\(id\)[\s\S]{0,180}, 4000\)/,
+    'a hidden note needs a deliberate four-second hold');
+  assert.match(script, /revealedFilteredNoteUntil = Date\.now\(\) \+ 60000/);
+  assert.match(script, /clearRevealedFilteredNote\(\)/, 'only one temporary reveal remains active');
 });
 
 test('the board can start from where the reader is', async () => {
@@ -1001,7 +1057,7 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
   // The identity decides what the buttons mean, so a session change re-asks the desk and
   // re-draws: relabelling the account alone is what left a plan offered to a temporary
   // identity, at the previous identity's price.
-  assert.match(script, /function handleNostrSessionChange\(\) \{\s+updateAccount\(\);\s+[\s\S]{0,900}refreshPriceQuote\(getNostrSession\(\)\)\.catch/);
+  assert.match(script, /function handleNostrSessionChange\(\) \{\s+const session = getNostrSession\(\);[\s\S]{0,900}updateAccount\(\);[\s\S]{0,900}refreshPriceQuote\(session\)\.catch/);
   assert.match(script, /addEventListener\('satoshi-nostr-session', handleNostrSessionChange\)/);
   assert.match(script, /composingGeohashes = \[\.\.\.activeGeohashes\];\s+[\s\S]{0,300}refreshPriceQuote\(session\)\.catch/);
 
