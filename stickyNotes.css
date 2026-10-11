@@ -17,40 +17,40 @@
 .sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background:transparent; cursor: grab; touch-action: none; }
 .sticky-board.is-panning { cursor: grabbing; }
 /* Every geohash board uses one stable coordinate space; zoom only changes its presentation. */
-/* The cork has to live on the transformed element so it pans and zooms with the board (pinned
+/* The board has to live on the transformed element so it pans and zooms with the board (pinned
    by tests/stickyNotes.test.mjs). It must not be a PERMANENT composited layer, though: this
    element is 2048x2048 CSS px, so on a 3x phone the layer is 6144x6144 device pixels — larger
    than the textures mobile GPUs are willing to allocate — and the browser then hands parts of
-   it back as empty tiles, which on a phone reads as blank squares the size of the cork tile,
+   it back as empty tiles, which on a phone reads as blank squares the size of the board tile,
    right where the whole board is in view at low zoom. Promote it only while a gesture is
    actually running, which is when the hint buys anything, and leave it an ordinary painted
-   element at rest. Its contents are cheap to promote now that the cork is a bounded bitmap rather
+   element at rest. Its contents are cheap to promote now that the board is a bounded bitmap rather
    than a texture the compositor has to produce at device resolution. */
 /* The board element carries no texture of its own any more. A repeating background image here has
    to be produced at device resolution whenever the whole board is in view - 6144px on a 3x phone -
    and comes back from the browser with parts of it empty. The colour stays as the floor under the
-   canvas, so a canvas that cannot paint shows cork rather than black. */
+   canvas, so a canvas that cannot paint shows the board colour rather than black. */
 .sticky-canvas { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; transform-origin: 0 0; background-color:#b98b63; }
-/* The cork itself: a bounded bitmap inside the transformed element (see stickyNotes.mjs). Its width
+/* The board itself: a bounded bitmap inside the transformed element (see stickyNotes.mjs). Its width
    and height are set from the board's own coordinate space at runtime, so it covers the board exactly. */
-.cork-paint { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; display: block; }
+.board-paint { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; display: block; }
 .sticky-board.is-panning .sticky-canvas { will-change: transform; backface-visibility: hidden; transform-style: preserve-3d; }
-/* A wooden rail around the cork, sitting outside the board so no note is ever
+/* A wooden rail around the board, sitting outside the board so no note is ever
    covered by it. It lives inside the transformed canvas, so it pans and zooms
-   with the board; --cork-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so
+   with the board; --board-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so
    the rail and the fitting maths cannot drift apart. */
-/* The band just outside the rail: without it the board's cork tiling runs on past
-   the frame and the rail reads as a line drawn on a cork wall rather than as the
+/* The band just outside the rail: without it the board's texture tiling runs on past
+   the frame and the rail reads as a line drawn on the surface rather than as the
    board's own edge. Fades into the page, so a zoomed-out view is still the board. */
-.cork-frame { position: absolute; inset: calc(var(--cork-frame, 26px) * -1); pointer-events: none; box-shadow:0 5px 20px rgba(12,6,1,.5); }
-.cork-frame::after { content: ''; position: absolute; inset: var(--cork-frame, 26px); box-shadow: inset 0 0 8px rgba(28,14,4,.5), inset 0 0 2px rgba(255,232,190,.18); }
-.cork-frame__rail { position: absolute; background-color:#80532f; border:1px solid rgba(54,30,13,.42); box-shadow:0 2px 7px rgba(18,9,2,.42), inset 0 1px rgba(255,239,209,.18), inset 0 -2px rgba(48,25,10,.25); }
-.cork-frame__rail--top, .cork-frame__rail--bottom { left: 0; right: 0; height: var(--cork-frame, 26px); background-image:radial-gradient(ellipse at 18% 48%, transparent 0 4px, rgba(70,39,18,.35) 5px 6px, transparent 7px),radial-gradient(ellipse at 72% 55%, transparent 0 2px, rgba(65,35,15,.28) 3px 4px, transparent 5px),repeating-linear-gradient(2deg, rgba(52,28,12,.16) 0 1px, transparent 1px 5px, rgba(244,211,159,.08) 5px 6px, transparent 6px 12px),linear-gradient(180deg,#b07c48 0%,#966239 38%,#754725 72%,#593418 100%); background-size:260px 100%,190px 100%,120px 100%,100% 100%; }
-.cork-frame__rail--left, .cork-frame__rail--right { top: 0; bottom: 0; width: var(--cork-frame, 26px); background-image:radial-gradient(ellipse at 48% 22%, transparent 0 4px, rgba(70,39,18,.35) 5px 6px, transparent 7px),radial-gradient(ellipse at 52% 68%, transparent 0 2px, rgba(65,35,15,.28) 3px 4px, transparent 5px),repeating-linear-gradient(88deg, rgba(52,28,12,.16) 0 1px, transparent 1px 5px, rgba(244,211,159,.08) 5px 6px, transparent 6px 12px),linear-gradient(90deg,#b07c48 0%,#966239 38%,#754725 72%,#593418 100%); background-size:100% 260px,100% 190px,100% 120px,100% 100%; }
-.cork-frame__rail--top { top: 0; }
-.cork-frame__rail--bottom { bottom: 0; }
-.cork-frame__rail--left { left: 0; }
-.cork-frame__rail--right { right: 0; }
+.board-frame { position: absolute; inset: calc(var(--board-frame, 26px) * -1); pointer-events: none; box-shadow:0 5px 20px rgba(12,6,1,.5); }
+.board-frame::after { content: ''; position: absolute; inset: var(--board-frame, 26px); box-shadow: inset 0 0 8px rgba(28,14,4,.5), inset 0 0 2px rgba(255,232,190,.18); }
+.board-frame__rail { position: absolute; background-color:#80532f; border:1px solid rgba(54,30,13,.42); box-shadow:0 2px 7px rgba(18,9,2,.42), inset 0 1px rgba(255,239,209,.18), inset 0 -2px rgba(48,25,10,.25); }
+.board-frame__rail--top, .board-frame__rail--bottom { left: 0; right: 0; height: var(--board-frame, 26px); background-image:radial-gradient(ellipse at 18% 48%, transparent 0 4px, rgba(70,39,18,.35) 5px 6px, transparent 7px),radial-gradient(ellipse at 72% 55%, transparent 0 2px, rgba(65,35,15,.28) 3px 4px, transparent 5px),repeating-linear-gradient(2deg, rgba(52,28,12,.16) 0 1px, transparent 1px 5px, rgba(244,211,159,.08) 5px 6px, transparent 6px 12px),linear-gradient(180deg,#b07c48 0%,#966239 38%,#754725 72%,#593418 100%); background-size:260px 100%,190px 100%,120px 100%,100% 100%; }
+.board-frame__rail--left, .board-frame__rail--right { top: 0; bottom: 0; width: var(--board-frame, 26px); background-image:radial-gradient(ellipse at 48% 22%, transparent 0 4px, rgba(70,39,18,.35) 5px 6px, transparent 7px),radial-gradient(ellipse at 52% 68%, transparent 0 2px, rgba(65,35,15,.28) 3px 4px, transparent 5px),repeating-linear-gradient(88deg, rgba(52,28,12,.16) 0 1px, transparent 1px 5px, rgba(244,211,159,.08) 5px 6px, transparent 6px 12px),linear-gradient(90deg,#b07c48 0%,#966239 38%,#754725 72%,#593418 100%); background-size:100% 260px,100% 190px,100% 120px,100% 100%; }
+.board-frame__rail--top { top: 0; }
+.board-frame__rail--bottom { bottom: 0; }
+.board-frame__rail--left { left: 0; }
+.board-frame__rail--right { right: 0; }
 .board-status { position: absolute; inset: 50% auto auto 50%; z-index: 5; translate: -50% -50%; padding: 8px 12px; color: rgba(255,255,255,.72); background: rgba(32, 20, 12, .5); border-radius: 4px; pointer-events: none; }
 .login-confirmation { position: absolute; inset: 50% auto auto 50%; z-index: 30; translate: -50% -50%; max-width: min(88vw, 420px); padding: 12px 16px; color: #fff; background: rgba(22, 18, 14, .9); border: 1px solid rgba(242, 169, 0, .55); border-radius: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .28); text-align: center; pointer-events: none; }
 .sticky-note { --note: #f7dc63; --note-font-size: 17px; --note-letter-spacing: 0; position: absolute; width: 220px; aspect-ratio: 1; padding: 22px 18px 18px; overflow: hidden; color: #26231e; background: var(--note); box-shadow: 2px 5px 12px rgba(31, 16, 5, .3); font-family: 'Special Elite', 'Noto Sans', 'Courier New', monospace; font-size: var(--note-font-size); line-height: 1.42; letter-spacing: var(--note-letter-spacing); white-space: pre-wrap; overflow-wrap: anywhere; transform: translate(-50%, -50%) rotate(var(--rotation, 0deg)); }

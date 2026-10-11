@@ -10,7 +10,7 @@ const CORE = [
     '/wallet.html', '/wallet.css', '/wallet.mjs', '/walletModel.mjs', '/walletSecurity.mjs', '/qrCodeGenerator_1_4_4.js', '/vendor/jsqr/jsQR.js',
     '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
-    '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/cork-board.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
+    '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/board-cork.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
     '/vendor/maplibre/maplibre-gl.js', '/vendor/maplibre/maplibre-gl.css',
     '/vendor/lineicons/lineicons.css', '/vendor/lineicons/lineicons-free.woff2',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',

@@ -40,8 +40,8 @@ import {
   isStickyExpired,
   geohashGridFits,
   geohashCellsForPrecision,
-  corkBitmapSize,
-  corkPatternScale,
+  boardBitmapSize,
+  boardPatternScale,
   GRID_MIN_CELL_PX,
   linkDisplay,
   linkHref,} from './stickyNotesModel.mjs';
@@ -86,8 +86,8 @@ const SAVED_PLACE_NAME_MAX = 40;
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   loginConfirmation: document.getElementById('loginConfirmation'),
-  corkFrame: document.getElementById('corkFrame'),
-  corkPaint: document.getElementById('corkPaint'),
+  boardFrame: document.getElementById('boardFrame'),
+  boardPaint: document.getElementById('boardPaint'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   noteSort: document.getElementById('noteSort'), noteSortDialog: document.getElementById('noteSortDialog'),
   noteViewOptions: document.getElementById('noteViewOptions'), followsOnly: document.getElementById('followsOnly'),
@@ -258,17 +258,17 @@ if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.ha
 if (rememberBoard && activeGeohash && activeGeohashes.join(',') !== linkedCells.join(',')) updateBoardUrl();
 const boardView = {scale: .6, x: 0, y: 0};
 // Every geohash uses the same coordinate space. Geography decides which events are fetched,
-// never how much cork the reader gets or where a normalized note position lands.
+// never how much board the reader gets or where a normalized note position lands.
 const BOARD_SIZE = 2048;
 const boardSize = Object.freeze({width: BOARD_SIZE, height: BOARD_SIZE});
 let boardTransformFrame = 0;
 let pendingTransformRect = null;
 let boardViewport = null;
-// The wooden rail around the cork, in board pixels. The rail sits outside the board,
+// The wooden rail around the board, in board pixels. The rail sits outside the board,
 // so it never covers a note.
 const BOARD_FRAME_WIDTH = 26;
-// Opening a corkboard should feel like standing in front of it, not looking at a thumbnail.
-// Covering the viewport leaves cork beneath every edge while keeping the selected area centred.
+// Opening a board should feel like standing in front of it, not looking at a thumbnail.
+// Covering the viewport leaves board beneath every edge while keeping the selected area centred.
 const BOARD_OPEN_COVER = 1.02;
 // Zoom limits leave room to inspect the whole square when requested without making the first
 // pinch jump inward from the screen-filling opening view.
@@ -1206,14 +1206,14 @@ function noteBelongsToBoard(sticky) {
 
 function updateBoardControl() {
   const reach = boardDepth === 0 ? 'exact only' : boardDepth === 11 ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
-  const label = activeGeohash ? `Corkboard: ${boardCellsLabel()} (${reach})` : 'Choose a geohash corkboard';
+  const label = activeGeohash ? `Board: ${boardCellsLabel()} (${reach})` : 'Choose a geohash board';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
 }
 
 function selectBoard(geohash, closeDialog = true) {
   if (placingNote) {
-    status(elements.boardChooserStatus, 'Pin the current note before changing corkboards.', true);
+    status(elements.boardChooserStatus, 'Pin the current note before changing boards.', true);
     return;
   }
   const cells = geohashCellsFrom(geohash);
@@ -1240,9 +1240,9 @@ function selectBoard(geohash, closeDialog = true) {
   // The wooden rail is markup inside this canvas, so a bare replaceChildren() deleted the
   // board's own edge every time a board was opened - which is why the border was missing on
   // a phone, where a board almost always gets chosen before the board is looked at. Keep it.
-  elements.canvas.replaceChildren(elements.corkFrame);
+  elements.canvas.replaceChildren(elements.boardFrame);
   elements.boardStatus.hidden = false;
-  status(elements.boardStatus, `Opening corkboard ${boardCellsLabel()}...`);
+  status(elements.boardStatus, `Opening board ${boardCellsLabel()}...`);
   if (closeDialog) elements.boardDialog.close();
   requestAnimationFrame(fillBoard);
   connectBoard(boardConnectionVersion);
@@ -1259,7 +1259,7 @@ function clampViewToBoard(rect) {
 function paintBoardTransform(rect) {
   elements.canvas.style.transform = `translate3d(${boardView.x}px, ${boardView.y}px, 0) scale(${boardView.scale})`;
   boardViewport = {width: rect.width, height: rect.height};
-  scheduleCorkPaint();
+  scheduleBoardPaint();
 }
 
 function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
@@ -1287,35 +1287,35 @@ function scheduleBoardTransform(rect) {
 }
 
 /**
- * The cork is a pattern drawn into a canvas of its own, not a tiled background on the board. A 2048px
+ * The board is a pattern drawn into a canvas of its own, not a tiled background on the board. A 2048px
  * element with a repeating texture has to be produced at device resolution whenever the whole board is
  * in view, which on a phone means a 6144px texture - past what the GPU will hold - so the browser hands
- * parts of it back empty, and a reader sees blank squares the size of the cork tile. A canvas has a
- * bitmap whose size we choose (corkBitmapSize), so the texture stays inside every limit and the pattern
- * is drawn into it once per size. The canvas sits inside the transformed element, so the cork still
+ * parts of it back empty, and a reader sees blank squares the size of the board tile. A canvas has a
+ * bitmap whose size we choose (boardBitmapSize), so the texture stays inside every limit and the pattern
+ * is drawn into it once per size. The canvas sits inside the transformed element, so the board still
  * scales, pans and stays aligned with the notes.
  */
-const cork = {image: null, ready: false, timer: 0};
+const boardTexture = {image: null, ready: false, timer: 0};
 
-function loadCorkImage() {
+function loadBoardImage() {
   const image = new Image();
   image.decoding = 'async';
-  image.addEventListener('load', () => { cork.image = image; cork.ready = true; paintCork(); }, {once: true});
-  image.src = '/img/cork-board.png';
+  image.addEventListener('load', () => { boardTexture.image = image; boardTexture.ready = true; paintBoard(); }, {once: true});
+  image.src = '/img/board-cork.png';
 }
 
-function paintCork() {
-  const canvas = elements.corkPaint;
-  if (!canvas || !cork.ready) return;
-  const side = corkBitmapSize(boardView.scale, devicePixelRatio || 1, boardSize.width);
+function paintBoard() {
+  const canvas = elements.boardPaint;
+  if (!canvas || !boardTexture.ready) return;
+  const side = boardBitmapSize(boardView.scale, devicePixelRatio || 1, boardSize.width);
   if (canvas.width === side && canvas.dataset.painted === '1') return;
   canvas.width = side;              // setting the size also clears the bitmap
   canvas.height = side;
   const context = canvas.getContext('2d');
   if (!context) return;
-  const pattern = context.createPattern(cork.image, 'repeat');
+  const pattern = context.createPattern(boardTexture.image, 'repeat');
   if (!pattern) return;
-  const scale = corkPatternScale(side, boardSize.width);
+  const scale = boardPatternScale(side, boardSize.width);
   context.imageSmoothingQuality = 'high';
   context.scale(scale, scale);
   context.fillStyle = pattern;
@@ -1324,20 +1324,20 @@ function paintCork() {
   canvas.dataset.painted = '1';
 }
 
-function scheduleCorkPaint() {
+function scheduleBoardPaint() {
   // A pinch changes the scale every frame and only the settled value matters, so the bitmap is
   // resized once the view stops rather than during the gesture.
-  if (cork.timer) clearTimeout(cork.timer);
-  cork.timer = setTimeout(() => { cork.timer = 0; paintCork(); }, 150);
+  if (boardTexture.timer) clearTimeout(boardTexture.timer);
+  boardTexture.timer = setTimeout(() => { boardTexture.timer = 0; paintBoard(); }, 150);
 }
 
 function applyBoardSize() {
   // Keep the runtime dimensions tied to the same fixed coordinate space as the first CSS paint.
   elements.canvas.style.width = `${boardSize.width}px`;
   elements.canvas.style.height = `${boardSize.height}px`;
-  if (elements.corkPaint) {
-    elements.corkPaint.style.width = `${boardSize.width}px`;
-    elements.corkPaint.style.height = `${boardSize.height}px`;
+  if (elements.boardPaint) {
+    elements.boardPaint.style.width = `${boardSize.width}px`;
+    elements.boardPaint.style.height = `${boardSize.height}px`;
   }
 }
 
@@ -1492,7 +1492,7 @@ function shortAuthor(pubkey) {
 
 function connectBoard(version = boardConnectionVersion) {
   if (!activeGeohash) {
-    status(elements.boardStatus, 'Choose a geohash to open its corkboard.');
+    status(elements.boardStatus, 'Choose a geohash to open its board.');
     elements.boardStatus.hidden = false;
     return;
   }
@@ -1766,7 +1766,7 @@ async function startPayment() {
       ? composingGeohashes
       : (pending?.action === 'pin' && Array.isArray(pending.geohashes) ? pending.geohashes : []);
     if (!activeGeohash || composed.join(',') !== activeGeohashes.join(',')) {
-      throw new Error('Choose the geohash corkboard again, then reopen the note.');
+      throw new Error('Choose the geohash board again, then reopen the note.');
     }
     await ensureReadySigner();
     const mentions = editorMentions();
@@ -2664,7 +2664,7 @@ function updateMentionElements(pubkey, label) {
   });
 }
 
-// ---- a link in a note: the word "link" on the cork, the address one confirmation away
+// ---- a link in a note: the word "link" on the board, the address one confirmation away
 const LINK_LABEL = 'link';
 
 function linkRestLabel() {
@@ -3184,7 +3184,7 @@ function readPosition(precision) {
 
 async function showNotesAroundMe(precision) {
   if (placingNote) {
-    status(elements.areaStatus, 'Pin the current note before changing corkboards.', true);
+    status(elements.areaStatus, 'Pin the current note before changing boards.', true);
     return;
   }
   if (!navigator.geolocation) {
@@ -3393,7 +3393,7 @@ elements.shareBoard.addEventListener('click', async () => {
   try {
     if (navigator.share) {
       try {
-        await navigator.share({title: `Corkboard ${geohash}`, text: `Open the ${geohash} Nostr corkboard on satoshi.si.`, url: url.href});
+        await navigator.share({title: `Board ${geohash}`, text: `Open the ${geohash} Nostr board on satoshi.si.`, url: url.href});
         status(elements.boardChooserStatus, 'Board link shared.');
         return;
       } catch (error) {
@@ -3511,7 +3511,7 @@ window.addEventListener('storage', event => {
   status(elements.boardStatus, flow.message || 'Your note is pinned.');
   elements.boardStatus.hidden = false;
 });
-loadCorkImage();
+loadBoardImage();
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 let boardResizeFrame = 0;
 window.addEventListener('resize', () => {
@@ -3540,7 +3540,7 @@ setInterval(() => {
 updateAccount();
 // One source for the rail's thickness: the stylesheet reads this variable, the
 // fitting maths reads the constant, so the frame and the fit cannot disagree.
-elements.canvas.style.setProperty('--cork-frame', `${BOARD_FRAME_WIDTH}px`);
+elements.canvas.style.setProperty('--board-frame', `${BOARD_FRAME_WIDTH}px`);
 // The canvas wears its board's size from the first paint. The board the reader arrives on comes
 // from the link, the kept place or the remembered board, and that resolution does not pass
 // through selectBoard, so the size is worked out from what it settled on here as well.
@@ -3552,7 +3552,7 @@ installBoardNavigation();
 requestAnimationFrame(fillBoard);
 if (activeGeohash) connectBoard();
 else {
-  status(elements.boardStatus, 'Choose a geohash to open its corkboard.');
+  status(elements.boardStatus, 'Choose a geohash to open its board.');
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
 }

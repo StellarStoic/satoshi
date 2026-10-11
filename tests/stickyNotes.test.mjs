@@ -4,12 +4,12 @@ import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
-  corkBitmapSize,
-  corkPatternScale,
-  CORK_TILE_PX,
-  CORK_IMAGE_PX,
-  CORK_BITMAP_MAX,
-  CORK_BITMAP_MIN,
+  boardBitmapSize,
+  boardPatternScale,
+  BOARD_TILE_PX,
+  BOARD_IMAGE_PX,
+  BOARD_BITMAP_MAX,
+  BOARD_BITMAP_MIN,
   geohashCellsForPrecision,
   geohashCellDimensions,
   geohashGridFits,
@@ -37,8 +37,8 @@ test('a link lets the sentence keep its punctuation, but a bracket it opened sta
   assert.deepEqual(dotted.map(part => part.type), ['text', 'link', 'text']);
   assert.equal(dotted[1].href, 'https://example.com/x');
   assert.equal(dotted[2].text, '.');
-  const wiki = stickyTextParts('https://en.wikipedia.org/wiki/Cork_(material)').find(part => part.type === 'link');
-  assert.equal(wiki.href, 'https://en.wikipedia.org/wiki/Cork_(material)');
+  const wiki = stickyTextParts('https://en.wikipedia.org/wiki/Board_(material)').find(part => part.type === 'link');
+  assert.equal(wiki.href, 'https://en.wikipedia.org/wiki/Board_(material)');
   const wrapped = stickyTextParts('(see https://example.com/x)').find(part => part.type === 'link');
   assert.equal(wrapped.href, 'https://example.com/x');
   const listy = stickyTextParts('links: https://a.example.com, https://b.example.com!').filter(part => part.type === 'link');
@@ -506,28 +506,28 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(script, /rotation: gesture\.placement\.rotation \+ difference/);
   const placementGestures = script.slice(script.indexOf('function installPlacementGestures'), script.indexOf('function isOverBin'));
   assert.match(placementGestures, /elements\.board\.addEventListener\('pointerdown'/,
-    'placement gestures use the whole corkboard, not only the paper');
+    'placement gestures use the whole board, not only the paper');
   assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
   assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
     'one two-finger gesture zooms the board and rotates the note');
   assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link'\)[\s\S]{0,180}return;/,
     'the pin and a note link keep their own click instead of dragging the board');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
-  // The cork is a pattern drawn into a canvas inside the transformed element, not a repeating
+  // The board is a pattern drawn into a canvas inside the transformed element, not a repeating
   // background on the 2048px board element. That tiled form has to be produced at device resolution
   // whenever the whole board is in view - 6144px on a 3x phone - and comes back from the browser with
-  // parts of it empty, which a reader sees as blank squares the size of the cork tile. What matters is
-  // kept: the cork still tiles every 600 board px, still moves with the board, and still sits under
+  // parts of it empty, which a reader sees as blank squares the size of the board tile. What matters is
+  // kept: the board still tiles every 600 board px, still moves with the board, and still sits under
   // the rail and the notes.
-  assert.match(script, /image\.src = '\/img\/cork-board\.png'/);
-  assert.match(script, /createPattern\(cork\.image, 'repeat'\)/,
-    'the cork is still a repeating pattern, drawn into the canvas');
-  assert.match(html, /<div id="stickyCanvas"[^>]*>\s*<canvas id="corkPaint"/,
-    'the cork canvas is inside the transformed element, so it pans and zooms with the board');
+  assert.match(script, /image\.src = '\/img\/board-cork\.png'/);
+  assert.match(script, /createPattern\(boardTexture\.image, 'repeat'\)/,
+    'the board is still a repeating pattern, drawn into the canvas');
+  assert.match(html, /<div id="stickyCanvas"[^>]*>\s*<canvas id="boardPaint"/,
+    'the board canvas is inside the transformed element, so it pans and zooms with the board');
   assert.doesNotMatch(css, /\.sticky-canvas[^}]+background-image:/,
     'the board element asks for no board-sized tiled texture');
   assert.match(css, /\.sticky-canvas[^}]+background-color:\s*#b98b63/,
-    'a canvas that cannot paint shows cork, never black');
+    'a canvas that cannot paint shows the board colour, never black');
   assert.doesNotMatch(script, /backgroundSize = `\$\{600 \* boardView\.scale\}px/);
   assert.doesNotMatch(script, /backgroundPosition = `\$\{boardView\.x\}px \$\{boardView\.y\}px`/);
 });
@@ -558,7 +558,7 @@ test('payment sheet opens during invoice creation and pinned state stays complet
   assert.doesNotMatch(`${html}\n${script}`, /Bark/i);
 });
 
-test('board chrome stays compact over the corkboard', async () => {
+test('board chrome stays compact over the board', async () => {
   const [html, css, script] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
@@ -620,7 +620,7 @@ test('board chrome stays compact over the corkboard', async () => {
   // and the cells already chosen are still drawn so the reader keeps sight of their own area.
   assert.match(script, /if \(!geohashGridFits\(\{cellPixels, columns, rows\}\)\)/);
   assert.match(script, /source\.setData\(\{type: 'FeatureCollection', features: chosen\}\)/);
-  // Geography filters events; it never changes the cork's coordinate space.
+  // Geography filters events; it never changes the board's coordinate space.
   assert.match(script, /const BOARD_SIZE = 2048;/);
   assert.match(script, /const boardSize = Object\.freeze\(\{width: BOARD_SIZE, height: BOARD_SIZE\}\)/);
   assert.doesNotMatch(script, /boardExtentForCells|BOARD_CELL_WIDTH|BOARD_CELL_HEIGHT/);
@@ -791,42 +791,42 @@ test('every note carries exactly one expiration tag, in unix seconds', () => {
     geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long the note should live/);
 });
 
-test('the corkboard has a wooden rail, and it sits outside the cork', async () => {
+test('the board has a wooden rail, and it sits outside the board', async () => {
   const [html, page, css] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(html, /<div id="corkFrame" class="cork-frame" aria-hidden="true">/,
+  assert.match(html, /<div id="boardFrame" class="board-frame" aria-hidden="true">/,
     'the frame is in the markup');
-  assert.equal((html.match(/cork-frame__rail cork-frame__rail--/g) || []).length, 4,
+  assert.equal((html.match(/board-frame__rail board-frame__rail--/g) || []).length, 4,
     'a rail on each of the four edges');
-  assert.ok(html.indexOf('id="corkFrame"') < html.indexOf('cork-frame__rail--right'),
+  assert.ok(html.indexOf('id="boardFrame"') < html.indexOf('board-frame__rail--right'),
     'the rails are inside the frame element');
 
-  // Decoration, never a target: it must not swallow clicks meant for the cork.
-  assert.match(css, /\.cork-frame \{[^}]*pointer-events: none/,
+  // Decoration, never a target: it must not swallow clicks meant for the board.
+  assert.match(css, /\.board-frame \{[^}]*pointer-events: none/,
     'the frame does not take pointer events');
   // The rail extends outward from the board, so no note is ever covered by it.
-  assert.match(css, /\.cork-frame \{ position: absolute; inset: calc\(var\(--cork-frame, 26px\) \* -1\)/,
-    'the frame is drawn outside the cork');
+  assert.match(css, /\.board-frame \{ position: absolute; inset: calc\(var\(--board-frame, 26px\) \* -1\)/,
+    'the frame is drawn outside the board');
   assert.match(css, /repeating-linear-gradient/, 'the wood is drawn from gradients, with no image to fetch');
   assert.match(css, /radial-gradient/, 'small irregular knots break up the synthetic grain');
-  assert.match(css, /var\(--cork-frame, 26px\)/, 'the thinner rail thickness comes from one variable');
+  assert.match(css, /var\(--board-frame, 26px\)/, 'the thinner rail thickness comes from one variable');
   assert.match(css, /\.sticky-board \{[^}]*background:transparent/,
     'space outside the rail lets the selected site theme show through');
-  assert.doesNotMatch(css, /--cork-surround/, 'no hard-coded brown band covers the themed space');
-  assert.doesNotMatch(page, /setProperty\('--cork-surround'/);
+  assert.doesNotMatch(css, /--board-surround/, 'no hard-coded brown band covers the themed space');
+  assert.doesNotMatch(page, /setProperty\('--board-surround'/);
 
   // One source of truth for that variable. Opening covers the viewport rather than shrinking
   // the whole board until its rail fits like a thumbnail.
   assert.match(page, /const BOARD_FRAME_WIDTH = 26;/);
-  assert.match(page, /setProperty\('--cork-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
+  assert.match(page, /setProperty\('--board-frame', `\$\{BOARD_FRAME_WIDTH\}px`\)/,
     'the constant is published to the stylesheet');
   assert.match(page, /BOARD_OPEN_COVER \* Math\.max\(/,
-    'opening fills the window with cork instead of fitting the complete board');
-  // The rail is also the limit: nothing may be panned into the cork that lies past it.
+    'opening fills the window with board instead of fitting the complete board');
+  // The rail is also the limit: nothing may be panned into the board that lies past it.
   assert.match(page, /clampViewToBoard\(rect\)/, 'the transform holds the line');
   assert.match(page, /frame: BOARD_FRAME_WIDTH,/);
 });
@@ -1068,7 +1068,7 @@ test('the board can start from where the reader is', async () => {
   // every way it can fail says what to do instead
   for (const code of [1, 2, 3]) assert.match(script, new RegExp(`code === ${code}`));
   assert.match(script, /has no location support/);
-  assert.match(script, /Pin the current note before changing corkboards/);
+  assert.match(script, /Pin the current note before changing boards/);
   // a vague fix is not presented as a certain cell, and the comparison is in metres:
   // geohashCellDimensions() answers in degrees, which is what made every size read "0 m"
   assert.match(script, /coords\.accuracy <= geohashCellHeightMetres\(precision\)/);
@@ -1159,7 +1159,7 @@ test('the restored board and account dialog cannot trap the reader', async () =>
   assert.ok(logout.indexOf('elements.accountDialog.close()') < logout.indexOf('logoutNostr()'),
     'logout dismisses the modal before session listeners run');
   assert.match(css, /\.board-status \{[^}]*pointer-events: none/,
-    'the opening message cannot block dragging the corkboard');
+    'the opening message cannot block dragging the board');
 });
 
 test('the X on the invoice discards it, and a settled payment is not thrown away', async () => {
@@ -1339,7 +1339,7 @@ test('saved places carry a name the reader chose, and stay in the browser', asyn
 test('the rail is the board\u2019s limit, so the view cannot leave the framed sheet', () => {
   const viewport = {width: 1000, height: 800};
   // where the rail's four outer edges land on screen: -90 is the rail on the near side,
-  // 2690/1890 on the far side of the 2600x1800 cork
+  // 2690/1890 on the far side of the 2600x1800 board
   const rails = view => ({
     left: view.x - 90 * view.scale,
     right: view.x + 2690 * view.scale,
@@ -1399,15 +1399,15 @@ test('opening a board keeps the wooden rail, instead of deleting it with the can
 
   // the rail is markup inside the canvas, not something the script builds
   const canvasStart = html.indexOf('id="stickyCanvas"');
-  assert.ok(canvasStart > 0 && html.indexOf('id="corkFrame"', canvasStart) > canvasStart,
+  assert.ok(canvasStart > 0 && html.indexOf('id="boardFrame"', canvasStart) > canvasStart,
     'the frame lives inside the canvas, so it pans and zooms with the board');
 
   // so the place that clears the canvas must keep it
-  assert.match(page, /elements\.canvas\.replaceChildren\(elements\.corkFrame\)/,
+  assert.match(page, /elements\.canvas\.replaceChildren\(elements\.boardFrame\)/,
     'clearing the canvas keeps the rail');
   assert.doesNotMatch(page, /elements\.canvas\.replaceChildren\(\)/,
     'a bare clear would delete the board\u2019s own edge');
-  assert.match(page, /corkFrame: document\.getElementById\('corkFrame'\)/);
+  assert.match(page, /boardFrame: document\.getElementById\('boardFrame'\)/);
   // and nothing else clears that canvas
   assert.equal((page.match(/elements\.canvas\.replaceChildren/g) || []).length, 1,
     'one place clears the canvas, and it keeps the rail');
@@ -1544,39 +1544,39 @@ test('the cell grid is only drawn where a cell can be read and tapped', () => {
   assert.equal(geohashGridFits(), false);
 });
 
-test('the cork bitmap stays inside what a phone will hold, at every zoom', () => {
+test('the board bitmap stays inside what a phone will hold, at every zoom', () => {
   // The shape of the bug: the whole board at a phone's 3x ratio is 2048 * 3 = 6144 a side, 37.7M
   // pixels, past the textures a mobile GPU will allocate - and the browser answers by returning
   // parts of it empty. The bitmap is bounded instead of that.
-  assert.equal(corkBitmapSize(1, 3), CORK_BITMAP_MAX, 'a 3x phone at 1:1 is capped, not 6144');
-  assert.equal(corkBitmapSize(2.5, 3), CORK_BITMAP_MAX, 'zoomed in stays capped');
-  assert.equal(corkBitmapSize(50, 4), CORK_BITMAP_MAX, 'and no scale talks it past the cap');
+  assert.equal(boardBitmapSize(1, 3), BOARD_BITMAP_MAX, 'a 3x phone at 1:1 is capped, not 6144');
+  assert.equal(boardBitmapSize(2.5, 3), BOARD_BITMAP_MAX, 'zoomed in stays capped');
+  assert.equal(boardBitmapSize(50, 4), BOARD_BITMAP_MAX, 'and no scale talks it past the cap');
   // Zoomed out on a phone - the state the blank squares appeared in - gets the floor: a small
   // texture, the opposite of what the tiled background produced there.
-  assert.equal(corkBitmapSize(0.12, 3), CORK_BITMAP_MIN);
-  assert.equal(corkBitmapSize(0.12, 1), CORK_BITMAP_MIN);
+  assert.equal(boardBitmapSize(0.12, 3), BOARD_BITMAP_MIN);
+  assert.equal(boardBitmapSize(0.12, 1), BOARD_BITMAP_MIN);
   // A step, so a continuous pinch does not resize and redraw the bitmap every frame.
-  assert.equal(corkBitmapSize(0.5, 1), 1024);
-  assert.equal(corkBitmapSize(0.5, 1), corkBitmapSize(0.52, 1));
+  assert.equal(boardBitmapSize(0.5, 1), 1024);
+  assert.equal(boardBitmapSize(0.5, 1), boardBitmapSize(0.52, 1));
   // Monotonic, and always inside the bounds.
-  const ladder = [0.12, 0.25, 0.5, 0.6, 1, 1.5, 2.5].map(scale => corkBitmapSize(scale, 1));
+  const ladder = [0.12, 0.25, 0.5, 0.6, 1, 1.5, 2.5].map(scale => boardBitmapSize(scale, 1));
   assert.deepEqual(ladder, [...ladder].sort((a, b) => a - b));
-  assert.ok(ladder.every(side => side <= CORK_BITMAP_MAX && side >= CORK_BITMAP_MIN));
+  assert.ok(ladder.every(side => side <= BOARD_BITMAP_MAX && side >= BOARD_BITMAP_MIN));
   // A missing or silly pixel ratio must not produce a broken bitmap.
-  assert.equal(corkBitmapSize(1, 0), 2048);
-  assert.equal(corkBitmapSize(1, undefined), 2048);
-  assert.equal(corkBitmapSize(0, 1), CORK_BITMAP_MIN);
+  assert.equal(boardBitmapSize(1, 0), 2048);
+  assert.equal(boardBitmapSize(1, undefined), 2048);
+  assert.equal(boardBitmapSize(0, 1), BOARD_BITMAP_MIN);
 });
 
-test('the cork tiles every 600 board px, whatever size the bitmap is', () => {
+test('the board tiles every 600 board px, whatever size the bitmap is', () => {
   // 600 board px per tile from a 400px image: the sheet's background-size: 600px, kept.
-  assert.equal(CORK_TILE_PX, 600);
-  assert.equal(corkPatternScale(2048, 2048), 1.5, 'a 1:1 bitmap draws the 400px image at 600px');
-  assert.equal(corkPatternScale(1024, 2048), 0.75);
+  assert.equal(BOARD_TILE_PX, 600);
+  assert.equal(boardPatternScale(2048, 2048), 1.5, 'a 1:1 bitmap draws the 400px image at 600px');
+  assert.equal(boardPatternScale(1024, 2048), 0.75);
   for (const side of [1024, 1280, 1536, 1792, 2048]) {
-    assert.equal(CORK_IMAGE_PX * corkPatternScale(side, 2048) * (2048 / side), 600,
+    assert.equal(BOARD_IMAGE_PX * boardPatternScale(side, 2048) * (2048 / side), 600,
       `a ${side}px bitmap still tiles every 600 board px`);
-    assert.equal(CORK_IMAGE_PX * corkPatternScale(side, 2048), 600 * (side / 2048),
+    assert.equal(BOARD_IMAGE_PX * boardPatternScale(side, 2048), 600 * (side / 2048),
       'the tile lands where the board would put it, measured in bitmap pixels');
   }
 });

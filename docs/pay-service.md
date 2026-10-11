@@ -336,7 +336,7 @@ told apart from the parents that were added for reach. The payment service must 
 missing cell, a duplicate, an extra `g` value that is neither a paid cell nor a board
 above one, and any mode mismatch. The `i` and `k` pair follows NIP-73's external-content
 identifier, naming one of the cells that was paid for. These tags sort public events into
-corkboards; they do not encrypt a note or restrict who can fetch it.
+boards; they do not encrypt a note or restrict who can fetch it.
 
 Every note is temporary. `["expiration", "<unix seconds>"]` is **mandatory** (NIP-40): the
 moment the note stops existing, computed as the event's `created_at` plus the term the writer

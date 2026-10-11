@@ -50,14 +50,14 @@ export const PAGE_HELP = Object.freeze({
     '/stickyNotes.html': {
         title: 'About Pinstr',
         description: 'Pinstr notes are small public messages signed with your Nostr identity and placed on a shared'
-            + ' corkboard. Tag people with @, choose how long a note lives, and post with a subscription: 10 sats a'
+            + ' board. Tag people with @, choose how long a note lives, and post with a subscription: 10 sats a'
             + ' week, or 5 with a satoshi.si name.',
         sections: [
             {
                 label: 'In plain words',
                 paragraphs: [
                     'Pinstr notes are small public messages, signed with your Nostr identity or a random anonymous one,'
-                    + ' and placed on a shared corkboard. Choose where the note will be visible, and choose how long it'
+                    + ' and placed on a shared board. Choose where the note will be visible, and choose how long it'
                     + ' lives. Perfect for small areas and groups pinning notes to each other.',
                     'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
                     + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
@@ -127,11 +127,11 @@ export const PAGE_HELP = Object.freeze({
                     + ' browser. “Notes from my follows” reads the signed-in account’s latest NIP-02 kind 3 contact-list'
                     + ' event from public relays and matches the note author against its p tags. The contact list is not'
                     + ' sent to satoshi.si or written into a note; only the toggle preference is kept in local storage.',
-                    'While placing a paid note, the whole corkboard is the gesture surface. One finger moves the note.'
-                    + ' Two fingers rotate the note and zoom the corkboard together around their midpoint, so the paper'
+                    'While placing a paid note, the whole board is the gesture surface. One finger moves the note.'
+                    + ' Two fingers rotate the note and zoom the board together around their midpoint, so the paper'
                     + ' stays under control even when the fingers begin away from it.',
                     'Once notes are pinned, they are part of the board surface: dragging or pinching over ordinary paper'
-                    + ' pans and zooms the corkboard just like touching bare cork. Pins remain buttons for note details.',
+                    + ' pans and zooms the board just like touching the bare board. Pins remain buttons for note details.',
                     'Every pin belongs to a geohash of three to nine characters: you enter one or pick it on the'
                     + ' map view, where zooming changes the grid between those depths. A place that straddles two'
                     + ' or three cells — a building on a corner — can be pinned to all of them at once, as long as the cells'

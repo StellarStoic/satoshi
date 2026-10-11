@@ -727,7 +727,7 @@ export function normaliseStickyText(value) {
  *
  * A board coordinate lands on screen at `view.x + coordinate * scale`, so the rail's outer
  * edge (`-frame` on the left, `canvasWidth + frame` on the right) may sit on the window
- * edge but never inside it - otherwise a reader is looking at cork that past the board does
+ * edge but never inside it - otherwise a reader is looking at board that past the board does
  * not exist. When the framed sheet cannot fill the window, as on a phone at low zoom, it is
  * centred instead of pinned to one edge.
  */
@@ -817,7 +817,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {
-    throw new Error(issue === 'Choose at least one cell.' ? 'Choose a valid geohash corkboard first.' : issue);
+    throw new Error(issue === 'Choose at least one cell.' ? 'Choose a valid geohash board first.' : issue);
   }
   const cells = normaliseGeohashes(choice);
   const primary = cells[0];
@@ -911,38 +911,38 @@ export async function stickyContentHash(content, color, font = 'typewriter', cry
 
 
 /**
- * What the cork texture is made of: the board pixels one tile of the image covers, and the image's
+ * What the board texture is made of: the board pixels one tile of the image covers, and the image's
  * own size. Board space is presentation-independent, so the tile is 600 board px at every zoom.
  */
-export const CORK_TILE_PX = 600;
-export const CORK_IMAGE_PX = 400;
+export const BOARD_TILE_PX = 600;
+export const BOARD_IMAGE_PX = 400;
 /**
- * The cork bitmap's own bounds, and the point of this whole exercise: 2048x2048 is 4.2M pixels,
+ * The board bitmap's own bounds, and the point of this whole exercise: 2048x2048 is 4.2M pixels,
  * which every mobile GPU holds, where a board-sized texture at a phone's 3x ratio is 6144x6144 =
  * 37.7M pixels and comes back from the browser with parts of it empty - the blank, tile-sized
  * squares a phone shows when the whole board is in view. The floor is a floor on redraws, not on
  * quality: below it the bitmap is smaller than any screen the board fills.
  */
-export const CORK_BITMAP_MIN = 1024;
-export const CORK_BITMAP_MAX = 2048;
-export const CORK_BITMAP_STEP = 256;
+export const BOARD_BITMAP_MIN = 1024;
+export const BOARD_BITMAP_MAX = 2048;
+export const BOARD_BITMAP_STEP = 256;
 
 /**
- * The side of the cork bitmap that covers a board of `boardSide` board pixels. It only has to serve
+ * The side of the board bitmap that covers a board of `boardSide` board pixels. It only has to serve
  * the pixels actually on screen - board pixels x the view's scale x the device pixel ratio -
  * rounded to a step so a continuous pinch does not resize it every frame, then bounded above.
  */
-export function corkBitmapSize(scale, pixelRatio = 1, boardSide = 2048) {
+export function boardBitmapSize(scale, pixelRatio = 1, boardSide = 2048) {
   const demand = boardSide * Math.max(0, Number(scale) || 0) * Math.max(1, Number(pixelRatio) || 1);
-  const stepped = Math.round(demand / CORK_BITMAP_STEP) * CORK_BITMAP_STEP;
-  return Math.min(CORK_BITMAP_MAX, Math.max(CORK_BITMAP_MIN, stepped));
+  const stepped = Math.round(demand / BOARD_BITMAP_STEP) * BOARD_BITMAP_STEP;
+  return Math.min(BOARD_BITMAP_MAX, Math.max(BOARD_BITMAP_MIN, stepped));
 }
 
 /**
- * How far the cork image has to be scaled for a bitmap of this side: the tile's spacing in bitmap
+ * How far the board image has to be scaled for a bitmap of this side: the tile's spacing in bitmap
  * pixels over the image's own width. Drawing the pattern with it reproduces the 600px tile the sheet
- * used to ask for, so the cork keeps its scale and its alignment in board space.
+ * used to ask for, so the board keeps its scale and its alignment in board space.
  */
-export function corkPatternScale(bitmapSide, boardSide = 2048) {
-  return (CORK_TILE_PX / CORK_IMAGE_PX) * (bitmapSide / boardSide);
+export function boardPatternScale(bitmapSide, boardSide = 2048) {
+  return (BOARD_TILE_PX / BOARD_IMAGE_PX) * (bitmapSide / boardSide);
 }
