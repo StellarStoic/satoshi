@@ -409,6 +409,16 @@ test('a copied key finishes a no-callback sign-in by itself, but never one copie
   copied.text = 'not a key either';
   assert.equal(await sessionModule.adoptAmberClipboard({silent: true}), null, 'junk is ignored in silence');
   assert.equal(sessionModule.amberClipboardPending(), true, 'and it does not spend the request');
+
+  // An identity this browser has signed in with is the reader's own, so an unchanged clipboard is
+  // no reason to refuse it: that is what every return visit looks like, because the same key is
+  // copied again. 'd' was signed in with above, so it is now a known identity.
+  sessionModule.beginAmberLogin({copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  copied.text = 'D'.repeat(64);
+  const returning = await sessionModule.adoptAmberClipboard({silent: true});
+  assert.equal(returning?.session.pubkey, 'd'.repeat(64),
+    'coming back with the identity this browser already uses needs no tap');
 });
 
 test('the button still works when the browser refuses an automatic read', async () => {

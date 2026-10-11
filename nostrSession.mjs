@@ -2,6 +2,11 @@ const SESSION_KEY = 'satoshi:nostr:session:v1';
 const BUNKER_KEY = 'satoshi:nostr:bunker:v1';
 const ANONYMOUS_KEY = 'satoshi:nostr:anonymous:v1';
 const PREVIOUS_SESSION_KEY = 'satoshi:nostr:previous-session:v1';
+
+// The identities this browser has signed in with. Public keys only, and not a secret: they are what
+// lets a signer's answer be trusted as the reader's own rather than as whatever was on the clipboard.
+const KNOWN_IDENTITIES_KEY = 'satoshi:nostr:known-identities:v1';
+const KNOWN_IDENTITIES_MAX = 5;
 const AMBER_PREFIX = 'satoshi:nostr:amber:';
 const AMBER_MAX_AGE = 30 * 60 * 1000;
 // How many unanswered requests of one action stay readable. Android decides which attempt's
@@ -47,8 +52,27 @@ function readJson(storage, key) {
   try { return JSON.parse(storage.getItem(key) || 'null'); } catch { return null; }
 }
 
+function rememberIdentity(pubkey) {
+  if (!/^[0-9a-f]{64}$/.test(pubkey || '')) return;
+  const known = knownIdentities().filter(value => value !== pubkey);
+  known.unshift(pubkey);
+  localStorage.setItem(KNOWN_IDENTITIES_KEY, JSON.stringify(known.slice(0, KNOWN_IDENTITIES_MAX)));
+}
+
+/** Identities that have signed in on this browser, plus whoever is signed in or was before. */
+function knownIdentities() {
+  const stored = readJson(localStorage, KNOWN_IDENTITIES_KEY);
+  const values = Array.isArray(stored) ? stored.filter(value => /^[0-9a-f]{64}$/.test(value)) : [];
+  for (const key of [SESSION_KEY, ANONYMOUS_KEY, PREVIOUS_SESSION_KEY]) {
+    const pubkey = readJson(localStorage, key)?.pubkey;
+    if (/^[0-9a-f]{64}$/.test(pubkey || '') && !values.includes(pubkey)) values.push(pubkey);
+  }
+  return values;
+}
+
 function saveSession(pubkey, method, profile = null, extra = {}) {
   const session = {pubkey, method, npub: tools().nip19.npubEncode(pubkey), profile: profile || null, ...extra};
+  rememberIdentity(pubkey);
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   window.dispatchEvent(new CustomEvent('satoshi-nostr-session', {detail: session}));
   return session;
@@ -275,9 +299,12 @@ export async function adoptAmberClipboard({silent = false} = {}) {
   if (!/^[0-9a-f]{64}$/.test(pubkey)) {
     return stop('That is not a public key. In Amber, copy the key it offered, then tap again.');
   }
-  // The one thing an automatic read must not do is take whatever was on the clipboard before the
-  // request was made, so a value that is unchanged since then is not this signer's answer.
-  if (silent && waiting.state.clipboard && waiting.state.clipboard === clipboardHash(pubkey)) return null;
+  // An automatic read must not take whatever happened to be on the clipboard, so a value that is
+  // unchanged since the request was made is refused - unless it is a key this browser has signed in
+  // with, which is the reader's own whatever the clipboard did. That is the ordinary case for a
+  // return visit: the same identity is copied again, so the value does not change at all.
+  const unchanged = Boolean(waiting.state.clipboard) && waiting.state.clipboard === clipboardHash(pubkey);
+  if (silent && unchanged && !knownIdentities().includes(pubkey)) return null;
   const session = saveSession(pubkey, 'amber');
   localStorage.removeItem(waiting.key);
   return {action: 'login', session};
