@@ -7,9 +7,10 @@ Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0,
 https://creativecommons.org/licenses/by-sa/3.0/). That is the licence the collection's
 own repository states, https://github.com/atlemo/SubtlePatterns.
 
-Attribution is required: the designer's name travels with the pattern, and a work that
-uses these patterns stays under the same licence. The board's kefir-free honour code
-does not apply here - keep this file with the images.
+Attribution is required: the designer's name travels with the pattern, and a pattern that is
+modified or built on stays under this same licence. Using a pattern unchanged as a background does
+not put the board's own code under it - but keep this file with the images, and keep the credit
+where a reader can find it.
 
   file                        pattern                 designer
   board-cork.png              Cork Board Pattern      Lopez Theo
