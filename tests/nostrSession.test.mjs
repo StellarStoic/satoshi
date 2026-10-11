@@ -240,3 +240,42 @@ test('Amber pinning returns a compact signature and rebuilds the verified event 
   assert.deepEqual(answer.context, {action: 'pin', orderId: 'order-21'});
   assert.deepEqual(answer.event, {...template, pubkey, id: eventId, sig: signature});
 });
+
+test('a retry keeps the record of the attempt the signer actually finishes', async () => {
+  const storage = memoryStorage();
+  const assigned = [];
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'Android'}});
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    assign: value => assigned.push(value),
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`}}};
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-retry-test=${Date.now()}`);
+  const requestId = url => new URL(new URL(url).searchParams.get('callbackUrl')).hash.match(/^#nostr_signer=([a-z0-9-]+)\.$/i)[1];
+
+  // A reader who taps again while the first round trip is still out leaves two attempts in
+  // flight, and Android decides which answer arrives first — not the newest one.
+  sessionModule.beginAmberLogin();
+  const first = requestId(assigned[0]);
+  sessionModule.beginAmberLogin();
+  const second = requestId(assigned[1]);
+  assert.notEqual(second, first, 'a retry is a new request, not the same one re-sent');
+
+  globalThis.location.hash = `#nostr_signer=${first}.${'e'.repeat(64)}`;
+  const answer = sessionModule.resumeAmber();
+  assert.equal(answer?.action, 'login', 'the answer names the attempt it belongs to');
+  assert.equal(sessionModule.getNostrSession().pubkey, 'e'.repeat(64));
+
+  // However often the reader taps, the stored history stays bounded instead of growing.
+  for (let attempt = 0; attempt < 10; attempt += 1) sessionModule.beginAmberLogin();
+  const parked = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key?.startsWith('satoshi:nostr:amber:')) parked.push(key);
+  }
+  assert.ok(parked.length <= 5, `four kept attempts plus the latest, not ${parked.length}`);
+});

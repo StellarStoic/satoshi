@@ -4,6 +4,10 @@ const ANONYMOUS_KEY = 'satoshi:nostr:anonymous:v1';
 const PREVIOUS_SESSION_KEY = 'satoshi:nostr:previous-session:v1';
 const AMBER_PREFIX = 'satoshi:nostr:amber:';
 const AMBER_MAX_AGE = 30 * 60 * 1000;
+// How many unanswered requests of one action stay readable. Android decides which attempt's
+// answer arrives, and it is not always the newest one, so a retry must not erase the attempt
+// that is still on its way back.
+const AMBER_KEPT_REQUESTS = 4;
 const AMBER_RESULT_PARAM = 'nostr_signer_result';
 const AMBER_ID_PARAM = 'nostr_signer_id';
 const AMBER_CALLBACK_PARAM = 'nostr_signer';
@@ -134,15 +138,24 @@ function openAmber(type, payload, id, options = {}) {
 }
 
 function parkAmberRequest(id, state) {
-  // A retry supersedes an unanswered request of the same kind. Keeping old requests around
-  // makes a later visibility event report the wrong attempt and can leave the UI "Connecting".
+  // A retry must not invalidate an attempt the signer has already finished: Android decides
+  // which answer arrives, and not always the newest one. Keep a bounded history of this
+  // action's requests so a late answer still finds its record, and let the newest one be what
+  // the page reports as in flight.
+  const sameAction = [];
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const key = localStorage.key(index);
     if (!key?.startsWith(AMBER_PREFIX)) continue;
     const parked = readJson(localStorage, key);
     const expired = !parked || !Number.isFinite(parked.createdAt) || Date.now() - parked.createdAt > AMBER_MAX_AGE;
-    if (expired || parked.action === state.action) localStorage.removeItem(key);
+    if (expired) {
+      localStorage.removeItem(key);
+      continue;
+    }
+    if (parked.action === state.action) sameAction.push({key, createdAt: parked.createdAt});
   }
+  sameAction.sort((left, right) => right.createdAt - left.createdAt);
+  sameAction.slice(AMBER_KEPT_REQUESTS).forEach(item => localStorage.removeItem(item.key));
   localStorage.setItem(AMBER_PREFIX + id, JSON.stringify({
     ...state,
     createdAt: Date.now(),
