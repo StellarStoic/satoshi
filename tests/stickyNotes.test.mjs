@@ -1665,3 +1665,29 @@ test('the paint follows the width of the image that loaded, and its catalogue ti
     'the pattern follows the tile its catalogue entry names');
   assert.match(script, /BOARD_TEXTURES\.find\(entry => entry\.url === boardTextureSource\(\)\)/);
 });
+
+test('the board lands on the device pixel grid so its texture and text stop crawling', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  const paint = script.slice(script.indexOf('function paintBoardTransform('), script.indexOf('function applyBoardTransform('));
+  // A fractional offset or scale resamples the pattern and the note text differently on every frame,
+  // which a reader sees as shimmer and wobble while the board moves.
+  assert.match(paint, /x: onDeviceGrid\(boardView\.x, ratio\)/,
+    'the pan offset lands on whole device pixels');
+  assert.match(paint, /y: onDeviceGrid\(boardView\.y, ratio\)/);
+  assert.match(script, /function onDeviceGrid\(value, ratio\) \{\s*return Math\.round\(value \* ratio\) \/ ratio;/,
+    'and that grid is the device pixel, not the CSS pixel');
+  assert.match(paint, /boardTextureTile\(texture\)/,
+    'the zoom is quantised against the pattern tile that is on the board');
+  assert.match(paint, /Math\.round\(boardView\.scale \* unit\) \/ unit/,
+    'the scale keeps one pattern tile on a whole number of device pixels');
+  // A 3D rendering context buys nothing here and sends the layer down another rasterisation path.
+  assert.doesNotMatch(css, /transform-style:\s*preserve-3d/);
+  // Button and fit zooms are composited, and never while a finger is driving the board.
+  assert.match(css, /\.sticky-board\.is-zooming \.sticky-canvas \{ transition: transform/);
+  assert.match(script, /function animateBoardZoom\(\) \{[\s\S]{0,140}if \(!boardSettled\) return;/,
+    'the first fit is not animated');
+  assert.match(script, /elements\.board\.classList\.add\('is-zooming'\)/);
+});

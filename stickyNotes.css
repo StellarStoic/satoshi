@@ -34,7 +34,11 @@
 /* The board itself: a bounded bitmap inside the transformed element (see stickyNotes.mjs). Its width
    and height are set from the board's own coordinate space at runtime, so it covers the board exactly. */
 .board-paint { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; display: block; }
-.sticky-board.is-panning .sticky-canvas { will-change: transform; backface-visibility: hidden; transform-style: preserve-3d; }
+.sticky-board.is-panning .sticky-canvas { will-change: transform; backface-visibility: hidden; }
+/* A zoom from the buttons or the fit action is a single jump of the whole layer: a short transition
+   lets the compositor scale what is already rasterised rather than rebuilding it in one frame.
+   Scoped to this class so a gesture never lags behind the finger. */
+.sticky-board.is-zooming .sticky-canvas { transition: transform .18s ease-out; }
 /* A wooden rail around the board, sitting outside the board so no note is ever
    covered by it. It lives inside the transformed canvas, so it pans and zooms
    with the board; --board-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so

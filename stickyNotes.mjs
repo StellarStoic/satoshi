@@ -1276,8 +1276,44 @@ function clampViewToBoard(rect) {
   boardView.y = clamped.y;
 }
 
+let boardSettled = false;
+let boardZoomTimer = 0;
+
+/** A value on a grid of whole device pixels (at dpr 3, a third of a CSS pixel). */
+function onDeviceGrid(value, ratio) {
+  return Math.round(value * ratio) / ratio;
+}
+
+/**
+ * Programmatic zooms - the buttons and the fit action - move the whole layer in one jump. Handing
+ * that to the compositor as a short transition scales what is already rasterised instead of making
+ * the browser build the layer at the new scale inside a single frame, which on a phone is the flash
+ * a reader notices. Scoped to this class so it never applies while a gesture drives the board, and
+ * skipped for the first fit: at boot there is nothing on screen yet, and sliding the board into
+ * place would be the very jolt this avoids.
+ */
+function animateBoardZoom() {
+  if (!boardSettled) return;
+  elements.board.classList.add('is-zooming');
+  clearTimeout(boardZoomTimer);
+  boardZoomTimer = setTimeout(() => elements.board.classList.remove('is-zooming'), 260);
+}
+
 function paintBoardTransform(rect) {
-  elements.canvas.style.transform = `translate3d(${boardView.x}px, ${boardView.y}px, 0) scale(${boardView.scale})`;
+  // What a reader actually sees is this layer's sampling grid, so both halves of the transform are
+  // snapped: the offset to whole device pixels, and the scale so one pattern tile covers a whole
+  // number of them. Otherwise every frame samples the pattern and the note text a little
+  // differently, and the board shimmers, crawls and wobbles as it moves - the glitch that survives
+  // on a phone after the layer is already optimised.
+  const ratio = Math.max(1, devicePixelRatio || 1);
+  const texture = BOARD_TEXTURES.find(entry => entry.url === boardTextureSource());
+  const unit = ratio * (boardTextureTile(texture) || 600);
+  const next = {
+    x: onDeviceGrid(boardView.x, ratio),
+    y: onDeviceGrid(boardView.y, ratio),
+    scale: Math.round(boardView.scale * unit) / unit,
+  };
+  elements.canvas.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) scale(${next.scale})`;
   boardViewport = {width: rect.width, height: rect.height};
   scheduleBoardPaint();
 }
@@ -1464,6 +1500,10 @@ function fillBoard() {
   )));
   boardView.x = (rect.width - boardSize.width * boardView.scale) / 2;
   boardView.y = (rect.height - boardSize.height * boardView.scale) / 2;
+  // Before the transform this fit is about to apply, so the transition is in place for it; the
+  // first fit runs with boardSettled still false and is therefore not animated.
+  animateBoardZoom();
+  boardSettled = true;
   applyBoardTransform(rect);
 }
 
@@ -1477,7 +1517,10 @@ function setZoom(nextScale, clientX = innerWidth / 2, clientY = innerHeight / 2,
   boardView.x = pointX - worldX * boardView.scale;
   boardView.y = pointY - worldY * boardView.scale;
   if (deferred) scheduleBoardTransform(rect);
-  else applyBoardTransform(rect);
+  else {
+    animateBoardZoom();
+    applyBoardTransform(rect);
+  }
 }
 
 function clearRevealedFilteredNote() {
