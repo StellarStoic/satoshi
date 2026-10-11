@@ -24,8 +24,16 @@
    it back as empty tiles, which on a phone reads as blank squares the size of the cork tile,
    right where the whole board is in view at low zoom. Promote it only while a gesture is
    actually running, which is when the hint buys anything, and leave it an ordinary painted
-   element at rest. */
-.sticky-canvas { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; transform-origin: 0 0; background-color:#b98b63; background-image:url('/img/cork-board.png'); background-repeat:repeat; background-size:600px 600px; }
+   element at rest. Its contents are cheap to promote now that the cork is a bounded bitmap rather
+   than a texture the compositor has to produce at device resolution. */
+/* The board element carries no texture of its own any more. A repeating background image here has
+   to be produced at device resolution whenever the whole board is in view - 6144px on a 3x phone -
+   and comes back from the browser with parts of it empty. The colour stays as the floor under the
+   canvas, so a canvas that cannot paint shows cork rather than black. */
+.sticky-canvas { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; transform-origin: 0 0; background-color:#b98b63; }
+/* The cork itself: a bounded bitmap inside the transformed element (see stickyNotes.mjs). Its width
+   and height are set from the board's own coordinate space at runtime, so it covers the board exactly. */
+.cork-paint { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; display: block; }
 .sticky-board.is-panning .sticky-canvas { will-change: transform; backface-visibility: hidden; transform-style: preserve-3d; }
 /* A wooden rail around the cork, sitting outside the board so no note is ever
    covered by it. It lives inside the transformed canvas, so it pans and zooms

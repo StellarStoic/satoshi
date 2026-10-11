@@ -40,6 +40,8 @@ import {
   isStickyExpired,
   geohashGridFits,
   geohashCellsForPrecision,
+  corkBitmapSize,
+  corkPatternScale,
   GRID_MIN_CELL_PX,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
@@ -83,6 +85,7 @@ const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   loginConfirmation: document.getElementById('loginConfirmation'),
   corkFrame: document.getElementById('corkFrame'),
+  corkPaint: document.getElementById('corkPaint'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   noteSort: document.getElementById('noteSort'), noteSortDialog: document.getElementById('noteSortDialog'),
   noteViewOptions: document.getElementById('noteViewOptions'), followsOnly: document.getElementById('followsOnly'),
@@ -1251,6 +1254,7 @@ function clampViewToBoard(rect) {
 function paintBoardTransform(rect) {
   elements.canvas.style.transform = `translate3d(${boardView.x}px, ${boardView.y}px, 0) scale(${boardView.scale})`;
   boardViewport = {width: rect.width, height: rect.height};
+  scheduleCorkPaint();
 }
 
 function applyBoardTransform(rect = elements.board.getBoundingClientRect()) {
@@ -1277,10 +1281,59 @@ function scheduleBoardTransform(rect) {
   });
 }
 
+/**
+ * The cork is a pattern drawn into a canvas of its own, not a tiled background on the board. A 2048px
+ * element with a repeating texture has to be produced at device resolution whenever the whole board is
+ * in view, which on a phone means a 6144px texture - past what the GPU will hold - so the browser hands
+ * parts of it back empty, and a reader sees blank squares the size of the cork tile. A canvas has a
+ * bitmap whose size we choose (corkBitmapSize), so the texture stays inside every limit and the pattern
+ * is drawn into it once per size. The canvas sits inside the transformed element, so the cork still
+ * scales, pans and stays aligned with the notes.
+ */
+const cork = {image: null, ready: false, timer: 0};
+
+function loadCorkImage() {
+  const image = new Image();
+  image.decoding = 'async';
+  image.addEventListener('load', () => { cork.image = image; cork.ready = true; paintCork(); }, {once: true});
+  image.src = '/img/cork-board.png';
+}
+
+function paintCork() {
+  const canvas = elements.corkPaint;
+  if (!canvas || !cork.ready) return;
+  const side = corkBitmapSize(boardView.scale, devicePixelRatio || 1, boardSize.width);
+  if (canvas.width === side && canvas.dataset.painted === '1') return;
+  canvas.width = side;              // setting the size also clears the bitmap
+  canvas.height = side;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const pattern = context.createPattern(cork.image, 'repeat');
+  if (!pattern) return;
+  const scale = corkPatternScale(side, boardSize.width);
+  context.imageSmoothingQuality = 'high';
+  context.scale(scale, scale);
+  context.fillStyle = pattern;
+  // filled in the pattern's own coordinates: the whole board, once scaled
+  context.fillRect(0, 0, Math.ceil(side / scale), Math.ceil(side / scale));
+  canvas.dataset.painted = '1';
+}
+
+function scheduleCorkPaint() {
+  // A pinch changes the scale every frame and only the settled value matters, so the bitmap is
+  // resized once the view stops rather than during the gesture.
+  if (cork.timer) clearTimeout(cork.timer);
+  cork.timer = setTimeout(() => { cork.timer = 0; paintCork(); }, 150);
+}
+
 function applyBoardSize() {
   // Keep the runtime dimensions tied to the same fixed coordinate space as the first CSS paint.
   elements.canvas.style.width = `${boardSize.width}px`;
   elements.canvas.style.height = `${boardSize.height}px`;
+  if (elements.corkPaint) {
+    elements.corkPaint.style.width = `${boardSize.width}px`;
+    elements.corkPaint.style.height = `${boardSize.height}px`;
+  }
 }
 
 function fillBoard() {
@@ -3395,6 +3448,7 @@ window.addEventListener('storage', event => {
   status(elements.boardStatus, flow.message || 'Your note is pinned.');
   elements.boardStatus.hidden = false;
 });
+loadCorkImage();
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 let boardResizeFrame = 0;
 window.addEventListener('resize', () => {

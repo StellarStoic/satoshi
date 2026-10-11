@@ -4,6 +4,12 @@ import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
+  corkBitmapSize,
+  corkPatternScale,
+  CORK_TILE_PX,
+  CORK_IMAGE_PX,
+  CORK_BITMAP_MAX,
+  CORK_BITMAP_MIN,
   geohashCellsForPrecision,
   geohashCellDimensions,
   geohashGridFits,
@@ -411,9 +417,10 @@ test('font dropdown previews the three note typefaces without breaking older not
 });
 
 test('mobile board and note gestures support pinch zoom and two-finger rotation', async () => {
-  const [script, css] = await Promise.all([
+  const [script, css, html] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
   ]);
   assert.match(script, /gesture\.scale \* distance\(\) \/ gesture\.distance/);
   assert.match(script, /rotation: gesture\.placement\.rotation \+ difference/);
@@ -426,10 +433,21 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin'\)[\s\S]{0,180}return;/,
     'ordinary note paper no longer blocks board navigation');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
-  assert.match(css, /url\('\/img\/cork-board\.png'\)/);
-  assert.match(css, /background-repeat:\s*repeat/);
-  assert.match(css, /\.sticky-canvas[^}]+background-image:url\('\/img\/cork-board\.png'\)/,
-    'the cork texture moves with the composited canvas');
+  // The cork is a pattern drawn into a canvas inside the transformed element, not a repeating
+  // background on the 2048px board element. That tiled form has to be produced at device resolution
+  // whenever the whole board is in view - 6144px on a 3x phone - and comes back from the browser with
+  // parts of it empty, which a reader sees as blank squares the size of the cork tile. What matters is
+  // kept: the cork still tiles every 600 board px, still moves with the board, and still sits under
+  // the rail and the notes.
+  assert.match(script, /image\.src = '\/img\/cork-board\.png'/);
+  assert.match(script, /createPattern\(cork\.image, 'repeat'\)/,
+    'the cork is still a repeating pattern, drawn into the canvas');
+  assert.match(html, /<div id="stickyCanvas"[^>]*>\s*<canvas id="corkPaint"/,
+    'the cork canvas is inside the transformed element, so it pans and zooms with the board');
+  assert.doesNotMatch(css, /\.sticky-canvas[^}]+background-image:/,
+    'the board element asks for no board-sized tiled texture');
+  assert.match(css, /\.sticky-canvas[^}]+background-color:\s*#b98b63/,
+    'a canvas that cannot paint shows cork, never black');
   assert.doesNotMatch(script, /backgroundSize = `\$\{600 \* boardView\.scale\}px/);
   assert.doesNotMatch(script, /backgroundPosition = `\$\{boardView\.x\}px \$\{boardView\.y\}px`/);
 });
@@ -1444,4 +1462,41 @@ test('the cell grid is only drawn where a cell can be read and tapped', () => {
   assert.equal(geohashGridFits({cellPixels: 32, columns: 0, rows: 0}), false);
   assert.equal(geohashGridFits({}), false);
   assert.equal(geohashGridFits(), false);
+});
+
+test('the cork bitmap stays inside what a phone will hold, at every zoom', () => {
+  // The shape of the bug: the whole board at a phone's 3x ratio is 2048 * 3 = 6144 a side, 37.7M
+  // pixels, past the textures a mobile GPU will allocate - and the browser answers by returning
+  // parts of it empty. The bitmap is bounded instead of that.
+  assert.equal(corkBitmapSize(1, 3), CORK_BITMAP_MAX, 'a 3x phone at 1:1 is capped, not 6144');
+  assert.equal(corkBitmapSize(2.5, 3), CORK_BITMAP_MAX, 'zoomed in stays capped');
+  assert.equal(corkBitmapSize(50, 4), CORK_BITMAP_MAX, 'and no scale talks it past the cap');
+  // Zoomed out on a phone - the state the blank squares appeared in - gets the floor: a small
+  // texture, the opposite of what the tiled background produced there.
+  assert.equal(corkBitmapSize(0.12, 3), CORK_BITMAP_MIN);
+  assert.equal(corkBitmapSize(0.12, 1), CORK_BITMAP_MIN);
+  // A step, so a continuous pinch does not resize and redraw the bitmap every frame.
+  assert.equal(corkBitmapSize(0.5, 1), 1024);
+  assert.equal(corkBitmapSize(0.5, 1), corkBitmapSize(0.52, 1));
+  // Monotonic, and always inside the bounds.
+  const ladder = [0.12, 0.25, 0.5, 0.6, 1, 1.5, 2.5].map(scale => corkBitmapSize(scale, 1));
+  assert.deepEqual(ladder, [...ladder].sort((a, b) => a - b));
+  assert.ok(ladder.every(side => side <= CORK_BITMAP_MAX && side >= CORK_BITMAP_MIN));
+  // A missing or silly pixel ratio must not produce a broken bitmap.
+  assert.equal(corkBitmapSize(1, 0), 2048);
+  assert.equal(corkBitmapSize(1, undefined), 2048);
+  assert.equal(corkBitmapSize(0, 1), CORK_BITMAP_MIN);
+});
+
+test('the cork tiles every 600 board px, whatever size the bitmap is', () => {
+  // 600 board px per tile from a 400px image: the sheet's background-size: 600px, kept.
+  assert.equal(CORK_TILE_PX, 600);
+  assert.equal(corkPatternScale(2048, 2048), 1.5, 'a 1:1 bitmap draws the 400px image at 600px');
+  assert.equal(corkPatternScale(1024, 2048), 0.75);
+  for (const side of [1024, 1280, 1536, 1792, 2048]) {
+    assert.equal(CORK_IMAGE_PX * corkPatternScale(side, 2048) * (2048 / side), 600,
+      `a ${side}px bitmap still tiles every 600 board px`);
+    assert.equal(CORK_IMAGE_PX * corkPatternScale(side, 2048), 600 * (side / 2048),
+      'the tile lands where the board would put it, measured in bitmap pixels');
+  }
 });
