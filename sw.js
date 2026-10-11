@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v247';   // v247: Pinstr hashtags and live note-expiry countdown
+const CACHE = 'satoshi-static-v248';   // v248: board motion on the device pixel grid, one Amber button with a scanned connect code
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js',
