@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 const root = new URL('../', import.meta.url);
@@ -63,4 +63,31 @@ test('one bad file cannot cost the install, and the panel still finds a time', a
   assert.match(settingsScript, /const updatedAt = usable\(details\.updatedAt\)\s*\n?\s*\|\| usable\(metadata && metadata\.headers\.get\('date'\)\)\s*\n?\s*\|\| await oldestCachedDate\(cache\)/);
   assert.match(settingsScript, /visibilitychange/);
   assert.match(settingsScript, /Date\.parse\(\(response && response\.headers\.get\('date'\)\) \|\| ''\)/);
+});
+
+test('every precached path resolves in the checkout, and the icon font is precached', async () => {
+  // A batch of new CORE entries typed in one go loses a shared prefix or a directory more
+  // easily than it looks, and the failure is a 404 that aborts that file's cache write with
+  // nothing in the UI to say why. Holding the list against the checkout is what makes the
+  // next addition safe (the icon font and its stylesheet moved in-house with Lineicons 5.1).
+  const worker = await read('sw.js');
+  const start = worker.indexOf('const CORE = [');
+  assert.ok(start !== -1, 'CORE list not found in sw.js');
+  const core = worker.slice(start, worker.indexOf('\n];', start));
+  const paths = [...core.matchAll(/'([^']+)'/g)].map(match => match[1]);
+  assert.ok(paths.length > 100, `expected the whole site in CORE, found ${paths.length} paths`);
+
+  const missing = [];
+  for (const path of paths) {
+    if (path === '/') continue;
+    try {
+      await stat(new URL('.' + path, root));
+    } catch {
+      missing.push(path);
+    }
+  }
+  assert.deepEqual(missing, [], 'CORE lists paths that do not exist in the repo');
+
+  assert.match(worker, /'\/vendor\/lineicons\/lineicons\.css'/, 'the icon stylesheet must be precached');
+  assert.match(worker, /'\/vendor\/lineicons\/lineicons-free\.woff2'/, 'the icon font must be precached');
 });

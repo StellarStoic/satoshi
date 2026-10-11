@@ -63,10 +63,10 @@ if (!SENSITIVE_WALLET_PAGE) {
 }
 import('/seo.mjs').catch(error => console.warn('SEO metadata could not be loaded:', error));
 
-if (!document.querySelector('link[href*="lineicons.com"]')) {
+if (!document.querySelector('link[href*="/vendor/lineicons/"]')) {
     const lineIconStyles = document.createElement('link');
     lineIconStyles.rel = 'stylesheet';
-    lineIconStyles.href = 'https://cdn.lineicons.com/5.0/lineicons.css';
+    lineIconStyles.href = '/vendor/lineicons/lineicons.css';
     document.head.append(lineIconStyles);
 }
 if (!document.querySelector('link[href="/siteHelp.css"]')) {

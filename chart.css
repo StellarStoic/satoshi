@@ -98,7 +98,7 @@ button:disabled {
     font-style: italic;
 }
 
-#currentSats .lni-spinner-solid {
+#currentSats .lni-spinner-3 {
     margin-right: 8px;
     color: var(--accent);
 }
@@ -230,7 +230,7 @@ option:checked {
     border: 1px solid var(--accent);
 }
 
-.sats-display .lni-spinner-solid {
+.sats-display .lni-spinner-3 {
     margin-right: 8px;
     animation: spin 1s linear infinite;
 }

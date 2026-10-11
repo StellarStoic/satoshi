@@ -793,7 +793,7 @@ function showAutoLoading(show) {
         isAutoLoading = true;
         if (loadingElement) {
             loadingElement.style.display = 'flex';
-            loadingElement.innerHTML = '<i class="lni lni-spinner-solid spinning"></i> Loading...';
+            loadingElement.innerHTML = '<i class="lni lni-spinner-3 spinning"></i> Loading...';
         }
     } else {
         isAutoLoading = false;
@@ -903,7 +903,7 @@ function showSnapshotFeedback() {
     const originalHtml = button.innerHTML;
     
     // Visual feedback
-    button.innerHTML = '<i class="lni lni-checkmark-circle"></i> Snapshot Saved!';
+    button.innerHTML = '<i class="lni lni-check-circle-1"></i> Snapshot Saved!';
     button.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
     
     // Show notification
@@ -1226,9 +1226,9 @@ function showLoading(show) {
     if (button) {
         button.disabled = show;
         if (show) {
-            button.innerHTML = '<i class="lni lni-spinner-solid spinning"></i> Loading...';
+            button.innerHTML = '<i class="lni lni-spinner-3 spinning"></i> Loading...';
         } else {
-            button.innerHTML = '<i class="lni lni-camera"></i> Take Snapshot';
+            button.innerHTML = '<i class="lni lni-camera-1"></i> Take Snapshot';
         }
     }
 }
@@ -1469,8 +1469,8 @@ function updateSatsDisplay(currency, satsPerFiat, btcFiatPrice) {
 //     if (button) {
 //         button.disabled = show;
 //         button.innerHTML = show ? 
-//             '<i class="lni lni-spinner-solid spinning"></i> Loading...' : 
-//                         '<i class="lni lni-camera"></i> <span class="button-text">Take Snapshot</span>';
+//             '<i class="lni lni-spinner-3 spinning"></i> Loading...' : 
+//                         '<i class="lni lni-camera-1"></i> <span class="button-text">Take Snapshot</span>';
 //     }
     
 //     if (loadingElement) {

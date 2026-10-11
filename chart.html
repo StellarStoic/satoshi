@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="chart.css">
-    <link href="https://cdn.lineicons.com/5.0/lineicons.css" rel="stylesheet"> <!--this might needed to be updated in the future https://lineicons.com/docs/cdn-->
+    <link href="/vendor/lineicons/lineicons.css" rel="stylesheet"> <!--this might needed to be updated in the future https://lineicons.com/docs/cdn-->
 
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -258,7 +258,7 @@
             </div>
             
             <button onclick="takeSnapshot()" class="snapshot-btn">
-                <i class="lni lni-camera"></i> Take Snapshot
+                <i class="lni lni-camera-1"></i> Take Snapshot
             </button>
             <button onclick="showExportModal()" style="background: #4CAF50;">Export Data</button>            
         </div>
@@ -273,7 +273,7 @@
         
         <div class="chart-wrapper">
             <div id="loading" class="loading" style="display: none;">
-                <i class="lni lni-spinner-solid spinning"></i> Loading chart data...
+                <i class="lni lni-spinner-3 spinning"></i> Loading chart data...
             </div>
             <canvas id="priceChart"></canvas>
             <!-- 🎯 Zoom Reset Button -->
@@ -319,12 +319,12 @@
                 <p>Choose export format:</p>
                 <div class="export-options">
                     <button class="export-option-btn csv-option" onclick="exportDataAs('csv')">
-                        <i class="lni lni-spreadsheet"></i>
+                        <i class="lni lni-bar-chart-4"></i>
                         <span>CSV Format</span>
                         <small>Spreadsheet compatible • Calculating...</small>
                     </button>
                     <button class="export-option-btn json-option" onclick="exportDataAs('json')">
-                        <i class="lni lni-json"></i>
+                        <i class="lni lni-code-1"></i>
                         <span>JSON Format</span>
                         <small>For developers & APIs • Calculating...</small>
                     </button>
