@@ -17,6 +17,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   LINK_DISPLAY_MAX,
   linkDisplay,
   linkHref,
+  boardPlateFontSize,
   linkMatches,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
@@ -1722,4 +1723,61 @@ test('one Amber button, with the hand-over in a dialog and a code for desktops',
     'a code that is closed stops waiting');
   // A reload between the two apps must land on the step that can finish, not on the list of ways in.
   assert.match(script, /if \(dialog === elements\.login && amberClipboardPending\(\)\) \{\s+dialog = elements\.amberDialog;\s+status\(elements\.amberCopyStatus, 'Approve it in Amber,/);
+});
+
+test('the board plate is engraved with its own cells, cut to fit, and no deeper ones', async () => {
+  const [markup, script, css, model] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8'),
+  ]);
+
+  // A small plaque: it may not grow to fit a long line of cells.
+  assert.match(script, /const BOARD_PLATE_WIDTH = 620;/);
+  assert.ok(620 <= 2048 / 3, 'the plate stays small against the board it is nailed to');
+  assert.match(css, /\.board-plate \{[^}]*width: 620px/);
+
+  // It belongs to the board: inside the transformed canvas, after the rail, before the notes.
+  const canvas = markup.indexOf('id="stickyCanvas"');
+  const frame = markup.indexOf('class="board-frame"');
+  const plate = markup.indexOf('id="boardPlate"');
+  assert.ok(canvas >= 0 && frame > canvas && plate > frame,
+    'the plate is on the board itself, so it pans and zooms with it');
+  assert.match(markup, /id="boardPlate"[^>]*aria-hidden="true"/, 'the toolbar still carries the accessible label');
+  assert.match(css, /\.board-plate \{[^}]*pointer-events: none/, 'dragging on the plate still moves the board');
+
+  // One size for the whole string, and never bigger than the plate's own type.
+  assert.match(model, /export function boardPlateFontSize\(innerWidth, measuredWidth, maximum\)/);
+  assert.equal(boardPlateFontSize(400, 800, 46), 23);
+  assert.equal(boardPlateFontSize(400, 100, 46), 46, 'a short line is not blown up past the plate type');
+  assert.equal(boardPlateFontSize(0, 800, 46), 46, 'an unmeasurable plate leaves the type alone');
+  assert.equal(boardPlateFontSize(400, 0, 46), 46);
+  // The engraving follows the board's cells, with a nail head between them...
+  const render = script.slice(script.indexOf('function renderBoardPlate()'), script.indexOf('function selectBoard('));
+  // The line is cut down until it is inside the plate rather than measured once: the gaps and nail
+  // heads are in em and do not divide out exactly, so a single pass landed a few percent over.
+  assert.match(render, /for \(let pass = 0; pass < 4; pass \+= 1\)/);
+  assert.match(render, /if \(!\(width > 0\) \|\| width <= target\) break;/);
+  assert.match(render, /boardPlateFontSize\(target, width, size\)/);
+  assert.match(render, /const target = Math\.max\(1, inner - BOARD_PLATE_INSET\)/,
+    'the engraving stops just inside the plate, where layout rounding cannot push it over the edge');
+  assert.match(render, /activeGeohashes\.join\(','\)/, 'the plate follows the cells the board covers');
+  assert.match(render, /if \(index\) parts\.push\(nailHead\(\)\)/, 'two cells are separated by a nail head');
+  assert.match(css, /\.board-plate__nail \{[^}]*width: \.34em/, 'and that nail is cut down with the letters');
+  // ...and never the deeper cells a filter can reveal, which are notes from inside it, not places.
+  assert.doesNotMatch(render, /\b(boardDepth|reach|deeper|child|children|layers?)\b/i,
+    'the plate names the board, not the layers of notes showing on it');
+  // Panning and zooming must not re-engrave the plate on every frame.
+  assert.match(render, /if \(signature === boardPlateLine\) return;/);
+  assert.match(script, /boardAppliedScale = next\.scale;\s*\n\s*renderBoardPlate\(\);/,
+    'the plate is measured through the transform it sits in');
+});
+
+test('the board plate separator and the plate itself are styled as metal, not as text', async () => {
+  const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  assert.match(css, /\.board-plate__cell \{[^}]*text-shadow: 0 1px rgba\(255, 248, 220, \.55\)/,
+    'the letters are cut into the metal, with the light catching the lower edge');
+  assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'the plate is a slab of aged brass');
+  assert.match(css, /\.board-plate\[hidden\] \{ display: none; \}/, 'a board with no cells shows no plate');
 });

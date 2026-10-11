@@ -1021,3 +1021,14 @@ export function boardTextureLabel(url) {
   if (!file) return parsed.host || 'That pattern';
   return parsed.host === 'satoshi.si' ? file : `${file} on ${parsed.host}`;
 }
+
+
+/**
+ * The engraved line on the board's plate is one size for the whole string. The plate is a small,
+ * fixed plaque, so the cells are set as large as they go and then cut down together until the line
+ * fits: a board covering more cells gets smaller letters, never a bigger plate.
+ */
+export function boardPlateFontSize(innerWidth, measuredWidth, maximum) {
+  if (!(innerWidth > 0) || !(measuredWidth > 0)) return maximum;
+  return Math.min(maximum, maximum * (innerWidth / measuredWidth));
+}

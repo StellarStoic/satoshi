@@ -49,7 +49,8 @@ import {
   DEFAULT_BOARD_TEXTURE_URL,
   boardTextureUrl,
   boardTextureLabel,
-  boardTextureTile,} from './stickyNotesModel.mjs';
+  boardTextureTile,
+  boardPlateFontSize,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -162,6 +163,8 @@ const elements = {
   nostrConnectUri: document.getElementById('nostrConnectUri'),
   nostrConnectCopy: document.getElementById('nostrConnectCopy'),
   nostrConnectStatus: document.getElementById('nostrConnectStatus'),
+  boardPlate: document.getElementById('boardPlate'),
+  boardPlateLine: document.getElementById('boardPlateLine'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
@@ -292,6 +295,14 @@ let boardViewport = null;
 // The wooden rail around the board, in board pixels. The rail sits outside the board,
 // so it never covers a note.
 const BOARD_FRAME_WIDTH = 26;
+// The plate on the bottom rail: a fixed, small plaque. Its width is what the engraved line has to fit
+// inside, so it is stated once here and the type is cut to it.
+const BOARD_PLATE_WIDTH = 620;
+const BOARD_PLATE_TYPE_MAX = 46;
+// A hair of brass left at each end of the engraving. The line is measured once and then the board is
+// free to be zoomed, and the browser rounds a row of letters and nail heads to device pixels slightly
+// differently at each scale - so the type is cut a little inside the plate rather than exactly to it.
+const BOARD_PLATE_INSET = 10;
 // Opening a board should feel like standing in front of it, not looking at a thumbnail.
 // Covering the viewport leaves board beneath every edge while keeping the selected area centred.
 const BOARD_OPEN_COVER = 1.02;
@@ -1319,6 +1330,66 @@ function updateBoardControl() {
   elements.openBoard.title = label;
 }
 
+let boardAppliedScale = 1;
+let boardPlateLine = '';
+
+/** The head of a nail, holding two cells apart on the plate. */
+function nailHead() {
+  const nail = document.createElement('span');
+  nail.className = 'board-plate__nail';
+  return nail;
+}
+
+/**
+ * Engrave the board's own cells on the plate.
+ *
+ * Only the cells this board was opened for. A filter that reveals cells further inside it is showing
+ * notes that are pinned within the place, not other places this board is, so nothing about that
+ * belongs on the plate: it names the board and stops there.
+ * is measured once at full size and then cut down so that the whole string fits the plaque at one
+ * size; panning and zooming never change what is engraved, only how large it is on screen.
+ */
+function renderBoardPlate() {
+  const plate = elements.boardPlate;
+  const line = elements.boardPlateLine;
+  if (!plate || !line) return;
+  const signature = activeGeohashes.join(',');
+  if (signature === boardPlateLine) return;
+  boardPlateLine = signature;
+  plate.hidden = !activeGeohashes.length;
+  if (!activeGeohashes.length) {
+    line.replaceChildren();
+    return;
+  }
+  line.replaceChildren(...activeGeohashes.flatMap((cell, index) => {
+    const parts = [];
+    if (index) parts.push(nailHead());
+    const engraved = document.createElement('span');
+    engraved.className = 'board-plate__cell';
+    engraved.textContent = cell;
+    parts.push(engraved);
+    return parts;
+  }));
+  const style = getComputedStyle(plate);
+  const inner = plate.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const target = Math.max(1, inner - BOARD_PLATE_INSET);
+  // Set as large as the plate will ever carry, then cut down until the whole line is inside it. One
+  // pass gets close; the line's own gaps and nail heads are in em and do not divide out perfectly, so
+  // the measurement is repeated until it fits rather than trusted once. This runs when the plate is
+  // re-engraved - not while the board is panned or zoomed, where the size in board pixels stands.
+  // Readings come through the board's transform, so each is divided back into board pixels, which is
+  // what the font size is in.
+  let size = BOARD_PLATE_TYPE_MAX;
+  for (let pass = 0; pass < 4; pass += 1) {
+    line.style.fontSize = `${size}px`;
+    const width = line.getBoundingClientRect().width / (boardAppliedScale || 1);
+    if (!(width > 0) || width <= target) break;
+    const next = boardPlateFontSize(target, width, size);
+    if (!(next < size)) break;
+    size = next;
+  }
+}
+
 function selectBoard(geohash, closeDialog = true) {
   if (placingNote) {
     status(elements.boardChooserStatus, 'Pin the current note before changing boards.', true);
@@ -1402,6 +1473,10 @@ function paintBoardTransform(rect) {
     scale: Math.round(boardView.scale * unit) / unit,
   };
   elements.canvas.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) scale(${next.scale})`;
+  // What the plate was measured through. Its font size is in board pixels, so this is only needed
+  // while a new line is being engraved; renderBoardPlate returns at once for everything else.
+  boardAppliedScale = next.scale;
+  renderBoardPlate();
   boardViewport = {width: rect.width, height: rect.height};
   scheduleBoardPaint();
 }
