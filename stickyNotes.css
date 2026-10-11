@@ -17,7 +17,16 @@
 .sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background:transparent; cursor: grab; touch-action: none; }
 .sticky-board.is-panning { cursor: grabbing; }
 /* Every geohash board uses one stable coordinate space; zoom only changes its presentation. */
-.sticky-canvas { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; transform-origin: 0 0; background-color:#b98b63; background-image:url('/img/cork-board.png'); background-repeat:repeat; background-size:600px 600px; will-change: transform; backface-visibility:hidden; transform-style:preserve-3d; }
+/* The cork has to live on the transformed element so it pans and zooms with the board (pinned
+   by tests/stickyNotes.test.mjs). It must not be a PERMANENT composited layer, though: this
+   element is 2048x2048 CSS px, so on a 3x phone the layer is 6144x6144 device pixels — larger
+   than the textures mobile GPUs are willing to allocate — and the browser then hands parts of
+   it back as empty tiles, which on a phone reads as blank squares the size of the cork tile,
+   right where the whole board is in view at low zoom. Promote it only while a gesture is
+   actually running, which is when the hint buys anything, and leave it an ordinary painted
+   element at rest. */
+.sticky-canvas { position: absolute; top: 0; left: 0; width: 2048px; height: 2048px; transform-origin: 0 0; background-color:#b98b63; background-image:url('/img/cork-board.png'); background-repeat:repeat; background-size:600px 600px; }
+.sticky-board.is-panning .sticky-canvas { will-change: transform; backface-visibility: hidden; transform-style: preserve-3d; }
 /* A wooden rail around the cork, sitting outside the board so no note is ever
    covered by it. It lives inside the transformed canvas, so it pans and zooms
    with the board; --cork-frame is set from BOARD_FRAME_WIDTH in stickyNotes.mjs, so
