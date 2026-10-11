@@ -357,3 +357,6 @@
 .board-texture-field { display: flex; flex-direction: column; gap: 4px; }
 .board-texture-field input { width: 100%; }
 .board-texture-note { margin: 0; font-size: 12px; opacity: .75; }
+
+/* The clipboard route back from Amber: a full-width action under the login methods. */
+.amber-paste { width: 100%; margin-top: 10px; }

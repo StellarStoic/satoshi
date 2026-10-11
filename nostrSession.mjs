@@ -10,6 +10,14 @@ const AMBER_MAX_AGE = 30 * 60 * 1000;
 const AMBER_KEPT_REQUESTS = 4;
 const AMBER_RESULT_PARAM = 'nostr_signer_result';
 const AMBER_ID_PARAM = 'nostr_signer_id';
+/**
+ * Where a signer's answer may sit. Our own callback ends with `nostr_signer=<id>.`, which is read
+ * first; the rest are the names NIP-55 documents and the ones signers use in practice, because
+ * the spec leaves that choice to the signer.
+ */
+const AMBER_RESULT_PARAMS = ['nostr_signer_result', 'result', 'event', 'signature', 'pubkey'];
+const AMBER_ID_PARAMS = ['nostr_signer_id', 'id'];
+const AMBER_REJECTED_PARAMS = ['rejected', 'nostr_signer_rejected'];
 const AMBER_CALLBACK_PARAM = 'nostr_signer';
 export const ANONYMOUS_SESSION_MS = 24 * 60 * 60 * 1000;
 let privateSecret = null;
@@ -163,11 +171,66 @@ function parkAmberRequest(id, state) {
   }));
 }
 
-export function beginAmberLogin() {
+/**
+ * Ask Amber for the identity.
+ *
+ * `copy` sends the request with no callback URL at all, which is the one return path that cannot
+ * be lost between two apps: NIP-55 has a signer given no callback copy the result to the clipboard
+ * instead, and Amber does exactly that. The reader then hands the value back with the button under
+ * the login form.
+ */
+export function beginAmberLogin({copy = false} = {}) {
   if (!/Android/i.test(navigator.userAgent || '')) throw new Error('Amber login is available on Android.');
   const id = randomId();
-  parkAmberRequest(id, {action: 'login'});
+  parkAmberRequest(id, {action: 'login', copy});
+  if (copy) {
+    const params = new URLSearchParams({type: 'get_public_key', appName: 'satoshi.si'});
+    location.assign(`nostrsigner:?${params.toString()}`);
+    return;
+  }
   openAmber('get_public_key', '', id, {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])});
+}
+
+/** A login request that was sent without a callback URL is waiting to be handed its value. */
+export function amberClipboardPending() {
+  const newest = pendingAmberRequest();
+  return Boolean(newest && newest.action === 'login' && newest.copy);
+}
+
+/**
+ * Take the value Amber copied, for a request sent with no callback URL. The request that is still
+ * parked decides what is being handed over, never what the clipboard happens to hold.
+ */
+export async function adoptAmberClipboard() {
+  const parked = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(AMBER_PREFIX)) continue;
+    const state = readJson(localStorage, key);
+    if (!state || !Number.isFinite(state.createdAt) || Date.now() - state.createdAt > AMBER_MAX_AGE) continue;
+    parked.push({key, state});
+  }
+  parked.sort((left, right) => right.state.createdAt - left.state.createdAt);
+  const waiting = parked[0];
+  if (!waiting) throw new Error('Nothing is waiting for Amber. Start the sign-in again.');
+  if (waiting.state.action !== 'login') throw new Error('That request is not a sign-in. Start the sign-in again.');
+  if (!navigator.clipboard?.readText) {
+    throw new Error('This browser will not let the page read the clipboard. Paste the key into the private key field instead.');
+  }
+  let text = '';
+  try {
+    text = (await navigator.clipboard.readText()) || '';
+  } catch {
+    throw new Error('The browser refused to read the clipboard. Tap again and allow it.');
+  }
+  const pubkey = text.trim().toLowerCase();
+  if (!pubkey) throw new Error('The clipboard is empty. In Amber, copy the key it offered, then tap again.');
+  if (!/^[0-9a-f]{64}$/.test(pubkey)) {
+    throw new Error('That is not a public key. In Amber, copy the key it offered, then tap again.');
+  }
+  const session = saveSession(pubkey, 'amber');
+  localStorage.removeItem(waiting.key);
+  return {action: 'login', session};
 }
 
 export function beginAmberSigning(template, context = null) {
@@ -202,39 +265,91 @@ export function pendingAmberRequest() {
   return newest;
 }
 
-export function resumeAmber() {
-  const params = new URLSearchParams(location.search);
-  const fragment = location.hash.match(/^#nostr_signer=([a-z0-9-]+)\.(.*)$/i);
-  const callback = params.get(AMBER_CALLBACK_PARAM) || '';
-  const separator = callback.indexOf('.');
-  const callbackId = separator > 0 ? callback.slice(0, separator) : '';
-  const callbackResult = separator > 0 ? callback.slice(separator + 1) : '';
-  let id = callbackId || fragment?.[1] || params.get(AMBER_ID_PARAM) || '';
-  let result = callbackResult || fragment?.[2] || params.get(AMBER_RESULT_PARAM) || '';
+/** The requests this browser has in flight; an answer is matched against one of them. */
+function parkedAmberRequestIds() {
+  const ids = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(AMBER_PREFIX)) ids.push(key.slice(AMBER_PREFIX.length));
+  }
+  return ids;
+}
 
-  // Recover callbacks issued by the previous build. Amber truncated that callback at its
-  // embedded `&`, then appended the result directly to the id value.
-  if (id && !result) {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (!key?.startsWith(AMBER_PREFIX)) continue;
-      const pendingId = key.slice(AMBER_PREFIX.length);
-      if (id.startsWith(pendingId) && id.length > pendingId.length) {
-        result = id.slice(pendingId.length);
-        id = pendingId;
-        break;
+/**
+ * The answer a signer left in this page's URL, or null.
+ *
+ * NIP-55 promises only that the signer "appends the result" to the callbackUrl, so the parameter
+ * name is the signer's choice: the value may follow our own `nostr_signer=<id>.` in the fragment,
+ * sit in a documented name like `result`, or arrive beside an echoed `id`. An id is only accepted
+ * when it matches a request this page parked, which is what keeps an answer from a stale tab out.
+ */
+function amberReturn() {
+  const chunks = [location.search.replace(/^\?/, ''), location.hash.replace(/^#/, '')].filter(Boolean);
+  const pairs = chunks.flatMap(chunk => [...new URLSearchParams(chunk)]).filter(([, value]) => value);
+  const parked = parkedAmberRequestIds();
+  // Every parameter the answer was read from is recorded, so the page can take the answer out of
+  // its own URL afterwards instead of reading the same one again on the next load.
+  const used = [];
+  const read = names => {
+    for (const name of names) {
+      const found = pairs.find(([key]) => key === name);
+      if (found) {
+        used.push(name);
+        return found[1];
       }
     }
+    return '';
+  };
+  const rejected = /^(true|1)$/i.test(read(AMBER_REJECTED_PARAMS));
+
+  // An id echoed by name, or a parameter whose whole value is one of our ids.
+  let id = read(AMBER_ID_PARAMS);
+  if (!parked.includes(id)) id = parked.find(candidate => pairs.some(([, value]) => value === candidate)) || '';
+  let result = '';
+  for (const [name, value] of pairs) {
+    const match = parked.find(candidate => value.startsWith(candidate));
+    if (!match) continue;
+    used.push(name);
+    id = match;
+    // What the signer appended behind our own parameter: `#nostr_signer=<id>.<key>`. Callbacks
+    // from the previous build, whose id carried the result glued on, land here too.
+    result = value.slice(match.length).replace(/^[.:]/, '');
+    if (result) break;
   }
-  if (!id || !result) return null;
+  // An id may also sit anywhere in the URL, matched against the requests in flight.
+  if (!id) id = parked.find(candidate => location.href.includes(candidate)) || '';
+  if (!result) result = read(AMBER_RESULT_PARAMS);
+  // A signer that rebuilt the callback URL rather than appending to it leaves the value with no id
+  // to match on at all. With exactly one request in flight the answer can only belong to it.
+  if (!id && parked.length === 1 && (result || rejected)) id = parked[0];
+  if (!id) return null;
+  if (!result && !rejected) return null;
+  return {id, result, rejected, used};
+}
+
+export function resumeAmber() {
+  const params = new URLSearchParams(location.search);
+  const answer = amberReturn();
+  if (!answer) return null;
+  const id = answer.id;
+  let result = answer.result;
   const key = AMBER_PREFIX + id;
   const state = readJson(localStorage, key);
   if (!state || Date.now() - state.createdAt > AMBER_MAX_AGE) throw new Error('The Amber request expired. Please try again.');
+  if (answer.rejected) {
+    localStorage.removeItem(key);
+    throw new Error(state.action === 'login'
+      ? 'Amber refused that request, so nothing was signed in. Try again and approve it in Amber.'
+      : 'Amber refused that signature. Your note is still here - pin it again.');
+  }
   // Restore the board URL that was open before Android took over. The callback itself cannot
   // carry a query string because of Amber's parser, so it is parked with the request instead.
   params.delete(AMBER_CALLBACK_PARAM);
   params.delete(AMBER_ID_PARAM);
   params.delete(AMBER_RESULT_PARAM);
+  // Whatever name the signer chose carries the answer, and leaving it in the URL would let the
+  // next load read the same spent answer again.
+  answer.used.forEach(name => params.delete(name));
   const fallbackPath = `${location.pathname}${params.size ? `?${params}` : ''}`;
   const returnPath = typeof state.returnPath === 'string' && /^\/[\w./~%-]*(?:\?[^#]*)?$/.test(state.returnPath)
     ? state.returnPath
@@ -243,7 +358,11 @@ export function resumeAmber() {
   try { result = decodeURIComponent(result); } catch {}
   if (state.action === 'login') {
     const pubkey = result.trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(pubkey)) throw new Error('Amber returned an invalid public key.');
+    if (!/^[0-9a-f]{64}$/.test(pubkey)) {
+      throw new Error(result.trim()
+        ? 'Amber did not return a usable key. Try again, or use the key Amber copies to the clipboard.'
+        : 'Amber came back without a key. Try again, or use the key Amber copies to the clipboard.');
+    }
     const session = saveSession(pubkey, 'amber');
     localStorage.removeItem(key);
     return {action: 'login', session};

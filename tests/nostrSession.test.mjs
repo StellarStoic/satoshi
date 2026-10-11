@@ -279,3 +279,87 @@ test('a retry keeps the record of the attempt the signer actually finishes', asy
   }
   assert.ok(parked.length <= 5, `four kept attempts plus the latest, not ${parked.length}`);
 });
+
+
+test('an answer is read wherever a signer puts it, and a refusal is reported as one', async () => {
+  // NIP-55 has the signer append its result to the callbackUrl without fixing the parameter name,
+  // so every shape a real signer produces has to be read - and a refusal is not a broken key.
+  const shapes = [
+    {label: 'a callback ending in a bare parameter name', search: pubkey => `?result=${pubkey}`},
+    {label: 'a result beside an echoed id', search: pubkey => `?id=req9&result=${pubkey}`},
+    {label: 'our own concatenated query', search: pubkey => `?nostr_signer=req9.${pubkey}`},
+    {label: 'a result glued onto the id', search: pubkey => `?nostr_signer_id=req9${pubkey}`},
+    {label: 'the concatenated fragment our callback produces', hash: pubkey => `#nostr_signer=req9.${pubkey}`},
+  ];
+  for (const shape of shapes) {
+    const pubkey = 'c'.repeat(64);
+    const storage = memoryStorage();
+    const replaced = [];
+    storage.setItem('satoshi:nostr:amber:req9', JSON.stringify({createdAt: Date.now(), action: 'login'}));
+    globalThis.localStorage = storage;
+    globalThis.history = {replaceState: (...args) => replaced.push(args[2])};
+    globalThis.location = {
+      search: shape.search ? shape.search(pubkey) : '',
+      hash: shape.hash ? shape.hash(pubkey) : '',
+      pathname: '/stickyNotes.html', href: '',
+    };
+    globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+
+    const sessionModule = await import(`../nostrSession.mjs?amber-shape=${Date.now()}-${Math.random()}`);
+    const answer = sessionModule.resumeAmber();
+    assert.equal(answer?.session.pubkey, pubkey, shape.label);
+    assert.equal(storage.getItem('satoshi:nostr:amber:req9'), null, `the request is spent: ${shape.label}`);
+    assert.equal(/[?&](result|id|signature|pubkey|event|nostr_signer)=/.test(replaced[0] || ''), false,
+      `the spent answer is taken out of the URL, whatever it was called: ${shape.label}`);
+  }
+});
+
+test('a refusal in the signer is reported as a refusal', async () => {
+  const storage = memoryStorage();
+  storage.setItem('satoshi:nostr:amber:req9', JSON.stringify({createdAt: Date.now(), action: 'login'}));
+  globalThis.localStorage = storage;
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {search: '?id=req9&rejected=true', hash: '', pathname: '/stickyNotes.html', href: ''};
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-rejected=${Date.now()}`);
+  assert.throws(() => sessionModule.resumeAmber(), /refused/);
+  assert.equal(storage.getItem('satoshi:nostr:amber:req9'), null, 'a refusal does not leave the request hanging');
+  assert.equal(sessionModule.getNostrSession(), null, 'a refusal is not a login');
+});
+
+test('a request sent with no callback can be finished from what Amber copied', async () => {
+  const storage = memoryStorage();
+  const assigned = [];
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    assign: value => assigned.push(value),
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+  const copied = {text: ''};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => copied.text}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-clipboard=${Date.now()}`);
+  sessionModule.beginAmberLogin({copy: true});
+  assert.equal(assigned.length, 1, 'the request opens Amber');
+  assert.equal(new URL(assigned[0]).searchParams.has('callbackUrl'), false,
+    'no callback is sent, which is what makes the signer copy the result instead');
+  assert.equal(new URL(assigned[0]).searchParams.get('type'), 'get_public_key');
+  assert.equal(sessionModule.amberClipboardPending(), true, 'the page knows to offer the button');
+
+  copied.text = 'not a key at all';
+  await assert.rejects(() => sessionModule.adoptAmberClipboard(), /not a public key/);
+  assert.equal(sessionModule.getNostrSession(), null, 'junk in the clipboard is not a login');
+
+  copied.text = `${'D'.repeat(64)}\n`;
+  const answer = await sessionModule.adoptAmberClipboard();
+  assert.equal(answer.session.pubkey, 'd'.repeat(64), 'the copied key is read, whatever its case');
+  assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64));
+  assert.equal(sessionModule.amberClipboardPending(), false, 'the request is spent');
+});

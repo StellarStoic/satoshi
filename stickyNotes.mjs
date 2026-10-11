@@ -52,6 +52,8 @@ import {
   boardTextureTile,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
+  adoptAmberClipboard,
+  amberClipboardPending,
   getNostrSession,
   loginAnonymously,
   loginWithBunker,
@@ -151,6 +153,7 @@ const elements = {
   closePayment: document.getElementById('closeStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   bunkerReconnect: document.getElementById('bunkerReconnect'),
+  amberPaste: document.getElementById('amberPaste'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
@@ -403,6 +406,9 @@ function showLoginConfirmation(session) {
 }
 
 function showDialog(dialog) {
+  // The clipboard route back from Amber only has something to hand over while such a request is in
+  // flight, and a reload between the two apps must not leave the reader without the way to finish.
+  if (dialog === elements.login) elements.amberPaste.hidden = !amberClipboardPending();
   if (!dialog.open) dialog.showModal();
 }
 
@@ -2572,6 +2578,14 @@ async function handleLogin(method) {
     status(elements.loginStatus, 'Connecting...');
     if (method === 'extension') await loginWithExtension();
     else if (method === 'amber') { beginAmberLogin(); return; }
+    else if (method === 'amber-copy') {
+      // No callback URL is sent, so nothing comes back on its own: the reader returns here and
+      // hands over what Amber copied.
+      beginAmberLogin({copy: true});
+      elements.amberPaste.hidden = false;
+      status(elements.loginStatus, 'Approve it in Amber, then tap the button below.');
+      return;
+    }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
     else if (method === 'bunker-saved') await reconnectBunker();
     else if (method === 'anonymous') loginAnonymously();
@@ -3184,6 +3198,19 @@ elements.account.addEventListener('click', () => {
 elements.closePayment.addEventListener('click', discardInvoice);
 elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
+elements.amberPaste.addEventListener('click', async () => {
+  try {
+    status(elements.loginStatus, 'Reading what Amber copied...');
+    const answer = await adoptAmberClipboard();
+    updateAccount();
+    status(elements.loginStatus, '');
+    elements.amberPaste.hidden = true;
+    elements.login.close();
+    showLoginConfirmation(answer.session);
+  } catch (error) {
+    status(elements.loginStatus, error.message, true);
+  }
+});
 elements.stickySettings.addEventListener('click', openBoardStyle);
 elements.resetBoardTexture.addEventListener('click', () => applyBoardTexture(''));
 elements.boardStyleForm.addEventListener('submit', event => {
@@ -3736,7 +3763,9 @@ if (!signerReturn.applied) {
   // A browser may reload before Android appends the callback. A parked request is therefore
   // still waiting, not a failed login; the reader can retry from the same dialog if needed.
   if (parkedRequest?.action === 'login' && Date.now() - parkedRequest.createdAt < 10 * 60 * 1000) {
-    status(elements.loginStatus, 'Waiting for Amber. Tap Amber again if no answer arrives.');
+    status(elements.loginStatus, parkedRequest.copy
+      ? 'Amber was asked without a callback: approve it, then tap the button below.'
+      : 'Waiting for Amber. Tap Amber again if no answer arrives.');
   }
 }
 // The answer can also arrive with no reload at all: the browser resumes the page it already

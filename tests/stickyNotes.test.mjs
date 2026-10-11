@@ -1142,7 +1142,11 @@ test('a signature that cannot be used says so, and the board does not talk over 
   assert.match(script, /elements\.loginConfirmation\.textContent = `Logged in as \$\{signedInLabel\(session\)\}`/);
   assert.doesNotMatch(script, /Amber returned without an account/);
   assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\.\.\.'\);/);
-  assert.match(script, /status\(elements\.loginStatus, 'Waiting for Amber\. Tap Amber again if no answer arrives\.'\);/);
+  // A sign-in parked with a callback waits for Amber to come back; one sent without a callback
+  // tells the reader what to tap when they return, because nothing will arrive on its own.
+  assert.match(script, /status\(elements\.loginStatus, parkedRequest\.copy/);
+  assert.match(script, /'Amber was asked without a callback: approve it, then tap the button below\.'/);
+  assert.match(script, /'Waiting for Amber\. Tap Amber again if no answer arrives\.'/);
 });
 
 test('the restored board and account dialog cannot trap the reader', async () => {
