@@ -140,9 +140,20 @@ function amberCallback(id) {
   return `${location.origin}${location.pathname}#${AMBER_CALLBACK_PARAM}=${id}.`;
 }
 
+/**
+ * The parameters an Amber intent carries. The app name is stated in this one place: the board's
+ * copy on pinstr.si renames it, and a second copy of the literal is a second thing to rename.
+ * An empty id means no callback URL, which is how the clipboard route asks for its answer.
+ */
+function amberParams(type, id, options = {}) {
+  const params = new URLSearchParams({type, appName: 'satoshi.si'});
+  if (id) params.set('callbackUrl', amberCallback(id));
+  for (const [name, value] of Object.entries(options)) params.set(name, value);
+  return params;
+}
+
 function openAmber(type, payload, id, options = {}) {
-  const params = new URLSearchParams({type, callbackUrl: amberCallback(id), appName: 'satoshi.si', ...options});
-  location.assign(`nostrsigner:${encodeURIComponent(payload)}?${params.toString()}`);
+  location.assign(`nostrsigner:${encodeURIComponent(payload)}?${amberParams(type, id, options).toString()}`);
 }
 
 function parkAmberRequest(id, state) {
@@ -184,8 +195,8 @@ export function beginAmberLogin({copy = false} = {}) {
   const id = randomId();
   parkAmberRequest(id, {action: 'login', copy});
   if (copy) {
-    const params = new URLSearchParams({type: 'get_public_key', appName: 'satoshi.si'});
-    location.assign(`nostrsigner:?${params.toString()}`);
+    // No id, so no callback URL: Amber copies the result to the clipboard instead of returning it.
+    location.assign(`nostrsigner:?${amberParams('get_public_key', '').toString()}`);
     return;
   }
   openAmber('get_public_key', '', id, {permissions: JSON.stringify([{type: 'sign_event', kind: 1}])});
