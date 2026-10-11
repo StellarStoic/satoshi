@@ -1145,7 +1145,13 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // A sign-in parked with a callback waits for Amber to come back; one sent without a callback
   // tells the reader what to tap when they return, because nothing will arrive on its own.
   assert.match(script, /status\(elements\.loginStatus, parkedRequest\.copy/);
-  assert.match(script, /'Amber was asked without a callback: approve it, then tap the button below\.'/);
+  assert.match(script, /'Amber was asked without a callback: approve it, then come back here\.'/);
+  // The clipboard route finishes by itself where the browser allows a read, and falls back to the
+  // button - both are in the resume path, not only in the button's own handler.
+  assert.match(script, /await adoptAmberClipboard\(\{silent: true\}\)/);
+  assert.match(script, /status\(elements\.loginStatus, 'Approve it in Amber, then tap the button below\.'\)/);
+  assert.match(script, /elements\.amberPaste\.hidden = false;/,
+    'a failed automatic read offers the button instead of leaving the reader without a way in');
   assert.match(script, /'Waiting for Amber\. Tap Amber again if no answer arrives\.'/);
 });
 

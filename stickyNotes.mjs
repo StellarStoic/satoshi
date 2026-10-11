@@ -2583,7 +2583,7 @@ async function handleLogin(method) {
       // hands over what Amber copied.
       beginAmberLogin({copy: true});
       elements.amberPaste.hidden = false;
-      status(elements.loginStatus, 'Approve it in Amber, then tap the button below.');
+      status(elements.loginStatus, 'Approve it in Amber, then come back here.');
       return;
     }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
@@ -3764,7 +3764,7 @@ if (!signerReturn.applied) {
   // still waiting, not a failed login; the reader can retry from the same dialog if needed.
   if (parkedRequest?.action === 'login' && Date.now() - parkedRequest.createdAt < 10 * 60 * 1000) {
     status(elements.loginStatus, parkedRequest.copy
-      ? 'Amber was asked without a callback: approve it, then tap the button below.'
+      ? 'Amber was asked without a callback: approve it, then come back here.'
       : 'Waiting for Amber. Tap Amber again if no answer arrives.');
   }
 }
@@ -3781,7 +3781,24 @@ async function resumeExternalFlow() {
       else if (pending?.status === 'paid') syncPlacementWithSession();
     }
     const parked = pendingAmberRequest();
-    if (!signer.applied && !signer.unusable && parked?.action === 'login') {
+    if (!signer.applied && !signer.unusable && parked?.action === 'login' && parked.copy) {
+      // This request has no callback URL, so the signer answers by copying. Reading that needs a
+      // permission this origin may already hold, in which case the sign-in finishes with no tap at
+      // all; where the browser refuses, the button under the form is the way in.
+      const automatic = await adoptAmberClipboard({silent: true});
+      if (automatic?.action === 'login') {
+        updateAccount();
+        status(elements.loginStatus, '');
+        elements.amberPaste.hidden = true;
+        if (elements.login.open) elements.login.close();
+        if (!syncPlacementWithSession()) showLoginConfirmation(automatic.session);
+      } else {
+        // The automatic read did not happen here, so the button that always works is put in front of
+        // the reader now rather than waiting for them to reopen the login dialog.
+        elements.amberPaste.hidden = false;
+        status(elements.loginStatus, 'Approve it in Amber, then tap the button below.');
+      }
+    } else if (!signer.applied && !signer.unusable && parked?.action === 'login') {
       // Android commonly focuses the browser before Amber follows the callback URL. Focus is
       // not a failed sign-in: leave the request parked and let hashchange/pageshow consume the
       // public key when the callback lands.

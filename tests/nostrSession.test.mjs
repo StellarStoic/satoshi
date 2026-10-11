@@ -363,3 +363,69 @@ test('a request sent with no callback can be finished from what Amber copied', a
   assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64));
   assert.equal(sessionModule.amberClipboardPending(), false, 'the request is spent');
 });
+
+
+test('a copied key finishes a no-callback sign-in by itself, but never one copied for something else', async () => {
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '',
+    assign: () => {},
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+  const existing = 'C'.repeat(64);
+  const copied = {text: existing};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => copied.text}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-auto=${Date.now()}`);
+  sessionModule.beginAmberLogin({copy: true});
+  // The fingerprint of what was already there is recorded while the tap is still live.
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(await sessionModule.adoptAmberClipboard({silent: true}), null,
+    'a key that was already on the clipboard is not this signer answer, however valid it looks');
+  assert.equal(sessionModule.getNostrSession(), null);
+  assert.equal(sessionModule.amberClipboardPending(), true, 'the request stays parked for the button');
+
+  copied.text = 'D'.repeat(64);
+  const answer = await sessionModule.adoptAmberClipboard({silent: true});
+  assert.equal(answer?.session.pubkey, 'd'.repeat(64), 'what the signer copied is the answer');
+  assert.equal(sessionModule.getNostrSession().pubkey, 'd'.repeat(64));
+  assert.equal(sessionModule.amberClipboardPending(), false, 'the request is spent');
+
+  // The same value handed over on purpose is accepted: the guard only governs the silent read.
+  sessionModule.beginAmberLogin({copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const deliberate = await sessionModule.adoptAmberClipboard();
+  assert.equal(deliberate?.session.pubkey, 'd'.repeat(64), 'the button takes what is there when asked');
+
+  sessionModule.beginAmberLogin({copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  copied.text = 'not a key either';
+  assert.equal(await sessionModule.adoptAmberClipboard({silent: true}), null, 'junk is ignored in silence');
+  assert.equal(sessionModule.amberClipboardPending(), true, 'and it does not spend the request');
+});
+
+test('the button still works when the browser refuses an automatic read', async () => {
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', assign: () => {}};
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => { throw new Error('NotAllowedError'); }}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-refused=${Date.now()}`);
+  sessionModule.beginAmberLogin({copy: true});
+  assert.equal(await sessionModule.adoptAmberClipboard({silent: true}), null, 'a refused read is silence, not an error');
+  await assert.rejects(() => sessionModule.adoptAmberClipboard(), /refused to read the clipboard/,
+    'the reader who taps the button is told what happened');
+});

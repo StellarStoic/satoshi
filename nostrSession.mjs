@@ -152,6 +152,27 @@ function amberParams(type, id, options = {}) {
   return params;
 }
 
+/** What the clipboard holds, or an empty string when this page may not read it. */
+async function clipboardText() {
+  if (!navigator.clipboard?.readText) return '';
+  return (await navigator.clipboard.readText()) || '';
+}
+
+/**
+ * A fingerprint of a clipboard value, so a later read can tell "the signer copied something" from
+ * "this is what the reader had copied already" without this page storing anyone's copied text.
+ * FNV-1a over the normalised value is enough for that comparison and cannot be read back.
+ */
+function clipboardHash(text) {
+  const value = String(text).replace(/\s+/g, '').toLowerCase();
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
 function openAmber(type, payload, id, options = {}) {
   location.assign(`nostrsigner:${encodeURIComponent(payload)}?${amberParams(type, id, options).toString()}`);
 }
@@ -195,7 +216,16 @@ export function beginAmberLogin({copy = false} = {}) {
   const id = randomId();
   parkAmberRequest(id, {action: 'login', copy});
   if (copy) {
-    // No id, so no callback URL: Amber copies the result to the clipboard instead of returning it.
+    // Read what is already on the clipboard while this tap's user activation is still live. Only its
+    // fingerprint is kept, and only for one purpose: it is what stops a later automatic read from
+    // adopting a key the reader copied for something else as their identity.
+    clipboardText().then(text => {
+      const parked = readJson(localStorage, AMBER_PREFIX + id);
+      if (!parked) return;
+      parked.clipboard = clipboardHash(text);
+      localStorage.setItem(AMBER_PREFIX + id, JSON.stringify(parked));
+    }).catch(() => {});
+    // No id, so no callback URL: the signer copies the result to the clipboard instead of returning it.
     location.assign(`nostrsigner:?${amberParams('get_public_key', '').toString()}`);
     return;
   }
@@ -212,7 +242,13 @@ export function amberClipboardPending() {
  * Take the value Amber copied, for a request sent with no callback URL. The request that is still
  * parked decides what is being handed over, never what the clipboard happens to hold.
  */
-export async function adoptAmberClipboard() {
+export async function adoptAmberClipboard({silent = false} = {}) {
+  // A silent read is the page finishing a sign-in by itself; it never reports anything, and the
+  // request stays parked when it cannot be used, so the button under the form still works.
+  const stop = message => {
+    if (silent) return null;
+    throw new Error(message);
+  };
   const parked = [];
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
@@ -223,22 +259,25 @@ export async function adoptAmberClipboard() {
   }
   parked.sort((left, right) => right.state.createdAt - left.state.createdAt);
   const waiting = parked[0];
-  if (!waiting) throw new Error('Nothing is waiting for Amber. Start the sign-in again.');
-  if (waiting.state.action !== 'login') throw new Error('That request is not a sign-in. Start the sign-in again.');
+  if (!waiting) return stop('Nothing is waiting for Amber. Start the sign-in again.');
+  if (waiting.state.action !== 'login') return stop('That request is not a sign-in. Start the sign-in again.');
   if (!navigator.clipboard?.readText) {
-    throw new Error('This browser will not let the page read the clipboard. Paste the key into the private key field instead.');
+    return stop('This browser will not let the page read the clipboard. Paste the key into the private key field instead.');
   }
   let text = '';
   try {
     text = (await navigator.clipboard.readText()) || '';
   } catch {
-    throw new Error('The browser refused to read the clipboard. Tap again and allow it.');
+    return stop('The browser refused to read the clipboard. Tap again and allow it.');
   }
   const pubkey = text.trim().toLowerCase();
-  if (!pubkey) throw new Error('The clipboard is empty. In Amber, copy the key it offered, then tap again.');
+  if (!pubkey) return stop('The clipboard is empty. In Amber, copy the key it offered, then tap again.');
   if (!/^[0-9a-f]{64}$/.test(pubkey)) {
-    throw new Error('That is not a public key. In Amber, copy the key it offered, then tap again.');
+    return stop('That is not a public key. In Amber, copy the key it offered, then tap again.');
   }
+  // The one thing an automatic read must not do is take whatever was on the clipboard before the
+  // request was made, so a value that is unchanged since then is not this signer's answer.
+  if (silent && waiting.state.clipboard && waiting.state.clipboard === clipboardHash(pubkey)) return null;
   const session = saveSession(pubkey, 'amber');
   localStorage.removeItem(waiting.key);
   return {action: 'login', session};
