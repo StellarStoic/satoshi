@@ -39,6 +39,7 @@ import {
   stickyExpiryCountdown,
   isStickyExpired,
   geohashGridFits,
+  geohashCellsForPrecision,
   GRID_MIN_CELL_PX,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
@@ -220,6 +221,9 @@ let mapTroubleSaid = false;
 
 let geohashMap = null;
 let geohashMapCells = [];
+// Set while the picker applies its opening view: that jump fires `zoomend` as well, and it is
+// not the reader zooming, so it must never be read as a grid change.
+let geohashMapOpening = false;
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
 let lockedCells = geohashCellsFrom(localStorage.getItem(LOCKED_PLACE_KEY));
@@ -411,6 +415,13 @@ function toggleMapCell(cell) {
   }
   const issue = geohashSetIssue(next);
   if (issue) {
+    // A tap on a cell that touches nothing is a reader pointing somewhere else, not a mistake:
+    // it starts a new area there rather than being refused. Every other issue — too many cells,
+    // a different depth, a set that would come apart — keeps the old area and the old wording.
+    if (geohashMapCells.length && !geohashMapCells.includes(cell) && issue.startsWith('Cells have to stick together')) {
+      setMapCells([cell], 'Started a new area here — cells have to touch to be one board');
+      return;
+    }
     // Say why rather than swallowing the tap, and say how to get where they meant:
     // a cell across the map is not part of this area, and Clear starts a new one.
     setMapCells(geohashMapCells, geohashMapCells.length && issue.startsWith('Cells have to stick together')
@@ -642,13 +653,22 @@ async function initialiseGeohashMap() {
     // Opening the map sets the view to the board's own zoom, which fires here too.
     // That is not the reader zooming, and the cells they picked are still theirs —
     // only a real change of depth makes them meaningless, and then it is said.
+    if (geohashMapOpening) {
+      scheduleGeohashGrid();
+      return;
+    }
     if (geohashMapCells.length && geohashMapCells[0].length === precision) {
       scheduleGeohashGrid();
       return;
     }
-    const center = geohashMap.getCenter();
-    setMapCells([encodeGeohash(center.lat, center.lng, precision)],
-      'Zoomed to a new grid — pick the cells for this area again');
+    // A changed grid is not a choice. Zooming out carries the reader's area over by cutting a
+    // character off each cell; zooming in cannot be carried at all, and choosing a cell for them
+    // would put one on the map nobody tapped. So it is carried where it can be, and otherwise
+    // dropped with the reason said out loud.
+    const carried = geohashCellsForPrecision(geohashMapCells, precision);
+    setMapCells(carried.cells, carried.lost
+      ? 'Zooming changed the grid — pick the cells for this area again'
+      : '');
     scheduleGeohashGrid();
   });
   // One click handler, not two: asking what was under the pointer is the only way
@@ -714,15 +734,20 @@ async function openGeohashMap() {
   }
   if (!elements.geohashMapDialog.open) return;
   try {
-    if (current.length) {
-      const bounds = geohashBounds(current[0]);
-      setMapCells(current, current.length === 1
-        ? 'Tap a cell touching this one to cover two or three'
-        : `${current.length} cells on this board`);
-      map.jumpTo({center: [bounds.center.lng, bounds.center.lat], zoom: mapZoomForGeohashPrecision(current[0].length)});
-    } else {
-      setMapCells([]);
-      map.jumpTo({center: [0, 20], zoom: 2});
+    geohashMapOpening = true;
+    try {
+      if (current.length) {
+        const bounds = geohashBounds(current[0]);
+        setMapCells(current, current.length === 1
+          ? 'Tap a cell touching this one to cover two or three'
+          : `${current.length} cells on this board`);
+        map.jumpTo({center: [bounds.center.lng, bounds.center.lat], zoom: mapZoomForGeohashPrecision(current[0].length)});
+      } else {
+        setMapCells([]);
+        map.jumpTo({center: [0, 20], zoom: 2});
+      }
+    } finally {
+      geohashMapOpening = false;
     }
     // A new map measured the visible dialog in its constructor. Only a reused
     // map needs resizing after the dialog was closed and opened again.

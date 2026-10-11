@@ -356,6 +356,28 @@ export function geohashNeighbours(value) {
   return neighbours;
 }
 
+/**
+ * The same area on a different grid. The zoom decides how coarse the cells are, so zooming out
+ * can carry what the reader chose by cutting characters off each cell — the same place, one grid
+ * up. Zooming in cannot be carried over: a finer cell is not derivable from a coarser one, and
+ * choosing whatever sits under the map's centre instead puts a cell on the map nobody tapped.
+ * `lost` says exactly that case, so the page can hand the choosing back to the reader.
+ */
+export function geohashCellsForPrecision(cells = [], precision = 0) {
+  const chosen = geohashCells(cells);
+  const depth = Number(precision);
+  if (!Number.isFinite(depth) || depth < GEOHASH_MIN_LENGTH || depth > GEOHASH_MAX_LENGTH) {
+    return {cells: [], lost: chosen.length > 0};
+  }
+  const carried = [];
+  for (const cell of chosen) {
+    if (cell.length < depth) continue;
+    const coarser = cell.slice(0, depth);
+    if (!carried.includes(coarser)) carried.push(coarser);
+  }
+  return {cells: carried, lost: chosen.length > 0 && !carried.length};
+}
+
 /** Two cells stick together when they share a side or a corner. */
 export function geohashTouches(left, right) {
   const a = normaliseGeohash(left);

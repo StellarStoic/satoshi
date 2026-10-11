@@ -4,6 +4,7 @@ import {webcrypto} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
+  geohashCellsForPrecision,
   geohashCellDimensions,
   geohashGridFits,
   GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
@@ -254,6 +255,40 @@ test('a clump may reach out two steps, but not fall apart', () => {
   assert.equal(geohashSetIssue([cell, step, beyond]), '', 'it still holds together through the middle cell');
   assert.equal(geohashSetIssue([cell, step, beyond, '9q8yyk8y']),
     'Cells have to stick together — pick ones that touch.', 'one loose cell breaks the clump');
+});
+
+test('a changed grid carries the chosen area instead of choosing one for the reader', () => {
+  const cell = 'u4pr7z0y';
+  // Zooming out: the same place, one grid up.
+  assert.deepEqual(geohashCellsForPrecision([cell], 5), {cells: ['u4pr7'], lost: false});
+  assert.deepEqual(geohashCellsForPrecision([cell, 'u4pr7z0z'], 7), {cells: ['u4pr7z0'], lost: false},
+    'cells that share a coarser cell are that one cell up there');
+  assert.deepEqual(geohashCellsForPrecision([cell, cell], 7).cells, ['u4pr7z0'], 'and are never listed twice');
+  // A carried clump is still a legal board: coarser cells of touching cells touch.
+  const clump = [cell, ...geohashNeighbours(cell).slice(0, 2)];
+  assert.equal(geohashSetIssue(geohashCellsForPrecision(clump, 6).cells), '');
+  // Zooming in cannot be carried: a finer cell is not derivable from a coarser one, and the
+  // answer is to lose the area rather than to put a cell on the map nobody tapped.
+  assert.deepEqual(geohashCellsForPrecision(['u4pr7'], 8), {cells: [], lost: true});
+  // Outside the geohash range nothing carries either.
+  assert.deepEqual(geohashCellsForPrecision([cell], 2), {cells: [], lost: true});
+  // Nothing chosen is not reported as lost, and a region is not a cell.
+  assert.deepEqual(geohashCellsForPrecision([], 5), {cells: [], lost: false});
+  assert.deepEqual(geohashCellsForPrecision(['u4'], 5), {cells: [], lost: false});
+});
+
+test('the picker never chooses a cell by itself, and a tap outside the area starts a new one', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // Zooming carries the reader's area over, or drops it with the reason said — it never paints
+  // a cell nobody tapped, which is what made a pinch look like a random selection.
+  assert.match(script, /geohashCellsForPrecision\(geohashMapCells, precision\)/);
+  assert.doesNotMatch(script, /setMapCells\(\[encodeGeohash\(/);
+  assert.match(script, /Zooming changed the grid/);
+  // The picker's own opening view fires `zoomend` too, and is not the reader zooming.
+  assert.match(script, /if \(geohashMapOpening\)/);
+  // A tap on a cell that touches nothing is a reader pointing somewhere else, not a mistake.
+  assert.match(script, /Started a new area here/);
+  assert.match(script, /function toggleMapCell\(cell\)/);
 });
 
 test('exact-geohash notes publish and parse as exact only', () => {
