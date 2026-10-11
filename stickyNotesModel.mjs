@@ -943,8 +943,10 @@ export function boardBitmapSize(scale, pixelRatio = 1, boardSide = 2048) {
  * pixels over the image's own width. Drawing the pattern with it reproduces the 600px tile the sheet
  * used to ask for, so the board keeps its scale and its alignment in board space.
  */
-export function boardPatternScale(bitmapSide, boardSide = 2048) {
-  return (BOARD_TILE_PX / BOARD_IMAGE_PX) * (bitmapSide / boardSide);
+export function boardPatternScale(bitmapSide, boardSide = 2048, imageWidth = BOARD_IMAGE_PX,
+                               tile = BOARD_TEXTURE_TILE_PX) {
+  const width = Number(imageWidth) > 0 ? Number(imageWidth) : BOARD_IMAGE_PX;
+  return (tile / width) * (bitmapSide / boardSide);
 }
 
 /**
@@ -954,9 +956,29 @@ export function boardPatternScale(bitmapSide, boardSide = 2048) {
  */
 export const BOARD_TEXTURES = Object.freeze([
   Object.freeze({id: 'cork', label: 'Cork', url: '/img/board-cork.png'}),
+  Object.freeze({id: 'cartographer', label: 'Cartographer', url: '/img/board-cartographer.png'}),
+  Object.freeze({id: 'carbon-fibre', label: 'Carbon fibre', url: '/img/board-carbon-fibre.png', tile: 96}),
+  Object.freeze({id: 'christmas-dark', label: 'Christmas dark', url: '/img/board-christmas-dark.png'}),
+  Object.freeze({id: 'christmas', label: 'Christmas', url: '/img/board-christmas.png'}),
+  Object.freeze({id: 'dot-grid', label: 'Dot grid', url: '/img/board-dot-grid.jpg'}),
+  Object.freeze({id: 'natural-black', label: 'Natural black', url: '/img/board-natural-black.png'}),
 ]);
 
 export const DEFAULT_BOARD_TEXTURE_URL = BOARD_TEXTURES[0].url;
+
+/**
+ * The board pixels one tile of a pattern covers. A pattern painted at its file's own size would
+ * tile as densely as its file happens to be - a 24px weave repeating twenty-five times inside one
+ * cork tile - so a pattern may name the size it is painted at, and everything else keeps the 600
+ * board px the board has tiled at since it was built.
+ */
+export const BOARD_TEXTURE_TILE_PX = 600;
+
+/** The tile a pattern is painted at: its own if it names one, else the board's usual tile. */
+export function boardTextureTile(texture) {
+  const tile = Number(texture?.tile);
+  return Number.isFinite(tile) && tile > 0 ? tile : BOARD_TEXTURE_TILE_PX;
+}
 
 /** Long enough for a real image address, short enough that a paste of a file cannot get in. */
 export const BOARD_TEXTURE_URL_MAX = 2048;

@@ -48,7 +48,8 @@ import {
   BOARD_TEXTURES,
   DEFAULT_BOARD_TEXTURE_URL,
   boardTextureUrl,
-  boardTextureLabel,} from './stickyNotesModel.mjs';
+  boardTextureLabel,
+  boardTextureTile,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   getNostrSession,
@@ -1418,7 +1419,12 @@ function paintBoard() {
   if (!context) return;
   const pattern = context.createPattern(boardTexture.image, 'repeat');
   if (!pattern) return;
-  const scale = boardPatternScale(side, boardSize.width);
+  // A pattern is painted at the tile its catalogue entry asks for, whatever its file's own
+  // dimensions are: a 24px weave would otherwise repeat far finer than the board's own tile,
+  // and a pattern a reader linked would tile by whatever size its file arrived at.
+  const texture = BOARD_TEXTURES.find(entry => entry.url === boardTextureSource());
+  const scale = boardPatternScale(side, boardSize.width,
+    boardTexture.image.naturalWidth || BOARD_IMAGE_PX, boardTextureTile(texture));
   context.imageSmoothingQuality = 'high';
   context.scale(scale, scale);
   context.fillStyle = pattern;

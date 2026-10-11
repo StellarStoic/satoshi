@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
+import {readFile, stat} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
@@ -1617,4 +1617,41 @@ test('the board style dialog keeps its choice in this browser, never in the note
     'the dialog offers a pattern address');
   assert.match(html, /id="stickySettings"[^>]*aria-label="Board style"/);
   assert.doesNotMatch(html, /id="stickySettings"[^>]*disabled/, 'the gear is the settings control now');
+});
+
+
+test('every pattern in the quick selection is a real file, and cork stays the default', async () => {
+  const model = await import('../stickyNotesModel.mjs');
+  const seen = new Set();
+  for (const texture of model.BOARD_TEXTURES) {
+    assert.match(texture.url, /^\/img\/[\w.-]+$/, `${texture.id} must be a path on this site`);
+    assert.ok(!seen.has(texture.url), `${texture.url} is listed twice`);
+    seen.add(texture.url);
+    await assert.doesNotReject(stat(new URL(`..${texture.url}`, import.meta.url)),
+      `the catalogue lists ${texture.url}, so that file has to be in the checkout`);
+    assert.ok(texture.label && texture.label.length <= 20, `${texture.id} needs a short label`);
+  }
+  assert.ok(model.BOARD_TEXTURES.length >= 6, 'the quick selection holds a set, not one pattern');
+  assert.equal(model.BOARD_TEXTURES[0].url, model.DEFAULT_BOARD_TEXTURE_URL);
+  assert.equal(model.DEFAULT_BOARD_TEXTURE_URL, '/img/board-cork.png', 'cork stays the default board');
+
+  // a pattern is painted at the tile its entry names, whatever its file's own size is
+  assert.equal(model.boardTextureTile({tile: 96}), 96);
+  assert.equal(model.boardTextureTile({}), model.BOARD_TEXTURE_TILE_PX);
+  assert.equal(model.boardPatternScale(2048, 2048, 400, 600), 1.5);
+  assert.equal(model.boardPatternScale(2048, 2048, 24, 96), 4);
+  assert.equal(model.boardPatternScale(2048, 2048, 500, 600), 1.2);
+  for (const texture of model.BOARD_TEXTURES) {
+    const scale = model.boardPatternScale(2048, 2048, 24, model.boardTextureTile(texture));
+    assert.ok(scale > 0 && Number.isFinite(scale), `${texture.id} must produce a usable scale`);
+  }
+});
+
+test('the paint follows the width of the image that loaded, and its catalogue tile', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /boardTexture\.image\.naturalWidth/,
+    'the pattern is drawn at the size of the image that actually loaded');
+  assert.match(script, /boardTextureTile\(texture\)/,
+    'the pattern follows the tile its catalogue entry names');
+  assert.match(script, /BOARD_TEXTURES\.find\(entry => entry\.url === boardTextureSource\(\)\)/);
 });
