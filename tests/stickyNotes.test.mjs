@@ -13,9 +13,89 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   geohashCellsForPrecision,
   geohashCellDimensions,
   geohashGridFits,
-  GRID_MIN_CELL_PX,} from '../stickyNotesModel.mjs';
+  GRID_MIN_CELL_PX,
+  LINK_DISPLAY_MAX,
+  linkDisplay,
+  linkHref,
+  linkMatches,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
+
+test('a note draws http(s) and www links as parts, never as the raw address', () => {
+  const parts = stickyTextParts('see https://example.com/a/b for more');
+  assert.deepEqual(parts.map(part => part.type), ['text', 'link', 'text']);
+  assert.equal(parts[1].href, 'https://example.com/a/b');
+  assert.equal(parts[1].url, 'https://example.com/a/b');
+  assert.equal(parts[2].text, ' for more');
+  const www = stickyTextParts('www.example.com').filter(part => part.type === 'link');
+  assert.equal(www.length, 1);
+  assert.equal(www[0].href, 'https://www.example.com');
+});
+
+test('a link lets the sentence keep its punctuation, but a bracket it opened stays', () => {
+  const dotted = stickyTextParts('read https://example.com/x.');
+  assert.deepEqual(dotted.map(part => part.type), ['text', 'link', 'text']);
+  assert.equal(dotted[1].href, 'https://example.com/x');
+  assert.equal(dotted[2].text, '.');
+  const wiki = stickyTextParts('https://en.wikipedia.org/wiki/Cork_(material)').find(part => part.type === 'link');
+  assert.equal(wiki.href, 'https://en.wikipedia.org/wiki/Cork_(material)');
+  const wrapped = stickyTextParts('(see https://example.com/x)').find(part => part.type === 'link');
+  assert.equal(wrapped.href, 'https://example.com/x');
+  const listy = stickyTextParts('links: https://a.example.com, https://b.example.com!').filter(part => part.type === 'link');
+  assert.deepEqual(listy.map(part => part.href), ['https://a.example.com', 'https://b.example.com']);
+});
+
+test('only http(s) links are openable, so a javascript: run never becomes one', () => {
+  assert.equal(linkHref('javascript:alert(1)'), '');
+  assert.equal(linkHref('data:text/html,<script>'), '');
+  assert.equal(linkHref('nostr:npub1example'), '');
+  assert.equal(linkHref('  '), '');
+  assert.deepEqual(stickyTextParts('javascript:alert(1)').map(part => part.type), ['text']);
+  assert.deepEqual(stickyTextParts('try javascript:alert(1) now').map(part => part.type), ['text']);
+  assert.deepEqual(stickyTextParts('mailto:someone@example.com').map(part => part.type), ['text']);
+  assert.deepEqual(stickyTextParts('https://').map(part => part.type), ['text']);
+  assert.deepEqual(linkMatches('nothing to see'), []);
+});
+
+test('mentions and links share one note without eating each other', () => {
+  const parts = stickyTextParts(`hi nostr:${ALICE_NPUB} see https://example.com now`);
+  assert.deepEqual(parts.map(part => part.type), ['text', 'mention', 'text', 'link', 'text']);
+  assert.equal(parts[1].npub, ALICE_NPUB);
+  assert.equal(parts[3].href, 'https://example.com');
+});
+
+test('the link dialog shows 200 characters first and keeps the rest behind the arrow', () => {
+  assert.equal(LINK_DISPLAY_MAX, 200);
+  const long = `https://example.com/${'a'.repeat(400)}`;
+  const shown = linkDisplay(long);
+  assert.equal(shown.truncated, true);
+  assert.equal(shown.head.length, 200);
+  assert.equal(shown.head + shown.tail, long);
+  assert.equal(shown.total, long.length);
+  const short = linkDisplay('https://example.com/a');
+  assert.equal(short.truncated, false);
+  assert.equal(short.head, 'https://example.com/a');
+  assert.equal(short.tail, '');
+  assert.equal(linkDisplay('x'.repeat(LINK_DISPLAY_MAX)).truncated, false);
+  assert.equal(linkDisplay('x'.repeat(LINK_DISPLAY_MAX + 1)).truncated, true);
+  assert.equal(linkDisplay('x'.repeat(LINK_DISPLAY_MAX + 1)).head.length, LINK_DISPLAY_MAX);
+});
+
+test('the board labels a link "link" and confirms the address before opening it', async () => {
+  const [script, html] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+  assert.match(script, /const LINK_LABEL = 'link';/);
+  assert.match(script, /link\.textContent = LINK_LABEL;/);
+  assert.match(script, /openLinkDialog\(href\)/);
+  assert.match(script, /linkDialogRest\.hidden = true;/);
+  assert.match(html, /id="linkDialog"/);
+  assert.match(html, /Do you really want to open the following link\?/);
+  assert.match(html, /rel="noopener noreferrer"/);
+  assert.match(html, /id="linkExpand"[^>]*aria-expanded="false"/);
+  assert.doesNotMatch(script, /sticky-note__link[^;]*href = part\.url/);
+});
 
 test('Pinstr notes accept up to 501 characters', () => {
   assert.equal(STICKY_MAX_CHARACTERS, 501);
@@ -430,8 +510,8 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
   assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
     'one two-finger gesture zooms the board and rotates the note');
-  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin'\)[\s\S]{0,180}return;/,
-    'ordinary note paper no longer blocks board navigation');
+  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link'\)[\s\S]{0,180}return;/,
+    'the pin and a note link keep their own click instead of dragging the board');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   // The cork is a pattern drawn into a canvas inside the transformed element, not a repeating
   // background on the 2048px board element. That tiled form has to be produced at device resolution

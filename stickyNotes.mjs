@@ -42,7 +42,9 @@ import {
   geohashCellsForPrecision,
   corkBitmapSize,
   corkPatternScale,
-  GRID_MIN_CELL_PX,} from './stickyNotesModel.mjs';
+  GRID_MIN_CELL_PX,
+  linkDisplay,
+  linkHref,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   getNostrSession,
@@ -124,6 +126,9 @@ const elements = {
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
   discardBin: document.getElementById('discardBin'), discardDialog: document.getElementById('discardDialog'),
   discardWarning: document.getElementById('discardWarning'), discardConfirm: document.getElementById('discardNoteConfirm'),
+  linkDialog: document.getElementById('linkDialog'), linkDialogUrl: document.getElementById('linkDialogUrl'),
+  linkDialogRest: document.getElementById('linkDialogRest'), linkExpand: document.getElementById('linkExpand'),
+  linkOpen: document.getElementById('linkOpen'), linkCancel: document.getElementById('linkCancel'),
   discardCancel: document.getElementById('discardNoteCancel'),
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
@@ -2386,8 +2391,9 @@ function installBoardNavigation() {
   elements.board.addEventListener('pointerdown', event => {
     if (placingNote) return;
     // Ordinary paper is part of the board surface: dragging or pinching on it must move
-    // the board too. A pin remains a button, while concealed paper owns a four-second hold.
-    if (event.target.closest('.sticky-note__pin')
+    // the board too. A pin and a note's own link remain buttons, while concealed paper owns a
+    // four-second hold.
+    if (event.target.closest('.sticky-note__pin, .sticky-note__link')
         || event.target.closest('.sticky-note--filtered-out:not(.sticky-note--filter-revealed)')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
@@ -2658,8 +2664,59 @@ function updateMentionElements(pubkey, label) {
   });
 }
 
+// ---- a link in a note: the word "link" on the cork, the address one confirmation away
+const LINK_LABEL = 'link';
+
+function linkRestLabel() {
+  return `Show the rest (${elements.linkDialogRest.textContent.length} more characters)`;
+}
+
+/** Confirms an address before anything opens: the first 200 characters, the rest behind the arrow. */
+function openLinkDialog(href) {
+  const safe = linkHref(href);
+  if (!safe) return;
+  const shown = linkDisplay(safe);
+  elements.linkDialogUrl.textContent = shown.head;
+  elements.linkDialogRest.textContent = shown.tail;
+  elements.linkDialogRest.hidden = true;
+  elements.linkExpand.hidden = !shown.truncated;
+  elements.linkExpand.classList.remove('is-open');
+  elements.linkExpand.setAttribute('aria-expanded', 'false');
+  if (shown.truncated) elements.linkExpand.querySelector('span').textContent = linkRestLabel();
+  elements.linkOpen.href = safe;
+  elements.linkOpen.setAttribute('aria-label', `Open ${shown.truncated ? `${shown.head}…` : shown.head}`);
+  if (!elements.linkDialog.open) elements.linkDialog.showModal();
+  requestAnimationFrame(() => elements.linkCancel.focus());
+}
+
+function toggleLinkRest() {
+  const expanded = elements.linkExpand.getAttribute('aria-expanded') === 'true';
+  elements.linkExpand.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  elements.linkExpand.classList.toggle('is-open', !expanded);
+  elements.linkDialogRest.hidden = expanded;
+  elements.linkExpand.querySelector('span').textContent = expanded ? linkRestLabel() : 'Show less';
+}
+
 function renderNoteContent(container, content) {
   stickyTextParts(content).forEach(part => {
+    if (part.type === 'link') {
+      const href = linkHref(part.url);
+      if (!href) { container.appendChild(document.createTextNode(part.url)); return; }
+      const shown = linkDisplay(href);
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'sticky-note__link';
+      link.textContent = LINK_LABEL;
+      link.title = shown.truncated ? `${shown.head}…` : shown.head;
+      link.dataset.href = href;
+      link.setAttribute('aria-label', `Open link ${shown.truncated ? `${shown.head}…` : shown.head}`);
+      link.addEventListener('click', click => {
+        click.stopPropagation();
+        openLinkDialog(href);
+      });
+      container.appendChild(link);
+      return;
+    }
     if (part.type !== 'mention') { container.appendChild(document.createTextNode(part.text)); return; }
     const pubkey = pubkeyOfNpub(part.npub);
     const chip = document.createElement('span');
@@ -3350,6 +3407,12 @@ elements.shareBoard.addEventListener('click', async () => {
   }
 });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+elements.linkExpand.addEventListener('click', toggleLinkRest);
+elements.linkCancel.addEventListener('click', () => elements.linkDialog.close());
+elements.linkOpen.addEventListener('click', () => {
+  // The browser takes the address from here; the confirmation has done its job.
+  if (elements.linkDialog.open) elements.linkDialog.close();
+});
 document.querySelectorAll('[data-login]').forEach(button => button.addEventListener('click', () => handleLogin(button.dataset.login)));
 elements.logout.addEventListener('click', () => {
   // Closing first guarantees a broken downstream session listener cannot trap the reader

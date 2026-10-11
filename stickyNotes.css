@@ -258,3 +258,81 @@
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__pin { display:none; }
 .sticky-note--filter-revealed { z-index:490; opacity:1; filter:none; outline:2px solid #7cfc00; box-shadow:0 0 18px rgba(124,252,0,.3),2px 5px 12px rgba(31,16,5,.3); }
 .sticky-note__reveal-countdown { position:absolute; top:8px; right:9px; z-index:4; min-width:34px; border:1px solid rgba(38,35,30,.3); border-radius:12px; padding:2px 7px; background:rgba(255,255,255,.72); color:#20231d; font-family:var(--site-font,monospace); font-size:.68rem; font-weight:700; line-height:1.4; text-align:center; }
+
+/* A note shows every link as the word "link": a full address can fill the note, and the address
+   itself is one confirmation away in the dialog below. */
+.sticky-note__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+  cursor: pointer;
+}
+
+.sticky-note__link:hover,
+.sticky-note__link:focus-visible {
+  text-decoration-style: double;
+}
+
+.link-address {
+  margin: 0 0 0.7rem;
+  padding: 0.6rem 0.7rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.link-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.07);
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+/* The arrow is drawn, not typed: no icon font has to resolve for it to appear. */
+.link-expand::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.15s ease;
+}
+
+.link-expand.is-open::before {
+  transform: rotate(180deg);
+}
+
+.link-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.link-actions .link-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}

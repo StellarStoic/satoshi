@@ -180,18 +180,67 @@ function mentionMatches(content) {
   return matches;
 }
 
+/** How much of an address the note's confirmation shows before the rest waits behind the arrow. */
+export const LINK_DISPLAY_MAX = 200;
+
+const LINK_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
+/** Punctuation a sentence leaves outside its link. */
+const LINK_TRAILING_JUNK = ['.', ',', ';', ':', '!', '?', '…', '"', "'", '`', '*', '_'];
+
 /**
- * A note's text, cut into the pieces the board draws: plain runs and mentions.
- * The wire form is the npub; the label is resolved from the person's profile,
+ * The absolute form of a link, or '' when it is not one this board will open.
+ * Only http(s) survives: a javascript:, data: or nostr: run stays plain note text.
+ */
+export function linkHref(url) {
+  const raw = String(url || '').trim();
+  if (/^https?:\/\/[^\s]+$/i.test(raw)) return raw;
+  if (/^www\.[^\s]+$/i.test(raw)) return `https://${raw}`;
+  return '';
+}
+
+/** An address cut into what the confirmation shows at once and what waits behind the arrow. */
+export function linkDisplay(url, max = LINK_DISPLAY_MAX) {
+  const text = String(url || '');
+  if (text.length <= max) return {head: text, tail: '', truncated: false, total: text.length};
+  return {head: text.slice(0, max), tail: text.slice(max), truncated: true, total: text.length};
+}
+
+/**
+ * Links written into a note: http(s) and bare www. runs, with the sentence's own trailing
+ * punctuation left out (a closing bracket stays when the link opened one itself).
+ */
+export function linkMatches(content) {
+  const text = String(content || '');
+  const matches = [];
+  const count = (haystack, needle) => haystack.split(needle).length - 1;
+  for (const found of text.matchAll(LINK_PATTERN)) {
+    let url = found[0];
+    while (url && LINK_TRAILING_JUNK.includes(url.slice(-1))) url = url.slice(0, -1);
+    while (url.endsWith(')') && count(url, ')') > count(url, '(')) url = url.slice(0, -1);
+    while (url.endsWith(']') && count(url, ']') > count(url, '[')) url = url.slice(0, -1);
+    const href = linkHref(url);
+    if (!href) continue;
+    matches.push({index: found.index, length: url.length, url, href});
+  }
+  return matches;
+}
+
+/**
+ * A note's text, cut into the pieces the board draws: plain runs, mentions and links.
+ * Mentions and links are found together and placed by position, so a run can only be one of them.
+ * The wire form of a mention is the npub; the label is resolved from the person's profile,
  * falling back to their satoshi.si name, and only then to the shortened npub.
  */
 export function stickyTextParts(content) {
   const text = String(content || '');
   const parts = [];
   let cursor = 0;
-  for (const match of mentionMatches(text)) {
+  const found = [...mentionMatches(text), ...linkMatches(text)].sort((a, b) => a.index - b.index);
+  for (const match of found) {
+    if (match.index < cursor) continue;
     if (match.index > cursor) parts.push({type: 'text', text: text.slice(cursor, match.index)});
-    parts.push({type: 'mention', npub: match.npub, token: `nostr:${match.npub}`});
+    if (match.npub) parts.push({type: 'mention', npub: match.npub, token: `nostr:${match.npub}`});
+    else parts.push({type: 'link', url: match.url, href: match.href});
     cursor = match.index + match.length;
   }
   if (cursor < text.length) parts.push({type: 'text', text: text.slice(cursor)});

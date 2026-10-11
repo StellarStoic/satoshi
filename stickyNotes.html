@@ -267,6 +267,19 @@
     </div>
   </dialog>
 
+  <dialog id="linkDialog" class="sticky-dialog link-dialog" aria-labelledby="linkDialogTitle">
+    <div class="dialog-inner link-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="linkDialogTitle">Do you really want to open the following link?</h2>
+      <p class="link-address"><span id="linkDialogUrl"></span><span id="linkDialogRest" hidden></span></p>
+      <button type="button" id="linkExpand" class="link-expand" aria-expanded="false" aria-controls="linkDialogRest" hidden><span>Show the rest</span></button>
+      <div class="discard-actions link-actions">
+        <a id="linkOpen" class="primary-action link-open" target="_blank" rel="noopener noreferrer"><span>Open link</span></a>
+        <button type="button" id="linkCancel" class="secondary-action"><span>Cancel</span></button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Pinstr note details">
     <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
     <span>Event ID</span><code id="noteEventId"></code>
