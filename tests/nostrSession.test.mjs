@@ -439,3 +439,62 @@ test('the button still works when the browser refuses an automatic read', async 
   await assert.rejects(() => sessionModule.adoptAmberClipboard(), /refused to read the clipboard/,
     'the reader who taps the button is told what happened');
 });
+
+test('a nostrconnect offer names this origin, waits for the signer, and can be cancelled', async () => {
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.location = {host: 'pinstr.si', origin: 'https://pinstr.si', pathname: '/stickyNotes.html'};
+  if (!globalThis.crypto?.getRandomValues) {
+    globalThis.crypto = {...(globalThis.crypto || {}), getRandomValues: array => array.fill(7)};
+  }
+  let closed = 0;
+  let seen = null;
+  globalThis.window = {
+    dispatchEvent() {},
+    open() {},
+    NostrTools: {
+      generateSecretKey: () => Uint8Array.from({length: 32}, (_, index) => index + 1),
+      getPublicKey: secret => (secret.length === 32 ? 'a' : 'b').repeat(64),
+      nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`},
+    },
+    NostrBunker: {
+      BunkerSigner: {
+        fromURI: (clientSecret, uri, params) => {
+          seen = {clientSecret, uri, params};
+          return Promise.resolve({
+            getPublicKey: async () => 'e'.repeat(64),
+            signEvent: async template => template,
+            close: () => { closed += 1; },
+          });
+        },
+      },
+    },
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?connect-test=${Date.now()}`);
+  const offer = sessionModule.beginNostrConnect();
+  const url = new URL(offer.uri);
+
+  assert.equal(url.protocol, 'nostrconnect:');
+  assert.match(url.host, /^[0-9a-f]{64}$/, 'the offer names the client key it will be answered to');
+  assert.deepEqual(url.searchParams.getAll('relay'), ['wss://nostr.satoshi.si', 'wss://relay.damus.io']);
+  assert.ok(url.searchParams.get('secret'), 'the handshake carries a secret the signer echoes back');
+  assert.equal(url.searchParams.get('name'), 'pinstr.si', 'the signer is told which site it connects to');
+  assert.equal(url.searchParams.get('url'), 'https://pinstr.si/stickyNotes.html');
+
+  const session = await offer.promise;
+  assert.equal(session.method, 'bunker', 'a scanned code produces the connection a bunker link produces');
+  assert.equal(session.pubkey, 'e'.repeat(64));
+  // Stored the way a bunker:// link stores it, so reconnecting later needs no code at all.
+  const stored = JSON.parse(storage.getItem('satoshi:nostr:bunker:v1'));
+  assert.equal(stored.clientSecret, '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20');
+  assert.equal(stored.url, `bunker://${'e'.repeat(64)}?relay=wss%3A%2F%2Fnostr.satoshi.si&relay=wss%3A%2F%2Frelay.damus.io`);
+  assert.equal(seen.uri, offer.uri, 'the offer is what the signer is handed');
+  assert.equal(closed, 0, 'a connection that was made is left open');
+
+  // A code nobody scans must not hold a subscription open for the life of the page.
+  const abandoned = sessionModule.beginNostrConnect({timeout: 20});
+  abandoned.cancel();
+  await assert.rejects(abandoned.promise);
+});

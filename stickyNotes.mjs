@@ -54,6 +54,7 @@ import {
   beginAmberLogin,
   adoptAmberClipboard,
   amberClipboardPending,
+  beginNostrConnect,
   getNostrSession,
   loginAnonymously,
   loginWithBunker,
@@ -154,6 +155,13 @@ const elements = {
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   bunkerReconnect: document.getElementById('bunkerReconnect'),
   amberPaste: document.getElementById('amberPaste'),
+  amberDialog: document.getElementById('amberCopyDialog'),
+  amberCopyStatus: document.getElementById('amberCopyStatus'),
+  nostrConnect: document.getElementById('nostrConnectDialog'),
+  nostrConnectQr: document.getElementById('nostrConnectQr'),
+  nostrConnectUri: document.getElementById('nostrConnectUri'),
+  nostrConnectCopy: document.getElementById('nostrConnectCopy'),
+  nostrConnectStatus: document.getElementById('nostrConnectStatus'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
@@ -405,10 +413,90 @@ function showLoginConfirmation(session) {
   loginConfirmationTimer = window.setTimeout(() => { elements.loginConfirmation.hidden = true; }, 5000);
 }
 
+let nostrConnectRequest = null;
+
+/**
+ * The step between tapping Amber and being signed in. With nothing handed between the two apps the
+ * signer answers by copying the identity to the clipboard, and the browser gives that up on its own
+ * terms - which is exactly what a reader cannot guess. So the dialog says what to do, and carries the
+ * one button that always works.
+ */
+function showAmberCopyDialog() {
+  if (elements.login.open) elements.login.close();
+  if (!elements.amberDialog.open) elements.amberDialog.showModal();
+  status(elements.amberCopyStatus, amberClipboardPending() ? 'Approve it in Amber, then come back to this page.' : '');
+}
+
+/** A QR code for a string, as whole squares on the white field a scanner needs. */
+function drawQrCode(container, text) {
+  const qr = window.qrcode?.(0, 'M');
+  if (!qr || !container) return false;
+  qr.addData(text);
+  qr.make();
+  const size = qr.getModuleCount();
+  const cell = 6;
+  const canvas = document.createElement('canvas');
+  canvas.width = size * cell;
+  canvas.height = size * cell;
+  canvas.className = 'nostr-connect-qr__canvas';
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#000000';
+  for (let row = 0; row < size; row += 1) {
+    for (let column = 0; column < size; column += 1) {
+      if (qr.isDark(row, column)) context.fillRect(column * cell, row * cell, cell, cell);
+    }
+  }
+  container.replaceChildren(canvas);
+  return true;
+}
+
+/**
+ * The route for a browser that has no signer app to hand a request to. A desktop shows a code; the
+ * phone's Amber reads it and the two talk over the relay from there, with nothing to copy and no key
+ * touching this page.
+ */
+async function showNostrConnectDialog() {
+  if (typeof window.qrcode !== 'function') {
+    status(elements.loginStatus, 'The code tools did not load. Reload the page and try again.', true);
+    return;
+  }
+  nostrConnectRequest?.cancel();
+  let request = null;
+  try {
+    request = beginNostrConnect();
+  } catch (error) {
+    status(elements.loginStatus, error.message, true);
+    return;
+  }
+  nostrConnectRequest = request;
+  elements.nostrConnectUri.textContent = request.uri;
+  drawQrCode(elements.nostrConnectQr, request.uri);
+  status(elements.nostrConnectStatus, 'Waiting for Amber to connect...');
+  if (elements.login.open) elements.login.close();
+  if (!elements.nostrConnect.open) elements.nostrConnect.showModal();
+  try {
+    const session = await request.promise;
+    // The page closes this dialog itself in a moment, so the pending-request handle is dropped first:
+    // the close handler cancels whatever is still waiting, and this one is not.
+    if (nostrConnectRequest === request) nostrConnectRequest = null;
+    if (elements.nostrConnect.open) elements.nostrConnect.close();
+    updateAccount();
+    if (!syncPlacementWithSession()) showLoginConfirmation(session);
+  } catch (error) {
+    if (nostrConnectRequest === request) nostrConnectRequest = null;
+    status(elements.nostrConnectStatus, error.message, true);
+  }
+}
+
 function showDialog(dialog) {
-  // The clipboard route back from Amber only has something to hand over while such a request is in
-  // flight, and a reload between the two apps must not leave the reader without the way to finish.
-  if (dialog === elements.login) elements.amberPaste.hidden = !amberClipboardPending();
+  // A clipboard request already in flight is the one thing the plain list of ways in cannot finish
+  // on its own: the answer is sitting on the clipboard, so that step is what the reader is shown.
+  if (dialog === elements.login && amberClipboardPending()) {
+    dialog = elements.amberDialog;
+    status(elements.amberCopyStatus, 'Approve it in Amber, then come back to this page.');
+  }
   if (!dialog.open) dialog.showModal();
 }
 
@@ -2620,13 +2708,16 @@ async function handleLogin(method) {
   try {
     status(elements.loginStatus, 'Connecting...');
     if (method === 'extension') await loginWithExtension();
-    else if (method === 'amber') { beginAmberLogin(); return; }
-    else if (method === 'amber-copy') {
-      // No callback URL is sent, so nothing comes back on its own: the reader returns here and
-      // hands over what Amber copied.
+    else if (method === 'amber') {
+      // A desktop browser has no signer app to hand a request to, but a phone does: it shows a code
+      // Amber reads, and the connection is then made over a relay with nothing to copy.
+      if (!/Android/i.test(navigator.userAgent || '')) { await showNostrConnectDialog(); return; }
+      // Android: the request goes out with no callback URL at all, which is the one return path that
+      // cannot be lost between two apps - the signer copies the identity instead. The dialog that
+      // follows is where that copy is handed over, so show it before the intent can take the page.
+      showAmberCopyDialog();
       beginAmberLogin({copy: true});
-      elements.amberPaste.hidden = false;
-      status(elements.loginStatus, 'Approve it in Amber, then come back here.');
+      status(elements.amberCopyStatus, 'Approve it in Amber, then come back to this page.');
       return;
     }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
@@ -3243,16 +3334,36 @@ elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
 elements.amberPaste.addEventListener('click', async () => {
   try {
-    status(elements.loginStatus, 'Reading what Amber copied...');
+    status(elements.amberCopyStatus, 'Reading what Amber copied...');
     const answer = await adoptAmberClipboard();
     updateAccount();
-    status(elements.loginStatus, '');
-    elements.amberPaste.hidden = true;
-    elements.login.close();
+    status(elements.amberCopyStatus, '');
+    if (elements.amberDialog.open) elements.amberDialog.close();
+    if (elements.login.open) elements.login.close();
     showLoginConfirmation(answer.session);
   } catch (error) {
-    status(elements.loginStatus, error.message, true);
+    status(elements.amberCopyStatus, error.message, true);
   }
+});
+elements.nostrConnectCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(elements.nostrConnectUri.textContent);
+    status(elements.nostrConnectStatus, 'Link copied. Amber takes it pasted on its Connect screen.');
+  } catch {
+    status(elements.nostrConnectStatus, 'This browser will not let the page copy it. Select the link below and copy it by hand.', true);
+  }
+});
+// Closing either step hands the reader back to the ways in, and an unanswered code is cancelled with
+// it: its subscription must not outlive the dialog it was shown in.
+elements.amberDialog.addEventListener('close', () => {
+  status(elements.amberCopyStatus, '');
+  if (!getNostrSession() && !elements.login.open) elements.login.showModal();
+});
+elements.nostrConnect.addEventListener('close', () => {
+  nostrConnectRequest?.cancel();
+  nostrConnectRequest = null;
+  status(elements.nostrConnectStatus, '');
+  if (!getNostrSession() && !elements.login.open) elements.login.showModal();
 });
 elements.stickySettings.addEventListener('click', openBoardStyle);
 elements.resetBoardTexture.addEventListener('click', () => applyBoardTexture(''));
@@ -3807,7 +3918,7 @@ if (!signerReturn.applied) {
   // still waiting, not a failed login; the reader can retry from the same dialog if needed.
   if (parkedRequest?.action === 'login' && Date.now() - parkedRequest.createdAt < 10 * 60 * 1000) {
     status(elements.loginStatus, parkedRequest.copy
-      ? 'Amber was asked without a callback: approve it, then come back here.'
+      ? 'Amber is waiting for your approval. Come back to this page when you are done.'
       : 'Waiting for Amber. Tap Amber again if no answer arrives.');
   }
 }
@@ -3832,14 +3943,17 @@ async function resumeExternalFlow() {
       if (automatic?.action === 'login') {
         updateAccount();
         status(elements.loginStatus, '');
-        elements.amberPaste.hidden = true;
+        status(elements.amberCopyStatus, '');
+        if (elements.amberDialog.open) elements.amberDialog.close();
         if (elements.login.open) elements.login.close();
         if (!syncPlacementWithSession()) showLoginConfirmation(automatic.session);
-      } else {
-        // The automatic read did not happen here, so the button that always works is put in front of
-        // the reader now rather than waiting for them to reopen the login dialog.
-        elements.amberPaste.hidden = false;
-        status(elements.loginStatus, 'Approve it in Amber, then tap the button below.');
+      } else if (elements.amberDialog.open || elements.login.open) {
+        // The automatic read did not happen here, so the step with the button that always works is put in
+        // front of the reader rather than waiting for them to reopen the login dialog. A reader who has
+        // walked away from the sign-in is left alone: the request stays parked, and opening the login
+        // dialog leads straight back to this step.
+        if (!elements.amberDialog.open) showAmberCopyDialog();
+        status(elements.amberCopyStatus, 'Amber has it on your clipboard. Tap the button to hand it over.');
       }
     } else if (!signer.applied && !signer.unusable && parked?.action === 'login') {
       // Android commonly focuses the browser before Amber follows the callback URL. Focus is

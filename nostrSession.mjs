@@ -463,6 +463,82 @@ export function resumeAmber() {
   return {action: 'sign', event, context: state.context};
 }
 
+/**
+ * The relays a NIP-46 connection is offered on. One belongs to this project, so a signer that can
+ * reach it needs nothing else; the other is a widely used public relay, because a phone that cannot
+ * reach ours must still be able to answer.
+ */
+const NOSTR_CONNECT_RELAYS = ['wss://nostr.satoshi.si', 'wss://relay.damus.io'];
+
+/**
+ * Start a NIP-46 connection that a signer walks into by scanning a code.
+ *
+ * This is the route for a browser with no signer app to hand a `nostrsigner:` intent to: a desktop
+ * can show a code, and Amber on a phone can read it. The page makes its own throwaway client keypair,
+ * so the reader's identity never reaches this side - the signer only sees a request encrypted to that
+ * key - and the finished connection is stored in the same shape a `bunker://` link produces, which is
+ * what lets later visits reconnect with no code at all.
+ */
+export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 60 * 1000} = {}) {
+  if (!window.NostrBunker?.BunkerSigner?.fromURI) throw new Error('Nostr connect tools did not load.');
+  const clientSecret = tools().generateSecretKey();
+  const params = new URLSearchParams();
+  relays.forEach(relay => params.append('relay', relay));
+  params.set('secret', bytesToHex(crypto.getRandomValues(new Uint8Array(16))));
+  // The name the signer shows its reader is this page's own host, so an origin serving the same board
+  // under another name is never mislabelled as the other one.
+  params.set('name', location.host);
+  params.set('url', `${location.origin}${location.pathname}`);
+  params.set('perms', 'get_public_key,sign_event:1');
+  // getPublicKey already answers in hex, so this is not encoded again.
+  const uri = `nostrconnect://${tools().getPublicKey(clientSecret)}?${params.toString()}`;
+  const storedParams = new URLSearchParams();
+  relays.forEach(relay => storedParams.append('relay', relay));
+  let signer = null;
+  let cancelled = false;
+  let timer = 0;
+  const promise = new Promise((resolve, reject) => {
+    // A code nobody scans would otherwise hold a subscription open for the life of the page, so the
+    // offer expires on its own and says so.
+    timer = setTimeout(() => {
+      cancelled = true;
+      try { signer?.close?.(); } catch {}
+      reject(new Error('Amber did not answer. Show a new code and scan that one.'));
+    }, timeout);
+    window.NostrBunker.BunkerSigner.fromURI(clientSecret, uri, {
+      onauth: url => window.open(url, '_blank', 'noopener,noreferrer'),
+    }).then(connected => {
+      signer = connected;
+      if (cancelled) {
+        try { connected.close?.(); } catch {}
+        throw new Error('The code was closed before it was answered.');
+      }
+      return connected.getPublicKey();
+    }).then(pubkey => {
+      clearTimeout(timer);
+      localStorage.setItem(BUNKER_KEY, JSON.stringify({
+        url: `bunker://${pubkey}?${storedParams.toString()}`,
+        clientSecret: bytesToHex(clientSecret),
+      }));
+      bunkerSigner = signer;
+      clientSecret.fill(0);
+      resolve(saveSession(pubkey, 'bunker'));
+    }).catch(error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+  return {
+    uri,
+    promise,
+    cancel: () => {
+      cancelled = true;
+      clearTimeout(timer);
+      try { signer?.close?.(); } catch {}
+    },
+  };
+}
+
 async function connectBunker(saved) {
   if (!window.NostrBunker) throw new Error('Nostr bunker tools did not load.');
   const pointer = await window.NostrBunker.parseBunkerInput(saved.url);

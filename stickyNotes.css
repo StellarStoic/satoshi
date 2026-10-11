@@ -71,6 +71,18 @@
 .sticky-note--placing:active { cursor: grabbing; }
 .sticky-dialog { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #4b4d4d; border-radius: 8px; background: #17191a; color: #f3f3f1; box-shadow: 0 24px 75px rgba(0,0,0,.64); }
 .sticky-dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
+/* Amber, step two. With nothing handed between the two apps the answer arrives on the clipboard,
+   which is a hand-over a reader cannot guess: it gets a dialog in the middle of the screen with the
+   steps in it, rather than a button appearing under the login form. */
+.amber-steps { margin: 4px 0 16px; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; color: #d7d9d7; }
+.amber-steps strong { color: #f3f3f1; }
+.amber-paste { width: 100%; justify-content: center; }
+.nostr-connect-qr { display: flex; justify-content: center; padding: 12px; margin: 4px 0 12px; background: #ffffff; border-radius: 8px; }
+.nostr-connect-qr__canvas { width: min(300px, 66vw); height: auto; image-rendering: pixelated; }
+.nostr-connect-copy { width: 100%; justify-content: center; margin-bottom: 10px; }
+.nostr-connect-uri { margin-bottom: 12px; font-size: 13px; color: #d7d9d7; }
+.nostr-connect-uri summary { cursor: pointer; }
+.nostr-connect-uri code { display: block; margin-top: 8px; padding: 8px; overflow-wrap: anywhere; word-break: break-all; font-size: 12px; color: #f3f3f1; background: #101213; border: 1px solid #333536; border-radius: 6px; user-select: all; }
 .dialog-inner { position: relative; padding: 26px; overflow: auto; }
 .dialog-inner h2 { margin: 0 42px 8px 0; color: var(--accent, #f2a900); letter-spacing: 0; }
 .dialog-inner > p { color: #bfc1bf; line-height: 1.55; }

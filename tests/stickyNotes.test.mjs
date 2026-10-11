@@ -1145,12 +1145,11 @@ test('a signature that cannot be used says so, and the board does not talk over 
   // A sign-in parked with a callback waits for Amber to come back; one sent without a callback
   // tells the reader what to tap when they return, because nothing will arrive on its own.
   assert.match(script, /status\(elements\.loginStatus, parkedRequest\.copy/);
-  assert.match(script, /'Amber was asked without a callback: approve it, then come back here\.'/);
+  assert.match(script, /'Amber is waiting for your approval\. Come back to this page when you are done\.'/);
   // The clipboard route finishes by itself where the browser allows a read, and falls back to the
   // button - both are in the resume path, not only in the button's own handler.
   assert.match(script, /await adoptAmberClipboard\(\{silent: true\}\)/);
-  assert.match(script, /status\(elements\.loginStatus, 'Approve it in Amber, then tap the button below\.'\)/);
-  assert.match(script, /elements\.amberPaste\.hidden = false;/,
+  assert.match(script, /status\(elements\.amberCopyStatus, 'Amber has it on your clipboard\. Tap the button to hand it over\.'\)/,
     'a failed automatic read offers the button instead of leaving the reader without a way in');
   assert.match(script, /'Waiting for Amber\. Tap Amber again if no answer arrives\.'/);
 });
@@ -1690,4 +1689,37 @@ test('the board lands on the device pixel grid so its texture and text stop craw
   assert.match(script, /function animateBoardZoom\(\) \{[\s\S]{0,140}if \(!boardSettled\) return;/,
     'the first fit is not animated');
   assert.match(script, /elements\.board\.classList\.add\('is-zooming'\)/);
+});
+
+test('one Amber button, with the hand-over in a dialog and a code for desktops', async () => {
+  const [markup, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // One Amber button, and the reader is not asked to know what a callback is.
+  assert.doesNotMatch(markup, /data-login="amber-copy"/, 'the second Amber button is gone');
+  assert.doesNotMatch(markup, /no callback/);
+  assert.equal(markup.match(/data-login="amber"/g).length, 1);
+
+  // The hand-over is a dialog in the middle of the screen, and that is where the button lives.
+  assert.match(markup, /<dialog id="amberCopyDialog" class="sticky-dialog"[\s\S]{0,1600}id="amberPaste"/);
+  assert.match(markup, /class="primary-action amber-paste"/, 'the button that always works is in that dialog');
+  assert.match(markup, /<dialog id="nostrConnectDialog" class="sticky-dialog"/, 'the code has a dialog too');
+  assert.match(markup, /<script src="\/qrCodeGenerator_1_4_4\.js"/, 'the QR generator is loaded on this page');
+  assert.match(css, /\.nostr-connect-qr__canvas/, 'the code is styled as squares on white');
+  assert.match(css, /\.amber-steps/, 'the dialog carries the steps');
+
+  // Android gets the intent, a desktop gets the code - one button, decided by what the reader has.
+  assert.match(script, /if \(!\/Android\/i\.test\(navigator\.userAgent \|\| ''\)\) \{ await showNostrConnectDialog\(\); return; \}/);
+  assert.match(script, /beginAmberLogin\(\{copy: true\}\)/, 'the button asks for the clipboard route');
+  assert.doesNotMatch(script, /'amber-copy'/, 'the second login method is gone from the page as well');
+  assert.match(script, /function showAmberCopyDialog\(\)[\s\S]{0,220}elements\.amberDialog\.showModal\(\)/);
+  assert.match(script, /function drawQrCode\(container, text\)[\s\S]{0,700}qr\.isDark\(row, column\)/,
+    'the code is drawn module by module from the generator');
+  assert.match(script, /elements\.nostrConnect\.addEventListener\('close'[\s\S]{0,180}nostrConnectRequest\?\.cancel\(\)/,
+    'a code that is closed stops waiting');
+  // A reload between the two apps must land on the step that can finish, not on the list of ways in.
+  assert.match(script, /if \(dialog === elements\.login && amberClipboardPending\(\)\) \{\s+dialog = elements\.amberDialog;\s+status\(elements\.amberCopyStatus, 'Approve it in Amber,/);
 });
