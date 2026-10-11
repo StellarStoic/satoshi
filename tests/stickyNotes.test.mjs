@@ -1786,3 +1786,33 @@ test('the board plate separator and the plate itself are styled as metal, not as
   assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'the plate is a slab of aged brass');
   assert.match(css, /\.board-plate\[hidden\] \{ display: none; \}/, 'a board with no cells shows no plate');
 });
+
+test('the board leaves room for fixed chrome across the foot of the page', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // The board's own area stops above the chrome; where there is none the inset is zero, which is how
+  // the pinstr mirror keeps filling the viewport.
+  assert.match(css, /\.sticky-board \{[^}]*top: 0; right: 0; bottom: var\(--board-chrome-bottom, 0px\); left: 0;/);
+
+  const selector = script.slice(script.indexOf('const BOARD_CHROME_SELECTOR'), script.indexOf('function boardChromeBottom()'));
+  const chrome = script.slice(script.indexOf('function boardChromeBottom()'), script.indexOf('function applyBoardChrome()'));
+  assert.ok(selector.length > 0 && chrome.length > 0, 'the measurement is there to read');
+
+  // Only chrome that actually floats over the board and runs across the page's foot takes room.
+  assert.match(chrome, /placement !== 'fixed' && placement !== 'sticky'/, 'static markup never takes room');
+  assert.match(chrome, /rect\.width < window\.innerWidth \* 0\.6/, 'a floating button is not something the board makes room for');
+  assert.match(chrome, /rect\.top < viewport \* 0\.5/, 'a bar at the top of the page is not at its foot');
+  assert.match(chrome, /closest\('dialog, \[role="dialog"\], \.modal, \[aria-modal="true"\]'\)/,
+    "a dialog's own footer belongs to the dialog");
+  // Same code on both hosts: the mirror must not need a different rule.
+  assert.doesNotMatch(selector + chrome, /pinstr|satoshi\.si/i, 'nothing here names a site');
+  // Measured in the boot, after the frame variable and before the first sizing, and re-measured when
+  // the viewport changes.
+  assert.match(script, /setProperty\('--board-frame'[^\n]*\n(?:\/\/[^\n]*\n)*applyBoardChrome\(\);\n(?:\/\/[^\n]*\n)*applyBoardSize\(\);/,
+    'the first fit already knows where the bottom edge is allowed to be');
+  assert.match(script, /window\.addEventListener\('resize', \(\) => \{\n(?:\s*\/\/[^\n]*\n)*\s*applyBoardChrome\(\);/,
+    'a footer that changes height is not missed');
+});

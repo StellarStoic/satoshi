@@ -14,7 +14,11 @@
 .sticky-page .site-help-trigger.site-help-trigger--wide-offset { right: max(288px, calc(272px + env(safe-area-inset-right))) !important; }
 .icon-text-button, .primary-action, .secondary-action, .pay-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border: 1px solid #555; border-radius: 6px; padding: 9px 14px; color: #f6f5ef; background: #202223; font: inherit; cursor: pointer; }
 .primary-action, .pay-button { border-color: var(--accent, #f2a900); background: var(--accent, #f2a900); color: #111; font-weight: 700; }
-.sticky-board { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background:transparent; cursor: grab; touch-action: none; }
+/* The board's own area stops above fixed chrome across the foot of the page (satoshi.si's footer),
+   because a board that runs under it hides its own bottom edge - and the plate on it - behind that
+   chrome with no pan that can bring them out. The inset is measured at runtime in stickyNotes.mjs and
+   is zero wherever there is no such chrome, which is how the pinstr mirror fills the viewport. */
+.sticky-board { position: absolute; top: 0; right: 0; bottom: var(--board-chrome-bottom, 0px); left: 0; overflow: hidden; isolation: isolate; background:transparent; cursor: grab; touch-action: none; }
 .sticky-board.is-panning { cursor: grabbing; }
 /* Every geohash board uses one stable coordinate space; zoom only changes its presentation. */
 /* The board has to live on the transformed element so it pans and zooms with the board (pinned

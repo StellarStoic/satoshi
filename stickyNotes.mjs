@@ -1648,6 +1648,42 @@ function scheduleBoardPaint() {
   boardTexture.timer = setTimeout(() => { boardTexture.timer = 0; paintBoard(); }, 150);
 }
 
+/**
+ * Chrome the board has to leave room for: fixed (or sticky) bars that run across the page's foot and
+ * therefore paint over the board's own bottom edge. Only such chrome counts - a floating button over
+ * the board is not something the board should shrink for, and a footer inside a dialog belongs to that
+ * dialog, not to the page.
+ */
+const BOARD_CHROME_SELECTOR = '[data-live-footer], footer.footer, .site-footer, #footer';
+
+function boardChromeBottom() {
+  const viewport = window.innerHeight || 0;
+  if (!viewport) return 0;
+  let covered = 0;
+  for (const node of document.querySelectorAll(BOARD_CHROME_SELECTOR)) {
+    if (node.closest('dialog, [role="dialog"], .modal, [aria-modal="true"]')) continue;
+    const placement = getComputedStyle(node).position;
+    if (placement !== 'fixed' && placement !== 'sticky') continue;
+    const rect = node.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) continue;
+    if (rect.width < window.innerWidth * 0.6) continue;
+    if (rect.top < viewport * 0.5) continue;
+    covered = Math.max(covered, Math.min(viewport, viewport - rect.top));
+  }
+  return Math.round(covered);
+}
+
+/**
+ * Hand the measurement to the stylesheet as the board's bottom inset. Where a page has no such chrome
+ * the variable is removed, so nothing is left behind to affect a board that never needed it.
+ */
+function applyBoardChrome() {
+  const covered = boardChromeBottom();
+  if (covered > 0) document.documentElement.style.setProperty('--board-chrome-bottom', `${covered}px`);
+  else document.documentElement.style.removeProperty('--board-chrome-bottom');
+  return covered;
+}
+
 function applyBoardSize() {
   // Keep the runtime dimensions tied to the same fixed coordinate space as the first CSS paint.
   elements.canvas.style.width = `${boardSize.width}px`;
@@ -3895,6 +3931,9 @@ loadBoardImage();
 window.addEventListener('beforeunload', () => { try { boardSocket?.close(); } catch {} });
 let boardResizeFrame = 0;
 window.addEventListener('resize', () => {
+  // The footer can change height with the viewport (or with the text it shows), so the board's own
+  // area is re-measured here rather than only at load.
+  applyBoardChrome();
   cancelAnimationFrame(boardResizeFrame);
   boardResizeFrame = requestAnimationFrame(() => {
     const rect = elements.board.getBoundingClientRect();
@@ -3921,6 +3960,9 @@ updateAccount();
 // One source for the rail's thickness: the stylesheet reads this variable, the
 // fitting maths reads the constant, so the frame and the fit cannot disagree.
 elements.canvas.style.setProperty('--board-frame', `${BOARD_FRAME_WIDTH}px`);
+// Room for any fixed chrome across the foot of the page, before the board is sized for the first
+// time, so the first fit already knows where the board's bottom edge is allowed to be.
+applyBoardChrome();
 // The canvas wears its board's size from the first paint. The board the reader arrives on comes
 // from the link, the kept place or the remembered board, and that resolution does not pass
 // through selectBoard, so the size is worked out from what it settled on here as well.
