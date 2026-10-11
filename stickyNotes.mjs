@@ -298,7 +298,10 @@ const BOARD_FRAME_WIDTH = 26;
 // The plate on the bottom rail: a fixed, small plaque. Its width is what the engraved line has to fit
 // inside, so it is stated once here and the type is cut to it.
 const BOARD_PLATE_WIDTH = 620;
-const BOARD_PLATE_TYPE_MAX = 46;
+// Capped well under the plate's height (46 board px): the ink of a geohash reaches past its line box
+// - j, g, p, q and y carry descenders - and the plate clips at its edge, so the letters keep room to
+// hang below the line instead of being shaved off.
+const BOARD_PLATE_TYPE_MAX = 34;
 // A hair of brass left at each end of the engraving. The line is measured once and then the board is
 // free to be zoomed, and the browser rounds a row of letters and nail heads to device pixels slightly
 // differently at each scale - so the type is cut a little inside the plate rather than exactly to it.

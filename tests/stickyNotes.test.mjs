@@ -1737,6 +1737,11 @@ test('the board plate is engraved with its own cells, cut to fit, and no deeper 
   assert.match(script, /const BOARD_PLATE_WIDTH = 620;/);
   assert.ok(620 <= 2048 / 3, 'the plate stays small against the board it is nailed to');
   assert.match(css, /\.board-plate \{[^}]*width: 620px/);
+  assert.match(css, /\.board-plate \{[^}]*height: 46px/, 'the plate is a slim strip on the bottom rail');
+  // The letters must have somewhere to hang: a geohash's ink reaches past its line box.
+  const plateHeight = Number(/\.board-plate \{[^}]*height: (\d+)px/.exec(css)[1]);
+  const typeMax = Number(/const BOARD_PLATE_TYPE_MAX = (\d+);/.exec(script)[1]);
+  assert.ok(plateHeight - typeMax >= 10, `room for descenders: plate ${plateHeight}px, type ${typeMax}px`);
 
   // It belongs to the board: inside the transformed canvas, after the rail, before the notes.
   const canvas = markup.indexOf('id="stickyCanvas"');
