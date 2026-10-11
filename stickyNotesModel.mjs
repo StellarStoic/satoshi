@@ -946,3 +946,56 @@ export function boardBitmapSize(scale, pixelRatio = 1, boardSide = 2048) {
 export function boardPatternScale(bitmapSide, boardSide = 2048) {
   return (BOARD_TILE_PX / BOARD_IMAGE_PX) * (bitmapSide / boardSide);
 }
+
+/**
+ * The patterns a reader can put on the board. The first entry is the default: its file sits in
+ * img/ beside its own attribution, and any pattern added here needs the same, because a
+ * texture's licence travels with the image.
+ */
+export const BOARD_TEXTURES = Object.freeze([
+  Object.freeze({id: 'cork', label: 'Cork', url: '/img/board-cork.png'}),
+]);
+
+export const DEFAULT_BOARD_TEXTURE_URL = BOARD_TEXTURES[0].url;
+
+/** Long enough for a real image address, short enough that a paste of a file cannot get in. */
+export const BOARD_TEXTURE_URL_MAX = 2048;
+
+/**
+ * A pattern address a reader typed, or '' when it is not one this page will paint with. Only
+ * http(s) and this site's own paths pass through: a `data:` URL is a hole in the shape of an
+ * image, a `javascript:` one is not an image at all, and neither belongs in a style rule. The
+ * value goes through the URL parser, which also resolves what a bare string hides - a newline
+ * inside a scheme included.
+ */
+export function boardTextureUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw.length > BOARD_TEXTURE_URL_MAX) return '';
+  if (raw.startsWith('/') && !raw.startsWith('//')) return raw;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return '';
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
+  return parsed.href;
+}
+
+/**
+ * What to call a pattern: the name in the catalogue, the file name for a path on this site, and
+ * the host for a pattern linked from somewhere else.
+ */
+export function boardTextureLabel(url) {
+  const named = BOARD_TEXTURES.find(texture => texture.url === url);
+  if (named) return named.label;
+  let parsed;
+  try {
+    parsed = new URL(String(url), 'https://satoshi.si');
+  } catch {
+    return 'That pattern';
+  }
+  const file = parsed.pathname.split('/').filter(Boolean).pop();
+  if (!file) return parsed.host || 'That pattern';
+  return parsed.host === 'satoshi.si' ? file : `${file} on ${parsed.host}`;
+}

@@ -24,7 +24,7 @@
     <h1 class="sticky-page-title">Pinstr</h1>
     <div class="sticky-top-actions" aria-label="Pinstr controls">
       <span class="sticky-help-slot" aria-hidden="true"></span>
-      <button type="button" id="stickySettings" class="sticky-top-button" aria-label="Board settings are coming later" title="Board settings are coming later" disabled><i class="lni lni-gear-1" aria-hidden="true"></i></button>
+      <button type="button" id="stickySettings" class="sticky-top-button" aria-label="Board style" title="Board style"><i class="lni lni-gear-1" aria-hidden="true"></i></button>
       <button type="button" id="noteSort" class="sticky-top-button note-sort-button" aria-label="Sort and filter notes" title="Sort and filter notes" aria-pressed="false"><i class="lni lni-asana" aria-hidden="true"></i></button>
       <button type="button" id="openStickyBoard" class="sticky-top-button" aria-label="Choose board" title="Choose board"><i class="lni lni-map-marker-1" aria-hidden="true"></i></button>
       <button type="button" id="shareArea" class="sticky-top-button" aria-label="Show the notes around me" title="Show the notes around me"><i class="lni lni-cerebras" aria-hidden="true"></i></button>
@@ -72,6 +72,24 @@
       </label>
       <div id="noteSortStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
+  </dialog>
+
+  <dialog id="boardStyleDialog" class="sticky-dialog board-style-dialog" aria-labelledby="boardStyleTitle">
+    <form id="boardStyleForm" class="dialog-inner board-style-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="boardStyleTitle">Board style</h2>
+      <p>Choose the pattern your board is painted with. It is kept in this browser only.</p>
+      <div id="boardTextureOptions" class="board-textures" role="group" aria-label="Pattern"></div>
+      <label class="board-texture-field" for="boardTextureUrl"><span>Or link to a pattern image</span>
+        <input id="boardTextureUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2048" placeholder="https://example.com/pattern.png">
+      </label>
+      <p class="board-texture-note">A linked image is fetched by your browser from that address, so that site sees your visit. Patterns you add yourself stay yours.</p>
+      <div class="board-chooser__actions">
+        <button type="button" id="resetBoardTexture" class="secondary-action"><span>Use the default</span></button>
+        <button type="submit" class="primary-action">Use this pattern</button>
+      </div>
+      <div id="boardStyleStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </form>
   </dialog>
 
   <dialog id="boardDialog" class="sticky-dialog" aria-labelledby="boardDialogTitle">

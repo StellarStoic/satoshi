@@ -44,7 +44,11 @@ import {
   boardPatternScale,
   GRID_MIN_CELL_PX,
   linkDisplay,
-  linkHref,} from './stickyNotesModel.mjs';
+  linkHref,
+  BOARD_TEXTURES,
+  DEFAULT_BOARD_TEXTURE_URL,
+  boardTextureUrl,
+  boardTextureLabel,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   getNostrSession,
@@ -83,11 +87,20 @@ const LOCKED_PLACE_KEY = 'satoshi:sticky:locked-place:v1';
 const SAVED_PLACES_KEY = 'satoshi:sticky:saved-places:v1';
 const SAVED_PLACES_MAX = 24;
 const SAVED_PLACE_NAME_MAX = 40;
+// The pattern the reader picked for their board: this browser only, like the board itself.
+const BOARD_TEXTURE_KEY = 'satoshi:sticky:board-texture:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   loginConfirmation: document.getElementById('loginConfirmation'),
   boardFrame: document.getElementById('boardFrame'),
   boardPaint: document.getElementById('boardPaint'),
+  stickySettings: document.getElementById('stickySettings'),
+  boardStyleDialog: document.getElementById('boardStyleDialog'),
+  boardStyleForm: document.getElementById('boardStyleForm'),
+  boardTextureOptions: document.getElementById('boardTextureOptions'),
+  boardTextureUrl: document.getElementById('boardTextureUrl'),
+  resetBoardTexture: document.getElementById('resetBoardTexture'),
+  boardStyleStatus: document.getElementById('boardStyleStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
   noteSort: document.getElementById('noteSort'), noteSortDialog: document.getElementById('noteSortDialog'),
   noteViewOptions: document.getElementById('noteViewOptions'), followsOnly: document.getElementById('followsOnly'),
@@ -1295,13 +1308,103 @@ function scheduleBoardTransform(rect) {
  * is drawn into it once per size. The canvas sits inside the transformed element, so the board still
  * scales, pans and stays aligned with the notes.
  */
+/**
+ * The pattern the reader picked for their board, kept in this browser and falling back to the
+ * catalogue's own when they have not picked one.
+ */
+let boardTextureChoice = boardTextureUrl(localStorage.getItem(BOARD_TEXTURE_KEY) || '');
+// Set while the reader's own pattern is failing to load, so the catalogue's pattern is painted
+// without forgetting the address they typed.
+let boardTextureFallback = false;
+
+/** The address the canvas is painted from. */
+function boardTextureSource() {
+  return (!boardTextureFallback && boardTextureChoice) || DEFAULT_BOARD_TEXTURE_URL;
+}
+
+function sayBoardStyle(message, error = false) {
+  status(elements.boardStyleStatus, message, error);
+}
+
+/** Draw the pattern choices, marking the one the board is using now. */
+function renderBoardTextures() {
+  const group = elements.boardTextureOptions;
+  if (!group) return;
+  group.replaceChildren();
+  const current = boardTextureSource();
+  for (const texture of BOARD_TEXTURES) {
+    const selected = texture.url === current;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'board-texture';
+    button.dataset.textureUrl = texture.url;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    const swatch = document.createElement('span');
+    swatch.className = 'board-texture__swatch';
+    swatch.style.backgroundImage = `url("${texture.url}")`;
+    swatch.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'board-texture__label';
+    label.textContent = texture.label;
+    button.append(swatch, label);
+    button.addEventListener('click', () => applyBoardTexture(texture.url));
+    group.append(button);
+  }
+}
+
+function openBoardStyle() {
+  renderBoardTextures();
+  elements.boardTextureUrl.value = boardTextureChoice;
+  sayBoardStyle('');
+  showDialog(elements.boardStyleDialog);
+  requestAnimationFrame(() => elements.boardTextureUrl.focus());
+}
+
+/** Paint the board with `url` ('' means the catalogue's own) and remember the choice here. */
+function applyBoardTexture(url) {
+  boardTextureChoice = url;
+  if (url) localStorage.setItem(BOARD_TEXTURE_KEY, url);
+  else localStorage.removeItem(BOARD_TEXTURE_KEY);
+  // The canvas repaints when its size changes or its flag is cleared, and a new pattern does not
+  // change the size: clearing the flag is what tells it the picture is new.
+  boardTexture.ready = false;
+  boardTextureFallback = false;
+  elements.boardPaint.dataset.painted = '';
+  loadBoardImage();
+  renderBoardTextures();
+  elements.boardStyleDialog.close();
+  status(elements.boardStatus, url ? `Board pattern: ${boardTextureLabel(url)}.` : 'Board pattern: the default.');
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 3000);
+}
+
 const boardTexture = {image: null, ready: false, timer: 0};
 
 function loadBoardImage() {
+  const source = boardTextureSource();
   const image = new Image();
   image.decoding = 'async';
   image.addEventListener('load', () => { boardTexture.image = image; boardTexture.ready = true; paintBoard(); }, {once: true});
-  image.src = '/img/board-cork.png';
+  // A pattern that will not load leaves the canvas unpainted, and the colour under it is what
+  // the reader sees. Going back to the catalogue's own pattern is the one repair that always has
+  // a chance of working, and the choice is cleared first so a second failure cannot loop.
+  image.addEventListener('error', () => {
+    if (boardTextureChoice && !boardTextureFallback) {
+      // The address stays where the reader put it: a pattern that is down today may be up
+      // tomorrow, and forgetting what they typed is a worse failure than painting the
+      // catalogue's own pattern for now.
+      boardTextureFallback = true;
+      elements.boardPaint.dataset.painted = '';
+      status(elements.boardStatus, 'That pattern could not be loaded. The board keeps its own.');
+      elements.boardStatus.hidden = false;
+      loadBoardImage();
+      return;
+    }
+    status(elements.boardStatus, 'That board pattern could not be loaded.', true);
+    elements.boardStatus.hidden = false;
+  }, {once: true});
+  image.src = source;
 }
 
 function paintBoard() {
@@ -3075,6 +3178,18 @@ elements.account.addEventListener('click', () => {
 elements.closePayment.addEventListener('click', discardInvoice);
 elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
+elements.stickySettings.addEventListener('click', openBoardStyle);
+elements.resetBoardTexture.addEventListener('click', () => applyBoardTexture(''));
+elements.boardStyleForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const typed = elements.boardTextureUrl.value;
+  const url = boardTextureUrl(typed);
+  if (typed.trim() && !url) {
+    sayBoardStyle('Use an https:// link, a /path on this site, or leave it empty for the default.', true);
+    return;
+  }
+  applyBoardTexture(url);
+});
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {
     console.error('Could not open the geohash map:', error);

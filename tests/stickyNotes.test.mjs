@@ -519,7 +519,7 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   // parts of it empty, which a reader sees as blank squares the size of the board tile. What matters is
   // kept: the board still tiles every 600 board px, still moves with the board, and still sits under
   // the rail and the notes.
-  assert.match(script, /image\.src = '\/img\/board-cork\.png'/);
+  assert.match(script, /image\.src = source;/, 'the pattern comes from the reader’s choice, never a literal');
   assert.match(script, /createPattern\(boardTexture\.image, 'repeat'\)/,
     'the board is still a repeating pattern, drawn into the canvas');
   assert.match(html, /<div id="stickyCanvas"[^>]*>\s*<canvas id="boardPaint"/,
@@ -566,7 +566,7 @@ test('board chrome stays compact over the board', async () => {
   ]);
   assert.doesNotMatch(html, /class="sticky-header"/);
   assert.match(html, /id="stickySettings"[\s\S]{0,180}lni-gear-1/);
-  assert.match(html, /id="stickySettings"[^>]*disabled/);
+  assert.doesNotMatch(html, /id="stickySettings"[^>]*disabled/, 'the gear is the settings control now');
   assert.match(html, /id="nostrAccount"[\s\S]{0,180}lni-user-4/);
   assert.match(html, /class="sticky-help-slot"[\s\S]{0,180}id="stickySettings"[\s\S]{0,180}lni-gear-1[\s\S]{0,180}id="noteSort"[\s\S]{0,180}lni-asana[\s\S]{0,180}id="openStickyBoard"[\s\S]{0,180}lni-map-marker-1[\s\S]{0,180}id="shareArea"[\s\S]{0,180}lni-cerebras[\s\S]{0,180}id="nostrAccount"[\s\S]{0,180}lni-user-4[\s\S]{0,180}id="newSticky"[\s\S]{0,180}lni-plus/,
     'top controls follow the requested question, gear, sort, map, nearby, account, plus order');
@@ -1579,4 +1579,42 @@ test('the board tiles every 600 board px, whatever size the bitmap is', () => {
     assert.equal(BOARD_IMAGE_PX * boardPatternScale(side, 2048), 600 * (side / 2048),
       'the tile lands where the board would put it, measured in bitmap pixels');
   }
+});
+
+
+test('a board pattern is only painted from an address the page will really use', async () => {
+  const model = await import('../stickyNotesModel.mjs');
+  assert.equal(model.boardTextureUrl('https://example.com/p.png'), 'https://example.com/p.png');
+  assert.equal(model.boardTextureUrl('  http://example.com/p.png  '), 'http://example.com/p.png');
+  assert.equal(model.boardTextureUrl('/img/mine.png'), '/img/mine.png');
+  for (const bad of ['javascript:alert(1)', 'data:image/png;base64,AAAA', 'file:///etc/passwd',
+                     '//evil.example/p.png', 'example.com/p.png', '', '   ', 'x'.repeat(3000)]) {
+    assert.equal(model.boardTextureUrl(bad), '', `${JSON.stringify(bad)} must not become a pattern`);
+  }
+  assert.equal(model.boardTextureUrl('java\nscript:alert(1)'), '', 'a newline must not smuggle a scheme through');
+  assert.equal(model.DEFAULT_BOARD_TEXTURE_URL, '/img/board-cork.png');
+  assert.equal(model.boardTextureLabel('/img/board-cork.png'), 'Cork');
+  assert.equal(model.boardTextureLabel('/img/grain.png'), 'grain.png');
+  assert.equal(model.boardTextureLabel('https://cdn.example.com/a/b.png'), 'b.png on cdn.example.com');
+});
+
+test('the board style dialog keeps its choice in this browser, never in the note', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(script, /const BOARD_TEXTURE_KEY = 'satoshi:sticky:board-texture:v1'/);
+  assert.match(script, /image\.src = source/);
+  assert.match(script, /localStorage\.setItem\(BOARD_TEXTURE_KEY, url\)/);
+  assert.match(script, /elements\.stickySettings\.addEventListener\('click', openBoardStyle\)/);
+  assert.match(script, /\(!boardTextureFallback && boardTextureChoice\) \|\| DEFAULT_BOARD_TEXTURE_URL/,
+    'an unset or failing choice falls back to the catalogue pattern');
+  assert.match(script, /elements\.boardPaint\.dataset\.painted = '';/,
+    'a new pattern clears the painted flag, or the canvas keeps the old picture');
+  assert.match(script, /boardTextureFallback = true;/,
+    'a pattern that will not load falls back without erasing the address the reader typed');
+  assert.match(html, /<dialog id="boardStyleDialog"[\s\S]{0,1600}id="boardTextureUrl"/,
+    'the dialog offers a pattern address');
+  assert.match(html, /id="stickySettings"[^>]*aria-label="Board style"/);
+  assert.doesNotMatch(html, /id="stickySettings"[^>]*disabled/, 'the gear is the settings control now');
 });
