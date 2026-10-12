@@ -1983,7 +1983,7 @@ test('a board is shared by the link that carries its picture', async () => {
     'and the plate must stop swallowing its own clicks');
   assert.match(script, /dataset\.pinstrCard = 'ready'/,
     'the page tells the desk when the board is whole, so no picture is taken half-painted');
-  assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 34px; overflow: visible;/,
+  assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 34px; aspect-ratio: 1 \/ 1;/,
     'card mode is the board alone, with the rails and plate that hang outside it in the frame');
   // Everything the site paints around the board has to go, or it ends up inside a shared picture:
   // the menu affordance, the live footer, and the consent overlay, which dims the board as a backdrop.
