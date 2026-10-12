@@ -631,7 +631,7 @@ test('board chrome stays compact over the board', async () => {
   assert.match(script, /canvasWidth: boardSize\.width, canvasHeight: boardSize\.height/);
   assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
-  assert.match(script, /boardShareUrl\(location\.origin, chosen\)/,
+  assert.match(script, /const url = boardShareUrl\(chosen\);/,
     'a board is shared as the page that carries its picture, not as the app URL');
   assert.match(script, /BOARD_REMEMBER_KEY/);
   assert.match(script, /localStorage\.removeItem\(BOARD_KEY\)/);
@@ -1944,12 +1944,16 @@ test('an address in the composer counts as the word the paper prints', async () 
 
 
 test('a board is shared by the link that carries its picture', async () => {
-  assert.equal(boardShareUrl('https://satoshi.si', ['u0qj7z0y']), 'https://satoshi.si/b/u0qj7z0y');
-  assert.equal(boardShareUrl('https://pinstr.si/', ['u0qj7z0y', 'u0qj7z0z']),
-    'https://pinstr.si/b/u0qj7z0y,u0qj7z0z', 'a board of several cells lists them all');
-  assert.equal(boardShareUrl('https://pinstr.si', []), '', 'no cells, no board, no link');
-  assert.equal(boardShareUrl('https://pinstr.si', [null, '']), '');
-  assert.equal(boardShareUrl('https://pinstr.si', null), '');
+  assert.equal(boardShareUrl(['u0qj7z0y']), 'https://pinstr.si/b/u0qj7z0y');
+  assert.equal(boardShareUrl(['u0qj7z0y', 'u0qj7z0z']), 'https://pinstr.si/b/u0qj7z0y,u0qj7z0z',
+    'a board of several cells lists them all');
+  assert.equal(boardShareUrl(['u0qj7z0y'], 'https://example.org/'), 'https://example.org/b/u0qj7z0y',
+    'and it can be built for another host, which is how the board is tested elsewhere');
+  assert.equal(boardShareUrl([]), '', 'no cells, no board, no link');
+  assert.equal(boardShareUrl([null, '']), '');
+  assert.equal(boardShareUrl(null), '');
+  assert.match(script, /boardShareUrl\(chosen\)/,
+    'the page shares the board\u2019s own address rather than its own host');
 
   const [script, page, css] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),

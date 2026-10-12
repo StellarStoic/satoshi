@@ -4081,7 +4081,9 @@ function openShareBoard(cells = activeGeohashes) {
     status(elements.boardChooserStatus, 'Enter or open a geohash before sharing it.', true);
     return;
   }
-  const url = boardShareUrl(location.origin, chosen);
+  // The board's own host, not this page's: satoshi.si serves no board pages, and the picture a
+  // preview fetches is built there too - so the link and its picture always agree.
+  const url = boardShareUrl(chosen);
   elements.shareBoardLink.value = url;
   elements.shareBoardNative.hidden = !navigator.share;
   const preview = elements.shareBoardPreview;

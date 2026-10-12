@@ -1147,7 +1147,9 @@ export function boardPlateFontSize(innerWidth, measuredWidth, maximum) {
  * own picture so a chat unfurls the board itself instead of the site's generic card. An empty set
  * of cells has no board to point at, so there is no link.
  */
-export function boardShareUrl(origin, cells) {
+export const PINSTR_SHARE_ORIGIN = 'https://pinstr.si';
+
+export function boardShareUrl(cells, origin = PINSTR_SHARE_ORIGIN) {
   const clean = (cells || []).filter(cell => typeof cell === 'string' && cell);
   if (!clean.length) return '';
   return `${String(origin || '').replace(/\/+$/, '')}/b/${clean.join(',')}`;
