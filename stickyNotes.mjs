@@ -3,6 +3,7 @@ import {
   STICKY_FONTS,
   STICKY_ANONYMOUS_PRICE_SATS,
   STICKY_MAX_CHARACTERS,
+  stickyNoteLength,
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
   describeStickyAction,
@@ -1946,7 +1947,7 @@ function livelinessRung(key = selectedLiveliness) {
 function livelinessHintText(rung) {
   const when = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'})
     .format(stickyExpiration(Math.floor(Date.now() / 1000), rung.key) * 1000);
-  return `The relay deletes it around ${when}. Nothing keeps a copy.`;
+  return `The relay deletes it around ${when}. Other relays that already carry it keep their own copy.`;
 }
 
 function selectLiveliness(key) {
@@ -2008,7 +2009,7 @@ function updateCapacity() {
   // Counted in the text that will be published: a mention is drawn as a name in
   // the editor but travels as its whole npub, so what the counter shows is what
   // the relay will hold.
-  const length = normaliseStickyText(editorContent()).length;
+  const length = stickyNoteLength(normaliseStickyText(editorContent()));
   const full = length >= STICKY_MAX_CHARACTERS;
   const almostFull = !full && length >= Math.floor(STICKY_MAX_CHARACTERS * .9);
   elements.draft.classList.toggle('sticky-note--dense', length > 280);
@@ -2023,7 +2024,7 @@ function handleEditorInput() {
   const text = elements.editor.textContent;
   const published = normaliseStickyText(editorContent());
   elements.draft.classList.toggle('sticky-note--dense', published.length > 280);
-  if (published.length > STICKY_MAX_CHARACTERS) {
+  if (stickyNoteLength(published) > STICKY_MAX_CHARACTERS) {
     elements.editor.textContent = lastValidEditor;
     updateCapacity();
     fitDraftTypography();

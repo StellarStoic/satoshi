@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
   boardPatternScale,
@@ -1836,4 +1836,25 @@ test('a link chip is not drawn welded to the character before it', async () => {
   assert.match(head, /previous\.type === 'text'/, 'the drawing looks at the run before the chip');
   assert.match(head, /createTextNode\(' '\)/, 'and separates it with a space when it does not end in one');
   assert.match(head, /part\.type === 'link' && index/, 'only a link chip, and never a leading one');
+});
+
+
+test('a long link counts as the word the note shows', () => {
+  const link = 'https://example.com/' + 'a'.repeat(5000);
+  assert.equal(stickyNoteLength(`see ${link} now`), 'see '.length + 'link'.length + ' now'.length,
+    'an address counts as the word the paper prints in its place');
+  assert.ok(stickyNoteLength(`see ${link} now`) <= STICKY_MAX_CHARACTERS,
+    'five thousand characters of address leave the note its room');
+
+  // the same note is published rather than refused, and read back rather than hidden
+  const template = makeStickyTemplate({content: `see ${link} now`, color: 'yellow',
+    x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH});
+  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.ok(parsed, 'the board still reads its own note');
+  assert.ok(String(parsed.content).includes(link), 'the address travels whole');
+
+  // plain text is measured exactly as before, and a note that is really too long is refused
+  assert.equal(stickyNoteLength('y'.repeat(STICKY_MAX_CHARACTERS)), STICKY_MAX_CHARACTERS);
+  assert.throws(() => makeStickyTemplate({content: 'y'.repeat(STICKY_MAX_CHARACTERS + 1),
+    color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH}), /full/i);
 });

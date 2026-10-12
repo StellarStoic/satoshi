@@ -182,6 +182,24 @@ function mentionMatches(content) {
 
 /** How much of an address the note's confirmation shows before the rest waits behind the arrow. */
 export const LINK_DISPLAY_MAX = 200;
+export const LINK_LABEL = 'link';
+
+/**
+ * What the character limit and the counter count: the note as the reader will see it. An
+ * address is machine data that can run to thousands of characters, while the paper shows the
+ * word "link" in its place, so a link counts as that word. Mentions still count as the npub
+ * they travel as. The desk measures a note the same way, which is what the frontend contract
+ * check holds together.
+ */
+export function stickyNoteLength(content) {
+  let length = 0;
+  for (const part of stickyTextParts(content)) {
+    if (part.type === 'link') length += LINK_LABEL.length;
+    else if (part.type === 'mention') length += [...part.token].length; // travels as its npub
+    else length += [...part.text].length;
+  }
+  return length;
+}
 
 const LINK_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
 /** Punctuation a sentence leaves outside its link. */
@@ -799,7 +817,7 @@ export function normaliseStickyHashtags(input) {
 export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
-  if (text.length > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
+  if (stickyNoteLength(text) > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
   // Mandatory on purpose: a note with no expiry would sit on the relay forever,
@@ -861,7 +879,7 @@ export function parseStickyEvent(event) {
   const font = sticky[6] || 'typewriter';
   if (!STICKY_FONTS.includes(font)) return null;
   const content = normaliseStickyText(event.content);
-  if (!content || content.length > STICKY_MAX_CHARACTERS) return null;
+  if (!content || stickyNoteLength(content) > STICKY_MAX_CHARACTERS) return null;
   const named = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
   if (!named.length) return null;
   // The deepest tags are the cells the note was pinned to; anything shallower is a
