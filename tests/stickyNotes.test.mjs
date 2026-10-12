@@ -1417,12 +1417,14 @@ test('opening a board keeps the wooden rail, instead of deleting it with the can
     'the frame lives inside the canvas, so it pans and zooms with the board');
 
   // so the place that clears the canvas must keep it
-  assert.match(page, /elements\.canvas\.replaceChildren\(elements\.boardFrame\)/,
+  assert.match(page,
+    /elements\.canvas\.replaceChildren\(\s*\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate\]\.filter\(Boolean\)\)/,
     'clearing the canvas keeps the rail');
   assert.doesNotMatch(page, /elements\.canvas\.replaceChildren\(\)/,
     'a bare clear would delete the board\u2019s own edge');
   assert.match(page, /boardFrame: document\.getElementById\('boardFrame'\)/);
   // and nothing else clears that canvas
+  assert.match(page, /boardPlateLine = '';/, 'and the plate is re-engraved for the new board');
   assert.equal((page.match(/elements\.canvas\.replaceChildren/g) || []).length, 1,
     'one place clears the canvas, and it keeps the rail');
 });

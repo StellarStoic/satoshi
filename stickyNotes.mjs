@@ -1589,10 +1589,18 @@ function selectBoard(geohash, closeDialog = true) {
   rendered.clear();
   clearRevealedFilteredNote();
   noteEvents.clear();
-  // The wooden rail is markup inside this canvas, so a bare replaceChildren() deleted the
-  // board's own edge every time a board was opened - which is why the border was missing on
-  // a phone, where a board almost always gets chosen before the board is looked at. Keep it.
-  elements.canvas.replaceChildren(elements.boardFrame);
+  // The painted canvas, the wooden rail and the plate are all markup inside this canvas. A bare
+  // replaceChildren() deleted the board's own edge, and keeping only the rail deleted the other
+  // two: opening a board left a blank sheet with no pattern and no plate on it. Keep all three, in
+  // the order the markup has them, and let the notes go - they belong to the board being left and
+  // are re-fetched for the one being opened.
+  elements.canvas.replaceChildren(
+    ...[elements.boardPaint, elements.boardFrame, elements.boardPlate].filter(Boolean));
+  // Both of them cache what they last drew: the plate its engraving, the canvas its bitmap. A board
+  // change invalidates both, so clear them before the new board is fitted and painted.
+  boardPlateLine = '';
+  if (elements.boardPaint) elements.boardPaint.dataset.painted = '';
+  paintBoard();
   elements.boardStatus.hidden = false;
   status(elements.boardStatus, `Opening board ${boardCellsLabel()}...`);
   if (closeDialog) elements.boardDialog.close();
