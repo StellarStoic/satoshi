@@ -443,4 +443,5 @@ body.is-card .sticky-shell { padding: 0; margin: 0; max-width: none; min-height:
    the browser captures the finished board - rails and plate included - on the page's own dark ground.
    The box is square because the fitting maths takes its scale from the width alone, so a box that is
    wider than it is tall would push the board's own height, and the plate with it, out of the frame. */
-body.is-card #stickyBoard { position: fixed; inset: 34px; aspect-ratio: 1 / 1; margin: auto; overflow: visible; --board-chrome-bottom: 0px; }
+body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; right: 0; margin-inline: auto;
+  width: min(calc(100vw - 68px), calc(100vh - 96px)); aspect-ratio: 1 / 1; overflow: visible; --board-chrome-bottom: 0px; }
