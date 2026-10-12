@@ -1952,14 +1952,14 @@ test('a board is shared by the link that carries its picture', async () => {
   assert.equal(boardShareUrl([]), '', 'no cells, no board, no link');
   assert.equal(boardShareUrl([null, '']), '');
   assert.equal(boardShareUrl(null), '');
-  assert.match(script, /boardShareUrl\(chosen\)/,
-    'the page shares the board\u2019s own address rather than its own host');
 
   const [script, page, css] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8')
   ]);
+  assert.match(script, /boardShareUrl\(chosen\)/,
+    'the page shares the board\u2019s own address rather than its own host');
   assert.match(page, /<button type="button" id="boardPlate"/,
     'the plate names the board, so the plate is what opens the share dialog');
   assert.ok(!/<div id="boardPlate"/.test(page), 'and it is no longer a div that cannot be pressed');
