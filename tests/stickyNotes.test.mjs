@@ -2119,3 +2119,43 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(markup, /<p id="amberCopyNote" class="amber-note amber-copy-note" hidden><\/p>/);
   assert.match(script, /elements\.amberPaste\.addEventListener\('click'/);
 });
+
+test('a phone hands its NIP-46 invitation straight to Amber, and a reload keeps it', async () => {
+  const [script, markup, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // The phone gets a button that opens Amber on the same device; a desktop keeps the code, and the
+  // link stays in a copyable field either way.
+  assert.match(markup, /id="nostrConnectOpen"[^>]*hidden>/);
+  assert.match(markup, /<span>Open Amber on this phone<\/span>/);
+  assert.match(script, /elements\.nostrConnectOpen\.hidden = !onAndroid;/);
+  assert.match(script, /elements\.nostrConnectOpen\.addEventListener\('click', \(\) => \{[\s\S]{0,400}location\.assign\(uri\)/);
+  assert.match(script, /const uri = nostrConnectRequest\?\.uri \|\| elements\.nostrConnectUri\.textContent;/);
+  assert.match(script, /const onAndroid = \/Android\/i\.test\(navigator\.userAgent \|\| ''\);/);
+  assert.match(script, /drawQrCode\(elements\.nostrConnectQr, request\.uri\)/, 'the code is still drawn for a desktop');
+  assert.match(markup, /<code id="nostrConnectUri"><\/code>/, 'the link stays in a copyable field');
+  assert.match(css, /\.nostr-connect-open \{/);
+
+  // A reload during enrolment keeps the invitation already handed to Amber; a window that expires is
+  // not reused - the next attempt mints a new client key and secret.
+  assert.match(script, /!afterTimeout && pendingNostrConnect\(\) \? resumeNostrConnect\(\) : beginNostrConnect\(\)/);
+  assert.match(script, /pendingNostrConnect,\n  pendingAmberRequest,/);
+  assert.match(script, /resumeAmber,\n  resumeNostrConnect,/);
+  assert.match(script, /if \(!afterTimeout && elements\.nostrConnect\.open && \/did not answer\/\.test\(error\.message\)\) await attempt\(true\);/);
+
+  // The fallback Amber documents for itself sits where the NIP-46 flow lives, and the copy action
+  // names it too: one paste of the invitation, not a signature paste.
+  assert.match(markup, /Add a new application<\/strong>, then <strong>Paste from clipboard<\/strong> \(or <strong>Scan a QR Code<\/strong>\)/);
+  assert.match(markup, /That is this invitation link, pasted once — not a signature\./);
+  assert.match(script, /'Link copied\. In Amber, Add a new application, then Paste from clipboard\.'/);
+
+  // The invitation is reachable on the phone the hand-off is for, without disturbing the two ways in.
+  assert.match(markup, /data-login="amber-pair"/);
+  assert.equal(markup.match(/data-login="amber"/g).length, 1, 'the existing Amber button still stands alone');
+  assert.match(script, /else if \(method === 'amber-pair'\) \{ await showNostrConnectDialog\(\); return; \}/);
+  assert.match(script, /elements\.amberPair\.hidden = !\/Android\/i\.test\(navigator\.userAgent \|\| ''\);/);
+  assert.match(css, /\.amber-pair \{/);
+});

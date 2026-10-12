@@ -205,6 +205,7 @@
         <button type="button" data-login="extension"><i class="lni lni-plug-1" aria-hidden="true"></i><span>Browser extension</span></button>
         <button type="button" data-login="amber"><i class="lni lni-phone" aria-hidden="true"></i><span>Amber</span></button>
       </div>
+      <button type="button" class="amber-pair" id="amberPair" data-login="amber-pair" hidden><i class="lni lni-link-2" aria-hidden="true"></i><span>Pair Amber with this board (no clipboard)</span></button>
       <label class="login-field"><span>Bunker</span><input id="bunkerInput" type="text" inputmode="url" autocomplete="off" placeholder="bunker://..."><button type="button" data-login="bunker">Connect</button></label>
         <button type="button" class="bunker-reconnect" data-login="bunker-saved" id="bunkerReconnect" hidden><i class="lni lni-phone" aria-hidden="true"></i><span>Reconnect your bunker</span></button>
       <details class="private-key-login">
@@ -238,11 +239,13 @@
   <dialog id="nostrConnectDialog" class="sticky-dialog" aria-labelledby="nostrConnectTitle">
     <div class="dialog-inner">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
-      <h2 id="nostrConnectTitle">Scan this with Amber</h2>
-      <p>In Amber, open <strong>Connect</strong> and scan the code. The two then talk over a relay, so no key reaches this page and nothing has to be copied by hand.</p>
+      <h2 id="nostrConnectTitle">Connect Amber to this board</h2>
+      <p>Amber and this board then talk over a relay, so no key reaches this page and nothing is copied by hand.</p>
+      <button type="button" id="nostrConnectOpen" class="primary-action nostr-connect-open" hidden><i class="lni lni-phone" aria-hidden="true"></i><span>Open Amber on this phone</span></button>
       <div class="nostr-connect-qr" id="nostrConnectQr" aria-hidden="true"></div>
       <button type="button" id="nostrConnectCopy" class="secondary-action nostr-connect-copy"><i class="lni lni-copy-2" aria-hidden="true"></i><span>Copy the link instead</span></button>
       <details class="nostr-connect-uri"><summary>The link behind the code</summary><code id="nostrConnectUri"></code></details>
+      <p class="nostr-connect-help">In Amber, tap <strong>Add a new application</strong>, then <strong>Paste from clipboard</strong> (or <strong>Scan a QR Code</strong>). That is this invitation link, pasted once — not a signature.</p>
       <div id="nostrConnectStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>

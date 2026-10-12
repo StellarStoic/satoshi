@@ -73,9 +73,11 @@ import {
   loginWithPrivateKey,
   logoutNostr,
   markAnonymousNotePublished,
+  pendingNostrConnect,
   pendingAmberRequest,
   reconnectBunker,
   resumeAmber,
+  resumeNostrConnect,
   savedBunker,
   shortNpub,
   signNostrEvent,
@@ -145,6 +147,7 @@ const elements = {
   savedPlaceStatus: document.getElementById('savedPlaceStatus'),
   areaScaleList: document.getElementById('areaScaleList'),
   login: document.getElementById('loginDialog'), loginStatus: document.getElementById('loginStatus'),
+  amberPair: document.getElementById('amberPair'),
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
   accountNpub: document.getElementById('accountNpub'), accountMethod: document.getElementById('accountMethod'),
   accountPicture: document.getElementById('accountPicture'), accountNip05: document.getElementById('accountNip05'),
@@ -177,6 +180,7 @@ const elements = {
   nostrConnectQr: document.getElementById('nostrConnectQr'),
   nostrConnectUri: document.getElementById('nostrConnectUri'),
   nostrConnectCopy: document.getElementById('nostrConnectCopy'),
+  nostrConnectOpen: document.getElementById('nostrConnectOpen'),
   nostrConnectStatus: document.getElementById('nostrConnectStatus'),
   boardPlate: document.getElementById('boardPlate'),
   shareBoardDialog: document.getElementById('shareBoardDialog'),
@@ -197,6 +201,10 @@ const elements = {
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
   noteMenuStatus: document.getElementById('noteMenuStatus'),
 };
+
+// The NIP-46 hand-off needs an Amber on this same device to hand the invitation to, so the pairing
+// route is offered only where a signer app can be opened at all: on a phone. A desktop keeps the code.
+elements.amberPair.hidden = !/Android/i.test(navigator.userAgent || '');
 
 let selectedColor = 'yellow';
 let selectedFont = 'typewriter';
@@ -514,7 +522,7 @@ function drawQrCode(container, text) {
 /**
  * The route for a browser that has no signer app to hand a request to. A desktop shows a code; the
  * phone's Amber reads it and the two talk over the relay from there, with nothing to copy and no key
- * touching this page.
+ * touching this page. A phone can skip the code entirely by handing the invitation straight to Amber.
  */
 async function showNostrConnectDialog() {
   if (typeof window.qrcode !== 'function') {
@@ -522,31 +530,50 @@ async function showNostrConnectDialog() {
     return;
   }
   nostrConnectRequest?.cancel();
-  let request = null;
-  try {
-    request = beginNostrConnect();
-  } catch (error) {
-    status(elements.loginStatus, error.message, true);
-    return;
-  }
-  nostrConnectRequest = request;
-  elements.nostrConnectUri.textContent = request.uri;
-  drawQrCode(elements.nostrConnectQr, request.uri);
-  status(elements.nostrConnectStatus, 'Waiting for Amber to connect...');
+  const onAndroid = /Android/i.test(navigator.userAgent || '');
   if (elements.login.open) elements.login.close();
   if (!elements.nostrConnect.open) elements.nostrConnect.showModal();
-  try {
-    const session = await request.promise;
-    // The page closes this dialog itself in a moment, so the pending-request handle is dropped first:
-    // the close handler cancels whatever is still waiting, and this one is not.
-    if (nostrConnectRequest === request) nostrConnectRequest = null;
-    if (elements.nostrConnect.open) elements.nostrConnect.close();
-    updateAccount();
-    if (!syncPlacementWithSession()) showLoginConfirmation(session);
-  } catch (error) {
-    if (nostrConnectRequest === request) nostrConnectRequest = null;
-    status(elements.nostrConnectStatus, error.message, true);
-  }
+  // Each attempt hands the reader one invitation and waits for it. When it expires the spent one is
+  // not shown again - a fresh one, with a new secret, is put up once while the reader is still here.
+  // Closing the dialog ends the offers. A reload during enrolment instead finds the invitation that is
+  // already in flight and keeps waiting on it.
+  const attempt = async (afterTimeout = false) => {
+    let request = null;
+    try {
+      // The invitation already handed to Amber is the one to wait on; only a first attempt, or one
+      // whose predecessor expired, mints a new client key and secret.
+      request = !afterTimeout && pendingNostrConnect() ? resumeNostrConnect() : beginNostrConnect();
+    } catch (error) {
+      status(elements.loginStatus, error.message, true);
+      return;
+    }
+    nostrConnectRequest = request;
+    elements.nostrConnectUri.textContent = request.uri;
+    drawQrCode(elements.nostrConnectQr, request.uri);
+    // On the phone the invitation goes straight to Amber and needs no code; a desktop can only show
+    // one. The link stays in the field below either way, to paste on Amber's Connect screen.
+    elements.nostrConnectOpen.hidden = !onAndroid;
+    status(elements.nostrConnectStatus, onAndroid
+      ? 'Tap the button to hand the invitation to Amber.'
+      : 'Waiting for Amber to connect...');
+    try {
+      const session = await request.promise;
+      // The page closes this dialog itself in a moment, so the pending-request handle is dropped first:
+      // the close handler cancels whatever is still waiting, and this one is not.
+      if (nostrConnectRequest === request) nostrConnectRequest = null;
+      if (elements.nostrConnect.open) elements.nostrConnect.close();
+      updateAccount();
+      if (!syncPlacementWithSession()) showLoginConfirmation(session);
+    } catch (error) {
+      if (nostrConnectRequest !== request) return;      // the reader closed the step while it waited
+      nostrConnectRequest = null;
+      status(elements.nostrConnectStatus, error.message, true);
+      // The window that expired left a spent invitation on screen. The reader is still here, so one
+      // fresh offer replaces it; a second expiry just says so, and the dialog can be reopened.
+      if (!afterTimeout && elements.nostrConnect.open && /did not answer/.test(error.message)) await attempt(true);
+    }
+  };
+  await attempt();
 }
 
 function showDialog(dialog) {
@@ -3043,6 +3070,9 @@ async function handleLogin(method) {
       status(elements.amberCopyStatus, 'Approve it in Amber, then come back to this page.');
       return;
     }
+    // The pairing route is the NIP-46 flow a desktop reaches through the Amber button, but on a phone
+    // it walks the invitation straight into Amber instead of showing a code to be scanned.
+    else if (method === 'amber-pair') { await showNostrConnectDialog(); return; }
     else if (method === 'bunker') await loginWithBunker(elements.bunker.value);
     else if (method === 'bunker-saved') await reconnectBunker();
     else if (method === 'anonymous') loginAnonymously();
@@ -3768,10 +3798,16 @@ elements.amberPaste.addEventListener('click', async () => {
 elements.nostrConnectCopy.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(elements.nostrConnectUri.textContent);
-    status(elements.nostrConnectStatus, 'Link copied. Amber takes it pasted on its Connect screen.');
+    status(elements.nostrConnectStatus, 'Link copied. In Amber, Add a new application, then Paste from clipboard.');
   } catch {
     status(elements.nostrConnectStatus, 'This browser will not let the page copy it. Select the link below and copy it by hand.', true);
   }
+});
+elements.nostrConnectOpen.addEventListener('click', () => {
+  // On the same phone the invitation goes straight into Amber through its own scheme: no code to scan
+  // and nothing to copy by hand. The URI is the one already in the field, so the two can never drift.
+  const uri = nostrConnectRequest?.uri || elements.nostrConnectUri.textContent;
+  if (uri) location.assign(uri);
 });
 // Closing either step hands the reader back to the ways in, and an unanswered code is cancelled with
 // it: its subscription must not outlive the dialog it was shown in.

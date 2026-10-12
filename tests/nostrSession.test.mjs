@@ -767,3 +767,61 @@ test('a copy signing request plants a sentinel, so a stale clipboard can never b
   assert.equal(answer.event.sig, valid);
   assert.equal(sessionModule.amberSignaturePending(), false);
 });
+
+test('a nostrconnect invitation survives a reload, is spent on success, and is not reused after timing out', async () => {
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.location = {host: 'pinstr.si', origin: 'https://pinstr.si', pathname: '/stickyNotes.html'};
+  if (!globalThis.crypto?.getRandomValues) {
+    globalThis.crypto = {...(globalThis.crypto || {}), getRandomValues: array => array.fill(7)};
+  }
+  const connected = pubkey => ({getPublicKey: async () => pubkey, signEvent: async template => template, close() {}});
+  const bunker = pubkey => ({BunkerSigner: {fromURI: () => Promise.resolve(connected(pubkey))}});
+  globalThis.window = {
+    dispatchEvent() {}, open() {},
+    NostrTools: {
+      generateSecretKey: () => Uint8Array.from({length: 32}, (_, index) => index + 1),
+      getPublicKey: () => 'a'.repeat(64),
+      nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`},
+    },
+    NostrBunker: bunker('e'.repeat(64)),
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?connect-persist=${Date.now()}`);
+  const offer = sessionModule.beginNostrConnect();
+
+  // The invitation is recorded before it is handed over, so a reload while the reader is still in
+  // Amber can keep waiting on the same client key and secret instead of minting a second one.
+  const saved = JSON.parse(storage.getItem('satoshi:nostr:nostrconnect:v1'));
+  assert.equal(saved.uri, offer.uri, 'the invitation already given to Amber is what a reload finds');
+  assert.equal(saved.clientSecret, '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20',
+    'the client key the signer answers to is kept');
+  assert.ok(saved.secret, 'and the handshake secret is kept with it');
+  assert.deepEqual(saved.relays, ['wss://nostr.satoshi.si', 'wss://relay.damus.io']);
+  assert.equal(sessionModule.pendingNostrConnect().uri, offer.uri);
+
+  // The reload waits on that same invitation rather than starting a new one behind Amber's back.
+  const resumed = sessionModule.resumeNostrConnect();
+  assert.equal(resumed.uri, offer.uri, 'the reload keeps waiting on the invitation Amber already has');
+
+  await offer.promise;
+  await resumed.promise;
+  assert.equal(storage.getItem('satoshi:nostr:nostrconnect:v1'), null, 'an answered invitation is spent');
+  assert.equal(JSON.parse(storage.getItem('satoshi:nostr:bunker:v1')).clientSecret, saved.clientSecret,
+    'and the way back in is stored in the bunker shape, as before');
+
+  // A signer that never answers: the invitation expires, and a spent one is never offered again.
+  globalThis.window.NostrBunker.BunkerSigner.fromURI = () => new Promise(() => {});
+  const timedOut = sessionModule.beginNostrConnect({timeout: 15});
+  assert.ok(sessionModule.pendingNostrConnect(), 'a fresh invitation waits while it is being answered');
+  await assert.rejects(timedOut.promise, /did not answer/, 'an offer nobody answers says so');
+  assert.equal(sessionModule.pendingNostrConnect(), null, 'the expired invitation is dropped');
+
+  // The next attempt is genuinely new: a new secret, never the spent one.
+  globalThis.window.NostrBunker = bunker('f'.repeat(64));
+  const fresh = sessionModule.beginNostrConnect();
+  assert.notEqual(new URL(fresh.uri).searchParams.get('secret'), new URL(offer.uri).searchParams.get('secret'),
+    'a fresh attempt carries a new secret');
+  await fresh.promise;
+});

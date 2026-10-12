@@ -614,29 +614,34 @@ export function resumeAmber() {
  * reach ours must still be able to answer.
  */
 const NOSTR_CONNECT_RELAYS = ['wss://nostr.satoshi.si', 'wss://relay.damus.io'];
+// The invitation this page has already given a signer. It is kept so a reload while the reader is
+// still enrolling in Amber can wait on the same client key and secret instead of minting a second
+// one. Ten minutes: long enough to walk Amber's own screens, short enough that a stale offer is never
+// resumed. A spent invitation is removed, so every fresh attempt carries a new secret.
+const NOSTR_CONNECT_KEY = 'satoshi:nostr:nostrconnect:v1';
+const NOSTR_CONNECT_MAX_AGE = 10 * 60 * 1000;
+
+/** The invitation this page has already given a signer, if it is still worth waiting on. */
+export function pendingNostrConnect() {
+  const saved = readJson(localStorage, NOSTR_CONNECT_KEY);
+  if (!saved?.uri || !/^[0-9a-f]{64}$/.test(String(saved.clientSecret || '')) || !Array.isArray(saved.relays)) return null;
+  if (!Number.isFinite(saved.createdAt) || Date.now() - saved.createdAt > NOSTR_CONNECT_MAX_AGE) {
+    localStorage.removeItem(NOSTR_CONNECT_KEY);
+    return null;
+  }
+  return saved;
+}
 
 /**
- * Start a NIP-46 connection that a signer walks into by scanning a code.
+ * Wait for a signer to answer one invitation.
  *
- * This is the route for a browser with no signer app to hand a `nostrsigner:` intent to: a desktop
- * can show a code, and Amber on a phone can read it. The page makes its own throwaway client keypair,
- * so the reader's identity never reaches this side - the signer only sees a request encrypted to that
- * key - and the finished connection is stored in the same shape a `bunker://` link produces, which is
- * what lets later visits reconnect with no code at all.
+ * The client keypair is the page's own throwaway one, so the reader's identity never reaches this
+ * side: the signer only sees a request encrypted to that key. The finished connection is stored in
+ * the same shape a `bunker://` link produces, which is what lets later visits reconnect with no code
+ * at all. The invitation leaves storage as soon as the wait ends - answered, cancelled or expired -
+ * so a spent one is never resumed and a new attempt always carries a new secret.
  */
-export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 60 * 1000} = {}) {
-  if (!window.NostrBunker?.BunkerSigner?.fromURI) throw new Error('Nostr connect tools did not load.');
-  const clientSecret = tools().generateSecretKey();
-  const params = new URLSearchParams();
-  relays.forEach(relay => params.append('relay', relay));
-  params.set('secret', bytesToHex(crypto.getRandomValues(new Uint8Array(16))));
-  // The name the signer shows its reader is this page's own host, so an origin serving the same board
-  // under another name is never mislabelled as the other one.
-  params.set('name', location.host);
-  params.set('url', `${location.origin}${location.pathname}`);
-  params.set('perms', 'get_public_key,sign_event:1');
-  // getPublicKey already answers in hex, so this is not encoded again.
-  const uri = `nostrconnect://${tools().getPublicKey(clientSecret)}?${params.toString()}`;
+function awaitNostrConnect(clientSecret, uri, relays, timeout) {
   const storedParams = new URLSearchParams();
   relays.forEach(relay => storedParams.append('relay', relay));
   let signer = null;
@@ -647,8 +652,9 @@ export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 
     // offer expires on its own and says so.
     timer = setTimeout(() => {
       cancelled = true;
+      localStorage.removeItem(NOSTR_CONNECT_KEY);
       try { signer?.close?.(); } catch {}
-      reject(new Error('Amber did not answer. Show a new code and scan that one.'));
+      reject(new Error('Amber did not answer. Show a new code and try again.'));
     }, timeout);
     window.NostrBunker.BunkerSigner.fromURI(clientSecret, uri, {
       onauth: url => window.open(url, '_blank', 'noopener,noreferrer'),
@@ -661,6 +667,7 @@ export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 
       return connected.getPublicKey();
     }).then(pubkey => {
       clearTimeout(timer);
+      localStorage.removeItem(NOSTR_CONNECT_KEY);
       localStorage.setItem(BUNKER_KEY, JSON.stringify({
         url: `bunker://${pubkey}?${storedParams.toString()}`,
         clientSecret: bytesToHex(clientSecret),
@@ -674,14 +681,56 @@ export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 
     });
   });
   return {
-    uri,
     promise,
     cancel: () => {
       cancelled = true;
       clearTimeout(timer);
+      localStorage.removeItem(NOSTR_CONNECT_KEY);
       try { signer?.close?.(); } catch {}
     },
   };
+}
+
+/**
+ * Start a NIP-46 connection a signer walks into from a code, or from an invitation handed to the
+ * signer app on the same phone.
+ *
+ * This is the route for a browser with no signer app to hand a `nostrsigner:` intent to: a desktop
+ * can show a code, and Amber on a phone can read it. The page makes its own throwaway client keypair
+ * and the finished connection is stored in the same shape a `bunker://` link produces, which is what
+ * lets later visits reconnect with no code at all.
+ */
+export function beginNostrConnect({relays = NOSTR_CONNECT_RELAYS, timeout = 5 * 60 * 1000} = {}) {
+  if (!window.NostrBunker?.BunkerSigner?.fromURI) throw new Error('Nostr connect tools did not load.');
+  const clientSecret = tools().generateSecretKey();
+  const params = new URLSearchParams();
+  relays.forEach(relay => params.append('relay', relay));
+  const secret = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  params.set('secret', secret);
+  // The name the signer shows its reader is this page's own host, so an origin serving the same board
+  // under another name is never mislabelled as the other one.
+  params.set('name', location.host);
+  params.set('url', `${location.origin}${location.pathname}`);
+  params.set('perms', 'get_public_key,sign_event:1');
+  // getPublicKey already answers in hex, so this is not encoded again.
+  const uri = `nostrconnect://${tools().getPublicKey(clientSecret)}?${params.toString()}`;
+  // Recorded before it is handed over: a reload while the reader is still in Amber finds the same
+  // client key and secret and keeps waiting, rather than abandoning an invitation Amber already holds.
+  localStorage.setItem(NOSTR_CONNECT_KEY, JSON.stringify({
+    uri, clientSecret: bytesToHex(clientSecret), secret, relays, createdAt: Date.now(),
+  }));
+  return {uri, ...awaitNostrConnect(clientSecret, uri, relays, timeout)};
+}
+
+/** Keep waiting on the invitation already given to a signer, after a reload. */
+export function resumeNostrConnect({timeout = 5 * 60 * 1000} = {}) {
+  if (!window.NostrBunker?.BunkerSigner?.fromURI) throw new Error('Nostr connect tools did not load.');
+  const saved = pendingNostrConnect();
+  if (!saved) throw new Error('There is no connection waiting for Amber.');
+  // The secret is the one inside the saved URI - the signer echoes it back - so it is decoded, never
+  // minted again: a second secret would make the signer's answer fail the handshake.
+  const clientSecret = Uint8Array.from(saved.clientSecret.match(/.{2}/g), pair => Number.parseInt(pair, 16));
+  return {uri: saved.uri, ...awaitNostrConnect(clientSecret, saved.uri, saved.relays, timeout)};
 }
 
 async function connectBunker(saved) {

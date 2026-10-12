@@ -99,6 +99,9 @@
 .nostr-connect-qr { display: flex; justify-content: center; padding: 12px; margin: 4px 0 12px; background: #ffffff; border-radius: 8px; }
 .nostr-connect-qr__canvas { width: min(300px, 66vw); height: auto; image-rendering: pixelated; }
 .nostr-connect-open { width: 100%; justify-content: center; margin-bottom: 10px; }
+/* `hidden` is only the UA's display:none, so it loses to the display these buttons set: the desktop
+   must not show a hand-off button, and a desktop must not be offered the phone's pairing route. */
+.amber-pair[hidden], .nostr-connect-open[hidden] { display: none; }
 .nostr-connect-copy { width: 100%; justify-content: center; margin-bottom: 10px; }
 .nostr-connect-help { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #d7d9d7; }
 .nostr-connect-help strong { color: #f3f3f1; }
@@ -187,6 +190,9 @@
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }
+/* The pairing route is the phone's own - it hands the NIP-46 invitation straight to Amber - so it
+   sits under the two ways in and stays hidden until the page knows it is on a phone. */
+.amber-pair { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin: -6px 0 10px; border: 1px solid #505354; border-radius: 6px; background: #1d1f20; color: #e9e9e6; font: inherit; cursor: pointer; }
 .login-note { margin: 8px 0 0; color: #bbb; font-size: .84rem; line-height: 1.45; }
 .private-key-login { margin-top: 18px; color: #bbb; }.private-key-login summary { color: #ddd; cursor: pointer; }.private-key-login p { font-size: .84rem; }
 .private-key-login .private-key-warning { color: #ff7b75; line-height: 1.48; }
