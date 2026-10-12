@@ -2039,3 +2039,34 @@ test('a signature that is copied, not called back, is finished or sent again thr
   assert.match(complete, /signalStickyFlow\('signed', \{orderId: pending\.orderId\}\)/);
   assert.match(complete, /await publishPinnedNote\(answer\.event\)/);
 });
+
+
+test('pinning with Amber signs through the clipboard, not a callback that never arrives', async () => {
+  const assert = (await import('node:assert/strict')).default;
+  const { readFileSync } = await import('node:fs');
+  const board = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const signer = readFileSync(new URL('../nostrSession.mjs', import.meta.url), 'utf8');
+
+  // Amber's return through the callback URL is dropped between the two apps on Android: the
+  // signature is made, Amber closes, and the page is never told. So the signing request goes out
+  // without a callback, exactly as signing in does - Amber copies the signature instead.
+  assert.match(
+    signer,
+    /if \(session\.method === 'amber'\) \{[\s\S]*?beginAmberSigning\(template, context, \{copy: true\}\)/,
+    'the Amber branch of signNostrEvent must ask for the clipboard route',
+  );
+  // A callback request would leave the signature parked and unnoticed, which is the bug this covers.
+  assert.doesNotMatch(signer, /beginAmberSigning\(template, context\);/, 'no callback route may be left on the signing path');
+});
+
+test('a pin that is waiting on Amber says so instead of returning in silence', async () => {
+  const assert = (await import('node:assert/strict')).default;
+  const { readFileSync } = await import('node:fs');
+  const board = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // In Amber both buttons close the app, so a page that says nothing is indistinguishable from a
+  // page that is broken. The reader is told what to expect and what to do.
+  assert.match(board, /if \(!event\) \{\s*if \(amberSignaturePending\(\)\) \{/, 'a pending Amber signature must not return silently');
+  assert.match(board, /Amber copies the signature instead of returning it/, 'the reader must be told where the signature goes');
+  assert.match(board, /then come back to this page/, 'the reader must be told what to do');
+});

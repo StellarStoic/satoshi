@@ -2780,7 +2780,16 @@ async function publishPinnedNote(resumedEvent = null) {
     const placement = currentPlacement();
     const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
-    if (!event) return;
+    // A signing request that travels through Amber hands nothing back here: the answer arrives on the
+    // clipboard once the reader returns. Saying so is the difference between a wait and a page that
+    // looks broken, because in Amber both buttons close the app.
+    if (!event) {
+      if (amberSignaturePending()) {
+        showAmberCopyDialog();
+        status(elements.amberCopyStatus, 'Approve the note in Amber, then come back to this page. Amber copies the signature instead of returning it, and the note pins itself.');
+      }
+      return;
+    }
     if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid event.');
     signalStickyFlow('signed', {orderId: pending.orderId});
     const result = await api(`/orders/${encodeURIComponent(pending.orderId)}/publish`, {

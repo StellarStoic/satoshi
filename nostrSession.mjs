@@ -757,7 +757,11 @@ export async function signNostrEvent(template, context = null) {
     return bunkerSigner.signEvent(template);
   }
   if (session.method === 'amber') {
-    beginAmberSigning(template, context);
+    // Sent without a callback on purpose. Amber's return through the callback URL is dropped between
+    // the two apps on Android - the signature gets made, Amber closes, and the page is never told -
+    // so a signing request goes out the way signing in already goes: without a callback, Amber copies
+    // the signature, and the board reads it when the reader comes back.
+    beginAmberSigning(template, context, {copy: true});
     return null;
   }
   if (session.method === 'anonymous') {
