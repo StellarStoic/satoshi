@@ -1816,3 +1816,22 @@ test('the board leaves room for fixed chrome across the foot of the page', async
   assert.match(script, /window\.addEventListener\('resize', \(\) => \{\n(?:\s*\/\/[^\n]*\n)*\s*applyBoardChrome\(\);/,
     'a footer that changes height is not missed');
 });
+
+
+test('the counter counts down the characters a note has left', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /characters left/);
+  assert.match(script, /STICKY_MAX_CHARACTERS - length/, 'the number shown is what remains');
+  assert.doesNotMatch(script, /textContent = `\$\{length\} characters`/,
+    'it must not count up to the cap and only then start counting down');
+  assert.match(script, /is-almost-full/, 'the near-the-cap warning class stays');
+});
+
+test('a link chip is not drawn welded to the character before it', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const start = script.indexOf('function renderNoteContent');
+  const head = script.slice(start, start + 1100);
+  assert.match(head, /previous\.type === 'text'/, 'the drawing looks at the run before the chip');
+  assert.match(head, /createTextNode\(' '\)/, 'and separates it with a space when it does not end in one');
+  assert.match(head, /part\.type === 'link' && index/, 'only a link chip, and never a leading one');
+});

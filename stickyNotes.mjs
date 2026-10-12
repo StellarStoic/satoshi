@@ -2018,8 +2018,7 @@ function updateCapacity() {
   elements.capacity.classList.toggle('is-full', full);
   if (!length) elements.capacity.textContent = 'The paper is empty';
   else if (full) elements.capacity.textContent = 'The note is full';
-  else if (almostFull) elements.capacity.textContent = `${STICKY_MAX_CHARACTERS - length} characters left`;
-  else elements.capacity.textContent = `${length} characters`;
+  else elements.capacity.textContent = `${STICKY_MAX_CHARACTERS - length} characters left`;
 }
 
 function handleEditorInput() {
@@ -3069,7 +3068,16 @@ function toggleLinkRest() {
 }
 
 function renderNoteContent(container, content) {
-  stickyTextParts(content).forEach(part => {
+  const parts = stickyTextParts(content);
+  parts.forEach((part, index) => {
+    // A link chip must never sit welded to the character before it. A note whose text has no
+    // space where the address starts - one pasted in that ate the space, or written that way -
+    // reads as a single word on the paper otherwise. The stored text stays exactly as written:
+    // this is only the drawing, and only where a text run is what touches the chip.
+    const previous = parts[index - 1];
+    if (part.type === 'link' && index && previous.type === 'text' && !/\s$/.test(previous.text)) {
+      container.appendChild(document.createTextNode(' '));
+    }
     if (part.type === 'link') {
       const href = linkHref(part.url);
       if (!href) { container.appendChild(document.createTextNode(part.url)); return; }
