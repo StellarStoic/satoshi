@@ -438,4 +438,8 @@ body.is-card .sticky-shell { padding: 0; margin: 0; max-width: none; min-height:
 /* Full bleed. The wooden rails and the engraved plate hang outside the board's own box and the app's
    fit fills it exactly, so those are the one thing a captured card does not show; the page around the
    picture names the geohash in its title instead, which is what a preview shows as text. */
-body.is-card #stickyBoard { position: fixed; inset: 0; --board-chrome-bottom: 0px; }
+/* Card mode: the picture a shared board unfurls as. The wooden rails hang outside the board itself
+   and the engraved plate hangs below it, so the board is set in from the viewport by more than the
+   rails are wide and is no longer clipped: the browser captures the finished board - rails and plate
+   included - on the page's own dark ground. */
+body.is-card #stickyBoard { position: fixed; inset: 34px; overflow: visible; --board-chrome-bottom: 0px; }

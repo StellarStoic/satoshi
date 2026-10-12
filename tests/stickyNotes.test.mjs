@@ -1943,6 +1943,20 @@ test('an address in the composer counts as the word the paper prints', async () 
 });
 
 
+test('the shared picture is the finished board, in a preview format', async () => {
+  const [css, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  const card = /body\.is-card #stickyBoard \{[^}]*\}/u.exec(css);
+  assert.ok(card, 'card mode styles the board');
+  // The rails sit outside the board and the engraving below it: without the inset and without letting
+  // the board paint past its own box, the picture is a board with its frame cut off.
+  assert.match(card[0], /inset: 34px/u, 'the board leaves room for what hangs outside it');
+  assert.match(card[0], /overflow: visible/u, 'and is not clipped at its own edge');
+  assert.match(script, /preview\.src = `\$\{url\}\.webp`/u, 'the preview asks for WebP');
+});
+
 test('a board is shared by the link that carries its picture', async () => {
   assert.equal(boardShareUrl(['u0qj7z0y']), 'https://pinstr.si/b/u0qj7z0y');
   assert.equal(boardShareUrl(['u0qj7z0y', 'u0qj7z0z']), 'https://pinstr.si/b/u0qj7z0y,u0qj7z0z',
@@ -1969,8 +1983,8 @@ test('a board is shared by the link that carries its picture', async () => {
     'and the plate must stop swallowing its own clicks');
   assert.match(script, /dataset\.pinstrCard = 'ready'/,
     'the page tells the desk when the board is whole, so no picture is taken half-painted');
-  assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 0;/,
-    'card mode is the board alone, filling the frame');
+  assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 34px; overflow: visible;/,
+    'card mode is the board alone, with the rails and plate that hang outside it in the frame');
   // Everything the site paints around the board has to go, or it ends up inside a shared picture:
   // the menu affordance, the live footer, and the consent overlay, which dims the board as a backdrop.
   for (const hidden of ['#toggle', '#menu', 'footer\\.footer', '\\[data-live-footer\\]', '\\.satoshi-analytics-consent',

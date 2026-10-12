@@ -4088,7 +4088,7 @@ function openShareBoard(cells = activeGeohashes) {
   elements.shareBoardNative.hidden = !navigator.share;
   const preview = elements.shareBoardPreview;
   preview.hidden = false;
-  preview.src = `${url}.png`;
+  preview.src = `${url}.webp`;
   status(elements.shareBoardStatus, 'Drawing the board...');
   if (!elements.shareBoardDialog.open) elements.shareBoardDialog.showModal();
 }
