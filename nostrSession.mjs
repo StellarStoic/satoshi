@@ -376,9 +376,11 @@ export async function adoptAmberSignature({silent = false} = {}) {
   if (!signature) {
     return stop('The clipboard is empty. In Amber, approve the note and copy the signature it offered, then tap again.');
   }
-  // An automatic read must not take whatever happened to be on the clipboard, so a value unchanged
-  // since the request was made is refused: it is what the reader copied earlier, not this signature.
-  const unchanged = Boolean(waiting.state.clipboard) && waiting.state.clipboard === clipboardHash(signature);
+  // Amber overwrites the clipboard, so a read that still carries the sentinel this page wrote before
+  // handing off has not been answered yet: it is not this signature, however valid it looks. Older
+  // parked requests carry a fingerprint of the clipboard instead of the sentinel; both are honoured.
+  const planted = waiting.state.sentinel || waiting.state.clipboard;
+  const unchanged = Boolean(planted) && planted === clipboardHash(signature);
   if (silent && unchanged) return null;
   let event;
   try {
@@ -407,15 +409,19 @@ export function beginAmberSigning(template, context = null, {copy = false} = {})
   const id = randomId();
   parkAmberRequest(id, {action: 'sign', template, context, copy});
   if (copy) {
-    // Read what is already on the clipboard while this tap's user activation is still live. Only its
-    // fingerprint is kept, and only for one purpose: it is what stops a later automatic read from
-    // adopting a signature the reader copied for something else as this note's.
-    clipboardText().then(text => {
-      const parked = readJson(localStorage, AMBER_PREFIX + id);
-      if (!parked) return;
-      parked.clipboard = clipboardHash(text);
+    // A fresh random sentinel goes on the clipboard *before* Amber is opened, while this tap's user
+    // activation is still live. Amber answers by copying, which replaces whatever is there, so a read
+    // that still carries this sentinel has not been answered yet - and a signature the reader copied
+    // for something else can never be mistaken for this note's. This replaces the earlier "fingerprint
+    // whatever is already copied" guard, whose async read could be cancelled by the very navigation to
+    // the signer that follows it, so nothing was recorded at all. Only a hash of the sentinel is kept.
+    const sentinel = `amber-waiting:${randomId()}`;
+    const parked = readJson(localStorage, AMBER_PREFIX + id);
+    if (parked) {
+      parked.sentinel = clipboardHash(sentinel);
       localStorage.setItem(AMBER_PREFIX + id, JSON.stringify(parked));
-    }).catch(() => {});
+    }
+    navigator.clipboard?.writeText?.(sentinel)?.catch?.(() => {});
     // No id, so no callback URL: the signer copies the signature to the clipboard instead of
     // returning it. The exact unsigned event is parked above, so the page can rebuild and verify the
     // signed event from the template while the signature travels on its own.
@@ -527,15 +533,28 @@ function amberReturn() {
  */
 function signedEventFrom(state, result, session) {
   const clean = String(result || '').trim();
-  let event;
-  if (/^[0-9a-f]{128}$/i.test(clean)) {
+  let event = null;
+  let signature = /^[0-9a-f]{128}$/i.test(clean) ? clean.toLowerCase() : '';
+  if (!signature) {
+    // A signer may hand the signature back on its own, wrapped in JSON (`{"sig": "..."}`), or as a
+    // whole event. Both carry a 128-hex `.sig`; only a full event also carries the id and pubkey that
+    // let it be trusted exactly as it came, which is what tells the two shapes apart.
+    let parsed;
+    try { parsed = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
+    if (parsed && typeof parsed === 'object' && typeof parsed.sig === 'string'
+        && /^[0-9a-f]{128}$/i.test(parsed.sig) && (!parsed.id || !parsed.pubkey)) {
+      signature = parsed.sig.toLowerCase();
+    } else {
+      event = parsed;
+      // Full-event replies created by the previous version remain usable while their request is
+      // still inside the thirty-minute return window.
+      if (!event || typeof event !== 'object') throw new Error('Amber did not return a usable signature. Please pin again.');
+    }
+  }
+  if (signature) {
     if (!session?.pubkey || !state.template) throw new Error('The Amber signing session could not be restored. Please pin again.');
     const unsigned = {...state.template, pubkey: session.pubkey};
-    event = {...unsigned, id: tools().getEventHash(unsigned), sig: clean.toLowerCase()};
-  } else {
-    // Full-event replies created by the previous version remain usable while their request is
-    // still inside the thirty-minute return window.
-    try { event = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
+    event = {...unsigned, id: tools().getEventHash(unsigned), sig: signature};
   }
   if (!tools().verifyEvent(event) || event.pubkey !== session?.pubkey) throw new Error('Amber returned an invalid signed event.');
   return event;

@@ -170,6 +170,8 @@ const elements = {
   bunkerReconnect: document.getElementById('bunkerReconnect'),
   amberPaste: document.getElementById('amberPaste'),
   amberDialog: document.getElementById('amberCopyDialog'),
+  amberCopyTitle: document.getElementById('amberCopyTitle'),
+  amberCopyNote: document.getElementById('amberCopyNote'),
   amberCopyStatus: document.getElementById('amberCopyStatus'),
   nostrConnect: document.getElementById('nostrConnectDialog'),
   nostrConnectQr: document.getElementById('nostrConnectQr'),
@@ -477,6 +479,10 @@ let nostrConnectRequest = null;
 function showAmberCopyDialog() {
   if (elements.login.open) elements.login.close();
   if (!elements.amberDialog.open) elements.amberDialog.showModal();
+  // One dialog carries both hand-overs, so its heading names which one this is: a sign-in here, a
+  // signature in showAmberHandOver(). The signature sentence belongs to the signing step alone.
+  elements.amberCopyTitle.textContent = 'Finish signing in with Amber';
+  elements.amberCopyNote.hidden = true;
   status(elements.amberCopyStatus, amberClipboardPending() ? 'Approve it in Amber, then come back to this page.' : '');
 }
 
@@ -2782,11 +2788,13 @@ async function publishPinnedNote(resumedEvent = null) {
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     // A signing request that travels through Amber hands nothing back here: the answer arrives on the
     // clipboard once the reader returns. Saying so is the difference between a wait and a page that
-    // looks broken, because in Amber both buttons close the app.
+    // looks broken, because in Amber both buttons close the app. The clipboard is then polled for it,
+    // because returning fires none of the events the old "read it when the reader comes back" path
+    // waited for.
     if (!event) {
       if (amberSignaturePending()) {
-        showAmberCopyDialog();
-        status(elements.amberCopyStatus, 'Approve the note in Amber, then come back to this page. Amber copies the signature instead of returning it, and the note pins itself.');
+        showAmberHandOver('Approve the note in Amber, then come back to this page. Amber copies the signature instead of returning it, and the note pins itself.');
+        startAmberClipboardPoll();
       }
       return;
     }
@@ -3724,6 +3732,9 @@ elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
 elements.amberPaste.addEventListener('click', async () => {
   try {
+    // A tap is the reader taking the hand-over into their own hands: the background poll stands down
+    // so the two can never read, and spend, the same parked request at once.
+    stopAmberClipboardPoll();
     // What is parked decides what this button hands over. A signing request sent without a callback
     // has its signature on the clipboard; one whose callback never came back is sent again through
     // the clipboard, the one return path Android cannot drop. Anything else is an ordinary sign-in.
@@ -3738,6 +3749,9 @@ elements.amberPaste.addEventListener('click', async () => {
     }
     if (parked?.action === 'sign') {
       beginAmberSigning(parked.template, parked.context, {copy: true});
+      // The re-sent request is waited on the same way the first was: Amber copies the signature, and
+      // the page watches for it instead of waiting for a return event that does not come.
+      startAmberClipboardPoll();
       return;
     }
     status(elements.amberCopyStatus, 'Reading what Amber copied...');
@@ -3762,6 +3776,9 @@ elements.nostrConnectCopy.addEventListener('click', async () => {
 // Closing either step hands the reader back to the ways in, and an unanswered code is cancelled with
 // it: its subscription must not outlive the dialog it was shown in.
 elements.amberDialog.addEventListener('close', () => {
+  // Closing the step is the reader cancelling this hand-over: the poll stops with it. The parked
+  // request stays, so reopening the step (or the login dialog) lands back on it and polls again.
+  stopAmberClipboardPoll();
   status(elements.amberCopyStatus, '');
   if (!getNostrSession() && !elements.login.open) elements.login.showModal();
 });
@@ -4380,6 +4397,11 @@ async function applySignerReturn() {
  */
 async function completeAmberSignature(answer) {
   if (!answer || answer.action !== 'sign') return false;
+  // The round trip is over, whichever path finished it: the background poll has nothing left to watch.
+  stopAmberClipboardPoll();
+  // A note that is already pinned leaves nothing to finish here, and a duplicate of its own signature
+  // arriving from a second path must not be announced as a signature for some other note.
+  if (!pending?.orderId) return false;
   if (pending?.orderId !== answer.context?.orderId) {
     notice('That signature was for a different note. Your note is still here — pin it again.');
     return false;
@@ -4398,7 +4420,71 @@ async function completeAmberSignature(answer) {
 function showAmberHandOver(message) {
   if (elements.login.open) elements.login.close();
   if (!elements.amberDialog.open) elements.amberDialog.showModal();
+  // This step is a signature, and the dialog has to say where a signature actually goes: Amber copies
+  // it to the clipboard, it does not call this page back. A reader who is not told waits for a return
+  // that never comes.
+  elements.amberCopyTitle.textContent = 'Finish signing with Amber';
+  elements.amberCopyNote.hidden = false;
+  elements.amberCopyNote.textContent = 'Amber copies the signature instead of returning it to this page. Approve the note there, then come back to this page and tap the button below.';
   status(elements.amberCopyStatus, message);
+}
+
+// How a copy-route signature gets home once the reader has left the page. Android fires no
+// visibilitychange and no focus event on the way back, and a clipboard read while the document is
+// not focused throws NotAllowedError, so waiting for a "reader returned" event can wait forever.
+// While a copy-route signing request is parked the page therefore polls the clipboard every half
+// second, reads only while it has focus, and treats a refusal as "keep waiting". snort's own client
+// gives up after 120 s and so does this one, so an abandoned page cannot poll forever.
+const AMBER_CLIPBOARD_POLL_MS = 500;
+const AMBER_CLIPBOARD_POLL_TIMEOUT_MS = 120000;
+let amberClipboardTimer = 0;
+let amberClipboardDeadline = 0;
+
+// Only one read of a parked signature may be in flight at a time. The poll and the resume path both
+// try to finish the same round trip, and a request is spent only *after* the read resolves, so two
+// overlapping reads could both accept the same signature and both publish. This makes them serialise:
+// whichever finishes first spends the request, and the other then finds nothing to do.
+let amberAdoptRunning = false;
+async function adoptParkedSignature() {
+  if (amberAdoptRunning) return null;
+  amberAdoptRunning = true;
+  try { return await adoptAmberSignature({silent: true}); } catch { return null; } finally { amberAdoptRunning = false; }
+}
+
+function stopAmberClipboardPoll() {
+  if (!amberClipboardTimer) return;
+  clearInterval(amberClipboardTimer);
+  amberClipboardTimer = 0;
+}
+
+/** One turn of the poll: finish the round trip if Amber has copied a signature, else keep waiting. */
+async function pollAmberClipboard() {
+  // The request being spent is what tells this loop there is nothing left to wait for: the poll only
+  // runs while a copy-route signing request is parked, and every path spends it in the same place.
+  if (!amberSignaturePending()) { stopAmberClipboardPoll(); return; }
+  if (Date.now() > amberClipboardDeadline) {
+    stopAmberClipboardPoll();
+    // Handing the reader the paste button is the whole point of the timeout: nothing arrived within
+    // the window the shipped clients use, so the route that always works is put in front of them.
+    showAmberHandOver('Amber never handed a signature back. Tap Pin again, or use the paste button.');
+    return;
+  }
+  // A read attempted while this page is not focused throws NotAllowedError, and the signer app is
+  // usually still in front at that moment; there is nothing to read yet, so the next tick tries again.
+  if (!document.hasFocus()) return;
+  const answer = await adoptParkedSignature();
+  if (answer?.action !== 'sign') return;
+  stopAmberClipboardPoll();
+  if (elements.amberDialog.open) elements.amberDialog.close();
+  await completeAmberSignature(answer);
+}
+
+/** Start watching the clipboard for a copied signature, or restart it for a freshly parked request. */
+function startAmberClipboardPoll() {
+  if (!amberSignaturePending()) return;
+  amberClipboardDeadline = Date.now() + AMBER_CLIPBOARD_POLL_TIMEOUT_MS;
+  if (amberClipboardTimer) return;
+  amberClipboardTimer = setInterval(() => { pollAmberClipboard().catch(() => {}); }, AMBER_CLIPBOARD_POLL_MS);
 }
 
 const signerReturn = await applySignerReturn();
@@ -4420,6 +4506,9 @@ if (!signerReturn.applied) {
       ? 'Amber is waiting for your approval. Come back to this page when you are done.'
       : 'Waiting for Amber. Tap Amber again if no answer arrives.');
   }
+  // A reload between the two apps loses the poll the request began under. A copy-route signature
+  // still parked is picked up again here, so an answer Amber has already copied is not left unread.
+  if (amberSignaturePending()) startAmberClipboardPoll();
 }
 // The answer can also arrive with no reload at all: the browser resumes the page it already
 // has and only the URL changes. Nothing else reads that hash, so these are where it is read.
@@ -4437,11 +4526,17 @@ async function resumeExternalFlow() {
     if (!signer.applied && !signer.unusable && amberSignaturePending()) {
       // The signature is copied rather than called back. Finish the round trip here where the browser
       // allows the read; where it does not, the button that always works is put in front of the reader.
-      const automatic = await adoptAmberSignature({silent: true});
+      const automatic = await adoptParkedSignature();
       if (automatic?.action === 'sign') {
         if (elements.amberDialog.open) elements.amberDialog.close();
         await completeAmberSignature(automatic);
-      } else showAmberHandOver('Amber has the signature on your clipboard. Tap the button to hand it over.');
+      } else {
+        showAmberHandOver('Amber has the signature on your clipboard. Tap the button to hand it over.');
+        // A resume is not the reader coming back for certain - Android fires none of these events on
+        // the way home - so the clipboard keeps being watched rather than the answer being left for an
+        // event that will not come.
+        startAmberClipboardPoll();
+      }
     } else if (!signer.applied && !signer.unusable && parked?.action === 'sign'
         && pending?.status === 'paid' && parked.context?.orderId === pending.orderId) {
       // The signer never came back and the request is still parked. The boot path names this only on a

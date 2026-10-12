@@ -2014,11 +2014,14 @@ test('a signature that is copied, not called back, is finished or sent again thr
   const resume = script.slice(script.indexOf('async function resumeExternalFlow'),
     script.indexOf("window.addEventListener('hashchange'"));
   assert.match(resume, /amberSignaturePending\(\)/);
-  assert.match(resume, /const automatic = await adoptAmberSignature\(\{silent: true\}\);/);
+  assert.match(resume, /const automatic = await adoptParkedSignature\(\);/);
   assert.match(resume, /if \(automatic\?\.action === 'sign'\) \{\s+if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\);\s+await completeAmberSignature\(automatic\);/);
   assert.match(resume, /showAmberHandOver\('Amber has the signature on your clipboard\. Tap the button to hand it over\.'\)/);
   assert.match(resume, /'The signer did not come back with a signature\. Your note is still here — pin it again\.'/);
   assert.match(resume, /showAmberHandOver\('Amber did not come back with a signature\. Tap the button to send the request again\.'\)/);
+  // A resume that did not finish starts the poll, because the resume event may itself be a false
+  // positive: Android fires none of these on the way back from the signer.
+  assert.match(resume, /startAmberClipboardPoll\(\)/);
 
   // The button that always works dispatches on what is parked: a copied signature is adopted and the
   // paid note pinned, a callback that never returned is re-sent through the clipboard, and anything
@@ -2069,4 +2072,50 @@ test('a pin that is waiting on Amber says so instead of returning in silence', a
   assert.match(board, /if \(!event\) \{\s*if \(amberSignaturePending\(\)\) \{/, 'a pending Amber signature must not return silently');
   assert.match(board, /Amber copies the signature instead of returning it/, 'the reader must be told where the signature goes');
   assert.match(board, /then come back to this page/, 'the reader must be told what to do');
+});
+
+test('the copied signature is polled for, because Android fires no return event', async () => {
+  const [script, markup] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+
+  // Polling, not "read it when the reader comes back": returning from the signer app fires no
+  // visibilitychange and no focus event on Android, so waiting for that event waits forever.
+  assert.match(script, /const AMBER_CLIPBOARD_POLL_MS = 500;/);
+  assert.match(script, /const AMBER_CLIPBOARD_POLL_TIMEOUT_MS = 120000;/, 'snort gives up at 120 s, and so does this');
+  assert.match(script, /setInterval\(\(\) => \{ pollAmberClipboard\(\)\.catch\(\(\) => \{\}\); \}, AMBER_CLIPBOARD_POLL_MS\)/);
+
+  const poll = script.slice(script.indexOf('async function pollAmberClipboard'),
+    script.indexOf('function startAmberClipboardPoll'));
+  // Only while a copy-route signing request is parked (the park being spent is how the poll knows
+  // there is nothing left), and only while this page has focus, because a read without focus throws
+  // NotAllowedError. A refusal is refused by continuing, not by giving up.
+  assert.match(poll, /if \(!amberSignaturePending\(\)\) \{ stopAmberClipboardPoll\(\); return; \}/);
+  assert.match(poll, /if \(!document\.hasFocus\(\)\) return;/);
+  assert.match(poll, /const answer = await adoptParkedSignature\(\);/);
+  assert.match(poll, /if \(answer\?\.action !== 'sign'\) return;/);
+  assert.match(poll, /stopAmberClipboardPoll\(\)/);
+  // An abandoned page stops on its own and hands the reader the button that always works.
+  assert.match(poll, /if \(Date\.now\(\) > amberClipboardDeadline\) \{/);
+  assert.match(poll, /'Amber never handed a signature back\. Tap Pin again, or use the paste button\.'/);
+
+  // One read at a time, so the poll and the resume path cannot both accept the same signature and
+  // both publish: the request is spent inside the read, so the loser finds nothing left to do.
+  assert.match(script, /let amberAdoptRunning = false;/);
+  assert.match(script, /if \(amberAdoptRunning\) return null;/);
+
+  // Started where a copy-route request is made and where a reloaded page finds one still parked,
+  // stopped when the request is spent, when the reader closes the step, and on the timeout.
+  assert.match(script, /showAmberHandOver\('Approve the note in Amber[\s\S]{0,220}startAmberClipboardPoll\(\);/);
+  assert.match(script, /beginAmberSigning\(parked\.template, parked\.context, \{copy: true\}\);[\s\S]{0,240}startAmberClipboardPoll\(\);/);
+  assert.match(script, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/);
+  assert.match(script, /stopAmberClipboardPoll\(\);\s+status\(elements\.amberCopyStatus, ''\);/);
+  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,200}if \(!pending\?\.orderId\) return false;[\s\S]{0,120}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
+
+  // The manual step in front of the reader still exists, and it names where the signature goes.
+  assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
+  assert.match(script, /elements\.amberCopyNote\.textContent = 'Amber copies the signature instead of returning it to this page\./);
+  assert.match(markup, /<p id="amberCopyNote" class="amber-note amber-copy-note" hidden><\/p>/);
+  assert.match(script, /elements\.amberPaste\.addEventListener\('click'/);
 });

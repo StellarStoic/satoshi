@@ -651,6 +651,14 @@ test('the signature Amber copied finishes a signing round trip, and an unchanged
   assert.deepEqual(whole.event, signed, 'a full event is used as it came');
   assert.equal(sessionModule.amberSignaturePending(), false);
 
+  // A signer that hands the signature back wrapped in JSON, with no whole event around it, is
+  // understood the same way a bare 128-hex signature is.
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  copied.text = JSON.stringify({sig: valid});
+  const wrapped = await sessionModule.adoptAmberSignature();
+  assert.deepEqual(wrapped?.event, signed, 'a JSON object carrying only a .sig is rebuilt from the parked note');
+  assert.equal(sessionModule.amberSignaturePending(), false);
+
   // The unchanged guard governs the silent read only: the same value handed over on purpose is taken.
   copied.text = valid;
   sessionModule.beginAmberSigning(template, context, {copy: true});
@@ -700,4 +708,62 @@ test('a signing hand-over that the browser refuses to read is silence, never a w
   assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null);
   await assert.rejects(() => sessionModule.adoptAmberSignature(), /clipboard is empty/);
   assert.equal(sessionModule.amberSignaturePending(), true);
+});
+
+test('a copy signing request plants a sentinel, so a stale clipboard can never be the signature', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const valid = 'b'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: () => eventId,
+      verifyEvent: event => event.id === eventId && event.sig === valid,
+    },
+  };
+  const clipboard = {text: 'something the reader copied earlier', writes: 0};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {
+      readText: async () => clipboard.text,
+      writeText: async value => { clipboard.text = value; clipboard.writes += 1; },
+    }},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-sentinel=${Date.now()}`);
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'note', tags: []};
+  sessionModule.beginAmberSigning(template, {action: 'pin', orderId: 'order-9'}, {copy: true});
+
+  // The sentinel is written before Amber is opened, in the same tap, so the clipboard never holds a
+  // value that could be mistaken for the signature on the way back.
+  assert.equal(clipboard.writes, 1, 'the clipboard is written before the hand-off');
+  assert.match(clipboard.text, /^amber-waiting:/, 'and what it holds is this page\'s sentinel, not the old value');
+
+  const parked = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key.startsWith('satoshi:nostr:amber:')) parked.push(JSON.parse(storage.getItem(key)));
+  }
+  assert.equal(parked.length, 1);
+  assert.ok(parked[0].sentinel, 'the parked request remembers the sentinel, so a later read can tell "not yet"');
+  assert.equal(parked[0].clipboard, undefined, 'the old fingerprint-the-clipboard guard is not used for a new request');
+
+  // The clipboard still holds the sentinel: nothing has arrived, and a read of it is not an answer.
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null, 'the sentinel is not a signature');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'and it does not spend the request');
+
+  // Amber replaces the sentinel with the signature; that is the answer.
+  clipboard.text = valid;
+  const answer = await sessionModule.adoptAmberSignature({silent: true});
+  assert.equal(answer?.action, 'sign');
+  assert.equal(answer.event.sig, valid);
+  assert.equal(sessionModule.amberSignaturePending(), false);
 });

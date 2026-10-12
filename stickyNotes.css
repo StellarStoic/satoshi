@@ -93,9 +93,15 @@
 .amber-steps { margin: 4px 0 16px; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; color: #d7d9d7; }
 .amber-steps strong { color: #f3f3f1; }
 .amber-paste { width: 100%; justify-content: center; }
+/* The sentence that tells a reader where Amber's answer actually goes (its clipboard, not this
+   page), shown only for a signing hand-over; a sign-in keeps the steps above alone. */
+.amber-note { margin: 0 0 14px; padding: 10px 12px; border-left: 3px solid var(--accent, #f2a900); border-radius: 4px; background: #101213; color: #e6e7e4; font-size: 13px; line-height: 1.5; }
 .nostr-connect-qr { display: flex; justify-content: center; padding: 12px; margin: 4px 0 12px; background: #ffffff; border-radius: 8px; }
 .nostr-connect-qr__canvas { width: min(300px, 66vw); height: auto; image-rendering: pixelated; }
+.nostr-connect-open { width: 100%; justify-content: center; margin-bottom: 10px; }
 .nostr-connect-copy { width: 100%; justify-content: center; margin-bottom: 10px; }
+.nostr-connect-help { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #d7d9d7; }
+.nostr-connect-help strong { color: #f3f3f1; }
 .nostr-connect-uri { margin-bottom: 12px; font-size: 13px; color: #d7d9d7; }
 .nostr-connect-uri summary { cursor: pointer; }
 .nostr-connect-uri code { display: block; margin-top: 8px; padding: 8px; overflow-wrap: anywhere; word-break: break-all; font-size: 12px; color: #f3f3f1; background: #101213; border: 1px solid #333536; border-radius: 6px; user-select: all; }
