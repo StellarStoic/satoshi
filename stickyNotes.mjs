@@ -171,8 +171,6 @@ const elements = {
   livelinessTicks: document.getElementById('noteLivelinessTicks'), livelinessHint: document.getElementById('noteLivelinessHint'),
   noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpirationValue: document.getElementById('noteExpirationValue'),
   noteExpiresAt: document.getElementById('noteExpiresAt'), noteExpiryCountdown: document.getElementById('noteExpiryCountdown'),
-  zoomOut: document.getElementById('zoomOut'), zoomIn: document.getElementById('zoomIn'),
-  zoomFit: document.getElementById('zoomFit'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
@@ -3872,9 +3870,6 @@ elements.discardConfirm.addEventListener('click', () => discardPendingNote());
 elements.discardCancel.addEventListener('click', () => keepDiscardedNote());
 // Closing with the X or Escape is a no: put the note back where the drag started.
 elements.discardDialog.addEventListener('close', () => { if (discardRestore) keepDiscardedNote(); });
-elements.zoomOut.addEventListener('click', () => setZoom(boardView.scale - .15));
-elements.zoomIn.addEventListener('click', () => setZoom(boardView.scale + .15));
-elements.zoomFit.addEventListener('click', fillBoard);
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
 elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationFrame(keepNoteMenuOnScreen));

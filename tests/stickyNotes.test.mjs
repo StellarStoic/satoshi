@@ -576,10 +576,12 @@ test('board chrome stays compact over the board', async () => {
   assert.match(html, /id="noteSort"[^>]+aria-pressed="false"/);
   assert.match(css, /\.note-sort-button\.has-active-filter[^}]+border-color:#7cfc00/);
   assert.match(script, /elements\.noteSort\.classList\.toggle\('has-active-filter', filtered\)/);
-  assert.match(html, /lni-search-minus/);
-  assert.match(html, /lni-search-plus/);
+  assert.doesNotMatch(html, /class="board-controls"/, 'the board draws no zoom toolbar');
+  assert.doesNotMatch(html, /id="zoom(In|Out|Fit)"/);
+  assert.doesNotMatch(css, /\.board-controls/);
+  assert.doesNotMatch(script, /elements\.zoom(In|Out|Fit)\b/);
+  assert.match(script, /addEventListener\('wheel'/, 'zooming is a gesture: the wheel and two fingers');
   assert.doesNotMatch(html, /id="zoomLevel"/);
-  assert.match(css, /\.board-controls[^}]+left:\s*50%/);
   assert.doesNotMatch(script, /zoomLevel/);
   assert.doesNotMatch(html, /Global board/);
   assert.match(script, /'#g': \[\.\.\.activeGeohashes\]/);
