@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
   boardPatternScale,
@@ -1907,4 +1907,30 @@ test('the picker searches by name and marks the place it found', async () => {
   assert.match(script, /MAP_SEARCH_SOURCE_ID/, 'the marker has a source of its own');
   assert.match(html, /photon\.komoot\.io/, 'the geocoder is credited on the page');
   assert.match(html, /openstreetmap\.org\/copyright/, 'and so is the map data');
+});
+
+
+test('an address in the composer counts as the word the paper prints', async () => {
+  const link = 'https://example.com/' + 'a'.repeat(5000);
+  const text = `see ${link}`;
+  const match = linkMatches(text)[0];
+  assert.ok(match, 'the model finds the address');
+  assert.equal(linkRunIsComplete(match, text.length, {force: true}), true, 'a pasted address arrives whole');
+  assert.equal(linkRunIsComplete(match, text.length), false, 'typed, the same address is still being written');
+  assert.equal(linkRunIsComplete(match, text.length, {caret: text.length}), false, 'a caret at its end is still writing it');
+  const withMore = `${text} and more`;
+  const spaced = linkMatches(withMore)[0];
+  assert.equal(linkRunIsComplete(spaced, withMore.length), true, 'anything after it means it is finished');
+  assert.equal(linkRunIsComplete(spaced, withMore.length, {caret: spaced.index + 2}), false,
+    'a caret inside it is still editing it');
+  assert.equal(linkRunIsComplete(null, 10), false);
+
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /else if \(node\.dataset\?\.href\) out \+= node\.dataset\.href;/,
+    'a link chip stands for its address, never for the four characters it shows');
+  assert.match(script, /chip\.className = 'sticky-editor__link'/);
+  assert.match(script, /drawLinkChipsInEditor\(\);\n  const text = elements\.editor\.textContent/,
+    'addresses are drawn before the note is measured');
+  assert.match(script, /drawLinkChipsInEditor\(\{force: true\}\)/, 'a pasted address is converted whole');
+  assert.match(script, /if \(editorPasting\)/, 'and the guards wait for that conversion instead of refusing it');
 });

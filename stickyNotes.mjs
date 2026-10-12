@@ -6,6 +6,8 @@ import {
   stickyNoteLength,
   MAP_SEARCH_PRECISION,
   placeSearchResults,
+  linkMatches,
+  linkRunIsComplete,
   placeSearchUrl,
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
@@ -1941,7 +1943,7 @@ function renderNote(sticky, event = null, temporary = false) {
   if (!temporary) rendered.add(sticky.id);
   const note = document.createElement('article');
   note.className = `sticky-note sticky-note--${sticky.color} sticky-note--font-${sticky.font || 'typewriter'}${temporary ? ' sticky-note--placing' : ''}`;
-  note.classList.toggle('sticky-note--dense', sticky.content.length > 280);
+  note.classList.toggle('sticky-note--dense', stickyNoteLength(sticky.content) > 280);
   if (sticky.id) note.dataset.eventId = sticky.id;
   note.dataset.createdAt = String(sticky.createdAt || 0);
   note.tabIndex = temporary ? 0 : -1;
@@ -2173,9 +2175,17 @@ function updateCapacity() {
 }
 
 function handleEditorInput() {
+  if (editorPasting) {
+    // The paste listener converts first and calls back here afterwards.
+    updateCapacity();
+    return;
+  }
+  // A finished address is drawn as the word the paper prints before anything is measured: five
+  // thousand characters of query string drawn as `link` must not measure as five thousand.
+  drawLinkChipsInEditor();
   const text = elements.editor.textContent;
   const published = normaliseStickyText(editorContent());
-  elements.draft.classList.toggle('sticky-note--dense', published.length > 280);
+  elements.draft.classList.toggle('sticky-note--dense', stickyNoteLength(published) > 280);
   if (stickyNoteLength(published) > STICKY_MAX_CHARACTERS) {
     elements.editor.textContent = lastValidEditor;
     updateCapacity();
@@ -3351,6 +3361,8 @@ function editorContent(editor = elements.editor) {
     if (node.nodeType !== 1) return;
     // A mention becomes the thing it stands for: the npub, as NIP-27 writes it.
     if (node.dataset?.pubkey && node.dataset?.npub) out += `nostr:${node.dataset.npub}`;
+    // A link chip is the word the paper prints; the address it stands for is what travels.
+    else if (node.dataset?.href) out += node.dataset.href;
     else out += node.textContent;
   });
   return out;
@@ -3363,6 +3375,70 @@ function editorMentions(editor = elements.editor) {
     if (/^[0-9a-f]{64}$/.test(pubkey) && !keys.includes(pubkey)) keys.push(pubkey);
   });
   return keys;
+}
+
+// While a paste is being turned into chips the length and fitting guards stand aside: the text
+// they would measure is not the text the reader will be left with. They run again, on the converted
+// text, when the conversion is done.
+let editorPasting = false;
+
+/** Put the caret just after a chip, the way an inserted mention leaves it. */
+function caretAfterChip(chip) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  const next = chip.nextSibling;
+  if (next && next.nodeType === 3) range.setStart(next, 0);
+  else range.setStartAfter(chip);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+/**
+ * Draw every finished address in the composer as the word the paper prints, keeping the address on
+ * the chip. A pasted query string can run to thousands of characters: drawn as itself it fills the
+ * note and is refused for not fitting, while the paper will only ever show four characters.
+ */
+function drawLinkChipsInEditor({force = false} = {}) {
+  const editor = elements.editor;
+  const selection = window.getSelection();
+  const caretNode = selection && selection.rangeCount ? selection.getRangeAt(0).startContainer : null;
+  const caretOffset = selection && selection.rangeCount ? selection.getRangeAt(0).startOffset : null;
+  const nodes = [];
+  editor.childNodes.forEach(node => {
+    if (node.nodeType === 3) nodes.push(node);
+  });
+  let changed = false;
+  for (const node of nodes) {
+    const text = node.textContent || '';
+    const matches = linkMatches(text);
+    for (let index = matches.length - 1; index >= 0; index -= 1) {
+      const match = matches[index];
+      const caret = caretNode === node ? caretOffset : null;
+      if (!linkRunIsComplete(match, text.length, {caret, force})) continue;
+      const href = linkHref(match.url);
+      if (!href) continue;
+      const shown = linkDisplay(href);
+      const chip = document.createElement('span');
+      chip.className = 'sticky-editor__link';
+      chip.contentEditable = 'false';
+      chip.dataset.href = href;
+      chip.textContent = LINK_LABEL;
+      chip.title = shown.truncated ? `${shown.head}…` : shown.head;
+      const head = text.slice(0, match.index);
+      const rest = text.slice(match.index + match.length);
+      const parent = node.parentNode;
+      const anchor = node.nextSibling;
+      if (head) node.textContent = head;
+      else node.remove();
+      parent.insertBefore(chip, anchor);
+      if (rest) parent.insertBefore(document.createTextNode(rest), chip.nextSibling);
+      changed = true;
+      if (caretNode === node) caretAfterChip(chip);
+    }
+  }
+  return changed;
 }
 
 function insertMention(entry, query) {
@@ -4021,7 +4097,20 @@ elements.liveliness.addEventListener('input', () => selectLiveliness(STICKY_LIVE
 renderLiveliness();
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
 elements.editor.addEventListener('input', handleEditorInput);
-elements.editor.addEventListener('paste', event => { event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain')); });
+elements.editor.addEventListener('paste', event => {
+  event.preventDefault();
+  const pasted = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+  editorPasting = true;
+  try {
+    document.execCommand('insertText', false, pasted);
+    // A pasted address arrives whole, so it is converted even when it ends the note.
+    drawLinkChipsInEditor({force: true});
+  } finally {
+    editorPasting = false;
+  }
+  handleEditorInput();
+  fitDraftTypography();
+});
 elements.hashtags.addEventListener('input', validateHashtags);
 elements.pay.addEventListener('click', startPayment);
 elements.planPicker?.addEventListener('click', event => {

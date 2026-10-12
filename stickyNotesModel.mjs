@@ -227,6 +227,19 @@ export function linkDisplay(url, max = LINK_DISPLAY_MAX) {
  * Links written into a note: http(s) and bare www. runs, with the sentence's own trailing
  * punctuation left out (a closing bracket stays when the link opened one itself).
  */
+/**
+ * Whether the editor is holding a finished address rather than one still being typed: it stops
+ * before the text does, or the caret is somewhere else. A finished address is drawn as the word the
+ * paper prints, so a copied query string cannot fill a note it never appears on. `force` is for a
+ * paste, where the address arrives whole with the caret at its end.
+ */
+export function linkRunIsComplete(match, textLength, {caret = null, force = false} = {}) {
+  if (!match) return false;
+  const end = match.index + match.length;
+  if (typeof caret === 'number' && caret > match.index && caret < end) return false;
+  return end < textLength || force;
+}
+
 export function linkMatches(content) {
   const text = String(content || '');
   const matches = [];
