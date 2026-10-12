@@ -18,6 +18,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkDisplay,
   linkHref,
   boardPlateFontSize,
+  boardShareUrl,
   linkMatches,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
@@ -511,8 +512,8 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
   assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
     'one two-finger gesture zooms the board and rotates the note');
-  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link'\)[\s\S]{0,180}return;/,
-    'the pin and a note link keep their own click instead of dragging the board');
+  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)[\s\S]{0,180}return;/,
+    'the pin, a note link and the board plate keep their own click instead of dragging the board');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   // The board is a pattern drawn into a canvas inside the transformed element, not a repeating
   // background on the 2048px board element. That tiled form has to be produced at device resolution
@@ -630,7 +631,8 @@ test('board chrome stays compact over the board', async () => {
   assert.match(script, /canvasWidth: boardSize\.width, canvasHeight: boardSize\.height/);
   assert.match(script, /geohashMap = null/);
   assert.match(script, /searchParams\.get\('g'\)/);
-  assert.match(script, /searchParams\.set\('g', cells\.join\(','\)\)/);
+  assert.match(script, /boardShareUrl\(location\.origin, chosen\)/,
+    'a board is shared as the page that carries its picture, not as the app URL');
   assert.match(script, /BOARD_REMEMBER_KEY/);
   assert.match(script, /localStorage\.removeItem\(BOARD_KEY\)/);
 });
@@ -1751,8 +1753,13 @@ test('the board plate is engraved with its own cells, cut to fit, and no deeper 
   const plate = markup.indexOf('id="boardPlate"');
   assert.ok(canvas >= 0 && frame > canvas && plate > frame,
     'the plate is on the board itself, so it pans and zooms with it');
-  assert.match(markup, /id="boardPlate"[^>]*aria-hidden="true"/, 'the toolbar still carries the accessible label');
-  assert.match(css, /\.board-plate \{[^}]*pointer-events: none/, 'dragging on the plate still moves the board');
+  // The plate names the board, so it is the control that shares it: a button with a label of its
+  // own, and no longer something that has to swallow its clicks to stay out of the pan gesture.
+  assert.match(markup, /<button type="button" id="boardPlate"[^>]*aria-label="Share this board"/,
+    'the plate is the share control, and carries its own accessible label');
+  assert.match(css, /\.board-plate \{[^}]*cursor: pointer/, 'the plate shows that it can be pressed');
+  assert.doesNotMatch(css, /\.board-plate \{[^}]*pointer-events: none/,
+    'and it no longer swallows the click that opens the share dialog');
 
   // One size for the whole string, and never bigger than the plate's own type.
   assert.match(model, /export function boardPlateFontSize\(innerWidth, measuredWidth, maximum\)/);
@@ -1933,4 +1940,31 @@ test('an address in the composer counts as the word the paper prints', async () 
     'addresses are drawn before the note is measured');
   assert.match(script, /drawLinkChipsInEditor\(\{force: true\}\)/, 'a pasted address is converted whole');
   assert.match(script, /if \(editorPasting\)/, 'and the guards wait for that conversion instead of refusing it');
+});
+
+
+test('a board is shared by the link that carries its picture', async () => {
+  assert.equal(boardShareUrl('https://satoshi.si', ['u0qj7z0y']), 'https://satoshi.si/b/u0qj7z0y');
+  assert.equal(boardShareUrl('https://pinstr.si/', ['u0qj7z0y', 'u0qj7z0z']),
+    'https://pinstr.si/b/u0qj7z0y,u0qj7z0z', 'a board of several cells lists them all');
+  assert.equal(boardShareUrl('https://pinstr.si', []), '', 'no cells, no board, no link');
+  assert.equal(boardShareUrl('https://pinstr.si', [null, '']), '');
+  assert.equal(boardShareUrl('https://pinstr.si', null), '');
+
+  const [script, page, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8')
+  ]);
+  assert.match(page, /<button type="button" id="boardPlate"/,
+    'the plate names the board, so the plate is what opens the share dialog');
+  assert.ok(!/<div id="boardPlate"/.test(page), 'and it is no longer a div that cannot be pressed');
+  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)/,
+    'a control on the board is unreachable unless the pan guard names it');
+  assert.doesNotMatch(css, /\.board-plate \{[^}]*pointer-events: none/,
+    'and the plate must stop swallowing its own clicks');
+  assert.match(script, /dataset\.pinstrCard = 'ready'/,
+    'the page tells the desk when the board is whole, so no picture is taken half-painted');
+  assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 0;/,
+    'card mode is the board alone, filling the frame');
 });

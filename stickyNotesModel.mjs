@@ -1141,3 +1141,14 @@ export function boardPlateFontSize(innerWidth, measuredWidth, maximum) {
   if (!(innerWidth > 0) || !(measuredWidth > 0)) return maximum;
   return Math.min(maximum, maximum * (innerWidth / measuredWidth));
 }
+
+/**
+ * The link a board is shared by: the page the desk serves for that board, which carries the board's
+ * own picture so a chat unfurls the board itself instead of the site's generic card. An empty set
+ * of cells has no board to point at, so there is no link.
+ */
+export function boardShareUrl(origin, cells) {
+  const clean = (cells || []).filter(cell => typeof cell === 'string' && cell);
+  if (!clean.length) return '';
+  return `${String(origin || '').replace(/\/+$/, '')}/b/${clean.join(',')}`;
+}

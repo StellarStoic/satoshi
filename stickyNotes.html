@@ -41,9 +41,9 @@
           <span class="board-frame__rail board-frame__rail--left"></span>
           <span class="board-frame__rail board-frame__rail--right"></span>
         </div>
-        <div id="boardPlate" class="board-plate" hidden aria-hidden="true">
+        <button type="button" id="boardPlate" class="board-plate" hidden aria-label="Share this board" title="Share this board">
           <span id="boardPlateLine" class="board-plate__line"></span>
-        </div>
+        </button>
       </div>
       <div class="board-status" id="boardStatus" role="status" aria-live="polite">Opening the board...</div>
       <div class="login-confirmation" id="loginConfirmation" role="status" aria-live="polite" hidden></div>
@@ -124,6 +124,23 @@
     </form>
   </dialog>
 
+
+  <dialog id="shareBoardDialog" class="sticky-dialog share-board-dialog" aria-labelledby="shareBoardTitle">
+    <div class="dialog-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="shareBoardTitle">Share this board</h2>
+      <p>Whoever you send this to sees the board and its notes before they open it. The link opens the live board.</p>
+      <img id="shareBoardPreview" class="share-board-preview" alt="The board as it will be shown in a shared link" hidden>
+      <label class="share-board-link" for="shareBoardLink"><span>Board link</span>
+        <input id="shareBoardLink" type="text" readonly autocomplete="off" spellcheck="false">
+      </label>
+      <div class="board-chooser__actions">
+        <button type="button" id="copyBoardLink" class="secondary-action"><i class="lni lni-copy-2" aria-hidden="true"></i><span>Copy link</span></button>
+        <button type="button" id="nativeShareBoard" class="primary-action" hidden><i class="lni lni-share-1" aria-hidden="true"></i><span>Share…</span></button>
+      </div>
+      <div id="shareBoardStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </div>
+  </dialog>
 
   <dialog id="areaDialog" class="sticky-dialog" aria-labelledby="areaDialogTitle">
     <div class="dialog-inner">

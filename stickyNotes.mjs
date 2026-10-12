@@ -50,6 +50,7 @@ import {
   boardPatternScale,
   GRID_MIN_CELL_PX,
   linkDisplay,
+  boardShareUrl,
   linkHref,
   BOARD_TEXTURES,
   DEFAULT_BOARD_TEXTURE_URL,
@@ -173,6 +174,12 @@ const elements = {
   nostrConnectCopy: document.getElementById('nostrConnectCopy'),
   nostrConnectStatus: document.getElementById('nostrConnectStatus'),
   boardPlate: document.getElementById('boardPlate'),
+  shareBoardDialog: document.getElementById('shareBoardDialog'),
+  shareBoardLink: document.getElementById('shareBoardLink'),
+  shareBoardPreview: document.getElementById('shareBoardPreview'),
+  shareBoardStatus: document.getElementById('shareBoardStatus'),
+  shareBoardNative: document.getElementById('nativeShareBoard'),
+  copyBoardLink: document.getElementById('copyBoardLink'),
   boardPlateLine: document.getElementById('boardPlateLine'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   exactGeohash: document.getElementById('exactGeohashNote'),
@@ -281,6 +288,13 @@ let geohashPlaceTimer = 0;
 let geohashPlaceMarker = null;
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
+// Card mode: the same page, wearing nothing but the board, so the desk can screenshot it into the
+// picture a shared board link unfurls with.
+const cardMode = new URL(location.href).searchParams.has('card');
+if (cardMode) {
+  document.body.classList.add('is-card');
+  document.title = 'Pinstr board';
+}
 let lockedCells = geohashCellsFrom(localStorage.getItem(LOCKED_PLACE_KEY));
 let rememberBoard = localStorage.getItem(BOARD_REMEMBER_KEY) !== 'false';
 // A link somebody was sent wins, then the place they locked, then the board they last
@@ -2026,6 +2040,10 @@ function connectBoard(version = boardConnectionVersion) {
         clearTimeout(timeout);
         elements.boardStatus.hidden = true;
         applyNoteFilters();
+        // The relay has sent everything it stores for this board and the notes are drawn: this is
+        // the moment a picture of the board is whole. Rendered on the next frame, so nothing is
+        // captured with the layout still settling.
+        if (cardMode) requestAnimationFrame(() => { document.documentElement.dataset.pinstrCard = 'ready'; });
         return;
       }
       if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])) return;
@@ -2913,7 +2931,7 @@ function installBoardNavigation() {
     // Ordinary paper is part of the board surface: dragging or pinching on it must move
     // the board too. A pin and a note's own link remain buttons, while concealed paper owns a
     // four-second hold.
-    if (event.target.closest('.sticky-note__pin, .sticky-note__link')
+    if (event.target.closest('.sticky-note__pin, .sticky-note__link, .board-plate')
         || event.target.closest('.sticky-note--filtered-out:not(.sticky-note--filter-revealed)')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
@@ -4049,30 +4067,58 @@ for (const button of areaScaleButtons()) {
 }
 renderAreaScales();
 
-elements.shareBoard.addEventListener('click', async () => {
-  const typed = geohashCellsFrom(elements.boardGeohash.value);
-  const cells = typed.length ? typed : activeGeohashes;
-  if (!cells.length) {
+/**
+ * The board's share dialog. The link is the desk's page for this board, so whoever it is sent to
+ * sees the board itself in the preview before they open it. Tapping the engraved plate opens it,
+ * because the plate is what names the board.
+ */
+function openShareBoard(cells = activeGeohashes) {
+  const chosen = (cells || []).filter(Boolean);
+  if (!chosen.length) {
     status(elements.boardChooserStatus, 'Enter or open a geohash before sharing it.', true);
     return;
   }
-  const geohash = boardCellsLabel(cells);
-  const url = new URL('/stickyNotes.html', location.origin);
-  url.searchParams.set('g', cells.join(','));
+  const url = boardShareUrl(location.origin, chosen);
+  elements.shareBoardLink.value = url;
+  elements.shareBoardNative.hidden = !navigator.share;
+  const preview = elements.shareBoardPreview;
+  preview.hidden = false;
+  preview.src = `${url}.png`;
+  status(elements.shareBoardStatus, 'Drawing the board...');
+  if (!elements.shareBoardDialog.open) elements.shareBoardDialog.showModal();
+}
+
+elements.shareBoardPreview.addEventListener('load', () => status(elements.shareBoardStatus, ''));
+elements.shareBoardPreview.addEventListener('error', () => {
+  elements.shareBoardPreview.hidden = true;
+  status(elements.shareBoardStatus, 'The board picture is still being drawn. The link works either way.', true);
+});
+
+elements.boardPlate.addEventListener('click', () => openShareBoard());
+
+elements.shareBoard.addEventListener('click', () => {
+  const typed = geohashCellsFrom(elements.boardGeohash.value);
+  openShareBoard(typed.length ? typed : activeGeohashes);
+});
+
+elements.copyBoardLink.addEventListener('click', async () => {
   try {
-    if (navigator.share) {
-      try {
-        await navigator.share({title: `Board ${geohash}`, text: `Open the ${geohash} Nostr board on satoshi.si.`, url: url.href});
-        status(elements.boardChooserStatus, 'Board link shared.');
-        return;
-      } catch (error) {
-        if (error?.name === 'AbortError') return;
-      }
-    }
-    await navigator.clipboard.writeText(url.href);
-    status(elements.boardChooserStatus, 'Board link copied.');
+    await navigator.clipboard.writeText(elements.shareBoardLink.value);
+    status(elements.shareBoardStatus, 'Board link copied.');
+  } catch {
+    elements.shareBoardLink.select();
+    status(elements.shareBoardStatus, 'Select the link and copy it.', true);
+  }
+});
+
+elements.shareBoardNative.addEventListener('click', async () => {
+  const cells = geohashCellsFrom(elements.shareBoardLink.value.split('/b/')[1] || '');
+  const geohash = cells.length ? boardCellsLabel(cells) : 'Pinstr';
+  try {
+    await navigator.share({title: `Board ${geohash}`, text: `Open the ${geohash} board on Pinstr.`, url: elements.shareBoardLink.value});
+    status(elements.shareBoardStatus, 'Board link shared.');
   } catch (error) {
-    status(elements.boardChooserStatus, 'Could not share the board link.', true);
+    if (error?.name !== 'AbortError') status(elements.shareBoardStatus, 'Could not open the share sheet.', true);
   }
 });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
