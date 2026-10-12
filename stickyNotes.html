@@ -148,6 +148,17 @@
         <div><h2 id="geohashMapTitle">Choose a geohash</h2><p>Zoom for a smaller area, then tap a grid cell. A place that straddles a few cells: tap the dashed ones around it to add them — a board only ever covers cells that touch.</p></div>
         <button type="button" id="closeGeohashMap" class="dialog-close" aria-label="Close map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       </header>
+      <div class="geohash-map-search">
+        <div class="geohash-map-search__field">
+          <i class="lni lni-search-1" aria-hidden="true"></i>
+          <label class="geohash-map-search__label" for="placeSearch">Search a place by name</label>
+          <input id="placeSearch" type="search" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Search a place by name…" aria-describedby="placeSearchCredit">
+          <button type="button" id="clearPlaceSearch" class="geohash-map-search__clear" aria-label="Clear the place search" hidden><i class="lni lni-xmark" aria-hidden="true"></i></button>
+        </div>
+        <ul id="placeResults" class="geohash-map-search__results" aria-label="Places found" hidden></ul>
+        <div id="placeSearchStatus" class="inline-status geohash-map-search__status" role="status" aria-live="polite"></div>
+        <p id="placeSearchCredit" class="geohash-map-search__credit">Places by <a href="https://photon.komoot.io/" target="_blank" rel="noopener">Photon</a> · &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
+      </div>
       <div id="geohashMap" class="geohash-map" aria-label="Map for choosing the geohash cells of this board"></div>
       <details class="saved-places" id="savedPlacesPanel">
         <summary><i class="lni lni-bookmark-1" aria-hidden="true"></i><span id="savedPlacesSummary">Saved places</span></summary>

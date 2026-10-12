@@ -4,6 +4,9 @@ import {
   STICKY_ANONYMOUS_PRICE_SATS,
   STICKY_MAX_CHARACTERS,
   stickyNoteLength,
+  MAP_SEARCH_PRECISION,
+  placeSearchResults,
+  placeSearchUrl,
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
   describeStickyAction,
@@ -122,6 +125,9 @@ const elements = {
   geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
   geohashMapStatus: document.getElementById('geohashMapStatus'), clearGeohashSelection: document.getElementById('clearGeohashSelection'),
   useGeohashSelection: document.getElementById('useGeohashSelection'),
+  placeSearch: document.getElementById('placeSearch'), placeResults: document.getElementById('placeResults'),
+  clearPlaceSearch: document.getElementById('clearPlaceSearch'),
+  placeStatus: document.getElementById('placeSearchStatus'),
   boardChooserStatus: document.getElementById('boardChooserStatus'),
   shareArea: document.getElementById('shareArea'), areaDialog: document.getElementById('areaDialog'),
   areaStatus: document.getElementById('areaStatus'),
@@ -250,6 +256,14 @@ const MAP_LABEL_LAYER = 'geohash-cells-label';
 const MAP_TROUBLE_TEXT = 'The map tiles could not be loaded — you can still enter a geohash by hand.';
 const MAP_LAYOUT_WAIT_MS = 400;
 const MAP_LAYOUT_POLL_MS = 50;
+// The searched place draws its own source over the grid: a ring wide enough to see under the
+// cells, and a dot inside it. Three characters and a pause are the politeness the geocoder's
+// operators ask for, and a request still in flight is dropped the moment the reader types again.
+const MAP_SEARCH_SOURCE_ID = 'geohash-place';
+const MAP_SEARCH_RING_LAYER = 'geohash-place-ring';
+const MAP_SEARCH_MARKER_LAYER = 'geohash-place-marker';
+const MAP_SEARCH_DEBOUNCE_MS = 300;
+const MAP_SEARCH_TIMEOUT_MS = 8000;
 const MAP_MISSING_TEXT = 'The map could not load. You can still enter a geohash manually.';
 let mapLibraryPromise = null;
 let mapTroubleSaid = false;
@@ -259,6 +273,10 @@ let geohashMapCells = [];
 // Set while the picker applies its opening view: that jump fires `zoomend` as well, and it is
 // not the reader zooming, so it must never be read as a grid change.
 let geohashMapOpening = false;
+let geohashPlaceResults = [];
+let geohashPlaceRequest = null;
+let geohashPlaceTimer = 0;
+let geohashPlaceMarker = null;
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
 let lockedCells = geohashCellsFrom(localStorage.getItem(LOCKED_PLACE_KEY));
@@ -624,6 +642,138 @@ function addGeohashLayers(map) {
     },
     paint: {'text-color': '#17130d', 'text-halo-color': '#fff4d5', 'text-halo-width': 1.5},
   });
+  map.addSource(MAP_SEARCH_SOURCE_ID, {type: 'geojson', data: {type: 'FeatureCollection', features: []}});
+  map.addLayer({
+    id: MAP_SEARCH_RING_LAYER, type: 'circle', source: MAP_SEARCH_SOURCE_ID,
+    paint: {
+      'circle-radius': 14, 'circle-color': '#f2a900', 'circle-opacity': .16,
+      'circle-stroke-color': '#f2a900', 'circle-stroke-width': 2, 'circle-stroke-opacity': .9,
+    },
+  });
+  map.addLayer({
+    id: MAP_SEARCH_MARKER_LAYER, type: 'circle', source: MAP_SEARCH_SOURCE_ID,
+    paint: {
+      'circle-radius': 5, 'circle-color': '#17130d',
+      'circle-stroke-color': '#fff4d5', 'circle-stroke-width': 2,
+    },
+  });
+}
+
+/**
+ * Searching a place by name, so a board is not something a reader has to know the geohash of.
+ * The geocoder is komoot's open-source Photon over OpenStreetMap; it allows any origin and asks
+ * for no key, so the page asks it directly and sends nothing but the place name.
+ */
+function setPlaceResults(results) {
+  geohashPlaceResults = results;
+  const list = elements.placeResults;
+  list.replaceChildren();
+  results.forEach((result, index) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'geohash-map-search__result';
+    button.dataset.index = String(index);
+    button.textContent = result.label;
+    item.append(button);
+    list.append(item);
+  });
+  list.hidden = !results.length;
+}
+
+function clearPlaceSearch({keepInput = false} = {}) {
+  if (geohashPlaceRequest) {
+    geohashPlaceRequest.abort();
+    geohashPlaceRequest = null;
+  }
+  if (geohashPlaceTimer) {
+    clearTimeout(geohashPlaceTimer);
+    geohashPlaceTimer = 0;
+  }
+  if (!keepInput) elements.placeSearch.value = '';
+  elements.clearPlaceSearch.hidden = true;
+  status(elements.placeStatus, '');
+  setPlaceResults([]);
+  geohashPlaceMarker = null;
+  drawPlaceMarker();
+}
+
+function drawPlaceMarker() {
+  if (!geohashMap) return;
+  const source = geohashMap.getSource(MAP_SEARCH_SOURCE_ID);
+  if (!source) return; // the style is still on its way in
+  const marker = geohashPlaceMarker;
+  source.setData({
+    type: 'FeatureCollection',
+    features: marker ? [{
+      type: 'Feature',
+      properties: {label: marker.label},
+      geometry: {type: 'Point', coordinates: [marker.lng, marker.lat]},
+    }] : [],
+  });
+}
+
+/** Land on the place: centred, and on the four-character grid the model names. */
+function choosePlace(index) {
+  const result = geohashPlaceResults[Number(index)];
+  if (!result || !geohashMap) return;
+  geohashPlaceMarker = result;
+  geohashMap.jumpTo({
+    center: [result.lng, result.lat],
+    zoom: mapZoomForGeohashPrecision(MAP_SEARCH_PRECISION),
+  });
+  setPlaceResults([]);
+  drawPlaceMarker();
+  scheduleGeohashGrid();
+  status(elements.placeStatus, `${result.label} — the grid is ${MAP_SEARCH_PRECISION} characters here. Tap a cell to take it.`);
+}
+
+async function searchPlaces() {
+  const query = String(elements.placeSearch.value || '').trim();
+  elements.clearPlaceSearch.hidden = !query;
+  const url = placeSearchUrl(query);
+  if (!url) {
+    setPlaceResults([]);
+    return;
+  }
+  if (geohashPlaceRequest) geohashPlaceRequest.abort();
+  const controller = new AbortController();
+  geohashPlaceRequest = controller;
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, MAP_SEARCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {signal: controller.signal, headers: {Accept: 'application/json'}});
+    if (!response.ok) throw new Error(`The place search answered ${response.status}`);
+    const payload = await response.json();
+    if (geohashPlaceRequest !== controller) return; // a newer search has taken over
+    setPlaceResults(placeSearchResults(payload));
+    if (!geohashPlaceResults.length) {
+      status(elements.placeStatus, 'No place by that name — try another spelling, or tap a cell.');
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError' && !timedOut) return;
+    console.error('Could not search for a place:', error);
+    if (geohashPlaceRequest === controller) {
+      setPlaceResults([]);
+      status(elements.placeStatus, timedOut
+        ? 'The place search took too long — tap a cell on the grid instead.'
+        : 'The place search is unavailable — tap a cell on the grid instead.', true);
+    }
+  } finally {
+    clearTimeout(timeout);
+    if (geohashPlaceRequest === controller) geohashPlaceRequest = null;
+  }
+}
+
+function schedulePlaceSearch() {
+  if (geohashPlaceTimer) clearTimeout(geohashPlaceTimer);
+  geohashPlaceTimer = setTimeout(() => {
+    geohashPlaceTimer = 0;
+    searchPlaces();
+  }, MAP_SEARCH_DEBOUNCE_MS);
 }
 
 function drawGeohashGrid() {
@@ -774,6 +924,8 @@ async function initialiseGeohashMap() {
   geohashMap.addControl(new library.NavigationControl({showCompass: false}), 'top-right');
   geohashMap.on('load', () => {
     addGeohashLayers(geohashMap);
+    // A place searched before the style arrived still gets its marker.
+    drawPlaceMarker();
     scheduleGeohashGrid();
   });
   geohashMap.on('moveend', scheduleGeohashGrid);
@@ -3504,8 +3656,26 @@ elements.openGeohashMap.addEventListener('click', () => {
     sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
   });
 });
+elements.placeSearch.addEventListener('input', schedulePlaceSearch);
+elements.placeSearch.addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  if (geohashPlaceResults.length) choosePlace(0);
+  else searchPlaces();
+});
+elements.placeResults.addEventListener('click', event => {
+  const button = event.target.closest('.geohash-map-search__result');
+  if (button) choosePlace(button.dataset.index);
+});
+elements.clearPlaceSearch.addEventListener('click', () => {
+  clearPlaceSearch();
+  elements.placeSearch.focus();
+});
 elements.closeGeohashMap.addEventListener('click', () => elements.geohashMapDialog.close());
 elements.geohashMapDialog.addEventListener('close', () => {
+  // The search is an aid to this picking session, not a state of its own: the field and the
+  // marker go together, so the next open starts clean rather than showing a stale pin.
+  clearPlaceSearch();
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
 });

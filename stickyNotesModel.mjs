@@ -628,6 +628,84 @@ export function mapZoomForGeohashPrecision(precision) {
   return [0, 2, 4, 6, 8, 11, 13, 15, 18, 21][index];
 }
 
+/**
+ * Searching a place by name lands on a grid a reader can recognise: four characters is about
+ * 39 x 20 km, coarse enough to cover a district and fine enough that two towns are not one board.
+ */
+export const MAP_SEARCH_PRECISION = 4;
+/** Photon is komoot's open-source geocoder over OpenStreetMap; it takes no key and allows any origin. */
+export const MAP_SEARCH_URL = 'https://photon.komoot.io/api/';
+export const MAP_SEARCH_LIMIT = 5;
+export const MAP_SEARCH_MIN_QUERY = 3;
+
+/** The request a name search makes, built here so what we send can be asserted. */
+export function placeSearchUrl(query, {limit = MAP_SEARCH_LIMIT, base = MAP_SEARCH_URL} = {}) {
+  const text = String(query || '').replace(/\s+/g, ' ').trim();
+  if (text.length < MAP_SEARCH_MIN_QUERY) return '';
+  const url = new URL(base);
+  url.searchParams.set('q', text);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('lang', 'en');
+  return url.href;
+}
+
+/** What kind of thing a result is, in words: a village, a winter sports area. */
+export function placeSearchKind(osmValue) {
+  const value = String(osmValue || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  return value === 'yes' || value === 'unclassified' ? '' : value;
+}
+
+/**
+ * What to call a result: its name, then the parts that place it. A part that merely repeats the
+ * name is dropped, and the kind is added only when two results would otherwise read the same.
+ */
+export function placeSearchLabel(properties = {}, {kind = false, max = 90} = {}) {
+  const text = value => String(value ?? '').trim();
+  const name = text(properties.name) || text(properties.street);
+  const pieces = [name];
+  if (kind) pieces.push(placeSearchKind(properties.osm_value));
+  pieces.push(text(properties.city || properties.district), text(properties.state), text(properties.country));
+  const seen = new Set();
+  const label = pieces.filter(piece => {
+    const key = piece.toLowerCase();
+    if (!piece || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).join(', ');
+  return label.length > max ? `${label.slice(0, max - 1).trimEnd()}\u2026` : label;
+}
+
+/** Photon's answer as the picker needs it: where the place is, and what to call it. */
+export function placeSearchResults(payload, {limit = MAP_SEARCH_LIMIT} = {}) {
+  const features = Array.isArray(payload?.features) ? payload.features : [];
+  const found = [];
+  const seen = new Set();
+  for (const feature of features) {
+    const coordinates = feature?.geometry?.coordinates;
+    const lng = Number(coordinates?.[0]);
+    const lat = Number(coordinates?.[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+    const properties = feature?.properties || {};
+    const label = placeSearchLabel(properties);
+    if (!label) continue;
+    const key = `${label}@${lat.toFixed(4)},${lng.toFixed(4)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push({label, lat, lng, properties});
+    if (found.length >= limit) break;
+  }
+  // Photon answers "Kranjska Gora" with a municipality, a village and a ski area. Where two
+  // results would read the same, each also says what kind of place it is.
+  const count = new Map();
+  for (const item of found) count.set(item.label, (count.get(item.label) || 0) + 1);
+  return found.map(item => ({
+    label: count.get(item.label) > 1 ? placeSearchLabel(item.properties, {kind: true}) : item.label,
+    lat: item.lat,
+    lng: item.lng,
+  }));
+}
+
 /** What a plan costs this buyer: NIP-05 members pay half. Null for no such plan. */
 export function stickySubscriptionPrice(plan, { member = false } = {}) {
   if (plan === 'week') return member ? STICKY_SUB_MEMBER_WEEK_SATS : STICKY_SUB_WEEK_SATS;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
   boardPatternScale,
@@ -1857,4 +1857,54 @@ test('a long link counts as the word the note shows', () => {
   assert.equal(stickyNoteLength('y'.repeat(STICKY_MAX_CHARACTERS)), STICKY_MAX_CHARACTERS);
   assert.throws(() => makeStickyTemplate({content: 'y'.repeat(STICKY_MAX_CHARACTERS + 1),
     color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH}), /full/i);
+});
+
+
+test('a place found by name lands on a four-character grid', () => {
+  assert.equal(MAP_SEARCH_PRECISION, 4);
+  assert.equal(geohashPrecisionForZoom(mapZoomForGeohashPrecision(MAP_SEARCH_PRECISION)), MAP_SEARCH_PRECISION,
+    'the zoom a search jumps to has to draw the grid it promised');
+  assert.equal(placeSearchUrl('ab'), '', 'two characters is not a search');
+  assert.equal(placeSearchUrl('   '), '');
+  const url = new URL(placeSearchUrl('Kranjska  Gora'));
+  assert.equal(`${url.origin}${url.pathname}`, 'https://photon.komoot.io/api/');
+  assert.equal(url.searchParams.get('q'), 'Kranjska Gora', 'the query is tidied, not sent as typed');
+  assert.equal(url.searchParams.get('limit'), '5');
+});
+
+test('a place result reads as a name, a kind where needed, and where it is', () => {
+  const payload = {features: [
+    {geometry: {type: 'Point', coordinates: [14.11, 46.37]}, properties: {name: 'Bled', country: 'Slovenia', osm_value: 'town'}},
+    {geometry: {type: 'Point', coordinates: [13.84, 46.45]}, properties: {name: 'Kranjska Gora', country: 'Slovenia', osm_value: 'municipality'}},
+    {geometry: {type: 'Point', coordinates: [13.78, 46.48]}, properties: {name: 'Kranjska Gora', country: 'Slovenia', osm_value: 'village'}},
+    {geometry: {type: 'Point', coordinates: [14.11, 46.37]}, properties: {name: 'Bled', country: 'Slovenia', osm_value: 'town'}},
+    {geometry: {type: 'Point', coordinates: [0, 0]}, properties: {}},
+    {geometry: {type: 'Point', coordinates: [200, 100]}, properties: {name: 'Off the world'}},
+  ]};
+  const results = placeSearchResults(payload);
+  assert.deepEqual(results.map(result => result.label), [
+    'Bled, Slovenia',
+    'Kranjska Gora, municipality, Slovenia',
+    'Kranjska Gora, village, Slovenia',
+  ], 'a name alone reads the same for a municipality and a village, so the kind is added');
+  assert.deepEqual([results[0].lat, results[0].lng], [46.37, 14.11], 'lat and lng, as the map wants them');
+  assert.equal(placeSearchResults({features: []}).length, 0);
+  assert.equal(placeSearchResults(null).length, 0, 'an answer that never came is not a crash');
+  assert.equal(placeSearchResults({features: new Array(20).fill({geometry: {type: 'Point', coordinates: [1, 2]},
+    properties: {name: 'Same'}})}).length, 1, 'the same place twice is offered once');
+});
+
+test('the picker searches by name and marks the place it found', async () => {
+  const [script, html] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="placeSearch"/, 'the picker has a field to search in');
+  assert.match(html, /id="placeResults"/, 'and somewhere to show what was found');
+  assert.match(script, /zoom: mapZoomForGeohashPrecision\(MAP_SEARCH_PRECISION\)/, 'a search lands on the four-character grid');
+  assert.match(script, /placeSearchUrl\(query\)/, 'the request is built by the model, not in the page');
+  assert.match(script, /placeSearchResults\(payload\)/);
+  assert.match(script, /MAP_SEARCH_SOURCE_ID/, 'the marker has a source of its own');
+  assert.match(html, /photon\.komoot\.io/, 'the geocoder is credited on the page');
+  assert.match(html, /openstreetmap\.org\/copyright/, 'and so is the map data');
 });
