@@ -2000,3 +2000,42 @@ test('a board is shared by the link that carries its picture', async () => {
   assert.match(css, /html\.is-card, html\.is-card body \{ height: 100vh; min-height: 100vh; margin: 0; overflow: hidden; \}/,
     'the picture is the window, not the page length, so no part of the board is cut out of it');
 });
+
+test('a signature that is copied, not called back, is finished or sent again through the clipboard', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The page reaches for the new signing hand-over; the sign-in hand-over it is built beside is untouched.
+  assert.match(script, /  adoptAmberSignature,\n  amberSignaturePending,\n  beginAmberSigning,/);
+  assert.match(script, /beginAmberLogin\(\{copy: true\}\)/, 'the login clipboard route is unchanged');
+
+  // A resumed page that lost the callback names the hand-off and offers the retry, rather than leaving
+  // the reader in silence — the boot path's wording, but now on the no-reload path too. The retry is
+  // the clipboard route, which is the one return path Android cannot drop between the two apps.
+  const resume = script.slice(script.indexOf('async function resumeExternalFlow'),
+    script.indexOf("window.addEventListener('hashchange'"));
+  assert.match(resume, /amberSignaturePending\(\)/);
+  assert.match(resume, /const automatic = await adoptAmberSignature\(\{silent: true\}\);/);
+  assert.match(resume, /if \(automatic\?\.action === 'sign'\) \{\s+if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\);\s+await completeAmberSignature\(automatic\);/);
+  assert.match(resume, /showAmberHandOver\('Amber has the signature on your clipboard\. Tap the button to hand it over\.'\)/);
+  assert.match(resume, /'The signer did not come back with a signature\. Your note is still here — pin it again\.'/);
+  assert.match(resume, /showAmberHandOver\('Amber did not come back with a signature\. Tap the button to send the request again\.'\)/);
+
+  // The button that always works dispatches on what is parked: a copied signature is adopted and the
+  // paid note pinned, a callback that never returned is re-sent through the clipboard, and anything
+  // else is the sign-in hand-over it has always been.
+  const paste = script.slice(script.indexOf("elements.amberPaste.addEventListener('click'"),
+    script.indexOf("elements.nostrConnectCopy.addEventListener"));
+  assert.match(paste, /const parked = pendingAmberRequest\(\);/);
+  assert.match(paste, /const answer = await adoptAmberSignature\(\);/);
+  assert.match(paste, /await completeAmberSignature\(answer\);/);
+  assert.match(paste, /beginAmberSigning\(parked\.template, parked\.context, \{copy: true\}\)/);
+  assert.match(paste, /showLoginConfirmation\(answer\.session\)/, 'the sign-in hand-over still finishes a login');
+
+  // Applying a copied signature tells the launching flow and publishes the note, exactly as the
+  // callback path does, and only for the note the signature is for.
+  const complete = script.slice(script.indexOf('async function completeAmberSignature'),
+    script.indexOf('function showAmberHandOver'));
+  assert.match(complete, /pending\?\.orderId !== answer\.context\?\.orderId/);
+  assert.match(complete, /signalStickyFlow\('signed', \{orderId: pending\.orderId\}\)/);
+  assert.match(complete, /await publishPinnedNote\(answer\.event\)/);
+});

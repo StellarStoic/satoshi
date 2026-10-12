@@ -62,6 +62,9 @@ import {
   beginAmberLogin,
   adoptAmberClipboard,
   amberClipboardPending,
+  adoptAmberSignature,
+  amberSignaturePending,
+  beginAmberSigning,
   beginNostrConnect,
   getNostrSession,
   loginAnonymously,
@@ -3712,6 +3715,22 @@ elements.paymentDialog.addEventListener('cancel', discardInvoice);
 elements.newSticky.addEventListener('click', openComposer);
 elements.amberPaste.addEventListener('click', async () => {
   try {
+    // What is parked decides what this button hands over. A signing request sent without a callback
+    // has its signature on the clipboard; one whose callback never came back is sent again through
+    // the clipboard, the one return path Android cannot drop. Anything else is an ordinary sign-in.
+    const parked = pendingAmberRequest();
+    if (parked?.action === 'sign' && parked.copy) {
+      status(elements.amberCopyStatus, 'Reading what Amber copied...');
+      const answer = await adoptAmberSignature();
+      status(elements.amberCopyStatus, '');
+      if (elements.amberDialog.open) elements.amberDialog.close();
+      await completeAmberSignature(answer);
+      return;
+    }
+    if (parked?.action === 'sign') {
+      beginAmberSigning(parked.template, parked.context, {copy: true});
+      return;
+    }
     status(elements.amberCopyStatus, 'Reading what Amber copied...');
     const answer = await adoptAmberClipboard();
     updateAccount();
@@ -4344,6 +4363,35 @@ async function applySignerReturn() {
   return {applied, unusable};
 }
 
+/**
+ * Apply a signature that came back through the clipboard, exactly as the callback route does: tell
+ * the flow that launched the request, then publish the paid note the signature belongs to. A
+ * signature for another note is named rather than dropped - that note is paid for and one tap from
+ * being pinned.
+ */
+async function completeAmberSignature(answer) {
+  if (!answer || answer.action !== 'sign') return false;
+  if (pending?.orderId !== answer.context?.orderId) {
+    notice('That signature was for a different note. Your note is still here — pin it again.');
+    return false;
+  }
+  signalStickyFlow('signed', {orderId: pending.orderId});
+  await publishPinnedNote(answer.event);
+  return true;
+}
+
+/**
+ * Put the hand-over step in front of the reader with the one button that always works - the same
+ * surfaces the login hand-over uses, because it is the same clipboard step. Shared by a signature
+ * already sitting on the clipboard and a signing request that has to be sent again through it, so
+ * both end at the same tap.
+ */
+function showAmberHandOver(message) {
+  if (elements.login.open) elements.login.close();
+  if (!elements.amberDialog.open) elements.amberDialog.showModal();
+  status(elements.amberCopyStatus, message);
+}
+
 const signerReturn = await applySignerReturn();
 resumedSigning = signerReturn.applied;
 // The other way a round trip loses its answer: the signer never came back at all, so nothing
@@ -4377,7 +4425,23 @@ async function resumeExternalFlow() {
       else if (pending?.status === 'paid') syncPlacementWithSession();
     }
     const parked = pendingAmberRequest();
-    if (!signer.applied && !signer.unusable && parked?.action === 'login' && parked.copy) {
+    if (!signer.applied && !signer.unusable && amberSignaturePending()) {
+      // The signature is copied rather than called back. Finish the round trip here where the browser
+      // allows the read; where it does not, the button that always works is put in front of the reader.
+      const automatic = await adoptAmberSignature({silent: true});
+      if (automatic?.action === 'sign') {
+        if (elements.amberDialog.open) elements.amberDialog.close();
+        await completeAmberSignature(automatic);
+      } else showAmberHandOver('Amber has the signature on your clipboard. Tap the button to hand it over.');
+    } else if (!signer.applied && !signer.unusable && parked?.action === 'sign'
+        && pending?.status === 'paid' && parked.context?.orderId === pending.orderId) {
+      // The signer never came back and the request is still parked. The boot path names this only on a
+      // fresh load, so a page that is merely resumed would otherwise leave the reader in silence. The
+      // same advice is given, and the retry is the clipboard route - the one return path Android
+      // cannot drop between the two apps.
+      notice('The signer did not come back with a signature. Your note is still here — pin it again.');
+      showAmberHandOver('Amber did not come back with a signature. Tap the button to send the request again.');
+    } else if (!signer.applied && !signer.unusable && parked?.action === 'login' && parked.copy) {
       // This request has no callback URL, so the signer answers by copying. Reading that needs a
       // permission this origin may already hold, in which case the sign-in finishes with no tap at
       // all; where the browser refuses, the button under the form is the way in.

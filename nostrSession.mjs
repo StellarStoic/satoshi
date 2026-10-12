@@ -336,15 +336,102 @@ export async function adoptAmberClipboard({silent = false} = {}) {
   return {action: 'login', session};
 }
 
-export function beginAmberSigning(template, context = null) {
+/**
+ * Take the signature Amber copied, for a signing request sent with no callback URL. The same rules
+ * as the login hand-over: the request that is still parked decides what is being handed over, never
+ * what the clipboard happens to hold, and a silent read never swallows a value the reader copied
+ * before asking.
+ */
+export async function adoptAmberSignature({silent = false} = {}) {
+  // A silent read is the page finishing a signing round trip by itself; it never reports anything,
+  // and the request stays parked when it cannot be used, so the button still works.
+  const stop = message => {
+    if (silent) return null;
+    throw new Error(message);
+  };
+  const parked = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(AMBER_PREFIX)) continue;
+    const state = readJson(localStorage, key);
+    if (!state || !Number.isFinite(state.createdAt) || Date.now() - state.createdAt > AMBER_MAX_AGE) continue;
+    parked.push({key, state});
+  }
+  parked.sort((left, right) => right.state.createdAt - left.state.createdAt);
+  const waiting = parked[0];
+  if (!waiting) return stop('Nothing is waiting for Amber. Start the signing again.');
+  if (waiting.state.action !== 'sign' || !waiting.state.copy) {
+    return stop('That request is not a signing hand-off. Start the signing again.');
+  }
+  if (!navigator.clipboard?.readText) {
+    return stop('This browser will not let the page read the clipboard. Pin the note again to sign it.');
+  }
+  let text = '';
+  try {
+    text = (await navigator.clipboard.readText()) || '';
+  } catch {
+    return stop('The browser refused to read the clipboard. Tap again and allow it.');
+  }
+  const signature = text.trim();
+  if (!signature) {
+    return stop('The clipboard is empty. In Amber, approve the note and copy the signature it offered, then tap again.');
+  }
+  // An automatic read must not take whatever happened to be on the clipboard, so a value unchanged
+  // since the request was made is refused: it is what the reader copied earlier, not this signature.
+  const unchanged = Boolean(waiting.state.clipboard) && waiting.state.clipboard === clipboardHash(signature);
+  if (silent && unchanged) return null;
+  let event;
+  try {
+    event = signedEventFrom(waiting.state, signature, getNostrSession());
+  } catch (error) {
+    return stop(error.message);
+  }
+  // Spend the request only after the return has been rebuilt and verified, exactly as the callback
+  // route does: a half-read return must not consume the attempt still on its way back.
+  localStorage.removeItem(waiting.key);
+  return {action: 'sign', event, context: waiting.state.context};
+}
+
+/**
+ * Ask Amber to sign an event.
+ *
+ * `copy` is the same route beginAmberLogin's copy takes for an identity: the request is sent with no
+ * callback URL at all, so NIP-55 has the signer copy the signature to the clipboard instead of
+ * returning it. That is the one return path Android cannot drop between the two apps - the callback
+ * needs a main-thread Activity context on Amber's side that is not always there - and Amber shows
+ * the ordinary "wants you to sign a short text note" flow either way.
+ */
+export function beginAmberSigning(template, context = null, {copy = false} = {}) {
   const session = getNostrSession();
   if (!session || session.method !== 'amber') throw new Error('Connect Amber first.');
   const id = randomId();
-  parkAmberRequest(id, {action: 'sign', template, context});
+  parkAmberRequest(id, {action: 'sign', template, context, copy});
+  if (copy) {
+    // Read what is already on the clipboard while this tap's user activation is still live. Only its
+    // fingerprint is kept, and only for one purpose: it is what stops a later automatic read from
+    // adopting a signature the reader copied for something else as this note's.
+    clipboardText().then(text => {
+      const parked = readJson(localStorage, AMBER_PREFIX + id);
+      if (!parked) return;
+      parked.clipboard = clipboardHash(text);
+      localStorage.setItem(AMBER_PREFIX + id, JSON.stringify(parked));
+    }).catch(() => {});
+    // No id, so no callback URL: the signer copies the signature to the clipboard instead of
+    // returning it. The exact unsigned event is parked above, so the page can rebuild and verify the
+    // signed event from the template while the signature travels on its own.
+    location.assign(`nostrsigner:${encodeURIComponent(JSON.stringify(template))}?${amberParams('sign_event', '', {current_user: session.pubkey, returnType: 'signature', compressionType: 'none'}).toString()}`);
+    return;
+  }
   // Returning the whole event can turn a long note and its tags into a callback URL large
   // enough for Android to drop. The signature is compact; the exact unsigned event is already
   // parked above, so the page can rebuild and verify the signed event when Amber returns.
   openAmber('sign_event', JSON.stringify(template), id, {current_user: session.pubkey, returnType: 'signature', compressionType: 'none'});
+}
+
+/** A signing request that was sent without a callback URL is waiting to be handed its signature. */
+export function amberSignaturePending() {
+  const newest = pendingAmberRequest();
+  return Boolean(newest && newest.action === 'sign' && newest.copy);
 }
 
 /**
@@ -430,6 +517,30 @@ function amberReturn() {
   return {id, result, rejected, used};
 }
 
+/**
+ * The signed event a signer's answer stands for, rebuilt from the parked template and verified.
+ *
+ * The signature is compact, so the exact unsigned event parked with the request is what the signed
+ * event is rebuilt from - and the answer is only trusted once it verifies against the pubkey this
+ * browser knows. Both the callback return and the clipboard hand-over come through here, so the two
+ * routes cannot drift apart.
+ */
+function signedEventFrom(state, result, session) {
+  const clean = String(result || '').trim();
+  let event;
+  if (/^[0-9a-f]{128}$/i.test(clean)) {
+    if (!session?.pubkey || !state.template) throw new Error('The Amber signing session could not be restored. Please pin again.');
+    const unsigned = {...state.template, pubkey: session.pubkey};
+    event = {...unsigned, id: tools().getEventHash(unsigned), sig: clean.toLowerCase()};
+  } else {
+    // Full-event replies created by the previous version remain usable while their request is
+    // still inside the thirty-minute return window.
+    try { event = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
+  }
+  if (!tools().verifyEvent(event) || event.pubkey !== session?.pubkey) throw new Error('Amber returned an invalid signed event.');
+  return event;
+}
+
 export function resumeAmber() {
   const params = new URLSearchParams(location.search);
   const answer = amberReturn();
@@ -470,19 +581,8 @@ export function resumeAmber() {
     localStorage.removeItem(key);
     return {action: 'login', session};
   }
-  const clean = result.trim();
   const session = getNostrSession();
-  let event;
-  if (/^[0-9a-f]{128}$/i.test(clean)) {
-    if (!session?.pubkey || !state.template) throw new Error('The Amber signing session could not be restored. Please pin again.');
-    const unsigned = {...state.template, pubkey: session.pubkey};
-    event = {...unsigned, id: tools().getEventHash(unsigned), sig: clean.toLowerCase()};
-  } else {
-    // Full-event replies created by the previous version remain usable while their request is
-    // still inside the thirty-minute return window.
-    try { event = JSON.parse(clean); } catch { throw new Error('Amber did not return a usable signature. Please pin again.'); }
-  }
-  if (!tools().verifyEvent(event) || event.pubkey !== session?.pubkey) throw new Error('Amber returned an invalid signed event.');
+  const event = signedEventFrom(state, result, session);
   // Spend the request only after the return has been rebuilt and verified. Android can open
   // the callback in a second browser/PWA context; a half-read return must not consume it.
   localStorage.removeItem(key);

@@ -540,3 +540,164 @@ test('a private key the curve rejects is refused when it is entered, not when it
   assert.throws(() => sessionModule.loginWithPrivateKey('f'.repeat(64)),
     /curve accepts/, 'a value at or above the curve order');
 });
+
+test('a copy signing request carries no callback URL and records the copy route', async () => {
+  const storage = memoryStorage();
+  const assigned = [];
+  const pubkey = 'a'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '',
+    assign: value => assigned.push(value),
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => ''}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-sign-copy=${Date.now()}`);
+  assert.equal(sessionModule.amberSignaturePending(), false, 'nothing is a hand-over before one is asked for');
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'A paid Pinstr note', tags: [['t', 'pinstr']]};
+  const context = {action: 'pin', orderId: 'order-42'};
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+
+  assert.equal(assigned.length, 1, 'the request opens Amber');
+  const signerUrl = new URL(assigned[0]);
+  assert.equal(signerUrl.searchParams.has('callbackUrl'), false,
+    'no callback is sent, which is what makes the signer copy the signature instead');
+  assert.equal(signerUrl.searchParams.get('type'), 'sign_event');
+  assert.equal(signerUrl.searchParams.get('returnType'), 'signature');
+  assert.equal(signerUrl.searchParams.get('compressionType'), 'none');
+  assert.deepEqual(JSON.parse(decodeURIComponent(signerUrl.pathname)), template,
+    'the exact note is what Amber is asked to sign');
+
+  const parked = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key.startsWith('satoshi:nostr:amber:')) parked.push(JSON.parse(storage.getItem(key)));
+  }
+  assert.equal(parked.length, 1);
+  assert.equal(parked[0].copy, true, 'the copy route is recorded with the request');
+  assert.deepEqual(parked[0].context, context);
+  assert.equal(sessionModule.amberSignaturePending(), true, 'the page knows a signature is on its way back');
+
+  // The callback route is unchanged: without copy it still carries a callback URL, and the newest
+  // request is then not a hand-over. (A pause so the second park is strictly newer than the first.)
+  await new Promise(resolve => setTimeout(resolve, 2));
+  sessionModule.beginAmberSigning(template, context);
+  assert.equal(new URL(assigned[1]).searchParams.has('callbackUrl'), true);
+  assert.equal(sessionModule.amberSignaturePending(), false, 'the newest request is a callback, not a hand-over');
+});
+
+test('the signature Amber copied finishes a signing round trip, and an unchanged or unusable clip does not', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const valid = 'b'.repeat(128);
+  const bogus = 'e'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: event => { assert.equal(event.pubkey, pubkey); return eventId; },
+      verifyEvent: event => event.id === eventId && event.sig === valid && event.pubkey === pubkey,
+    },
+  };
+  const copied = {text: 'the reader already had this copied'};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => copied.text}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-sign-adopt=${Date.now()}`);
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'A paid Pinstr note', tags: [['t', 'pinstr']]};
+  const context = {action: 'pin', orderId: 'order-42'};
+  const signed = {...template, pubkey, id: eventId, sig: valid};
+
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  // The fingerprint of what was already there is recorded while the tap is still live.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null,
+    'a clip that is unchanged since the request is not this signature');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'and it does not spend the request');
+
+  copied.text = valid;
+  const answer = await sessionModule.adoptAmberSignature({silent: true});
+  assert.equal(answer?.action, 'sign', 'the compact signature is rebuilt against the parked note');
+  assert.deepEqual(answer.context, context);
+  assert.deepEqual(answer.event, signed);
+  assert.equal(sessionModule.amberSignaturePending(), false, 'the request is spent on success');
+
+  // A signature the curve will not verify is refused, and it does not spend the attempt.
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  copied.text = bogus;
+  await assert.rejects(() => sessionModule.adoptAmberSignature(), /invalid signed event/);
+  assert.equal(sessionModule.amberSignaturePending(), true, 'a signature that does not verify stays parked');
+
+  // A whole signed event from the older reply shape is accepted too.
+  copied.text = JSON.stringify(signed);
+  const whole = await sessionModule.adoptAmberSignature();
+  assert.deepEqual(whole.event, signed, 'a full event is used as it came');
+  assert.equal(sessionModule.amberSignaturePending(), false);
+
+  // The unchanged guard governs the silent read only: the same value handed over on purpose is taken.
+  copied.text = valid;
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const deliberate = await sessionModule.adoptAmberSignature();
+  assert.deepEqual(deliberate?.event, signed, 'the button takes what is there when asked');
+
+  // A hand-over for a sign-in is not a signature.
+  sessionModule.beginAmberLogin({copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await assert.rejects(() => sessionModule.adoptAmberSignature(), /not a signing hand-off/);
+});
+
+test('a signing hand-over that the browser refuses to read is silence, never a wrong event', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: () => 'c'.repeat(64),
+      verifyEvent: () => true,
+    },
+  };
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => { throw new Error('NotAllowedError'); }}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-sign-refused=${Date.now()}`);
+  sessionModule.beginAmberSigning({kind: 1, content: 'note', tags: []}, {action: 'pin', orderId: 'o'}, {copy: true});
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null, 'a refused read is silence, not an error');
+  await assert.rejects(() => sessionModule.adoptAmberSignature(), /refused to read the clipboard/,
+    'the reader who taps the button is told what happened');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'the request stays parked for another try');
+
+  // An empty clipboard is named the same way, and still does not spend the request.
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true, value: {userAgent: 'Android', clipboard: {readText: async () => '   '}},
+  });
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null);
+  await assert.rejects(() => sessionModule.adoptAmberSignature(), /clipboard is empty/);
+  assert.equal(sessionModule.amberSignaturePending(), true);
+});
