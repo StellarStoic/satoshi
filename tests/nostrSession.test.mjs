@@ -498,3 +498,45 @@ test('a nostrconnect offer names this origin, waits for the signer, and can be c
   abandoned.cancel();
   await assert.rejects(abandoned.promise);
 });
+
+test('a stored secret the curve rejects is not a signer, and does not crash the page', async () => {
+  const storage = memoryStorage();
+  const expiresAt = Date.now() + 60_000;
+  const pubkey = 'a'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'anonymous', npub: `npub1${'a'.repeat(58)}`, expiresAt}));
+  // 64 hex characters, so every shape check passes -- and not a scalar the curve will accept.
+  storage.setItem('satoshi:nostr:anonymous:v1', JSON.stringify({pubkey, secret: '0'.repeat(64), expiresAt}));
+
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      generateSecretKey: () => Uint8Array.from({length: 32}, (_, index) => index + 1),
+      getPublicKey: () => 'a'.repeat(64),
+      nip19: {npubEncode: key => `npub1${key.slice(0, 58)}`},
+      finalizeEvent: template => ({...template, pubkey: 'a'.repeat(64), id: 'c'.repeat(64), sig: 'd'.repeat(128)}),
+    },
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?bad-scalar-test=${Date.now()}`);
+  assert.equal(await sessionModule.signerReady(), false, '64 hex characters is not the same as a usable key');
+  assert.equal(sessionModule.getNostrSession(), null, 'the page does not claim a signer it cannot use');
+  assert.equal(storage.getItem('satoshi:nostr:anonymous:v1'), null, 'the unusable key is dropped');
+  await assert.rejects(() => sessionModule.signNostrEvent({kind: 1, content: '', tags: [], created_at: 1}),
+    /Log in to Nostr first/, 'the reader is told to sign in, not shown a curve error');
+});
+
+test('a private key the curve rejects is refused when it is entered, not when it signs', async () => {
+  globalThis.localStorage = memoryStorage();
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {nip19: {decode: () => ({type: 'nsec', data: new Uint8Array(32)})}},
+  };
+
+  const sessionModule = await import(`../nostrSession.mjs?bad-private-key-test=${Date.now()}`);
+  assert.throws(() => sessionModule.loginWithPrivateKey('0'.repeat(64)), /curve accepts/, 'an all-zero key');
+  assert.throws(() => sessionModule.loginWithPrivateKey('f'.repeat(64)),
+    /curve accepts/, 'a value at or above the curve order');
+});

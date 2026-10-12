@@ -33,15 +33,40 @@ function tools() {
   return window.NostrTools;
 }
 
+// A private key is a scalar in [1, n-1]. A 64-character hex string outside that range is still
+// perfectly good text, so every shape check passes and the curve is the first thing to object --
+// with "invalid scalar: out of range", which says nothing a reader can act on. Catch it at entry.
+const CURVE_ORDER = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
+const BAD_KEY_MESSAGE = 'That private key is not one the curve accepts. Check that it is the whole '
+  + '64-character key (or an nsec), and not a public key or a blank value.';
+
+function isSigningScalar(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 32) return false;
+  const hex = bytesToHex(bytes);
+  if (!/[1-9a-f]/.test(hex)) return false;          // all zeros
+  return hex < CURVE_ORDER;                         // equal length, so a string compare is exact
+}
+
+/** Whether a stored hex secret is one parseSecret would accept, without throwing. */
+function storedSecretIsUsable(hex) {
+  const clean = String(hex || '');
+  if (!/^[0-9a-f]{64}$/i.test(clean)) return false;
+  return isSigningScalar(Uint8Array.from(clean.toLowerCase().match(/.{2}/g), pair => Number.parseInt(pair, 16)));
+}
+
 function parseSecret(value) {
   const clean = String(value || '').trim();
+  let bytes;
   if (/^nsec1/i.test(clean)) {
     const decoded = tools().nip19.decode(clean.toLowerCase());
     if (decoded.type !== 'nsec' || !(decoded.data instanceof Uint8Array)) throw new Error('That nsec is not valid.');
-    return new Uint8Array(decoded.data);
+    bytes = new Uint8Array(decoded.data);
+  } else {
+    if (!/^[0-9a-f]{64}$/i.test(clean)) throw new Error('Enter a valid nsec or 64-character private key.');
+    bytes = Uint8Array.from(clean.toLowerCase().match(/.{2}/g), pair => Number.parseInt(pair, 16));
   }
-  if (!/^[0-9a-f]{64}$/i.test(clean)) throw new Error('Enter a valid nsec or 64-character private key.');
-  return Uint8Array.from(clean.match(/.{2}/g), pair => Number.parseInt(pair, 16));
+  if (!isSigningScalar(bytes)) throw new Error(BAD_KEY_MESSAGE);
+  return bytes;
 }
 
 function bytesToHex(bytes) {
@@ -81,7 +106,8 @@ function saveSession(pubkey, method, profile = null, extra = {}) {
 export function getNostrSession() {
   let session = readJson(localStorage, SESSION_KEY);
   if (!session || !/^[0-9a-f]{64}$/.test(session.pubkey) || !session.method) return null;
-  if (session.method === 'anonymous' && (!Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now())) {
+  if (session.method === 'anonymous' && (!Number.isFinite(session.expiresAt) || session.expiresAt <= Date.now()
+      || !storedSecretIsUsable(readJson(localStorage, ANONYMOUS_KEY)?.secret))) {
     localStorage.removeItem(ANONYMOUS_KEY);
     session = readJson(localStorage, PREVIOUS_SESSION_KEY);
     localStorage.removeItem(PREVIOUS_SESSION_KEY);
@@ -606,7 +632,7 @@ export async function signerReady() {
   if (session.method === 'amber') return /Android/i.test(navigator.userAgent || '');
   if (session.method === 'anonymous') {
     const saved = readJson(localStorage, ANONYMOUS_KEY);
-    return saved?.pubkey === session.pubkey && saved?.expiresAt > Date.now() && /^[0-9a-f]{64}$/.test(saved.secret || '');
+    return saved?.pubkey === session.pubkey && saved?.expiresAt > Date.now() && storedSecretIsUsable(saved.secret);
   }
   if (session.method === 'bunker') {
     if (bunkerSigner) return true;
@@ -636,7 +662,10 @@ export async function signNostrEvent(template, context = null) {
   }
   if (session.method === 'anonymous') {
     const saved = readJson(localStorage, ANONYMOUS_KEY);
-    if (!saved || saved.pubkey !== session.pubkey || saved.expiresAt <= Date.now()) throw new Error('This temporary identity has expired. Create a new anonymous identity.');
+    if (!saved || saved.pubkey !== session.pubkey || saved.expiresAt <= Date.now()
+        || !storedSecretIsUsable(saved.secret)) {
+      throw new Error('This temporary identity has expired. Create a new anonymous identity.');
+    }
     const secret = parseSecret(saved.secret);
     try { return tools().finalizeEvent(template, secret); } finally { secret.fill(0); }
   }
