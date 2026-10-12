@@ -4120,7 +4120,7 @@ elements.shareBoardNative.addEventListener('click', async () => {
   const cells = geohashCellsFrom(elements.shareBoardLink.value.split('/b/')[1] || '');
   const geohash = cells.length ? boardCellsLabel(cells) : 'Pinstr';
   try {
-    await navigator.share({title: `Board ${geohash}`, text: `Open the ${geohash} board on Pinstr.`, url: elements.shareBoardLink.value});
+    await navigator.share({title: `Board ${geohash}`, text: `Open the ${geohash} board on pinstr.si.`, url: elements.shareBoardLink.value});
     status(elements.shareBoardStatus, 'Board link shared.');
   } catch (error) {
     if (error?.name !== 'AbortError') status(elements.shareBoardStatus, 'Could not open the share sheet.', true);
