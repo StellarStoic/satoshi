@@ -414,13 +414,28 @@
 .share-board-preview { display: block; width: 100%; margin: 14px 0 0; border: 1px solid rgba(255, 246, 214, .18); border-radius: 6px; background: #241608; aspect-ratio: 1; object-fit: cover; }
 
 /* Card mode: the page wearing nothing but the board, so the desk can screenshot the board itself
-   into the picture a shared link unfurls with. Everything the reader needs while browsing - the
-   title, the controls, the status line - is gone, and the board takes the whole frame. */
+   into the picture a shared link unfurls with. Everything the reader needs while browsing is gone -
+   the title, the controls, the help and menu affordances, the site's live footer, the status line,
+   and the analytics consent the site raises on a first visit (an overlay that would otherwise dim
+   the whole board). The plate stays: it is what names the board, and it is the board's own. */
 body.is-card { background: #2a1a0c; }
 body.is-card .sticky-page-title,
 body.is-card .sticky-top-actions,
 body.is-card .board-status,
 body.is-card .login-confirmation,
-body.is-card .board-plate { display: none !important; }
+body.is-card #toggle,
+body.is-card #menu,
+body.is-card #placementControls,
+body.is-card #discardBin,
+body.is-card footer.footer,
+body.is-card [data-live-footer],
+body.is-card .satoshi-analytics-consent,
+body.is-card .site-help-trigger { display: none !important; }
+/* Exactly the window, so the picture is the whole board. A page shorter than the viewport would
+   have its bottom cut out of the capture - which is where the plate naming the board is nailed. */
+html.is-card, html.is-card body { height: 100vh; min-height: 100vh; margin: 0; overflow: hidden; }
 body.is-card .sticky-shell { padding: 0; margin: 0; max-width: none; min-height: 100vh; }
+/* Full bleed. The wooden rails and the engraved plate hang outside the board's own box and the app's
+   fit fills it exactly, so those are the one thing a captured card does not show; the page around the
+   picture names the geohash in its title instead, which is what a preview shows as text. */
 body.is-card #stickyBoard { position: fixed; inset: 0; --board-chrome-bottom: 0px; }

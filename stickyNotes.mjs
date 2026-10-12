@@ -292,6 +292,9 @@ const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'
 // picture a shared board link unfurls with.
 const cardMode = new URL(location.href).searchParams.has('card');
 if (cardMode) {
+  // The class goes on the document element as well as the body: the page has to be exactly the
+  // window, or a capture of it loses the bottom of the board.
+  document.documentElement.classList.add('is-card');
   document.body.classList.add('is-card');
   document.title = 'Pinstr board';
 }

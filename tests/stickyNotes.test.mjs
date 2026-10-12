@@ -1967,4 +1967,14 @@ test('a board is shared by the link that carries its picture', async () => {
     'the page tells the desk when the board is whole, so no picture is taken half-painted');
   assert.match(css, /body\.is-card #stickyBoard \{ position: fixed; inset: 0;/,
     'card mode is the board alone, filling the frame');
+  // Everything the site paints around the board has to go, or it ends up inside a shared picture:
+  // the menu affordance, the live footer, and the consent overlay, which dims the board as a backdrop.
+  for (const hidden of ['#toggle', '#menu', 'footer\\.footer', '\\[data-live-footer\\]', '\\.satoshi-analytics-consent',
+    '\\.site-help-trigger']) {
+    assert.match(css, new RegExp(`body\\.is-card ${hidden}`), `${hidden} is not part of a board picture`);
+  }
+  assert.doesNotMatch(css, /body\.is-card \.board-plate \{ display: none/,
+    'the plate stays in the picture: it is what names the board');
+  assert.match(css, /html\.is-card, html\.is-card body \{ height: 100vh; min-height: 100vh; margin: 0; overflow: hidden; \}/,
+    'the picture is the window, not the page length, so no part of the board is cut out of it');
 });
