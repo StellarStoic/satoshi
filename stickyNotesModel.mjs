@@ -391,6 +391,11 @@ export function stickyExpiryCountdown(expiration, now = Date.now() / 1000) {
 export const GEOHASH_MIN_LENGTH = 3;
 export const GEOHASH_MAX_LENGTH = 9;
 export const GEOHASH_MAX_CELLS = 9;
+// How far in the reader's own board setting lets a board look. A cell is three to nine characters,
+// so six levels is the whole range a cell has under it and the deepest a board can reach: the eleven
+// this used to allow was never a number of levels any cell could have, and a stored eleven comes back
+// as the deepest real one rather than as a rung no board is.
+export const GEOHASH_MAX_BOARD_DEPTH = GEOHASH_MAX_LENGTH - GEOHASH_MIN_LENGTH;
 export const GEOHASH_PATTERN = new RegExp(`^[0123456789bcdefghjkmnpqrstuvwxyz]{${GEOHASH_MIN_LENGTH},${GEOHASH_MAX_LENGTH}}$`);
 const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
 
@@ -520,7 +525,7 @@ export function geohashMatchesBoard(noteGeohash, boardGeohash, depth = 0, exactO
   const notes = geohashCells(noteGeohash);
   const boards = geohashCells(boardGeohash);
   if (!notes.length || !boards.length) return false;
-  const levels = Math.max(0, Math.min(11, Number.parseInt(depth, 10) || 0));
+  const levels = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(depth, 10) || 0));
   return notes.some(note => boards.some(board => {
     if (!note.startsWith(board)) return false;
     if (note === board) return true;

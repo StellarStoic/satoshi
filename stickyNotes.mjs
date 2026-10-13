@@ -27,6 +27,7 @@ import {
   geohashSetIssue,
   geohashTouches,
   GEOHASH_MAX_CELLS,
+  GEOHASH_MAX_BOARD_DEPTH,
   normaliseGeohashes,
   makeStickyTemplate, mentionFilterAvailability, mentionLabel, stickyTextParts, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashMatchesBoard,
@@ -330,7 +331,7 @@ let activeGeohashes = linkedCells.length
     ? lockedCells
     : (rememberBoard ? geohashCellsFrom(localStorage.getItem(BOARD_CELLS_KEY) || localStorage.getItem(BOARD_KEY)) : []));
 let activeGeohash = activeGeohashes[0] || '';
-let boardDepth = Math.max(0, Math.min(11, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
+let boardDepth = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
 if (activeGeohashes.length && rememberBoard) rememberActiveBoard();
 if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.hasOwn(pending, 'geohashes'))) {
   const cells = geohashCellsFrom(pending.geohashes ?? pending.geohash);
@@ -1541,7 +1542,7 @@ function noteBelongsToBoard(sticky) {
 }
 
 function updateBoardControl() {
-  const reach = boardDepth === 0 ? 'exact only' : boardDepth === 11 ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
+  const reach = boardDepth === 0 ? 'exact only' : boardDepth === GEOHASH_MAX_BOARD_DEPTH ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
   const label = activeGeohash ? `Board: ${boardCellsLabel()} (${reach})` : 'Choose a geohash board';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
@@ -4007,7 +4008,7 @@ elements.boardChooser.addEventListener('submit', event => {
   selectBoard(cells);
 });
 elements.boardDepth.addEventListener('change', () => {
-  boardDepth = Math.max(0, Math.min(11, Number.parseInt(elements.boardDepth.value, 10) || 0));
+  boardDepth = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(elements.boardDepth.value, 10) || 0));
   localStorage.setItem(BOARD_DEPTH_KEY, String(boardDepth));
   updateBoardControl();
   if (activeGeohash) selectBoard([...activeGeohashes], false);
