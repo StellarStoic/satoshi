@@ -342,10 +342,17 @@ export async function adoptAmberClipboard({silent = false} = {}) {
  * what the clipboard happens to hold, and a silent read never swallows a value the reader copied
  * before asking.
  */
-export async function adoptAmberSignature({silent = false} = {}) {
+export async function adoptAmberSignature({silent = false, onStatus = null} = {}) {
   // A silent read is the page finishing a signing round trip by itself; it never reports anything,
-  // and the request stays parked when it cannot be used, so the button still works.
-  const stop = message => {
+  // and the request stays parked when it cannot be used, so the button still works. `onStatus` is
+  // how even a silent read says where it stopped: the board turns those codes into one line the
+  // reader can see, because a round trip between two apps has to be diagnosable from the page and not
+  // from a log nobody on a phone can open. It never changes what the read returns.
+  const report = (code, message) => {
+    if (typeof onStatus === 'function') onStatus(code, message);
+  };
+  const stop = (code, message) => {
+    report(code, message);
     if (silent) return null;
     throw new Error(message);
   };
@@ -359,34 +366,49 @@ export async function adoptAmberSignature({silent = false} = {}) {
   }
   parked.sort((left, right) => right.state.createdAt - left.state.createdAt);
   const waiting = parked[0];
-  if (!waiting) return stop('Nothing is waiting for Amber. Start the signing again.');
+  if (!waiting) return stop('no-request', 'Nothing is waiting for Amber. Start the signing again.');
   if (waiting.state.action !== 'sign' || !waiting.state.copy) {
-    return stop('That request is not a signing hand-off. Start the signing again.');
+    return stop('not-handoff', 'That request is not a signing hand-off. Start the signing again.');
   }
   if (!navigator.clipboard?.readText) {
-    return stop('This browser will not let the page read the clipboard. Pin the note again to sign it.');
+    return stop('no-api', 'This browser will not let the page read the clipboard. Pin the note again to sign it.');
   }
   let text = '';
   try {
     text = (await navigator.clipboard.readText()) || '';
   } catch {
-    return stop('The browser refused to read the clipboard. Tap again and allow it.');
+    return stop('refused', 'The browser refused to read the clipboard. Tap again and allow it.');
   }
   const signature = text.trim();
   if (!signature) {
-    return stop('The clipboard is empty. In Amber, approve the note and copy the signature it offered, then tap again.');
+    return stop('empty', 'The clipboard is empty. In Amber, approve the note and copy the signature it offered, then tap again.');
   }
   // Amber overwrites the clipboard, so a read that still carries the sentinel this page wrote before
-  // handing off has not been answered yet: it is not this signature, however valid it looks. Older
-  // parked requests carry a fingerprint of the clipboard instead of the sentinel; both are honoured.
-  const planted = waiting.state.sentinel || waiting.state.clipboard;
+  // handing off has not been answered yet: it is not this signature, however valid it looks. A
+  // sentinel is never adopted, by a silent read or by the reader's own tap - it is a marker, not a
+  // signature. Older parked requests carry a fingerprint of the clipboard instead of the sentinel;
+  // both are honoured for the silent read, and only the sentinel is refused to a tap as well.
+  const sentinel = waiting.state.sentinel;
+  const planted = sentinel || waiting.state.clipboard;
   const unchanged = Boolean(planted) && planted === clipboardHash(signature);
-  if (silent && unchanged) return null;
+  if (unchanged) {
+    if (silent) {
+      report('waiting', 'Amber has not replaced the clipboard with its signature yet.');
+      return null;
+    }
+    if (sentinel && sentinel === clipboardHash(signature)) {
+      return stop('waiting', 'Amber has not put its signature on the clipboard yet. Approve the note in Amber, then tap again.');
+    }
+  } else {
+    // Something other than this page's own marker is on the clipboard. That is the moment the round
+    // trip may be about to finish, so it is worth saying the read is happening.
+    report('copied', 'A value Amber could have copied is on the clipboard.');
+  }
   let event;
   try {
     event = signedEventFrom(waiting.state, signature, getNostrSession());
   } catch (error) {
-    return stop(error.message);
+    return stop('invalid', error.message);
   }
   // Spend the request only after the return has been rebuilt and verified, exactly as the callback
   // route does: a half-read return must not consume the attempt still on its way back.

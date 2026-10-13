@@ -825,3 +825,96 @@ test('a nostrconnect invitation survives a reload, is spent on success, and is n
     'a fresh attempt carries a new secret');
   await fresh.promise;
 });
+
+test('a copy signing read says where it stopped, and never adopts the page marker', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const valid = 'b'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: () => eventId,
+      verifyEvent: event => event.id === eventId && event.sig === valid,
+    },
+  };
+  const clipboard = {text: 'something else entirely', read: 'ok'};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {
+      readText: async () => {
+        if (clipboard.read === 'refused') throw new Error('NotAllowedError: Document is not focused');
+        return clipboard.text;
+      },
+      writeText: async value => { clipboard.text = value; },
+    }},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-diagnose=${Date.now()}`);
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'a paid note', tags: []};
+  const context = {action: 'pin', orderId: 'order-7'};
+  // One request at a time, so the newest is unambiguously the one being read (two parked in the same
+  // millisecond sort by nothing at all).
+  const onlyOneRequest = () => {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key?.startsWith('satoshi:nostr:amber:')) storage.removeItem(key);
+    }
+  };
+
+  // What a mobile browser does while the signer app is in front: the read is refused. That is not a
+  // failure - it is "try again next tick" - and it is named so the page can say where it stopped.
+  clipboard.read = 'refused';
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  const refused = [];
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true, onStatus: code => refused.push(code)}), null,
+    'a refused read is silence, not an error');
+  assert.deepEqual(refused, ['refused'], 'and it names the refusal rather than reading nothing at all');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'the poll keeps its request to try again');
+
+  // The page's own marker is on the clipboard: nothing has arrived, and it is never adopted.
+  onlyOneRequest();
+  clipboard.read = 'ok';
+  sessionModule.beginAmberSigning(template, context, {copy: true});
+  assert.match(clipboard.text, /^amber-waiting:/, 'the sentinel the page wrote is what the clipboard holds');
+  const waiting = [];
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true, onStatus: code => waiting.push(code)}), null,
+    'the sentinel is not a signature');
+  assert.deepEqual(waiting, ['waiting'], 'and the read says "not yet" rather than blaming the clipboard');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'the sentinel never spends the request');
+  // The reader's own tap must not adopt it either: a marker is not a signature however it is read.
+  await assert.rejects(() => sessionModule.adoptAmberSignature(), /has not put its signature/);
+  assert.equal(sessionModule.amberSignaturePending(), true, 'and a tap on the sentinel does not spend it');
+
+  // An empty clipboard names itself...
+  clipboard.text = '   ';
+  const empty = [];
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true, onStatus: code => empty.push(code)}), null);
+  assert.deepEqual(empty, ['empty']);
+  assert.equal(sessionModule.amberSignaturePending(), true);
+  // ...and so does a value that is not a signature at all. The read first says it has something
+  // worth judging, then that the value is not the answer.
+  clipboard.text = 'not a signature at all';
+  const junk = [];
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true, onStatus: code => junk.push(code)}), null);
+  assert.deepEqual(junk, ['copied', 'invalid'], 'a clip that is not a signature is reported as invalid');
+  assert.equal(sessionModule.amberSignaturePending(), true, 'and it does not spend the request');
+
+  // Amber's answer: the read reports only that it is judging a value, rebuilds the event, and spends
+  // the request — the one outcome the poll acts on.
+  clipboard.text = valid;
+  const codes = [];
+  const answer = await sessionModule.adoptAmberSignature({silent: true, onStatus: code => codes.push(code)});
+  assert.equal(answer?.action, 'sign');
+  assert.equal(answer.event.sig, valid);
+  assert.deepEqual(codes, ['copied'], 'a value that is not the page marker is what the read is about to judge');
+  assert.equal(sessionModule.amberSignaturePending(), false, 'the request is spent only on the answer');
+});

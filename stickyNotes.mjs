@@ -4466,25 +4466,70 @@ function showAmberHandOver(message) {
 }
 
 // How a copy-route signature gets home once the reader has left the page. Android fires no
-// visibilitychange and no focus event on the way back, and a clipboard read while the document is
-// not focused throws NotAllowedError, so waiting for a "reader returned" event can wait forever.
-// While a copy-route signing request is parked the page therefore polls the clipboard every half
-// second, reads only while it has focus, and treats a refusal as "keep waiting". snort's own client
-// gives up after 120 s and so does this one, so an abandoned page cannot poll forever.
+// visibilitychange and no focus event on the way back, so waiting for a "reader returned" event can
+// wait forever. While a copy-route signing request is parked the page therefore polls the clipboard
+// every half second and *attempts* a read on every tick. A refused read
+// (NotAllowedError: "Document is not focused") is the expected answer while the signer is still in
+// front, so it means "try again next tick" and never stops the poll — gating the read on focus once
+// meant that on a window whose focus check miscarries not one read was attempted at all, and the
+// board ran out its timeout in perfect silence. snort's own client gives up after 120 s and so does
+// this one, so an abandoned page cannot poll forever.
 const AMBER_CLIPBOARD_POLL_MS = 500;
 const AMBER_CLIPBOARD_POLL_TIMEOUT_MS = 120000;
 let amberClipboardTimer = 0;
 let amberClipboardDeadline = 0;
+
+/**
+ * The copy round trip crosses two apps and a reload, and the reader has to be able to see where it
+ * stopped from the page itself — a log on a phone is not something they can open. Every step writes
+ * one line here, and the last line stays up.
+ */
+function sayAmberRoundTrip(message, error = false) {
+  if (!message) return;
+  // Written once: the poll ticks twice a second, and a live region re-announcing the same sentence is
+  // noise rather than a status.
+  if (elements.amberCopyStatus.textContent === message
+      && elements.amberCopyStatus.classList.contains('is-error') === error) return;
+  status(elements.amberCopyStatus, message, error);
+}
+
+/**
+ * The reader's sentence for whatever the last clipboard read reported, so a round trip that stops
+ * says which step it stopped at. Each failure point gets its own wording.
+ */
+function amberReadFailure(code, focused) {
+  if (code === 'refused' || code === 'no-api') {
+    // document.hasFocus() is a hint here and nowhere else: it only picks which of two true sentences
+    // fits. A refusal on a page that says it is focused is a permission problem; one on a page that
+    // says it is not is the ordinary "the signer is still in front" answer. The read is attempted
+    // either way, which is the whole point of the change.
+    return focused
+      ? 'The browser would not let the page read the clipboard. Tap the button below to read what Amber copied.'
+      : 'This page cannot read the clipboard while it is in the background. Tap the button below to read what Amber copied.';
+  }
+  if (code === 'empty' || code === 'invalid') {
+    return 'Nothing valid on the clipboard yet. Approve the note in Amber, then come back and tap the button below.';
+  }
+  // 'waiting' is not a failure: this page's own marker is still on the clipboard and the hand-over
+  // wording already says what to do, so it is not overwritten with a failure line.
+  return '';
+}
 
 // Only one read of a parked signature may be in flight at a time. The poll and the resume path both
 // try to finish the same round trip, and a request is spent only *after* the read resolves, so two
 // overlapping reads could both accept the same signature and both publish. This makes them serialise:
 // whichever finishes first spends the request, and the other then finds nothing to do.
 let amberAdoptRunning = false;
+// Why the last read produced nothing, in adoptAmberSignature's own codes. Kept between ticks so the
+// poll can put the right sentence on the page instead of the same silence every half second.
+let amberLastReadCode = '';
 async function adoptParkedSignature() {
   if (amberAdoptRunning) return null;
   amberAdoptRunning = true;
-  try { return await adoptAmberSignature({silent: true}); } catch { return null; } finally { amberAdoptRunning = false; }
+  amberLastReadCode = '';
+  try {
+    return await adoptAmberSignature({silent: true, onStatus: code => { amberLastReadCode = code; }});
+  } catch { return null; } finally { amberAdoptRunning = false; }
 }
 
 function stopAmberClipboardPoll() {
@@ -4493,7 +4538,7 @@ function stopAmberClipboardPoll() {
   amberClipboardTimer = 0;
 }
 
-/** One turn of the poll: finish the round trip if Amber has copied a signature, else keep waiting. */
+/** One turn of the poll: attempt the read, and finish the round trip if Amber has copied a signature. */
 async function pollAmberClipboard() {
   // The request being spent is what tells this loop there is nothing left to wait for: the poll only
   // runs while a copy-route signing request is parked, and every path spends it in the same place.
@@ -4505,11 +4550,17 @@ async function pollAmberClipboard() {
     showAmberHandOver('Amber never handed a signature back. Tap Pin again, or use the paste button.');
     return;
   }
-  // A read attempted while this page is not focused throws NotAllowedError, and the signer app is
-  // usually still in front at that moment; there is nothing to read yet, so the next tick tries again.
-  if (!document.hasFocus()) return;
+  // The read is attempted on every tick. document.hasFocus() never decides whether it happens — an
+  // installed Android window can report no focus while the reader is looking straight at it, and
+  // gating on it meant not one read was ever made — it is only a hint for the sentence below. A read
+  // that is refused is expected while the signer is still in front, so it is "try again next tick"
+  // and the poll keeps going.
+  const focused = document.hasFocus();
   const answer = await adoptParkedSignature();
-  if (answer?.action !== 'sign') return;
+  if (answer?.action !== 'sign') {
+    sayAmberRoundTrip(amberReadFailure(amberLastReadCode, focused), true);
+    return;
+  }
   stopAmberClipboardPoll();
   if (elements.amberDialog.open) elements.amberDialog.close();
   await completeAmberSignature(answer);

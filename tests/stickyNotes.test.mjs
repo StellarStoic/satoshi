@@ -2089,16 +2089,25 @@ test('the copied signature is polled for, because Android fires no return event'
   const poll = script.slice(script.indexOf('async function pollAmberClipboard'),
     script.indexOf('function startAmberClipboardPoll'));
   // Only while a copy-route signing request is parked (the park being spent is how the poll knows
-  // there is nothing left), and only while this page has focus, because a read without focus throws
-  // NotAllowedError. A refusal is refused by continuing, not by giving up.
+  // there is nothing left to wait for).
   assert.match(poll, /if \(!amberSignaturePending\(\)\) \{ stopAmberClipboardPoll\(\); return; \}/);
-  assert.match(poll, /if \(!document\.hasFocus\(\)\) return;/);
+  // The read is attempted on every tick. Focus may never gate it again: an installed Android window
+  // reports no focus while the reader is looking straight at it, and gating meant that on such a
+  // window not one read was made and the poll ran out in silence.
+  assert.doesNotMatch(poll, /if \(!document\.hasFocus\(\)\) return;/,
+    'the read must never be skipped for want of focus');
+  assert.match(poll, /const focused = document\.hasFocus\(\);/,
+    'focus is kept, but only as a hint for which sentence the reader gets');
   assert.match(poll, /const answer = await adoptParkedSignature\(\);/);
-  assert.match(poll, /if \(answer\?\.action !== 'sign'\) return;/);
+  // A refused read is "try again next tick": it is named on the page and the poll returns to tick on.
+  assert.match(poll, /sayAmberRoundTrip\(amberReadFailure\(amberLastReadCode, focused\), true\);/);
+  assert.match(poll, /if \(answer\?\.action !== 'sign'\) \{/);
   assert.match(poll, /stopAmberClipboardPoll\(\)/);
   // An abandoned page stops on its own and hands the reader the button that always works.
   assert.match(poll, /if \(Date\.now\(\) > amberClipboardDeadline\) \{/);
   assert.match(poll, /'Amber never handed a signature back\. Tap Pin again, or use the paste button\.'/);
+  // The interval and the timeout stay what the shipped clients use.
+  assert.match(script, /AMBER_CLIPBOARD_POLL_MS = 500;/);
 
   // One read at a time, so the poll and the resume path cannot both accept the same signature and
   // both publish: the request is spent inside the read, so the loser finds nothing left to do.
