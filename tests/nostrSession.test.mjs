@@ -961,3 +961,79 @@ test('two reads of one clipboard cannot both hand the same signature over', asyn
   // A third read after that is not an answer either: the request it belonged to is gone.
   assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null);
 });
+
+test('a hand-over outlives the request it was made under, so a later tap knows which flow it was', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const valid = 'b'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: () => eventId,
+      verifyEvent: event => event.id === eventId && event.sig === valid && event.pubkey === pubkey,
+    },
+  };
+  const copied = {text: ''};
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => copied.text}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-handover=${Date.now()}`);
+  assert.equal(sessionModule.lastAmberHandOver(), null, 'nothing has been handed over yet');
+
+  // A signature handed over leaves no request behind, so the record of the hand-over is all a later
+  // tap on the button has to go on.
+  const template = {kind: 1, created_at: 1_700_000_000, content: 'A paid Pinstr note', tags: [['t', 'pinstr']]};
+  sessionModule.beginAmberSigning(template, {action: 'pin', orderId: 'order-42'}, {copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  copied.text = valid;
+  const answer = await sessionModule.adoptAmberSignature();
+  assert.equal(answer?.action, 'sign');
+  assert.equal(sessionModule.pendingAmberRequest(), null, 'the request is spent');
+  assert.equal(sessionModule.lastAmberHandOver()?.action, 'sign', 'the signing hand-over is remembered past the request');
+  assert.equal(sessionModule.amberSignaturePending(), false);
+
+  // The record is kept beside the requests, never among them: a page that walks the keys for a
+  // parked request must not find this and treat the hand-over as one still in flight.
+  const requestKeys = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key.startsWith('satoshi:nostr:amber:')) requestKeys.push(key);
+  }
+  assert.deepEqual(requestKeys, [], 'the hand-over record is not under the request prefix');
+
+  // The desk's refusal is kept with the hand-over, so the next tap repeats the line the reader was
+  // looking at rather than reporting that nothing was waiting.
+  assert.equal(sessionModule.noteAmberHandOverOutcome('The server refused the pin: not found', true)?.message,
+    'The server refused the pin: not found');
+  assert.equal(sessionModule.lastAmberHandOver().action, 'sign', 'the outcome does not change the flow');
+  assert.equal(sessionModule.lastAmberHandOver().error, true);
+
+  // A sign-in handed over is remembered as a sign-in: the newest hand-over, so the signature's own
+  // record stops answering, and a spent sign-in tapped again is the sign-in wording as it always was.
+  sessionModule.beginAmberLogin({copy: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  copied.text = 'D'.repeat(64);
+  const signedIn = await sessionModule.adoptAmberClipboard();
+  assert.equal(signedIn?.action, 'login');
+  assert.equal(sessionModule.lastAmberHandOver()?.action, 'login');
+  assert.equal(sessionModule.lastAmberHandOver().message, '', 'the note line is not carried into a sign-in');
+  await assert.rejects(() => sessionModule.adoptAmberClipboard(),
+    /Nothing is waiting for Amber\. Start the sign-in again\./,
+    'a spent sign-in tapped again still gets the sign-in wording');
+
+  // An old hand-over answers nothing: the window is the same one the parked requests use.
+  storage.setItem('satoshi:nostr:amber-handover:v1',
+    JSON.stringify({action: 'sign', createdAt: Date.now() - 31 * 60 * 1000}));
+  assert.equal(sessionModule.lastAmberHandOver(), null, 'a stale hand-over does not decide a tap made later');
+});

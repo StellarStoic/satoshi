@@ -1154,3 +1154,30 @@ export function boardShareUrl(cells, origin = PINSTR_SHARE_ORIGIN) {
   if (!clean.length) return '';
   return `${String(origin || '').replace(/\/+$/, '')}/b/${clean.join(',')}`;
 }
+
+/**
+ * The line the hand-over step shows for a signature that is already gone. A verified signature
+ * spends the request that carried it, so a second tap has nothing to read and nothing to sign in
+ * for, and the last line the hand-over left stands as it was.
+ */
+export const AMBER_HANDED_OVER_LINE = 'This signature was already handed over - there is nothing left to pin.';
+
+/**
+ * The line a tap on the hand-over button writes for a hand-over that has already been made - the
+ * signature was verified and given to the desk, so the request that carried it is spent and there
+ * is nothing parked for the tap to act on. Null for every other case: a request still in flight
+ * decides the tap itself (hand its value over, or send it again), and a sign-in keeps the wording
+ * the sign-in route owns.
+ *
+ * `parked` is the newest request still in flight, `handed` what the last clipboard hand-over was.
+ * The hand-over's own last line is repeated rather than replaced: the desk's refusal is the most
+ * recent thing that happened to this note, and "nothing left to pin" underneath it reads as a
+ * second, quieter failure.
+ */
+export function spentAmberHandOver({parked = null, handed = null} = {}) {
+  if (parked || handed?.action !== 'sign') return null;
+  return {
+    message: handed.message || AMBER_HANDED_OVER_LINE,
+    error: Boolean(handed.error),
+  };
+}

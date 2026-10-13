@@ -19,7 +19,9 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkHref,
   boardPlateFontSize,
   boardShareUrl,
-  linkMatches,} from '../stickyNotesModel.mjs';
+  linkMatches,
+  AMBER_HANDED_OVER_LINE,
+  spentAmberHandOver,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -2214,7 +2216,9 @@ test('the clipboard round trip says on the page where it got to', async () => {
   assert.match(script, /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
     'the stage where a value is being read');
   assert.match(complete, /sayAmberRoundTrip\('Signature verified - pinning your note'\)/);
-  assert.match(complete, /sayAmberRoundTrip\('Your note is pinned'\)/);
+  // The round trip's last line is written through sayAmberOutcome, so it is both what the reader
+  // sees and what a later tap on the hand-over button repeats instead of a sign-in.
+  assert.match(complete, /sayAmberOutcome\('Your note is pinned'\)/);
 
   // The poll ticks twice a second, so the same sentence must be written once, not re-announced.
   const say = script.slice(script.indexOf('function sayAmberRoundTrip'), script.indexOf('function amberReadFailure'));
@@ -2249,4 +2253,55 @@ test('the clipboard round trip says on the page where it got to', async () => {
     'the poll leaves the hand-over up so the publish stages are visible');
   // The 120 s timeout state is unchanged.
   assert.match(script, /AMBER_CLIPBOARD_POLL_TIMEOUT_MS = 120000;/);
+});
+
+test('the hand-over button answers a spent hand-over in its own flow, never as a sign-in', async () => {
+  // A verified signature spends the request that carried it, so a reader who taps the button again
+  // has nothing parked to branch on. Reading that as a sign-in told them to start a sign-in for a
+  // note they had already signed - the flow the hand-over belonged to is what the tap must answer.
+  const [script, model] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8'),
+  ]);
+
+  // (a) A signature handed over, then the button tapped: pinning wording, and never the sign-in's.
+  const handedOver = spentAmberHandOver({parked: null, handed: {action: 'sign'}});
+  assert.equal(handedOver.message, AMBER_HANDED_OVER_LINE);
+  assert.equal(handedOver.error, false);
+  assert.notEqual(handedOver.message, 'Nothing is waiting for Amber. Start the sign-in again.');
+
+  // (c) The last thing that happened to the note was the desk refusing the pin: that refusal is
+  // repeated, rather than "nothing left to pin" or a sign-in.
+  const refused = spentAmberHandOver({parked: null, handed: {action: 'sign', message: 'The server refused the pin: not found', error: true}});
+  assert.equal(refused.message, 'The server refused the pin: not found');
+  assert.equal(refused.error, true);
+
+  // (b) A spent sign-in is still a sign-in, so nothing answers for it here: the tap reaches the
+  // sign-in route below this branch, which is the only place its wording lives.
+  assert.equal(spentAmberHandOver({parked: null, handed: {action: 'login'}}), null);
+  assert.equal(spentAmberHandOver({parked: null, handed: null}), null);
+
+  // A request that is still parked keeps deciding the tap, as it always has: the value is handed
+  // over, or the request is sent again, and the sign-in read stays where it was.
+  assert.equal(spentAmberHandOver({parked: {action: 'sign', copy: true}, handed: {action: 'sign'}}), null);
+  assert.equal(spentAmberHandOver({parked: {action: 'sign'}, handed: {action: 'sign'}}), null);
+  assert.equal(spentAmberHandOver({parked: {action: 'login', copy: true}, handed: {action: 'login'}}), null);
+  assert.equal(spentAmberHandOver({parked: {action: 'login'}, handed: {action: 'sign'}}), null);
+
+  // The button asks what was parked - kept past the spend - and answers before it reads anything,
+  // so the sign-in read is never reached for a hand-over that was already made.
+  const paste = script.slice(script.indexOf("elements.amberPaste.addEventListener('click'"),
+    script.indexOf("elements.nostrConnectCopy.addEventListener"));
+  assert.match(paste, /const spent = spentAmberHandOver\(\{parked, handed: lastAmberHandOver\(\)\}\);/);
+  assert.match(paste, /if \(spent\) \{\s+sayAmberRoundTrip\(spent\.message, spent\.error\);\s+return;\s+\}/);
+  assert.ok(paste.indexOf('spentAmberHandOver({parked') < paste.indexOf('await adoptAmberClipboard()'),
+    'the sign-in read stays on the sign-in route, below the hand-over that was already made');
+  assert.match(paste, /const answer = await adoptAmberClipboard\(\);/);
+
+  // The pinning line is shared with the hand-over itself, so the two can never drift apart, and the
+  // page puts everything the hand-over ends on through the helper that remembers it.
+  assert.match(model, /export const AMBER_HANDED_OVER_LINE = 'This signature was already handed over - there is nothing left to pin\.';/);
+  assert.match(script, /sayAmberOutcome\(AMBER_HANDED_OVER_LINE\);/);
+  assert.match(script, /function sayAmberOutcome\(message, error = false\) \{\s+sayAmberRoundTrip\(message, error\);\s+noteAmberHandOverOutcome\(message, error\);/);
+  assert.match(script, /sayAmberOutcome\(`The server refused the pin: \$\{outcome\.message\}`, true\);/);
 });

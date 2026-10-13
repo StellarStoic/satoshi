@@ -13,6 +13,12 @@ const AMBER_MAX_AGE = 30 * 60 * 1000;
 // answer arrives, and it is not always the newest one, so a retry must not erase the attempt
 // that is still on its way back.
 const AMBER_KEPT_REQUESTS = 4;
+// What the last clipboard hand-over was, kept past the request that carried it. A request leaves
+// storage the moment its value is verified, and the page reloads on the way back from the signer,
+// so the parked requests alone cannot say which flow the reader was in when they tap the hand-over
+// button again - and a spent signing hand-over then read as a sign-in. Deliberately not under
+// AMBER_PREFIX: everything under that prefix is enumerated as a parked request.
+const AMBER_HANDOVER_KEY = 'satoshi:nostr:amber-handover:v1';
 const AMBER_RESULT_PARAM = 'nostr_signer_result';
 const AMBER_ID_PARAM = 'nostr_signer_id';
 /**
@@ -289,6 +295,47 @@ export function amberClipboardPending() {
 }
 
 /**
+ * Remember what the last clipboard hand-over was, replacing whatever was remembered before: it
+ * describes the most recent one, and an older flow's line must never answer for a newer hand-over.
+ * The shape is fixed here, so a record that was written before its outcome was known still reads
+ * back with the same fields.
+ */
+function rememberAmberHandOver(record) {
+  localStorage.setItem(AMBER_HANDOVER_KEY, JSON.stringify({
+    action: record.action,
+    message: record.message || '',
+    error: Boolean(record.error),
+    createdAt: Date.now(),
+  }));
+  return readJson(localStorage, AMBER_HANDOVER_KEY);
+}
+
+/**
+ * The last clipboard hand-over this browser made, or null. It outlives the request that carried it,
+ * which is the whole point: the button that hands the value over is tapped again after that request
+ * is spent, and this is what says the tap is still the flow the hand-over belonged to.
+ */
+export function lastAmberHandOver() {
+  const record = readJson(localStorage, AMBER_HANDOVER_KEY);
+  if (!record || !Number.isFinite(record.createdAt) || Date.now() - record.createdAt > AMBER_MAX_AGE) {
+    localStorage.removeItem(AMBER_HANDOVER_KEY);
+    return null;
+  }
+  return record;
+}
+
+/**
+ * What became of the hand-over the reader just made, in the words the page put in front of them -
+ * the desk's refusal, or the note being pinned. Kept with the hand-over itself, so a second tap
+ * repeats that line rather than reporting that nothing is waiting.
+ */
+export function noteAmberHandOverOutcome(message, error = false) {
+  const handed = lastAmberHandOver();
+  if (!handed) return null;
+  return rememberAmberHandOver({...handed, message: message || '', error: Boolean(error)});
+}
+
+/**
  * Take the value Amber copied, for a request sent with no callback URL. The request that is still
  * parked decides what is being handed over, never what the clipboard happens to hold.
  */
@@ -333,6 +380,9 @@ export async function adoptAmberClipboard({silent = false} = {}) {
   if (silent && unchanged && !knownIdentities().includes(pubkey)) return null;
   const session = saveSession(pubkey, 'amber');
   localStorage.removeItem(waiting.key);
+  // A sign-in that has been handed over is remembered as a sign-in: a later tap on the same button
+  // must still speak to the sign-in, and never answer for a signature hand-over that came before.
+  rememberAmberHandOver({action: 'login'});
   return {action: 'login', session};
 }
 
@@ -420,6 +470,9 @@ export async function adoptAmberSignature({silent = false, onStatus = null} = {}
     return stop('spent', 'That signature was already handed over.');
   }
   localStorage.removeItem(waiting.key);
+  // Remembered as a signature hand-over, because from here on the request that carried it is gone:
+  // this is what a second tap on the button reads, before the note's own outcome is even known.
+  rememberAmberHandOver({action: 'sign'});
   return {action: 'sign', event, context: waiting.state.context};
 }
 

@@ -57,7 +57,9 @@ import {
   boardTextureUrl,
   boardTextureLabel,
   boardTextureTile,
-  boardPlateFontSize,} from './stickyNotesModel.mjs';
+  boardPlateFontSize,
+  AMBER_HANDED_OVER_LINE,
+  spentAmberHandOver,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -83,7 +85,8 @@ import {
   signNostrEvent,
   signerReady,
   updateNostrProfile,
-} from './nostrSession.mjs';
+  lastAmberHandOver,
+  noteAmberHandOverOutcome,} from './nostrSession.mjs';
 import {payServiceUrl} from './paymentService.mjs';
 
 const API = document.querySelector('meta[name="pinstr-api"]')?.content || payServiceUrl('pinstr');
@@ -3800,6 +3803,16 @@ elements.amberPaste.addEventListener('click', async () => {
       startAmberClipboardPoll();
       return;
     }
+    // What was parked decides this too, not only what is parked now: a verified signature spends the
+    // request that carried it, so a tap after one was handed over has nothing parked left to branch
+    // on - and reading that as a sign-in told the reader to start a sign-in for a note they had
+    // already signed. The note's own last line is repeated instead, the desk's refusal above all,
+    // because that is what the reader came back to. A sign-in keeps the wording below: it is its own.
+    const spent = spentAmberHandOver({parked, handed: lastAmberHandOver()});
+    if (spent) {
+      sayAmberRoundTrip(spent.message, spent.error);
+      return;
+    }
     status(elements.amberCopyStatus, 'Reading what Amber copied...');
     const answer = await adoptAmberClipboard();
     updateAccount();
@@ -4462,12 +4475,12 @@ async function completeAmberSignature(answer) {
   if (!pending?.orderId) {
     // The signature was handed over twice, or the note is already pinned. Saying so beats going quiet
     // on a reader who is watching this line.
-    sayAmberRoundTrip('This signature was already handed over - there is nothing left to pin.');
+    sayAmberOutcome(AMBER_HANDED_OVER_LINE);
     return false;
   }
   if (pending?.orderId !== answer.context?.orderId) {
     const mismatch = 'That signature did not match your note. Your note is still here - pin it again.';
-    sayAmberRoundTrip(mismatch, true);
+    sayAmberOutcome(mismatch, true);
     notice(mismatch);
     return false;
   }
@@ -4480,11 +4493,11 @@ async function completeAmberSignature(answer) {
   if (outcome?.published) {
     // The last line stays up: this is the surface the reader is looking at, and the hand-over is
     // theirs to close. The board's own line about the pin sits underneath it either way.
-    sayAmberRoundTrip('Your note is pinned');
+    sayAmberOutcome('Your note is pinned');
   } else if (outcome?.message) {
-    sayAmberRoundTrip(`The server refused the pin: ${outcome.message}`, true);
+    sayAmberOutcome(`The server refused the pin: ${outcome.message}`, true);
   } else {
-    sayAmberRoundTrip('The pin did not finish. Your note is still here - try again.', true);
+    sayAmberOutcome('The pin did not finish. Your note is still here - try again.', true);
   }
   return Boolean(outcome?.published);
 }
@@ -4533,6 +4546,16 @@ function sayAmberRoundTrip(message, error = false) {
   if (elements.amberCopyStatus.textContent === message
       && elements.amberCopyStatus.classList.contains('is-error') === error) return;
   status(elements.amberCopyStatus, message, error);
+}
+
+/**
+ * One line that is both what the reader sees and what a later tap repeats. A hand-over's own last
+ * line is the whole answer for the hand-over button once the request that carried it is spent, so
+ * it is written down here rather than said in one place and remembered in another.
+ */
+function sayAmberOutcome(message, error = false) {
+  sayAmberRoundTrip(message, error);
+  noteAmberHandOverOutcome(message, error);
 }
 
 /**
