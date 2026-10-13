@@ -2011,6 +2011,10 @@ function installFilteredNoteLongPress(note, id) {
 }
 
 function renderNote(sticky, event = null, temporary = false) {
+  // An expired note is never drawn, whatever path asked for it: the relay should not send
+  // one, but a stored flow or a note that crossed its moment between the send and this line
+  // must not reach the board. Checked here, at the one funnel every render passes through.
+  if (isStickyExpired(sticky)) return null;
   if (!temporary && rendered.has(sticky.id)) return null;
   if (!temporary) rendered.add(sticky.id);
   const note = document.createElement('article');
@@ -2069,6 +2073,19 @@ function renderNote(sticky, event = null, temporary = false) {
   // Limits such as "last 5" must be recalculated whenever a newer note arrives.
   if (!temporary) applyNoteFilters();
   return note;
+}
+
+/** Take every note that has passed its NIP-40 moment off the board. True when any went. */
+function dropExpiredNotes() {
+  let dropped = false;
+  noteEvents.forEach((record, id) => {
+    if (!isStickyExpired(record.sticky)) return;
+    record.element.remove();
+    noteEvents.delete(id);
+    rendered.delete(id);
+    dropped = true;
+  });
+  return dropped;
 }
 
 function shortAuthor(pubkey) {
@@ -4445,6 +4462,9 @@ setInterval(() => {
   const session = getNostrSession();
   const after = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
   if (before !== after) updateAccount();
+  // A note that crosses its own NIP-40 moment while the page is open stops being shown, the
+  // way the relay stops serving it. Nothing on this board outlives the moment it names.
+  if (dropExpiredNotes()) applyNoteFilters();
 }, 1000);
 
 setInterval(() => {

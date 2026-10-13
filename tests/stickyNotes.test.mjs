@@ -699,6 +699,20 @@ test('the reader’s board dropdown and the note’s reach control use the same 
   assert.match(script, /draft\?\.exactGeohash \? 0 : GEOHASH_MAX_NOTE_DEPTH/);
 });
 
+test('an expired note never reaches the board, whichever path asked for it', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // Every render goes through renderNote, and it refuses an expired note before anything is
+  // drawn or remembered — so a stored publish flow cannot put one back after the relay dropped it.
+  assert.match(script, /function renderNote\([\s\S]{0,400}?if \(isStickyExpired\(sticky\)\) return null;/,
+    'the one funnel every render passes through drops an expired note');
+  assert.match(script, /if \(!sticky \|\| isStickyExpired\(sticky\) \|\| !noteBelongsToBoard\(sticky\)\) return;/,
+    'and the socket path still drops one before it is parsed any further');
+  // A note that crosses its moment while the page is open is taken down: the board does not
+  // outlive the moment the note names.
+  assert.match(script, /function dropExpiredNotes\(\)/);
+  assert.match(script, /if \(dropExpiredNotes\(\)\) applyNoteFilters\(\)/);
+});
+
 test('board chrome stays compact over the board', async () => {
   const [html, css, script] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
