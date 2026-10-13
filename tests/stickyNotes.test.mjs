@@ -26,7 +26,8 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   GEOHASH_MAX_NOTE_DEPTH,
   clampNoteDepth,
   noteDepthFromTag,
-  noteDepthLabel,} from '../stickyNotesModel.mjs';
+  noteDepthLabel,
+  draftNoteDepth,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -311,6 +312,13 @@ test('a reach is clamped into the real range, however stale the value', () => {
   assert.equal(clampNoteDepth(''), 0);
   assert.equal(clampNoteDepth('nonsense'), 0);
   assert.equal(clampNoteDepth(undefined), 0);
+  // A saved draft names its reach in whichever shape it was written.
+  assert.equal(draftNoteDepth({noteDepth: 2}), 2);
+  assert.equal(draftNoteDepth({noteDepth: '11'}), 6, 'a stale saved rung is brought down too');
+  assert.equal(draftNoteDepth({exactGeohash: true}), 0, 'a draft from the old checkbox keeps its local reach');
+  assert.equal(draftNoteDepth({exactGeohash: false}), 6);
+  assert.equal(draftNoteDepth({}), 6, 'a draft naming nothing keeps the no-cap default');
+  assert.equal(draftNoteDepth(null), 6);
 });
 
 test('a note’s rung reads as digits, and the two words of the old flag still read', () => {
@@ -694,9 +702,10 @@ test('the reader’s board dropdown and the note’s reach control use the same 
   // The desk is told the reach as a digit, through the same field it was always told through.
   assert.match(script, /geohashMode: String\(noteDepth\)/);
   assert.doesNotMatch(script, /exactGeohash \? 'exact' : 'prefix'/);
-  // The draft carries the number, and one saved with the old boolean still opens at its rung.
+  // The draft carries the number, and one saved with the old boolean still opens and finishes
+  // at its own rung.
   assert.match(script, /geohashes: \[\.\.\.activeGeohashes\], noteDepth, contentHash/);
-  assert.match(script, /draft\?\.exactGeohash \? 0 : GEOHASH_MAX_NOTE_DEPTH/);
+  assert.match(script, /noteDepth: draftNoteDepth\(pending\)/);
 });
 
 test('an expired note never reaches the board, whichever path asked for it', async () => {

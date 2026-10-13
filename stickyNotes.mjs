@@ -33,6 +33,7 @@ import {
   GEOHASH_MAX_NOTE_DEPTH,
   clampNoteDepth,
   noteDepthLabel,
+  draftNoteDepth,
   geohashPrecisionForZoom,
   mapZoomForGeohashPrecision,
   normaliseGeohash,
@@ -2616,15 +2617,6 @@ function pendingBelongsToSession() {
   return !pending?.pubkey || session.pubkey === pending.pubkey;
 }
 
-/** The reach a draft names, in whichever shape it was saved. */
-function draftNoteDepth(draft) {
-  const depth = draft?.noteDepth;
-  if (depth !== undefined && depth !== null && Number.isFinite(Number(depth))) return clampNoteDepth(depth);
-  // A draft saved before the rung control carried a boolean: exact was rung 0, anything
-  // else had no cap. Read that shape here so an old saved note is not made local-only.
-  return draft?.exactGeohash ? 0 : GEOHASH_MAX_NOTE_DEPTH;
-}
-
 /** Put a saved, unpaid draft back into the editor only for the identity that wrote it. */
 function restoreSavedDraft() {
   if (!isStrandedPinDraft() || !pendingBelongsToSession()) return false;
@@ -2888,7 +2880,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     elements.pin.disabled = true;
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
-    const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
+    const template = makeStickyTemplate({...pending, ...placement, noteDepth: draftNoteDepth(pending), liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
     // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
     // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
     // one this device is known to complete. The navigation to the signer happens inside

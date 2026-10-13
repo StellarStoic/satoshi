@@ -554,6 +554,17 @@ export function noteDepthLabel(depth, {ownCell = 'exact only', deepest = 'all ch
 }
 
 /**
+ * The reach a saved draft names, in whichever shape it was saved. A draft written before the
+ * rung control carried the old boolean, and an exact draft was rung 0 — reading it here keeps a
+ * saved local note from widening to no cap when it is finally finished.
+ */
+export function draftNoteDepth(draft) {
+  const depth = draft?.noteDepth;
+  if (depth !== undefined && depth !== null && Number.isFinite(Number(depth))) return clampNoteDepth(depth);
+  return draft?.exactGeohash ? 0 : GEOHASH_MAX_NOTE_DEPTH;
+}
+
+/**
  * Does a note belong on a board? Either side may be a clump, because a note or a board can
  * cover several touching cells: a note is on the board when any of its cells is the board
  * cell or deeper inside it. Two limits meet here and neither overrides the other — the
