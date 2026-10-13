@@ -2239,9 +2239,10 @@ test('the clipboard round trip says on the page where it got to', async () => {
   assert.match(publish, /report\?\.\(true, 'Your note is pinned\.'\);/);
   assert.match(publish, /report\?\.\(false, error\.message\);/);
 
-  // The hand-over stays up through the publish so those lines can be read: it is closed on success
-  // only, and the poll no longer closes it on the way in.
-  assert.match(complete, /if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\);/);
+  // The hand-over stays up through the publish so those lines can be read: it is never closed by the
+  // poll, the resume path or the publish — the reader dismisses it when they are done with it.
+  assert.doesNotMatch(complete, /amberDialog\.close\(\)/,
+    'the last stage line must not be cleared while the reader is looking at it');
   const poll = script.slice(script.indexOf('async function pollAmberClipboard'),
     script.indexOf('function startAmberClipboardPoll'));
   assert.doesNotMatch(poll, /amberDialog\.close\(\)/,

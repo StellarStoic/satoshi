@@ -4450,7 +4450,8 @@ async function applySignerReturn() {
  * the flow that launched the request, then publish the paid note the signature belongs to. A
  * signature for another note is named rather than dropped - that note is paid for and one tap from
  * being pinned. Every stage of the round trip is written where the reader is looking, and the last
- * line stays up: a round trip between two apps has to be diagnosable from the page.
+ * line stays up — the hand-over is not closed on the way in or on success, so no stage of the round
+ * trip is cleared before it can be read.
  */
 async function completeAmberSignature(answer) {
   if (!answer || answer.action !== 'sign') return false;
@@ -4477,9 +4478,9 @@ async function completeAmberSignature(answer) {
   let outcome = null;
   await publishPinnedNote(answer.event, (published, message) => { outcome = {published, message}; });
   if (outcome?.published) {
+    // The last line stays up: this is the surface the reader is looking at, and the hand-over is
+    // theirs to close. The board's own line about the pin sits underneath it either way.
     sayAmberRoundTrip('Your note is pinned');
-    // The hand-over has done its job; the board's own line about the pin is the one that stays.
-    if (elements.amberDialog.open) elements.amberDialog.close();
   } else if (outcome?.message) {
     sayAmberRoundTrip(`The server refused the pin: ${outcome.message}`, true);
   } else {
