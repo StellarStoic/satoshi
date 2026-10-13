@@ -110,7 +110,7 @@ Create an order. Unauthenticated by design; the pubkey is the identity.
   "contentHash": "f85b3318961505a15465bd9bfca8ce0fa45336ed68cf53b4564643db6c14d1e9",
   "geohash": "u0qj7z0y1",
   "geohashes": ["u0qj7z0y1", "u0qj7z0z1"],
-  "geohashMode": "prefix" }
+  "geohashMode": "6" }
 ```
 
 `action` is exactly `subscribe` or `pin`. Every action requires a 64-character
@@ -131,7 +131,11 @@ The first cell is the *primary*: the one the note is written on, and the one the
 tag names. A clump remains one note: an active subscription includes it, while an
 anonymous identity pays the same 69 sats whether that note covers one or several cells.
 
-`geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
+`geohashMode` is required for a pin and is the note's reach as a digit: `"0"` (only the exact
+cell) through `"6"` (no cap, the deepest board above it). Six is the whole range because a cell
+is 3 to 9 characters. The two words an older client sent are still accepted — `exact` reads as
+`0` and `prefix` as `6` — so a page and this service can be updated in either order without
+refusing a note. `anonymous: true`
 is optional and valid only for `pin`; it selects the fixed 69-sat path. A named pin
 without an active subscription is refused with `402 subscription_required`, after
 which the client may buy a subscription and retry the same action. The created pin order
