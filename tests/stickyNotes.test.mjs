@@ -21,6 +21,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   boardLampCount,
   BOARD_LAMP_SOCKETS,
   GEOHASH_MAX_LENGTH,
+  GEOHASH_MAX_BOARD_DEPTH,
   boardShareUrl,
   linkMatches,
   AMBER_HAND_OVER_WAITING_LINE,
@@ -286,6 +287,39 @@ test('geohash depth includes only the selected number of child levels', () => {
   assert.equal(geohashMatchesBoard('u24jed', 'u24je', 11, true), false);
 });
 
+test('the reader’s board dropdown offers every level 0..6, and nothing past them', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  // The reader's dropdown is the one place a reader says how many levels of notes to see, and it
+  // offers every level 0..6 and nothing past them: the eleven it used to offer was never a number of
+  // levels a cell has, so it is gone from the markup and from the ceiling behind it.
+  const select = html.match(/<select id="boardDepth">([\s\S]*?)<\/select>/)[1];
+  assert.deepEqual([...select.matchAll(/<option value="(\d+)">([^<]+)<\/option>/g)].map(match => [match[1], match[2]]), [
+    ['0', 'Exact board only'], ['1', '1 level deeper'], ['2', '2 levels deeper'],
+    ['3', '3 levels deeper'], ['4', '4 levels deeper'], ['5', '5 levels deeper'],
+    ['6', 'All child boards'],
+  ]);
+  assert.doesNotMatch(html, /value="11"/);
+  assert.doesNotMatch(script, /Math\.min\(11/, 'the old eleven-level clamp is gone');
+  // The stored preference and the picked value both go through the same ceiling, so an eleven an
+  // older board saved comes back as the deepest level there is instead of a value no option offers.
+  assert.match(script, /boardDepth = Math\.max\(0, Math\.min\(GEOHASH_MAX_BOARD_DEPTH, Number\.parseInt\(localStorage\.getItem\(BOARD_DEPTH_KEY\), 10\) \|\| 0\)\)/);
+  assert.match(script, /boardDepth = Math\.max\(0, Math\.min\(GEOHASH_MAX_BOARD_DEPTH, Number\.parseInt\(elements\.boardDepth\.value, 10\) \|\| 0\)\)/);
+  // and the top of the range is the word the dropdown uses for it, rather than a rung that is not there.
+  assert.match(script, /boardDepth === GEOHASH_MAX_BOARD_DEPTH \? 'all child boards'/);
+  // Six is the whole range and not an arbitrary cap: a note is at most nine characters and a board
+  // at least three, so no board is ever more than six levels from a note and the ceiling cuts nothing
+  // that a reader could have asked for.
+  assert.equal(GEOHASH_MAX_BOARD_DEPTH, 6);
+  assert.equal(GEOHASH_MAX_BOARD_DEPTH, GEOHASH_MAX_LENGTH - GEOHASH_MIN_LENGTH);
+  assert.equal(geohashMatchesBoard(TEST_GEOHASH, TEST_GEOHASH.slice(0, GEOHASH_MIN_LENGTH), GEOHASH_MAX_BOARD_DEPTH), true,
+    'the deepest a note can sit under a board is six levels, and the ceiling reaches it');
+  assert.equal(geohashMatchesBoard(TEST_GEOHASH, TEST_GEOHASH.slice(0, GEOHASH_MIN_LENGTH), 11), true,
+    'a stale eleven reads as the deepest level rather than as something no cell has');
+});
+
 test('map coordinates round-trip through geohash cells up to precision 9', () => {
   assert.equal(encodeGeohash(42.6, -5.6, 5), 'ezs42');
   const hash = encodeGeohash(46.0569, 14.5058, 9);
@@ -435,6 +469,48 @@ test('legacy single-geohash notes stay exact instead of widening unexpectedly', 
   template.tags = template.tags.filter(tag => tag[0] !== 'geohash');
   const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
   assert.equal(parsed.exactGeohash, true);
+});
+
+test('a note published by the reach build still renders for the reader that reads it now', () => {
+  // The build that gave a note a reach of its own wrote a digit in the `geohash` tag and, at the
+  // last of it, a `["reach","inside"]` marker beside it. Those events are already on the relay and
+  // cannot be rewritten, so this reader has to keep drawing them: no tag a note carries may throw
+  // it out, and no note may be shown on a wider board than it was written for.
+  const reachEvent = tags => ({kind: 1, id: 'a'.repeat(64), pubkey: 'b'.repeat(64), created_at: 2000,
+    content: 'written by the reach build', tags: [
+      ['t', STICKY_TOPIC], ['client', 'satoshi.si'],
+      ...tags,
+      ['i', 'geo:u0m71d'], ['k', 'geo'],
+      ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
+      ['expiration', String(Math.floor(Date.now() / 1000) + 86400)],
+    ]});
+
+  // The shape the last reach build wrote: its own cell, the rung as a digit, and the marker that said
+  // which way the rung counted.
+  const inside = parseStickyEvent(reachEvent([['g', 'u0m71d'], ['geohash', '3'], ['reach', 'inside']]));
+  assert.ok(inside, 'a note carrying the digit and the marker parses rather than being dropped');
+  assert.deepEqual(inside.geohashes, ['u0m71d'], 'the one cell it names is the cell it sits on');
+  assert.equal(inside.geohash, 'u0m71d');
+  assert.equal(inside.exactGeohash, true,
+    'a scope word this reader does not know stays on the note’s own board, never a wider one');
+  assert.equal(geohashMatchesBoard(inside.geohashes, 'u0m71d', 0, inside.exactGeohash), true,
+    'so the board it was written on still shows it');
+  assert.equal(geohashMatchesBoard(inside.geohashes, 'u0m71d', 6, inside.exactGeohash), true,
+    'and a reader who opened their board out still sees it on its own cell');
+  for (const board of ['u0m71', 'u0m7', 'u0m']) {
+    assert.equal(geohashMatchesBoard(inside.geohashes, board, 6, inside.exactGeohash), false,
+      `${board} is above the cell: the note is never drawn wider than it was written`);
+  }
+
+  // The shape the brief middle build wrote: the rung as a digit, and the boards above the cell named
+  // as `g` tags. The deepest tag is still the cell, and the digit is still a word this reader reads
+  // as "this cell only" rather than as a reach it cannot honour.
+  const widened = parseStickyEvent(reachEvent([['g', 'u0m71d'], ['g', 'u0m71'], ['g', 'u0m7'], ['g', 'u0m'], ['geohash', '6']]));
+  assert.ok(widened, 'the digit alone parses too');
+  assert.deepEqual(widened.geohashes, ['u0m71d'], 'the shallower tags are boards, not cells of the note');
+  assert.equal(widened.exactGeohash, true);
+  assert.equal(geohashMatchesBoard(widened.geohashes, 'u0m71', 6, widened.exactGeohash), false,
+    'and those boards are not shown it on this reader’s word alone');
 });
 
 test('content fingerprint binds the paid text and color', async () => {
