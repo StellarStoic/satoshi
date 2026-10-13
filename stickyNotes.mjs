@@ -30,12 +30,6 @@ import {
   normaliseGeohashes,
   makeStickyTemplate, mentionFilterAvailability, mentionLabel, stickyTextParts, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashMatchesBoard,
-  geohashBoardChain,
-  GEOHASH_MAX_NOTE_DEPTH,
-  clampNoteDepth,
-  availableNoteDepth,
-  noteDepthLabel,
-  draftNoteDepth,
   geohashPrecisionForZoom,
   mapZoomForGeohashPrecision,
   normaliseGeohash,
@@ -206,8 +200,7 @@ const elements = {
   boardPlateLine: document.getElementById('boardPlateLine'),
   boardPlateTopLine: document.getElementById('boardPlateTopLine'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
-  noteReach: document.getElementById('noteReachSlider'), noteReachValue: document.getElementById('noteReachValue'),
-  noteReachTicks: document.getElementById('noteReachTicks'), noteReachHint: document.getElementById('noteReachHint'),
+  exactGeohash: document.getElementById('exactGeohashNote'),
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
   livelinessTicks: document.getElementById('noteLivelinessTicks'), livelinessHint: document.getElementById('noteLivelinessHint'),
   noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpirationValue: document.getElementById('noteExpirationValue'),
@@ -225,9 +218,6 @@ elements.amberPair.hidden = !/Android/i.test(navigator.userAgent || '');
 let selectedColor = 'yellow';
 let selectedFont = 'typewriter';
 let selectedLiveliness = STICKY_DEFAULT_LIVELINESS;
-// How far above its own cell a new note is willing to be seen. The deepest rung is the
-// default, which is what the old unchecked "exact" box meant: no cap.
-let selectedNoteDepth = GEOHASH_MAX_NOTE_DEPTH;
 let lastValidEditor = '';
 let pending = readPending();
 // Early note deletion is no longer a Pinstr action. Do not resume a stale removal
@@ -340,7 +330,7 @@ let activeGeohashes = linkedCells.length
     ? lockedCells
     : (rememberBoard ? geohashCellsFrom(localStorage.getItem(BOARD_CELLS_KEY) || localStorage.getItem(BOARD_KEY)) : []));
 let activeGeohash = activeGeohashes[0] || '';
-let boardDepth = clampNoteDepth(localStorage.getItem(BOARD_DEPTH_KEY));
+let boardDepth = Math.max(0, Math.min(11, Number.parseInt(localStorage.getItem(BOARD_DEPTH_KEY), 10) || 0));
 if (activeGeohashes.length && rememberBoard) rememberActiveBoard();
 if (pending?.action === 'pin' && (Object.hasOwn(pending, 'geohash') || Object.hasOwn(pending, 'geohashes'))) {
   const cells = geohashCellsFrom(pending.geohashes ?? pending.geohash);
@@ -1546,15 +1536,12 @@ function noteAtPlacement(note, placement) {
 
 function noteBelongsToBoard(sticky) {
   // Either side may be a clump: a note belongs to a board when any of the note's
-  // cells is one of the board's cells, or deeper inside one of them. A note written
-  // by this board carries its reach inward, so it is on a board at or inside its own
-  // cell and on no wider one; whether the reader is looking deep enough into their
-  // board is the reader's own setting and the model holds both ends apart.
-  return geohashMatchesBoard(sticky.geohashes ?? sticky.geohash, activeGeohashes, boardDepth, sticky.noteDepth, sticky.inwardReach);
+  // cells is one of the board's cells, or deeper inside one of them.
+  return geohashMatchesBoard(sticky.geohashes ?? sticky.geohash, activeGeohashes, boardDepth, sticky.exactGeohash);
 }
 
 function updateBoardControl() {
-  const reach = noteDepthLabel(boardDepth);
+  const reach = boardDepth === 0 ? 'exact only' : boardDepth === 11 ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
   const label = activeGeohash ? `Board: ${boardCellsLabel()} (${reach})` : 'Choose a geohash board';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
@@ -1697,9 +1684,6 @@ function selectBoard(geohash, closeDialog = true) {
   else forgetActiveBoard();
   updateBoardUrl();
   updateBoardControl();
-  // The note's reach is measured from the cell, so a new selection re-measures it: a deeper cell
-  // shrinks the range under an open composer and a value that no longer fits drops to the new top.
-  renderNoteReach();
   closeNoteMenu();
   boardConnectionVersion += 1;
   try { boardSocket?.close(); } catch {}
@@ -2175,12 +2159,8 @@ function connectBoard(version = boardConnectionVersion) {
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);
   socket.addEventListener('open', () => {
     // A board of several cells asks the relay for all of them at once: "any of
-    // these" is what the filter means, and the notes decide the rest. The boards
-    // above the cells are asked for too, because a note written on one of them names
-    // only its own cell and is listed inside it: a reader standing one level down is
-    // inside that note's cell and only receives it by asking for the wider cell.
-    // Each note's own rung then decides whether it is shown here.
-    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': geohashBoardChain(activeGeohashes), limit: 500};
+    // these" is what the filter means, and the notes decide the rest.
+    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [...activeGeohashes], limit: 500};
     socket.send(JSON.stringify(['REQ', subscription, noteFilter]));
   });
   socket.addEventListener('message', message => {
@@ -2264,59 +2244,6 @@ function renderLiveliness() {
 
 function livelinessRung(key = selectedLiveliness) {
   return stickyLiveliness(key) || stickyLiveliness(STICKY_DEFAULT_LIVELINESS);
-}
-
-/**
- * The note's own reach, on the same rungs the board's dropdown offers. The slider carries the
- * number and the words come from the model, so the note's control and the reader's board
- * cannot drift apart on what rung 3 is called.
- *
- * The rungs on offer are the ones that exist inside the board the note is being written on:
- * writing on `u0m71d` (6 characters) there are boards at 7, 8 and 9 and no others, so the control
- * offers 0..3 rather than 0..6. This reads the selection every time it is called, because the
- * cell can change under an open composer and the range has to shrink with it.
- */
-function renderNoteReach(cells = activeGeohashes) {
-  selectNoteDepth(selectedNoteDepth, cells);
-}
-
-/** What the note's reach means in the reader's terms, said beside the control itself. */
-function noteReachHintText(depth, limit = GEOHASH_MAX_NOTE_DEPTH) {
-  const level = clampNoteDepth(depth, limit);
-  if (!level) return 'Only the board for this exact cell shows it; a board opened on a wider cell does not.';
-  // On the top rung of a cell that has no full six left, the words say how much room the cell has:
-  // that is the rung a reader is most likely to read as "everything", and it is not everything.
-  const capped = limit < GEOHASH_MAX_NOTE_DEPTH && level >= limit
-    ? ` That is every board inside this cell: ${limit} level${limit === 1 ? '' : 's'} is all the room it has.`
-    : '';
-  return `Also shown on the boards up to ${level} level${level === 1 ? '' : 's'} inside it, and on no board above it.${capped}`;
-}
-
-function selectNoteDepth(depth, cells = activeGeohashes) {
-  const limit = availableNoteDepth(cells);
-  selectedNoteDepth = clampNoteDepth(depth, limit);
-  const label = noteDepthLabel(selectedNoteDepth, {ownCell: 'Here only', available: limit});
-  if (elements.noteReach) {
-    // The range is set before the value: a range clamps whatever it is given into its own range, so
-    // a value that is now past the new maximum would otherwise be left standing as the old one.
-    elements.noteReach.max = String(limit);
-    elements.noteReach.value = String(selectedNoteDepth);
-    elements.noteReach.setAttribute('aria-valuetext', label);
-  }
-  // One tick per rung on offer: leaving the ticks for the full range would draw stops the cell
-  // does not have, which is the same offer the maximum has to withhold.
-  if (elements.noteReachTicks && elements.noteReachTicks.childElementCount !== limit + 1) {
-    elements.noteReachTicks.replaceChildren(...Array.from({length: limit + 1}, (_, rung) => {
-      const tick = document.createElement('span');
-      tick.textContent = String(rung);
-      return tick;
-    }));
-  }
-  if (elements.noteReachTicks) {
-    [...elements.noteReachTicks.children].forEach((tick, position) => tick.classList.toggle('is-selected', position === selectedNoteDepth));
-  }
-  if (elements.noteReachValue) elements.noteReachValue.textContent = label;
-  if (elements.noteReachHint) elements.noteReachHint.textContent = noteReachHintText(selectedNoteDepth, limit);
 }
 
 function livelinessHintText(rung) {
@@ -2518,22 +2445,18 @@ async function startPayment() {
     status(elements.paymentStatus, quotedPrice === 0 ? 'Checking your subscription...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
     const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
-    // The reach is read against the cells the note is going on, not against the number the control
-    // happens to be sitting on: a note cannot reach past the boards that exist inside its own cell.
-    const noteDepth = clampNoteDepth(selectedNoteDepth, availableNoteDepth(activeGeohashes));
+    const exactGeohash = elements.exactGeohash.checked;
     const liveliness = livelinessRung().key;
     const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions, hashtags,
-      geohash: activeGeohash, geohashes: [...activeGeohashes], noteDepth, contentHash,
+      geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
       pubkey: session.pubkey, anonymous: session.method === 'anonymous'};
     let order;
     try {
       order = await api('/orders', {
         method: 'POST',
-        // The desk reads the reach off `geohashMode`: a digit now, though it still understands
-        // the words `exact` and `prefix` for anything the two sides send briefly out of step.
         body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
           geohash: activeGeohash, geohashes: [...activeGeohashes],
-          geohashMode: String(noteDepth), ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
+          geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
       });
     } catch (error) {
       // 402 is the desk saying "this key is registered but has no subscription".
@@ -2713,7 +2636,7 @@ function restoreSavedDraft() {
   if (!isStrandedPinDraft() || !pendingBelongsToSession()) return false;
   selectColor(pending.color);
   selectFont(pending.font || 'typewriter');
-  selectNoteDepth(draftNoteDepth(pending));
+  elements.exactGeohash.checked = Boolean(pending.exactGeohash);
   elements.hashtags.value = (pending.hashtags || []).join(', ');
   validateHashtags();
   selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
@@ -2971,11 +2894,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     elements.pin.disabled = true;
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
-    // A draft can come back from an older build, or from a board wider than the cells it is being
-    // finished on, and its own rung can then be one the cells do not have: it is read against them
-    // here, so the rung the event carries is the reach the note can really be seen on.
-    const reach = draftNoteDepth(pending, availableNoteDepth(pending.geohashes ?? pending.geohash));
-    const template = makeStickyTemplate({...pending, ...placement, noteDepth: reach, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
+    const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
     // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
     // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
     // one this device is known to complete. The navigation to the signer happens inside
@@ -3293,7 +3212,7 @@ function openComposer() {
   // Opening on a stale quote is how the buttons came to describe the wrong identity, so
   // the composer asks again every time it opens.
   refreshPriceQuote(session).catch(() => {});
-  if (!restoredDraft && !pending?.orderId) selectNoteDepth(GEOHASH_MAX_NOTE_DEPTH);
+  if (!restoredDraft && !pending?.orderId) elements.exactGeohash.checked = false;
   if (!restoredDraft && !pending?.orderId) elements.hashtags.value = '';
   if (!restoredDraft) selectLiveliness(pending?.liveliness || selectedLiveliness);
   validateHashtags();
@@ -4088,7 +4007,7 @@ elements.boardChooser.addEventListener('submit', event => {
   selectBoard(cells);
 });
 elements.boardDepth.addEventListener('change', () => {
-  boardDepth = clampNoteDepth(elements.boardDepth.value);
+  boardDepth = Math.max(0, Math.min(11, Number.parseInt(elements.boardDepth.value, 10) || 0));
   localStorage.setItem(BOARD_DEPTH_KEY, String(boardDepth));
   updateBoardControl();
   if (activeGeohash) selectBoard([...activeGeohashes], false);
@@ -4432,8 +4351,6 @@ elements.colors.addEventListener('click', event => selectColor(event.target.clos
 elements.font.addEventListener('change', () => selectFont(elements.font.value));
 elements.liveliness.addEventListener('input', () => selectLiveliness(STICKY_LIVELINESS[Number(elements.liveliness.value)]?.key));
 renderLiveliness();
-elements.noteReach.addEventListener('input', () => selectNoteDepth(elements.noteReach.value));
-renderNoteReach();
 elements.editor.addEventListener('beforeinput', () => { lastValidEditor = elements.editor.textContent; });
 elements.editor.addEventListener('input', handleEditorInput);
 elements.editor.addEventListener('paste', event => {
@@ -4929,7 +4846,7 @@ if (!resumedSigning && pending?.status === 'waiting') {
   if (pendingBelongsToSession()) {
     selectColor(pending.color);
     selectFont(pending.font || 'typewriter');
-    selectNoteDepth(draftNoteDepth(pending));
+    elements.exactGeohash.checked = Boolean(pending.exactGeohash);
     elements.hashtags.value = (pending.hashtags || []).join(', ');
     validateHashtags();
     selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);

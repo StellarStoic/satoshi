@@ -25,16 +25,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkMatches,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
-  spentAmberHandOver,
-  GEOHASH_MAX_NOTE_DEPTH,
-  clampNoteDepth,
-  availableNoteDepth,
-  noteDepthFromTag,
-  noteDepthLabel,
-  draftNoteDepth,
-  STICKY_REACH_TAG,
-  STICKY_REACH_INSIDE,
-  geohashBoardChain,} from '../stickyNotesModel.mjs';
+  spentAmberHandOver,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -279,146 +270,11 @@ test('a board geohash is required and carries searchable Nostr geo tags', () => 
   assert.deepEqual(template.tags.find(tag => tag[0] === 'g'), ['g', TEST_GEOHASH]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'i'), ['i', `geo:${TEST_GEOHASH}`]);
   assert.deepEqual(template.tags.find(tag => tag[0] === 'k'), ['k', 'geo']);
-  // The cells named are the note's own and nothing else: the reach counts the boards inside them,
-  // and a board above a cell is what used to put one note on every wider board at once.
-  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]), [TEST_GEOHASH]);
-  assert.deepEqual(template.tags.find(tag => tag[0] === STICKY_REACH_TAG), [STICKY_REACH_TAG, STICKY_REACH_INSIDE],
-    'the note says which way its rung counts');
-  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', '6']);
-});
-
-test('a note depth is a number in 0..6, and only the rungs that exist are offered', () => {
-  assert.equal(GEOHASH_MIN_LENGTH, 3);
-  assert.equal(GEOHASH_MAX_NOTE_DEPTH, 6, 'a 3-to-9 character cell has six boards above it');
-  for (let depth = 0; depth <= GEOHASH_MAX_NOTE_DEPTH; depth += 1) {
-    const template = makeStickyTemplate({content: 'rung', color: 'yellow', x: .5, y: .5, rotation: 0,
-      geohash: TEST_GEOHASH, noteDepth: depth});
-    assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', String(depth)]);
-    // The named `g` tags no longer say how far the note reaches: the rung counts the boards inside
-    // the cell, and no tag can name a level of them. Whatever the rung, the cells named are the
-    // note's own and no board above it is named.
-    const named = template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]);
-    assert.deepEqual(named, [TEST_GEOHASH], `rung ${depth} names its own cell and no board above it`);
-  }
-  // A depth beyond the range is brought down to the deepest rung rather than refused or kept.
-  const capped = makeStickyTemplate({content: 'rung', color: 'yellow', x: .5, y: .5, rotation: 0,
-    geohash: TEST_GEOHASH, noteDepth: 11});
-  assert.deepEqual(capped.tags.find(tag => tag[0] === 'geohash'), ['geohash', '6']);
-});
-
-test('a reach is clamped into the real range, however stale the value', () => {
-  assert.equal(clampNoteDepth(3), 3);
-  assert.equal(clampNoteDepth('3'), 3);
-  assert.equal(clampNoteDepth(0), 0);
-  assert.equal(clampNoteDepth(6), 6);
-  assert.equal(clampNoteDepth(-4), 0, 'nothing reaches below its own cell');
-  assert.equal(clampNoteDepth(11), 6, 'an eleven an older board saved is brought down, not crashed on');
-  assert.equal(clampNoteDepth('11'), 6);
-  assert.equal(clampNoteDepth(2.9), 2, 'a reach is a whole number of levels');
-  assert.equal(clampNoteDepth(null), 0);
-  assert.equal(clampNoteDepth(''), 0);
-  assert.equal(clampNoteDepth('nonsense'), 0);
-  assert.equal(clampNoteDepth(undefined), 0);
-  // A saved draft names its reach in whichever shape it was written.
-  assert.equal(draftNoteDepth({noteDepth: 2}), 2);
-  assert.equal(draftNoteDepth({noteDepth: '11'}), 6, 'a stale saved rung is brought down too');
-  assert.equal(draftNoteDepth({exactGeohash: true}), 0, 'a draft from the old checkbox keeps its local reach');
-  assert.equal(draftNoteDepth({exactGeohash: false}), 6);
-  assert.equal(draftNoteDepth({}), 6, 'a draft naming nothing keeps the no-cap default');
-  assert.equal(draftNoteDepth(null), 6);
-});
-
-test('the rungs a cell has are the levels inside it, so a deeper cell offers fewer', () => {
-  // A reach is a number of levels inside the chosen cell, so what is left under it is 9 minus its
-  // length. This is the rule that stopped a 6-character board from offering six levels it has not.
-  assert.equal(availableNoteDepth('u24'), 6, 'three characters leave six levels');
-  assert.equal(availableNoteDepth('u24je'), 4);
-  assert.equal(availableNoteDepth('u24j'), 5);
-  assert.equal(availableNoteDepth('u24jed'), 3, 'u24jed leaves only 7, 8 and 9');
-  assert.equal(availableNoteDepth('u0qj7z0y1'), 0, 'nine characters leave nothing under them');
-  assert.equal(availableNoteDepth(['u24jed']), 3, 'one cell reads like a list of one');
-  assert.equal(availableNoteDepth([]), 0, 'no cell chosen has nothing under it to offer');
-  assert.equal(availableNoteDepth(''), 0);
-  assert.equal(availableNoteDepth('not a geohash'), 0);
-  // A clump is cut to one depth, but a set read back from an older note can name cells of different
-  // lengths: the longest cell has the least room under it, and the reach has to hold for every cell
-  // the note sits on, so the longest one governs the group.
-  assert.equal(availableNoteDepth(['u24', 'u24jed']), 3, 'the longest cell governs the group');
-  assert.equal(availableNoteDepth(['u24jed', 'u24je']), 3);
-  assert.equal(availableNoteDepth(['u24je', 'u24je']), 4);
-  assert.equal(availableNoteDepth(['u24', 'u24je']), 4);
-});
-
-test('a reach too large for the cell comes down to the rung the cell has', () => {
-  assert.equal(clampNoteDepth(6, 3), 3, 'a six kept from a wider board comes down to three');
-  assert.equal(clampNoteDepth(6, 0), 0, 'a 9-character cell has no rung above its own board');
-  assert.equal(clampNoteDepth(2, 3), 2, 'a rung inside the range is left alone');
-  assert.equal(clampNoteDepth(11, 3), 3);
-  assert.equal(clampNoteDepth(-1, 3), 0);
-  assert.equal(clampNoteDepth('3', 1), 1);
-  assert.equal(clampNoteDepth(6, null), 6, 'a caller with no cell in hand keeps the full range');
-  assert.equal(clampNoteDepth(6), 6);
-  // A saved draft written on a wider board carries a rung the cell it is restored on may not have.
-  assert.equal(draftNoteDepth({noteDepth: 6}, 3), 3, 'a restored draft is clamped the same way');
-  assert.equal(draftNoteDepth({noteDepth: 6}, 0), 0);
-  assert.equal(draftNoteDepth({}, 3), 3, 'a draft naming nothing opens at the full depth of its cell');
-  assert.equal(draftNoteDepth({exactGeohash: true}, 3), 0, 'the old local draft stays local');
-  // The words never name the deepest rung when the rungs on offer stop short of the full range: on
-  // a 6-character cell the top rung is its third level, not 'all child boards'.
-  assert.equal(noteDepthLabel(3, {ownCell: 'Here only', available: 3}), '3 levels deeper');
-  assert.equal(noteDepthLabel(3, {ownCell: 'Here only', available: 6}), '3 levels deeper');
-  assert.equal(noteDepthLabel(6, {ownCell: 'Here only', available: 6}), 'all child boards');
-  assert.equal(noteDepthLabel(0, {ownCell: 'Here only', available: 0}), 'Here only');
-  assert.equal(noteDepthLabel(6, {ownCell: 'Here only', available: 3}), '3 levels deeper');
-});
-
-test('a changed selection re-clamps the reach, and a wider one never raises it back', () => {
-  // The editor opens on the full depth its cell leaves: what 'no cap' means inside that cell.
-  let cells = ['u24'];
-  let available = availableNoteDepth(cells);
-  let rung = clampNoteDepth(GEOHASH_MAX_NOTE_DEPTH, available);
-  assert.equal(available, 6);
-  assert.equal(rung, 6, 'a new note starts as deep as its cell allows');
-  // The reader picks a deeper cell in the group: the range shrinks and the rung that no longer fits
-  // drops with it, which is what the live re-clamp does under the open composer.
-  cells = ['u24', 'u24jed'];
-  available = availableNoteDepth(cells);
-  rung = clampNoteDepth(rung, available);
-  assert.equal(available, 3);
-  assert.equal(rung, 3, 'the rung follows the range down');
-  // Dropping the deeper cell widens the range again, and the value must not rise on its own.
-  cells = ['u24'];
-  available = availableNoteDepth(cells);
-  assert.equal(available, 6);
-  assert.equal(clampNoteDepth(rung, available), 3, 'a wide range does not widen the note by itself');
-  // Down to the deepest cell there is: nothing is offered past its own board.
-  cells = ['u0qj7z0y1'];
-  available = availableNoteDepth(cells);
-  assert.equal(available, 0);
-  assert.equal(clampNoteDepth(rung, available), 0);
-});
-
-test('a note’s rung reads as digits, and the two words of the old flag still read', () => {
-  assert.equal(noteDepthFromTag('0'), 0);
-  assert.equal(noteDepthFromTag('3'), 3);
-  assert.equal(noteDepthFromTag('6'), 6);
-  assert.equal(noteDepthFromTag('exact'), 0, 'the word an older build wrote is rung 0');
-  assert.equal(noteDepthFromTag('prefix'), GEOHASH_MAX_NOTE_DEPTH, 'and the other is the deepest rung');
-  assert.equal(noteDepthFromTag('EXACT'), 0, 'case is not meaning');
-  assert.equal(noteDepthFromTag('11'), 6, 'a tag past the range is clamped like any other value');
-  assert.equal(noteDepthFromTag(''), 0);
-  assert.equal(noteDepthFromTag(undefined), 0, 'a note naming no rung reads exactly as it always did');
-  assert.equal(noteDepthFromTag('soon'), 0);
-});
-
-test('the rungs are named in words the board and the note both use', () => {
-  assert.equal(noteDepthLabel(0), 'exact only');
-  assert.equal(noteDepthLabel(1), '1 level deeper');
-  assert.equal(noteDepthLabel(3), '3 levels deeper');
-  assert.equal(noteDepthLabel(6), 'all child boards');
-  assert.equal(noteDepthLabel(11), 'all child boards', 'past the range is the deepest rung');
-  assert.equal(noteDepthLabel(0, {ownCell: 'Here only'}), 'Here only');
-  assert.equal(noteDepthLabel(4, {ownCell: 'Here only'}), '4 levels deeper');
+  // Every parent that is still a code: the chain stops at 3 characters, because a
+  // shorter code is a region rather than a board.
+  assert.deepEqual(template.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]),
+    geohashPrefixes(TEST_GEOHASH).filter(prefix => prefix.length >= GEOHASH_MIN_LENGTH));
+  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', 'prefix']);
 });
 
 test('geohash depth includes only the selected number of child levels', () => {
@@ -426,25 +282,8 @@ test('geohash depth includes only the selected number of child levels', () => {
   assert.equal(geohashMatchesBoard('u24jed', 'u24j', 2), true);
   assert.equal(geohashMatchesBoard('u24jed', 'u24j', 1), false);
   assert.equal(geohashMatchesBoard('u24jed', 'u24je', 1), true);
-  assert.equal(geohashMatchesBoard('u24jed', 'u24jed', 0, 0), true);
-  assert.equal(geohashMatchesBoard('u24jed', 'u24je', 6, 0), false, 'a note that stays local stays local');
-});
-
-test('a note is shown only where both the reader and the note reach far enough', () => {
-  const cell = 'u24jed';   // 6 characters: 'u24j' is two levels above it, 'u24' three.
-  const board = 'u24j';
-  // Reader looking two levels in, note allowing two levels up: shown.
-  assert.equal(geohashMatchesBoard(cell, board, 2, 2), true);
-  // Reader looking far enough, note not willing to be seen that high: not shown.
-  assert.equal(geohashMatchesBoard(cell, board, 6, 1), false, 'the note’s own depth is not overridden by the reader');
-  // Note willing to be seen that high, reader not looking that deep: not shown either.
-  assert.equal(geohashMatchesBoard(cell, board, 1, 6), false, 'the reader’s depth is not overridden by the note');
-  // Neither limit overrides the other, so both have to allow the same reach.
-  assert.equal(geohashMatchesBoard(cell, board, 3, 3), true);
-  // The note's own cell is always its own, whatever either depth says.
-  assert.equal(geohashMatchesBoard(cell, cell, 0, 0), true);
-  assert.equal(geohashMatchesBoard(cell, 'u24', 6, 6), true, 'the coarsest board within reach');
-  assert.equal(geohashMatchesBoard(cell, 'u24', 2, 6), false, 'but not one the reader is not looking in');
+  assert.equal(geohashMatchesBoard('u24jed', 'u24jed', 0, true), true);
+  assert.equal(geohashMatchesBoard('u24jed', 'u24je', 11, true), false);
 });
 
 test('map coordinates round-trip through geohash cells up to precision 9', () => {
@@ -546,32 +385,21 @@ test('the picker never chooses a cell by itself, and a tap outside the area star
   assert.match(script, /function toggleMapCell\(cell\)/);
 });
 
-test('a rung-0 note publishes and parses as its own cell only', () => {
-  const template = makeStickyTemplate({content: 'local only', color: 'blue', x: .5, y: .5, rotation: 0, geohash: 'u24jed', noteDepth: 0});
+test('exact-geohash notes publish and parse as exact only', () => {
+  const template = makeStickyTemplate({content: 'local only', color: 'blue', x: .5, y: .5, rotation: 0, geohash: 'u24jed', exactGeohash: true});
   assert.deepEqual(template.tags.filter(tag => tag[0] === 'g'), [['g', 'u24jed']]);
-  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', '0']);
+  assert.deepEqual(template.tags.find(tag => tag[0] === 'geohash'), ['geohash', 'exact']);
   const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
   assert.equal(parsed.geohash, 'u24jed');
-  assert.equal(parsed.noteDepth, 0);
+  assert.equal(parsed.exactGeohash, true);
 });
 
-test('a note off the relay reads the two legacy words as the ends of the range', () => {
-  const base = makeStickyTemplate({content: 'legacy', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: 'u24jed'});
-  const withTag = value => ({...base, id: 'a'.repeat(64), pubkey: 'b'.repeat(64),
-    tags: [...base.tags.filter(tag => tag[0] !== 'geohash'), ['geohash', value]]});
-  assert.equal(parseStickyEvent(withTag('exact')).noteDepth, 0, 'a note already on the relay still reads as local');
-  assert.equal(parseStickyEvent(withTag('prefix')).noteDepth, GEOHASH_MAX_NOTE_DEPTH,
-    'and the old no-cap note reads as the deepest rung, so nothing already pinned widens or narrows');
-  assert.equal(parseStickyEvent(withTag('3')).noteDepth, 3, 'digits are the new shape and read as themselves');
-  assert.equal(parseStickyEvent(withTag('11')).noteDepth, GEOHASH_MAX_NOTE_DEPTH, 'a stale tag is clamped, not kept');
-});
-
-test('a note on several cells names every one of them and no board above them', () => {
+test('a note on several cells names every cell, and stays on those boards', () => {
   const cell = 'u4pr7z0y';
   const step = geohashNeighbours(cell)[0];
   const cells = [cell, step];
 
-  const exact = makeStickyTemplate({content: 'corner shop', color: 'green', x: .4, y: .6, rotation: 3, geohash: cell, geohashes: cells, noteDepth: 0});
+  const exact = makeStickyTemplate({content: 'corner shop', color: 'green', x: .4, y: .6, rotation: 3, geohash: cell, geohashes: cells, exactGeohash: true});
   assert.deepEqual(exact.tags.filter(tag => tag[0] === 'g'), [['g', cell], ['g', step]]);
   assert.deepEqual(exact.tags.find(tag => tag[0] === 'i'), ['i', `geo:${cell}`],
     'the cell the note was written on stays its primary');
@@ -581,109 +409,12 @@ test('a note on several cells names every one of them and no board above them', 
 
   const prefix = makeStickyTemplate({content: 'corner shop', color: 'green', x: .4, y: .6, rotation: 3, geohashes: cells});
   const named = prefix.tags.filter(tag => tag[0] === 'g').map(tag => tag[1]);
-  assert.deepEqual(named, cells, 'both cells are named, each of them once');
-  assert.equal(named.includes('u4pr7z0'), false, 'and no board above them is named');
+  assert.ok(named.includes(cell) && named.includes(step), 'both cells are named');
+  assert.ok(named.includes('u4pr7z0'), 'and the boards above them');
   const parsedPrefix = parseStickyEvent({...prefix, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
   assert.deepEqual(parsedPrefix.geohashes, cells,
-    'the note sits on exactly the cells it named');
-  assert.equal(parsedPrefix.noteDepth, GEOHASH_MAX_NOTE_DEPTH, 'the default rung is the deepest, as it always was');
-  assert.equal(parsedPrefix.inwardReach, true, 'and the rung counts the boards inside those cells');
-});
-
-test('a middle rung names no board above the cell, and reaches that far inside it', () => {
-  const template = depth => makeStickyTemplate({content: 'rung', color: 'green', x: .4, y: .6, rotation: 3,
-    geohash: 'u4pr7z0', noteDepth: depth});
-  const named = depth => template(depth).tags.filter(tag => tag[0] === 'g').map(tag => tag[1]);
-  assert.deepEqual(named(1), ['u4pr7z0'], 'rung 1 names its own cell and nothing above it');
-  assert.deepEqual(named(2), ['u4pr7z0']);
-  assert.equal(named(2).includes('u4pr7z'), false, 'a board one level up is never named, so it never fetches the note');
-  // What the rung does is read on the reader's side: rung 2 is two levels of boards inside the cell.
-  const note = parseStickyEvent({...template(2), id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
-  assert.equal(note.inwardReach, true);
-  assert.equal(geohashMatchesBoard(note.geohashes, 'u4pr7z0', 0, note.noteDepth, note.inwardReach), true,
-    'its own board shows it');
-  assert.equal(geohashMatchesBoard(note.geohashes, 'u4pr7z01', 0, note.noteDepth, note.inwardReach), true,
-    'and the board one level inside it');
-  assert.equal(geohashMatchesBoard(note.geohashes, 'u4pr7z012', 0, note.noteDepth, note.inwardReach), true,
-    'and the one two levels inside it');
-  assert.equal(geohashMatchesBoard(note.geohashes, 'u4pr7z', 6, note.noteDepth, note.inwardReach), false,
-    'never the board above it, however wide the reader opens their board');
-});
-
-test('a note that reaches inward is listed on the boards inside its cell, and on no wider one', () => {
-  // The user's own case: a note written on u0m71d (six characters, three levels under it) at rung 3.
-  const cells = ['u0m71d'];
-  const on = board => geohashMatchesBoard(cells, board, 6, 3, true);
-  assert.equal(on('u0m71d'), true, 'the board it was written on');
-  assert.equal(on('u0m71d1'), true, 'one level inside it');
-  assert.equal(on('u0m71d12'), true, 'two levels inside it');
-  assert.equal(on('u0m71d123'), true, 'three levels inside it — the last board that exists under it');
-  assert.equal(geohashMatchesBoard(['u0m'], 'u0m123', 6, 3, true), true, 'three levels in, on a three-character cell');
-  assert.equal(geohashMatchesBoard(['u0m'], 'u0m1234', 6, 3, true), false, 'one level past the rung, never');
-  // No wider board, whatever the reader has their own depth set to: the rung runs one way only.
-  for (const board of ['u0m71', 'u0m7', 'u0m']) {
-    assert.equal(on(board), false, `${board} is above the cell and shows nothing`);
-  }
-  assert.equal(on('u0m71e'), false, 'nor does a cell that is not inside it at all');
-  // Rung 0 is its own board and nothing under it.
-  assert.equal(geohashMatchesBoard(cells, 'u0m71d', 6, 0, true), true);
-  assert.equal(geohashMatchesBoard(cells, 'u0m71d1', 6, 0, true), false, 'rung 0 reaches no board inside it');
-});
-
-test('a note written by this board names its own cells at every rung, and never a board above them', () => {
-  const named = (cells, rung) => makeStickyTemplate({content: 'rung', color: 'yellow', x: .5, y: .5, rotation: 0,
-    geohash: cells[0], geohashes: cells, noteDepth: rung}).tags.filter(tag => tag[0] === 'g').map(tag => tag[1]);
-  // Six characters at rung 3: three levels of boards exist under it and none of them can be named.
-  const cell = named(['u0m71d'], 3);
-  assert.deepEqual(cell, ['u0m71d']);
-  assert.ok(cell.every(value => value.length > 'u0m71d'.length - 1), 'and every one of them is the cell itself');
-  assert.equal(cell.some(value => 'u0m71d'.startsWith(value) && value.length < 'u0m71d'.length), false,
-    'no board above the cell is named');
-  // Three characters at rung 6, and a clump of two: the same, for every cell of the group.
-  assert.deepEqual(named(['u0m'], 6), ['u0m']);
-  const step = geohashNeighbours('u0m71d')[0];
-  const clump = named(['u0m71d', step], 3);
-  assert.deepEqual(clump, ['u0m71d', step], 'each cell of the group is named once, and only the cells');
-  assert.equal(clump.some(value => value.length < 6), false, 'and no cell of the group names a board above it');
-});
-
-test('a note off the relay with no reach marker is read the way it was always read', () => {
-  // Everything published before the marker existed: its depth counted the boards above its cell and
-  // its tags name them. Rewriting that note here would change how it renders, which the relay's copy
-  // cannot be made to do — so the old reading is the one it keeps.
-  const legacyTags = [['g', 'u0m71d'], ['g', 'u0m71'], ['g', 'u0m7'], ['g', 'u0m'], ['geohash', '3']];
-  const legacy = parseStickyEvent({kind: 1, id: 'a'.repeat(64), pubkey: 'b'.repeat(64), created_at: 1000,
-    content: 'old note',
-    tags: [['t', STICKY_TOPIC], ['client', 'satoshi.si'], ...legacyTags,
-      ['i', 'geo:u0m71d'], ['k', 'geo'], ['sticky', 'v1', 'yellow', '0.50000', '0.50000', '0.00', 'typewriter'],
-      ['expiration', String(1000 + 86400)]]});
-  assert.equal(legacy.inwardReach, false, 'no marker, so its rung still counts upward');
-  assert.deepEqual(legacy.geohashes, ['u0m71d'], 'the shallower tags are boards, not cells');
-  assert.equal(legacy.noteDepth, 3);
-  // Above the cell: the reader's depth and the note's rung still both have to allow it, as before.
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71', 1, legacy.noteDepth, legacy.inwardReach), true);
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71', 0, legacy.noteDepth, legacy.inwardReach), false);
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71', 6, 0, legacy.inwardReach), false,
-    'the note’s own depth is not overridden by the reader');
-  // And it is still on no board inside its cell: that is the direction it was never written for.
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71d1', 6, legacy.noteDepth, legacy.inwardReach), false);
-  // The four-argument call every older caller makes reads it identically.
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71', 1, legacy.noteDepth), true);
-  assert.equal(geohashMatchesBoard(legacy.geohashes, 'u0m71d1', 6, legacy.noteDepth), false);
-});
-
-test('a search asks for the boards above the cell, so a note written inside it is received', () => {
-  assert.deepEqual(geohashBoardChain('u0m71d'), ['u0m71d', 'u0m71', 'u0m7', 'u0m'],
-    'the cell and every board above it, as far up as boards go');
-  assert.deepEqual(geohashBoardChain('u0m'), ['u0m'], 'a three-character cell has no board above it');
-  assert.deepEqual(geohashBoardChain(['u0m71d', 'u0m71e']), ['u0m71d', 'u0m71', 'u0m7', 'u0m', 'u0m71e'],
-    'a clump is chained cell by cell and the shared boards are named once');
-  assert.ok(geohashBoardChain(['u0m71d', 'u0m71e']).every(value => value.length >= GEOHASH_MIN_LENGTH),
-    'no region shorter than a board is ever asked for');
-  // The two sides agree: what a reader standing one level inside a note's cell asks for contains the
-  // cell that note named, so the note is received — and its rung is then what the filter reads.
-  assert.ok(geohashBoardChain('u0m71d1').includes('u0m71d'), 'a reader one level in receives the wider note');
-  assert.ok(geohashBoardChain('u0m71d123').includes('u0m71d'), 'and so does one three levels in');
+    'the shallower tags are boards, not cells, so they cannot count as cells of the note');
+  assert.equal(parsedPrefix.exactGeohash, false);
 });
 
 test('a note on several cells belongs to each of those boards', () => {
@@ -694,16 +425,16 @@ test('a note on several cells belongs to each of those boards', () => {
   assert.equal(geohashMatchesBoard(cells, step, 0), true, 'and the neighbour it also sits on');
   assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 1), true, 'the board above it, within depth');
   assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 0), false, 'but not beyond the depth the reader chose');
-  assert.equal(geohashMatchesBoard(cell, cells, 0, 0), true, 'a clump board shows a note on any of its cells');
-  assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 1, 0), false, 'a local note is only on the cells it names');
-  assert.equal(geohashMatchesBoard(cells, '9q8yyk8y', 6), false, 'and never on an unrelated board');
+  assert.equal(geohashMatchesBoard(cell, cells, 0, true), true, 'a clump board shows a note on any of its cells');
+  assert.equal(geohashMatchesBoard(cells, 'u4pr7z0', 1, true), false, 'an exact note is only on the cells it names');
+  assert.equal(geohashMatchesBoard(cells, '9q8yyk8y', 9), false, 'and never on an unrelated board');
 });
 
 test('legacy single-geohash notes stay exact instead of widening unexpectedly', () => {
-  const template = makeStickyTemplate({content: 'old note', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: 'u24jed'});
+  const template = makeStickyTemplate({content: 'old note', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: 'u24jed', exactGeohash: true});
   template.tags = template.tags.filter(tag => tag[0] !== 'geohash');
   const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
-  assert.equal(parsed.noteDepth, 0);
+  assert.equal(parsed.exactGeohash, true);
 });
 
 test('content fingerprint binds the paid text and color', async () => {
@@ -835,93 +566,6 @@ test('payment sheet opens during invoice creation and pinned state stays complet
   assert.doesNotMatch(`${html}\n${script}`, /Bark/i);
 });
 
-test('the reader’s board dropdown and the note’s reach control use the same six rungs', async () => {
-  const [html, script] = await Promise.all([
-    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
-    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
-  ]);
-  // The reader's dropdown offers every rung 0..6 and nothing past them: the eleven it used to
-  // offer was never a reach a cell could have, so it is gone from the markup.
-  const select = html.match(/<select id="boardDepth">([\s\S]*?)<\/select>/)[1];
-  assert.deepEqual([...select.matchAll(/<option value="(\d+)">([^<]+)<\/option>/g)].map(match => [match[1], match[2]]), [
-    ['0', 'Exact board only'], ['1', '1 level deeper'], ['2', '2 levels deeper'],
-    ['3', '3 levels deeper'], ['4', '4 levels deeper'], ['5', '5 levels deeper'],
-    ['6', 'All child boards'],
-  ]);
-  assert.doesNotMatch(html, /value="11"/);
-  assert.doesNotMatch(script, /Math\.min\(11/, 'the old eleven-level clamp is gone');
-  // The stored preference goes through the clamp, so an eleven an older board saved comes back
-  // as the deepest rung instead of a value no option offers.
-  assert.match(script, /boardDepth = clampNoteDepth\(localStorage\.getItem\(BOARD_DEPTH_KEY\)\)/);
-  assert.match(script, /boardDepth = clampNoteDepth\(elements\.boardDepth\.value\)/);
-  assert.match(script, /noteDepthLabel\(boardDepth\)/);
-  // The note's own control is a rung slider where the checkbox used to be. The markup ships it
-  // closed — no cell is chosen at load, so no level under one can be offered — and the page opens
-  // it to exactly the levels the selected cell has, so a 6-character cell offers three.
-  assert.match(html, /id="noteReachSlider"[^>]*type="range"[^>]*min="0"[^>]*max="0"[^>]*step="1"[^>]*value="0"/);
-  assert.doesNotMatch(html, /id="noteReachSlider"[^>]*max="6"/, 'the markup never claims the full range');
-  assert.match(html, /id="noteReachValue"/);
-  assert.match(html, /id="noteReachTicks"/);
-  assert.match(html, /id="noteReachHint"/);
-  assert.doesNotMatch(html, /id="exactGeohashNote"/);
-  assert.match(script, /let selectedNoteDepth = GEOHASH_MAX_NOTE_DEPTH/, 'a new note defaults to no cap');
-  assert.match(script, /elements\.noteReach\.addEventListener\('input'/);
-  assert.match(script, /noteDepthLabel\(selectedNoteDepth, \{ownCell: 'Here only', available: limit\}\)/);
-  // The desk is told the reach as a digit, through the same field it was always told through.
-  assert.match(script, /geohashMode: String\(noteDepth\)/);
-  assert.doesNotMatch(script, /exactGeohash \? 'exact' : 'prefix'/);
-  // The draft carries the number, and one saved with the old boolean still opens and finishes
-  // at its own rung — brought into the range the cells it is finishing on actually have.
-  assert.match(script, /geohashes: \[\.\.\.activeGeohashes\], noteDepth, contentHash/);
-  assert.match(script, /const reach = draftNoteDepth\(pending, availableNoteDepth\(pending\.geohashes \?\? pending\.geohash\)\)/);
-  assert.match(script, /noteDepth: reach/);
-});
-
-test('the note’s reach control is cut to the levels the selected cell(s) really have', async () => {
-  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
-  // The control measures the selection every time it is set, so the rungs, the range and the words
-  // are all the ones the cells leave rather than the whole range a cell of three characters has.
-  assert.match(script, /function renderNoteReach\(cells = activeGeohashes\) \{\s+selectNoteDepth\(selectedNoteDepth, cells\);/);
-  assert.match(script, /function selectNoteDepth\(depth, cells = activeGeohashes\) \{\s+const limit = availableNoteDepth\(cells\);/);
-  assert.match(script, /selectedNoteDepth = clampNoteDepth\(depth, limit\)/);
-  assert.match(script, /noteDepthLabel\(selectedNoteDepth, \{ownCell: 'Here only', available: limit\}\)/);
-  assert.match(script, /noteReachHintText\(selectedNoteDepth, limit\)/);
-  // The maximum is written before the value: a range clamps whatever it is given into its own
-  // range, so a value set while the maximum was still the old one would stand as that maximum.
-  const setMax = script.indexOf('elements.noteReach.max = String(limit)');
-  const setValue = script.indexOf('elements.noteReach.value = String(selectedNoteDepth)');
-  assert.ok(setMax > 0 && setValue > setMax, 'the range narrows before the value is written into it');
-  // One tick per rung on offer: ticks left over from a wider selection would offer levels the cell
-  // does not have, which is the same offer the maximum has to withhold.
-  assert.match(script, /elements\.noteReachTicks\.childElementCount !== limit \+ 1/);
-  assert.match(script, /elements\.noteReachTicks\.replaceChildren\(\.\.\.Array\.from\(\{length: limit \+ 1\}/);
-  // A new selection re-measures the reach, so picking a deeper cell shrinks the range under the
-  // composer and a rung that no longer fits comes down with it.
-  assert.match(script, /updateBoardControl\(\);[\s\S]{0,300}renderNoteReach\(\);/,
-    'the reach is measured again whenever the board changes');
-  // The rung the event carries is read against the cells the note is going on, not against the
-  // number the control happens to be on.
-  assert.match(script, /const noteDepth = clampNoteDepth\(selectedNoteDepth, availableNoteDepth\(activeGeohashes\)\)/);
-});
-
-test('the board says the reach runs inside the cell, and asks the relay for the boards above it', async () => {
-  const [html, script] = await Promise.all([
-    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
-    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
-  ]);
-  // The markup, the hint and the tags all tell the same story: a rung is a number of boards inside
-  // the cell, and no board above it is on offer or named.
-  assert.match(html, /aria-label="How far inside this cell the note is shown"/);
-  assert.doesNotMatch(html, /How far above this cell/);
-  assert.match(script, /inside it, and on no board above it/);
-  // The reader side hands the note's direction to the filter, so the two ends agree on what a rung
-  // means rather than each reading it its own way.
-  assert.match(script, /geohashMatchesBoard\(sticky\.geohashes \?\? sticky\.geohash, activeGeohashes, boardDepth, sticky\.noteDepth, sticky\.inwardReach\)/);
-  // The search names the boards above the cell too: a note written on one of them names only its own
-  // cell, so without them a reader standing one level down would receive nothing at all.
-  assert.match(script, /'#g': geohashBoardChain\(activeGeohashes\)/);
-});
-
 test('an expired note never reaches the board, whichever path asked for it', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // Every render goes through renderNote, and it refuses an expired note before anything is
@@ -961,11 +605,11 @@ test('board chrome stays compact over the board', async () => {
   assert.doesNotMatch(html, /id="zoomLevel"/);
   assert.doesNotMatch(script, /zoomLevel/);
   assert.doesNotMatch(html, /Global board/);
-  assert.match(script, /'#g': geohashBoardChain\(activeGeohashes\)/);
+  assert.match(script, /'#g': \[\.\.\.activeGeohashes\]/);
   assert.match(html, /id="boardDepth"/);
   assert.match(html, /id="rememberStickyBoard"[^>]+role="switch"/);
   assert.match(html, /id="shareStickyBoard"/);
-  assert.match(html, /id="noteReachSlider"/);
+  assert.match(html, /id="exactGeohashNote"/);
   assert.match(html, /id="openGeohashMap"/);
   assert.match(script, /waitForGeohashMapLayout/);
   assert.match(html, /id="followsOnly"[^>]+role="switch"/);
@@ -1120,7 +764,7 @@ test('a board may be one cell or a clump of touching ones', async () => {
   assert.match(script, /searchParams\.set\('g', activeGeohashes\.join\(','\)\)/);
   // and orders, publishes and reads for every cell it covers
   assert.match(script, /geohash: activeGeohash, geohashes: \[\.\.\.activeGeohashes\]/);
-  assert.match(script, /'#g': geohashBoardChain\(activeGeohashes\)/);
+  assert.match(script, /'#g': \[\.\.\.activeGeohashes\]/);
   assert.match(script, /geohashMatchesBoard\(sticky\.geohashes \?\? sticky\.geohash, activeGeohashes/);
 });
 
