@@ -2168,3 +2168,37 @@ test('a phone hands its NIP-46 invitation straight to Amber, and a reload keeps 
   assert.match(script, /elements\.amberPair\.hidden = !\/Android\/i\.test\(navigator\.userAgent \|\| ''\);/);
   assert.match(css, /\.amber-pair \{/);
 });
+
+test('the hand-over control is in front of the reader the moment a copy request is parked', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The pin path mirrors the sign-in path: the dialog is surfaced in the same tap that sends the
+  // request, *before* the signer takes over. A dialog surfaced only after signNostrEvent returns is
+  // never seen on a device whose return fires no focus and no visibility event — the loop that
+  // prompted this change showed the reader nothing at all while Amber held the signature.
+  const pin = script.slice(script.indexOf('async function publishPinnedNote'), script.indexOf('function closeNoteMenu'));
+  const surface = pin.indexOf('showAmberHandOver(');
+  const handOff = pin.indexOf('await signNostrEvent(');
+  assert.ok(surface !== -1 && handOff !== -1, 'the pin path still has both steps');
+  assert.ok(surface < handOff, 'the hand-over is on screen before the request leaves for Amber');
+  assert.match(pin, /if \(!resumedEvent && getNostrSession\(\)\?\.method === 'amber'\) \{\s+showAmberHandOver\(/,
+    'only the Amber route opens the hand-over, and only for a live request');
+
+  // The wording says what to do, in the order the reader has to do it.
+  assert.match(script, /Approve the note in Amber, come back here, and tap the button below/,
+    'the reader must be told to approve, come back, and tap');
+
+  // Every way the poll starts surfaces the control first, so a reloaded page or a resume gets it too
+  // without waiting for an event this device never fires.
+  const start = script.slice(script.indexOf('function startAmberClipboardPoll'),
+    script.indexOf('const signerReturn = await applySignerReturn();'));
+  assert.match(start, /if \(!elements\.amberDialog\.open\) \{\s+showAmberHandOver\(/,
+    'the poll puts the button in front of a reader who is not already looking at it');
+
+  // The button reads inside the reader's own tap, and a tap that did not finish leaves the wait
+  // running rather than stopping the clock on a request that is still parked.
+  const paste = script.slice(script.indexOf("elements.amberPaste.addEventListener('click'"),
+    script.indexOf("elements.nostrConnectCopy.addEventListener"));
+  assert.match(paste, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/,
+    'a refused tap read restarts the watch');
+});

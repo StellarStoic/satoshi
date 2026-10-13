@@ -2812,6 +2812,15 @@ async function publishPinnedNote(resumedEvent = null) {
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
     const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
+    // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
+    // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
+    // one this device is known to complete. The navigation to the signer happens inside
+    // signNostrEvent, so a dialog surfaced only after it returns is never seen on a phone that comes
+    // back through no focus and no visibility event — and the button it carries reads the clipboard
+    // inside the reader's own tap, where user activation permits the read.
+    if (!resumedEvent && getNostrSession()?.method === 'amber') {
+      showAmberHandOver('Approve the note in Amber, then come back to this page and tap the button below. Amber copies the signature instead of returning it.');
+    }
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     // A signing request that travels through Amber hands nothing back here: the answer arrives on the
     // clipboard once the reader returns. Saying so is the difference between a wait and a page that
@@ -3793,6 +3802,10 @@ elements.amberPaste.addEventListener('click', async () => {
     showLoginConfirmation(answer.session);
   } catch (error) {
     status(elements.amberCopyStatus, error.message, true);
+    // The tap did not finish the round trip, but the request is still parked: the poll picks the wait
+    // back up rather than leaving the reader with a stopped clock and no second chance. The request is
+    // spent only by a verified signature, so this can never publish twice.
+    if (amberSignaturePending()) startAmberClipboardPoll();
   }
 });
 elements.nostrConnectCopy.addEventListener('click', async () => {
@@ -4461,7 +4474,7 @@ function showAmberHandOver(message) {
   // that never comes.
   elements.amberCopyTitle.textContent = 'Finish signing with Amber';
   elements.amberCopyNote.hidden = false;
-  elements.amberCopyNote.textContent = 'Amber copies the signature instead of returning it to this page. Approve the note there, then come back to this page and tap the button below.';
+  elements.amberCopyNote.textContent = 'Amber copies the signature instead of returning it to this page. Approve the note in Amber, come back here, and tap the button below — it reads the signature inside your tap.';
   status(elements.amberCopyStatus, message);
 }
 
@@ -4569,6 +4582,15 @@ async function pollAmberClipboard() {
 /** Start watching the clipboard for a copied signature, or restart it for a freshly parked request. */
 function startAmberClipboardPoll() {
   if (!amberSignaturePending()) return;
+  // The control that reads the clipboard inside the reader's own tap is put in front of them here,
+  // the moment a copy-route request is parked. This device fires no focus and no visibility event on
+  // the way back from the signer, so a hand-over that waits for one never appears at all — which is
+  // why the pin path shows this same dialog in the tap that sends the request, exactly as the sign-in
+  // path does. The poll still watches the clipboard in the background: the reader may never come back
+  // to the dialog, and an answer Amber has already copied must not be left unread.
+  if (!elements.amberDialog.open) {
+    showAmberHandOver('Approve the note in Amber, then come back to this page and tap the button below. Amber copies the signature instead of returning it.');
+  }
   amberClipboardDeadline = Date.now() + AMBER_CLIPBOARD_POLL_TIMEOUT_MS;
   if (amberClipboardTimer) return;
   amberClipboardTimer = setInterval(() => { pollAmberClipboard().catch(() => {}); }, AMBER_CLIPBOARD_POLL_MS);
