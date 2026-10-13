@@ -112,8 +112,9 @@
         <option value="1">1 level deeper</option>
         <option value="2">2 levels deeper</option>
         <option value="3">3 levels deeper</option>
+        <option value="4">4 levels deeper</option>
         <option value="5">5 levels deeper</option>
-        <option value="11">All child boards</option>
+        <option value="6">All child boards</option>
       </select>
       <label class="board-memory-toggle" for="rememberStickyBoard"><span>Open the last board on my next visit</span><input id="rememberStickyBoard" type="checkbox" role="switch"><span class="board-memory-toggle__track" aria-hidden="true"></span></label>
       <div class="board-chooser__actions">
@@ -279,7 +280,12 @@
       <label class="font-choice" for="noteFont"><span>Font</span><select id="noteFont" class="note-font-select note-font-select--typewriter" aria-label="Note font"><option class="font-preview--typewriter" value="typewriter">Special Elite</option><option class="font-preview--handwritten" value="handwritten">Caveat · Handwritten</option><option class="font-preview--comfortaa" value="comfortaa">Comfortaa · Rounded</option></select></label>
       <label class="hashtag-field" for="noteHashtags"><span>Hashtags <small>up to 3, separated by commas</small></span><input id="noteHashtags" type="text" maxlength="100" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mountains, quote, #sausage" aria-describedby="hashtagStatus"></label>
       <div id="hashtagStatus" class="hashtag-status" role="status" aria-live="polite"></div>
-      <label class="note-scope-toggle" title="Hide this note from broader parent boards"><input id="exactGeohashNote" type="checkbox"><span>Show only on this exact geohash</span></label>
+      <div class="note-reach" role="group" aria-labelledby="noteReachLabel">
+        <div class="note-reach__head"><span id="noteReachLabel">Seen on boards</span><output id="noteReachValue" for="noteReachSlider">All child boards</output></div>
+        <input id="noteReachSlider" class="note-reach__slider" type="range" min="0" max="6" step="1" value="6" aria-label="How far above this cell the note is shown" aria-describedby="noteReachHint">
+        <div id="noteReachTicks" class="note-reach__ticks" aria-hidden="true"></div>
+      </div>
+      <p id="noteReachHint" class="note-reach__hint"></p>
       <div class="liveliness" role="group" aria-labelledby="livelinessLabel">
         <div class="liveliness__head"><span id="livelinessLabel">Disappears after</span><output id="noteLivelinessValue" for="noteLiveliness">1 month</output></div>
         <input id="noteLiveliness" class="liveliness__slider" type="range" min="0" max="4" step="1" value="2" aria-label="How long the note should live" aria-describedby="noteLivelinessHint">
