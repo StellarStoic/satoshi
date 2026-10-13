@@ -18,6 +18,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkDisplay,
   linkHref,
   boardPlateFontSize,
+  boardLampCount,
   boardShareUrl,
   linkMatches,
   AMBER_HAND_OVER_WAITING_LINE,
@@ -1580,8 +1581,8 @@ test('opening a board keeps the wooden rail, instead of deleting it with the can
 
   // so the place that clears the canvas must keep it
   assert.match(page,
-    /elements\.canvas\.replaceChildren\(\s*\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate\]\.filter\(Boolean\)\)/,
-    'clearing the canvas keeps the rail');
+    /elements\.canvas\.replaceChildren\(\s*\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate, elements\.boardPlateTop\]\.filter\(Boolean\)\)/,
+    'clearing the canvas keeps the rail and both plaques');
   assert.doesNotMatch(page, /elements\.canvas\.replaceChildren\(\)/,
     'a bare clear would delete the board\u2019s own edge');
   assert.match(page, /boardFrame: document\.getElementById\('boardFrame'\)/);
@@ -1958,6 +1959,120 @@ test('the board plate separator and the plate itself are styled as metal, not as
     'the letters are cut into the metal, with the light catching the lower edge');
   assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'the plate is a slab of aged brass');
   assert.match(css, /\.board-plate\[hidden\] \{ display: none; \}/, 'a board with no cells shows no plate');
+});
+
+test('a rail of lamps lights one for each level still open under the board, and none at the deepest', async () => {
+  const [markup, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // The rule, worked out once: a cell is three to nine characters, so what is left under it is
+  // nine minus its own length. Three characters, the shallowest board, lights all six.
+  assert.equal(boardLampCount('u0q'), 6, 'a three-character board has every level below it');
+  assert.equal(boardLampCount('u0qj7z'), 3, 'a six-character board has three');
+  assert.equal(boardLampCount('u0qj7z0y8'), 0, 'the deepest board has none, so the strip is empty');
+  assert.equal(boardLampCount('u0qj7z0y'), 1);
+  assert.equal(boardLampCount(''), 0, 'no cell, no lamps');
+  assert.equal(boardLampCount('not a place'), 0, 'and a string that is not a geohash lights nothing');
+  for (const length of [GEOHASH_MIN_LENGTH, 4, 5, 6, 7, 8, 9]) {
+    assert.equal(boardLampCount(TEST_GEOHASH.slice(0, length)), 9 - length,
+      `${length} characters leaves ${9 - length} levels open`);
+  }
+
+  // The strips are chrome on the side rails: one per side, inside the frame, which never takes a
+  // click - so a lamp can never swallow a pan or a tap meant for the board.
+  assert.equal((markup.match(/class="board-frame__lamps board-frame__lamps--/g) || []).length, 2,
+    'a strip of lamps on each side rail');
+  const frame = markup.indexOf('id="boardFrame"');
+  const rightRail = markup.indexOf('board-frame__rail--right');
+  const lamps = markup.indexOf('id="boardLampsLeft"');
+  assert.ok(frame < rightRail && rightRail < lamps && lamps < markup.indexOf('id="boardPlate"'),
+    'the lamps hang inside the frame, on its rails');
+  assert.match(css, /\.board-frame \{ position: absolute;[^}]*pointer-events: none/,
+    'and the frame they live in only ever reads, never takes a click');
+  assert.match(css, /\.board-frame__lamps \{ position: absolute; top: 50%/);
+  assert.match(css, /\.board-frame__lamps--left \{ left: calc\(var\(--board-frame, 26px\)/,
+    'each strip is centred on its own rail');
+  assert.match(css, /\.board-frame__lamps--right \{ right: calc\(var\(--board-frame, 26px\)/);
+
+  // One lamp per level, built to that length: there is no unlit lamp to put out, so a shallower
+  // board simply wears more of them and the deepest wears none.
+  assert.match(script, /const lit = boardLampCount\(activeGeohash\);/,
+    'the strip is as long as the board is shallow');
+  assert.match(script, /Array\.from\(\{length: lit\}/);
+  assert.match(script, /lamp\.className = 'board-frame__lamp';/);
+  assert.doesNotMatch(css, /board-frame__lamp--(off|dark|unlit|expired)/,
+    'no socket is ever left standing dark');
+  assert.match(css, /\.board-frame__lamps:empty \{ display: none; \}/,
+    'and a board with no level below it shows no strip at all');
+  // Lit, and in the site's own green rather than a hue invented for it.
+  assert.match(css, /\.board-frame__lamp \{[^}]*#62c986/, 'the lamps burn green');
+});
+
+test('the top rail wears the bottom rail\u2019s plate, and both of them share the board', async () => {
+  const [markup, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // The same plaque: one button wearing the plate's own class, hung off the other rail.
+  assert.match(markup,
+    /<button type="button" id="boardPlateTop" class="board-plate board-plate--top"[^>]*aria-label="Share this board"/,
+    'the top plate is the same control, with the same label');
+  assert.match(markup, /<span id="boardPlateTopLine" class="board-plate__line"><\/span>/,
+    'carrying the same engraved line');
+  assert.match(css, /\.board-plate--top \{ top: calc\(8px - var\(--board-frame, 26px\)\); bottom: auto; \}/,
+    'the same material, hung from the other rail');
+  assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'which is the brass the bottom one is made of');
+
+  // Both plaques are engraved from the board's cells, in the one pass.
+  const render = script.slice(script.indexOf('function renderBoardPlate()'), script.indexOf('function selectBoard('));
+  assert.match(render, /\[elements\.boardPlate, elements\.boardPlateLine\]/);
+  assert.match(render, /\[elements\.boardPlateTop, elements\.boardPlateTopLine\]/);
+  assert.match(render, /for \(const \[plate, line\] of plates\)/,
+    'one engraving, worn by both plaques');
+
+  // And both of them do the one thing the plate does: open the board's share dialog.
+  assert.match(script, /const shareThisBoard = \(\) => openShareBoard\(\);/);
+  assert.match(script, /elements\.boardPlate\.addEventListener\('click', shareThisBoard\);/);
+  assert.match(script, /elements\.boardPlateTop\.addEventListener\('click', shareThisBoard\);/,
+    'the top plate presses exactly what the bottom one presses');
+  assert.equal((script.match(/addEventListener\('click', shareThisBoard\)/g) || []).length, 2,
+    'one handler, and no second one invented for the top plate');
+  // It also has to survive a board switch, and the pan guard already names the plate's class.
+  assert.match(script,
+    /\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate, elements\.boardPlateTop\]\.filter\(Boolean\)\)/);
+  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)/,
+    'so a press on either plaque reaches the button rather than the pan');
+});
+
+test('the lamps pulse once when the board changes, and the first strip is left still', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  const render = script.slice(script.indexOf('function renderBoardPlate()'), script.indexOf('function selectBoard('));
+  assert.match(render, /renderBoardLamps\(\);/, 'the strip is drawn from the board\u2019s own cells');
+  assert.match(render, /const wasDrawn = boardLampsReady;/);
+  assert.match(render, /if \(wasDrawn\) pulseLamps\(\);/, 'a new board is shown once, where the lamps are');
+  assert.match(render, /boardLampsReady = true;/,
+    'the strip drawn as the page opens is not a change, so nothing pulses over it');
+
+  // The class has to come off, and the layout be read back, before it goes on again: a browser
+  // restarts an animation only when the animation property really changed, so a second board
+  // opened straight after the first would otherwise be silent.
+  assert.match(script,
+    /strip\.classList\.remove\('is-pulsing'\);\s*\n(?:\s*\/\/[^\n]*\n)*\s*void strip\.offsetWidth;\s*\n\s*strip\.classList\.add\('is-pulsing'\);/);
+  assert.match(css, /\.board-frame__lamps\.is-pulsing \{ animation: board-lamps-pulse \.55s ease-out 1; \}/);
+  assert.match(css, /@keyframes board-lamps-pulse \{ 0%, 100% \{ filter: brightness\(1\); \} 45% \{ filter: brightness\(1\.85\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.board-frame__lamps\.is-pulsing \{ animation: none; \} \}/,
+    'a reader who asked for less motion is not flashed at');
+  assert.doesNotMatch(css, /board-frame__lamps[^{]*\{[^}]*animation: [^;]*infinite/,
+    'it happens once, not on a loop');
 });
 
 test('the board leaves room for fixed chrome across the foot of the page', async () => {

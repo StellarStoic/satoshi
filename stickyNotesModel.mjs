@@ -1200,6 +1200,19 @@ export function boardPlateFontSize(innerWidth, measuredWidth, maximum) {
 }
 
 /**
+ * The lamps a plate carries for a board's own cell: one for each level still open below it. A cell
+ * is GEOHASH_MIN_LENGTH to GEOHASH_MAX_LENGTH characters, so a three-character board has all six
+ * of them under it and a nine-character one has none - the count is literally
+ * GEOHASH_MAX_LENGTH - cell.length, so the strip is exactly as long as what is left to open and
+ * there is no dark socket standing in for a level that is gone.
+ */
+export function boardLampCount(cell) {
+  const length = normaliseGeohash(cell).length;
+  if (!length) return 0;
+  return GEOHASH_MAX_LENGTH - length;
+}
+
+/**
  * The link a board is shared by: the page the desk serves for that board, which carries the board's
  * own picture so a chat unfurls the board itself instead of the site's generic card. An empty set
  * of cells has no board to point at, so there is no link.

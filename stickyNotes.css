@@ -72,6 +72,25 @@
 /* The head of a nail holding two cells apart on the plate. Sized in em so it is cut down with the
    letters it separates. */
 .board-plate__nail { flex: none; width: .34em; height: .34em; border-radius: 50%; background: radial-gradient(circle at 36% 28%, #fff6dc 0%, #ecd8a4 26%, #b89150 62%, #7a5626 100%); box-shadow: 0 1px 2px rgba(24, 13, 3, .75), 0 0 0 1px rgba(46, 25, 6, .7), inset 0 1px rgba(255, 250, 230, .8), inset 0 -1px rgba(60, 34, 8, .5); }
+/* The top rail wears the same plaque as the bottom one, because both of them name the board and
+   both of them are the control that shares it: one plate, worn twice, rather than a second look
+   invented for the same job. Only the edge it hangs from differs. */
+.board-plate--top { top: calc(8px - var(--board-frame, 26px)); bottom: auto; }
+/* The lamps on the side rails: one for each level the board's own cell still has under it. Every
+   lamp in a strip is lit, so a deeper cell simply carries a shorter strip and a nine-character one
+   carries none at all -- an empty plate, not a row of dark sockets. Lit in the site's own green,
+   the colour it already uses where something is active. */
+.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; box-sizing: border-box; padding: 5px 3px; border: 1px solid rgba(52, 30, 10, .82); border-radius: 12px; background: radial-gradient(ellipse at 42% 14%, transparent 0 2px, rgba(70, 39, 18, .3) 3px 4px, transparent 5px), linear-gradient(90deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 2px 5px rgba(18, 10, 2, .55), inset 0 1px rgba(255, 246, 214, .45), inset 0 -1px rgba(52, 28, 7, .45), inset 0 0 12px rgba(60, 34, 8, .3); }
+.board-frame__lamps--left { left: calc(var(--board-frame, 26px) / 2); }
+.board-frame__lamps--right { right: calc(var(--board-frame, 26px) / 2); }
+/* A board cut to the deepest cell lights nothing, so there is no plate to show either. */
+.board-frame__lamps:empty { display: none; }
+.board-frame__lamp { flex: none; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #eafff2 0%, #93efb4 32%, #62c986 66%, #2f7d4c 100%); box-shadow: 0 0 5px rgba(98, 201, 134, .85), inset 0 1px rgba(255, 255, 255, .7), inset 0 -1px rgba(20, 60, 34, .55); }
+/* Opening a board changes how many lamps there are, and that is a change worth seeing where the
+   reader is already looking. One flash, then still. */
+.board-frame__lamps.is-pulsing { animation: board-lamps-pulse .55s ease-out 1; }
+@keyframes board-lamps-pulse { 0%, 100% { filter: brightness(1); } 45% { filter: brightness(1.85) saturate(1.25); } }
+@media (prefers-reduced-motion: reduce) { .board-frame__lamps.is-pulsing { animation: none; } }
 
 .sticky-note { --note: #f7dc63; --note-font-size: 17px; --note-letter-spacing: 0; position: absolute; width: 220px; aspect-ratio: 1; padding: 22px 18px 18px; overflow: hidden; color: #26231e; background: var(--note); box-shadow: 2px 5px 12px rgba(31, 16, 5, .3); font-family: 'Special Elite', 'Noto Sans', 'Courier New', monospace; font-size: var(--note-font-size); line-height: 1.42; letter-spacing: var(--note-letter-spacing); white-space: pre-wrap; overflow-wrap: anywhere; transform: translate(-50%, -50%) rotate(var(--rotation, 0deg)); }
 .sticky-note:not(.draft-note):not(.sticky-note--placing) { overflow: visible; }

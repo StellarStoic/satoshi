@@ -62,6 +62,7 @@ import {
   boardTextureLabel,
   boardTextureTile,
   boardPlateFontSize,
+  boardLampCount,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
   spentAmberHandOver,} from './stickyNotesModel.mjs';
@@ -190,6 +191,9 @@ const elements = {
   nostrConnectOpen: document.getElementById('nostrConnectOpen'),
   nostrConnectStatus: document.getElementById('nostrConnectStatus'),
   boardPlate: document.getElementById('boardPlate'),
+  boardPlateTop: document.getElementById('boardPlateTop'),
+  boardLampsLeft: document.getElementById('boardLampsLeft'),
+  boardLampsRight: document.getElementById('boardLampsRight'),
   shareBoardDialog: document.getElementById('shareBoardDialog'),
   shareBoardLink: document.getElementById('shareBoardLink'),
   shareBoardPreview: document.getElementById('shareBoardPreview'),
@@ -197,6 +201,7 @@ const elements = {
   shareBoardNative: document.getElementById('nativeShareBoard'),
   copyBoardLink: document.getElementById('copyBoardLink'),
   boardPlateLine: document.getElementById('boardPlateLine'),
+  boardPlateTopLine: document.getElementById('boardPlateTopLine'),
   privateKey: document.getElementById('privateKeyInput'), font: document.getElementById('noteFont'),
   noteReach: document.getElementById('noteReachSlider'), noteReachValue: document.getElementById('noteReachValue'),
   noteReachTicks: document.getElementById('noteReachTicks'), noteReachHint: document.getElementById('noteReachHint'),
@@ -1553,12 +1558,53 @@ function updateBoardControl() {
 
 let boardAppliedScale = 1;
 let boardPlateLine = '';
+// Whether a strip of lamps has been drawn already. The first one is drawn as the board opens, which
+// is not a change, so it is not shown as one; a board opened from another one is.
+let boardLampsReady = false;
 
 /** The head of a nail, holding two cells apart on the plate. */
 function nailHead() {
   const nail = document.createElement('span');
   nail.className = 'board-plate__nail';
   return nail;
+}
+
+/**
+ * The two strips of lamps, one on each side rail. They are read together because they always carry
+ * the same reading: they are this board's levels, seen from either side of it.
+ */
+function lampStrips() {
+  return [elements.boardLampsLeft, elements.boardLampsRight].filter(Boolean);
+}
+
+/**
+ * Light the two side rails: one lamp for each level the board's own cell still has under it, as
+ * boardLampCount reads it - six at three characters, three at six, none at nine. The lamps are
+ * built to that length rather than hidden and shown, so every lamp in the strip burns and a deeper
+ * board simply wears a shorter strip: no socket is left dark for a level that has been closed off.
+ */
+function renderBoardLamps() {
+  const lit = boardLampCount(activeGeohash);
+  for (const strip of lampStrips()) {
+    strip.replaceChildren(...Array.from({length: lit}, () => {
+      const lamp = document.createElement('span');
+      lamp.className = 'board-frame__lamp';
+      return lamp;
+    }));
+  }
+}
+
+/** One flash of the lamps, in the place the reader's eye is already resting when the board changes. */
+function pulseLamps() {
+  for (const strip of lampStrips()) {
+    strip.classList.remove('is-pulsing');
+    // The layout is read back between the two: a browser restarts an animation only when the
+    // animation property really changed, so putting the class on over itself would leave the next
+    // board unpulsed. One of these per board change, not per frame. A board that lights nothing
+    // still gets its pulse - there is simply no lamp left for it to show on.
+    void strip.offsetWidth;
+    strip.classList.add('is-pulsing');
+  }
 }
 
 /**
@@ -1569,45 +1615,58 @@ function nailHead() {
  * belongs on the plate: it names the board and stops there.
  * is measured once at full size and then cut down so that the whole string fits the plaque at one
  * size; panning and zooming never change what is engraved, only how large it is on screen.
+ *
+ * Both plaques carry this engraving, the top rail's and the bottom rail's, because both of them
+ * name the board.
  */
 function renderBoardPlate() {
-  const plate = elements.boardPlate;
-  const line = elements.boardPlateLine;
-  if (!plate || !line) return;
+  const plates = [
+    [elements.boardPlate, elements.boardPlateLine],
+    [elements.boardPlateTop, elements.boardPlateTopLine],
+  ].filter(([plate, line]) => plate && line);
+  if (!plates.length) return;
   const signature = activeGeohashes.join(',');
   if (signature === boardPlateLine) return;
+  const wasDrawn = boardLampsReady;
   boardPlateLine = signature;
-  plate.hidden = !activeGeohashes.length;
-  if (!activeGeohashes.length) {
-    line.replaceChildren();
-    return;
-  }
-  line.replaceChildren(...activeGeohashes.flatMap((cell, index) => {
-    const parts = [];
-    if (index) parts.push(nailHead());
-    const engraved = document.createElement('span');
-    engraved.className = 'board-plate__cell';
-    engraved.textContent = cell;
-    parts.push(engraved);
-    return parts;
-  }));
-  const style = getComputedStyle(plate);
-  const inner = plate.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  const target = Math.max(1, inner - BOARD_PLATE_INSET);
-  // Set as large as the plate will ever carry, then cut down until the whole line is inside it. One
-  // pass gets close; the line's own gaps and nail heads are in em and do not divide out perfectly, so
-  // the measurement is repeated until it fits rather than trusted once. This runs when the plate is
-  // re-engraved - not while the board is panned or zoomed, where the size in board pixels stands.
-  // Readings come through the board's transform, so each is divided back into board pixels, which is
-  // what the font size is in.
-  let size = BOARD_PLATE_TYPE_MAX;
-  for (let pass = 0; pass < 4; pass += 1) {
-    line.style.fontSize = `${size}px`;
-    const width = line.getBoundingClientRect().width / (boardAppliedScale || 1);
-    if (!(width > 0) || width <= target) break;
-    const next = boardPlateFontSize(target, width, size);
-    if (!(next < size)) break;
-    size = next;
+  renderBoardLamps();
+  // A board opened from another one is a change of cells, so the lamps show it once. The strip drawn
+  // as the page opens is the first thing there, and it stays still.
+  if (wasDrawn) pulseLamps();
+  boardLampsReady = true;
+  for (const [plate, line] of plates) {
+    plate.hidden = !activeGeohashes.length;
+    if (!activeGeohashes.length) {
+      line.replaceChildren();
+      continue;
+    }
+    line.replaceChildren(...activeGeohashes.flatMap((cell, index) => {
+      const parts = [];
+      if (index) parts.push(nailHead());
+      const engraved = document.createElement('span');
+      engraved.className = 'board-plate__cell';
+      engraved.textContent = cell;
+      parts.push(engraved);
+      return parts;
+    }));
+    const style = getComputedStyle(plate);
+    const inner = plate.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const target = Math.max(1, inner - BOARD_PLATE_INSET);
+    // Set as large as the plate will ever carry, then cut down until the whole line is inside it. One
+    // pass gets close; the line's own gaps and nail heads are in em and do not divide out perfectly, so
+    // the measurement is repeated until it fits rather than trusted once. This runs when the plate is
+    // re-engraved - not while the board is panned or zoomed, where the size in board pixels stands.
+    // Readings come through the board's transform, so each is divided back into board pixels, which is
+    // what the font size is in.
+    let size = BOARD_PLATE_TYPE_MAX;
+    for (let pass = 0; pass < 4; pass += 1) {
+      line.style.fontSize = `${size}px`;
+      const width = line.getBoundingClientRect().width / (boardAppliedScale || 1);
+      if (!(width > 0) || width <= target) break;
+      const next = boardPlateFontSize(target, width, size);
+      if (!(next < size)) break;
+      size = next;
+    }
   }
 }
 
@@ -1643,7 +1702,7 @@ function selectBoard(geohash, closeDialog = true) {
   // the order the markup has them, and let the notes go - they belong to the board being left and
   // are re-fetched for the one being opened.
   elements.canvas.replaceChildren(
-    ...[elements.boardPaint, elements.boardFrame, elements.boardPlate].filter(Boolean));
+    ...[elements.boardPaint, elements.boardFrame, elements.boardPlate, elements.boardPlateTop].filter(Boolean));
   // Both of them cache what they last drew: the plate its engraving, the canvas its bitmap. A board
   // change invalidates both, so clear them before the new board is fitted and painted.
   boardPlateLine = '';
@@ -4287,7 +4346,10 @@ elements.shareBoardPreview.addEventListener('error', () => {
   status(elements.shareBoardStatus, 'The board picture is still being drawn. The link works either way.', true);
 });
 
-elements.boardPlate.addEventListener('click', () => openShareBoard());
+/** Both plaques name the board, so both of them open the one share dialog. */
+const shareThisBoard = () => openShareBoard();
+elements.boardPlate.addEventListener('click', shareThisBoard);
+elements.boardPlateTop.addEventListener('click', shareThisBoard);
 
 elements.shareBoard.addEventListener('click', () => {
   const typed = geohashCellsFrom(elements.boardGeohash.value);
