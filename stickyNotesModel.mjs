@@ -520,11 +520,39 @@ export function normaliseGeohashes(value) {
  * reader's board setting, a note off the relay, a stored preference from an older build —
  * comes through here, so a stale value (an eleven some older page saved) is brought into
  * the real range rather than thrown or taken at face value.
+ *
+ * `available` is how many rungs the cell the depth belongs to actually has, and everything the
+ * board offers passes it: a note written on a 6-character cell has only three levels under it,
+ * so a six kept from an older draft has to come down to three rather than be offered or written
+ * as a reach the cell does not have. It defaults to the full range for the callers that read a
+ * value with no cell in hand (a note off the relay, a stored board preference).
  */
-export function clampNoteDepth(value) {
+export function clampNoteDepth(value, available = GEOHASH_MAX_NOTE_DEPTH) {
   const depth = Math.trunc(Number(value));
   if (!Number.isFinite(depth)) return 0;
-  return Math.max(0, Math.min(GEOHASH_MAX_NOTE_DEPTH, depth));
+  // An `available` that is not a number is a caller holding a value with no cell in hand (a note
+  // off the relay, the reader's own stored board setting): the full range stands there, which is
+  // how this clamp read before a cell's size could cap it.
+  const ceiling = available !== null && Number.isFinite(Number(available))
+    ? Math.max(0, Math.min(GEOHASH_MAX_NOTE_DEPTH, Math.trunc(Number(available))))
+    : GEOHASH_MAX_NOTE_DEPTH;
+  return Math.max(0, Math.min(ceiling, depth));
+}
+
+/**
+ * The rungs the cell(s) a note is being written on really have. A reach is a number of levels
+ * inside the chosen cell, so the boards that exist under it are 9 minus its length: a 3-character
+ * cell leaves six, `u0m71d` leaves three, and a 9-character cell leaves none — writing there, the
+ * control has nothing to offer past its own board. A clump is cut to one depth, but a set read back
+ * from an older note can name cells of different lengths; the longest is the most constrained, and a
+ * reach has to hold for every cell the note sits on, so the longest one governs.
+ */
+export function availableNoteDepth(cells) {
+  const list = geohashCells(cells);
+  // No cell chosen yet: nothing is known to be inside anything, so nothing is offered past the cell.
+  if (!list.length) return 0;
+  const longest = Math.max(...list.map(cell => cell.length));
+  return clampNoteDepth(GEOHASH_MAX_LENGTH - longest);
 }
 
 /**
@@ -545,9 +573,14 @@ export function noteDepthFromTag(value) {
  * The words a reach rung is written in, shared so the reader's board dropdown and the note's
  * own control agree on what a rung is called. The two ends have their own names; the safe
  * middle is counted in levels.
+ *
+ * `available` is the depth the cell in hand really has. The word for the deepest rung is only
+ * true when the rungs run to the end of the range: on a 6-character cell the top rung is its
+ * third level, and calling that 'all child boards' is what made a note read as though it
+ * reached boards the cell does not have.
  */
-export function noteDepthLabel(depth, {ownCell = 'exact only', deepest = 'all child boards'} = {}) {
-  const level = clampNoteDepth(depth);
+export function noteDepthLabel(depth, {ownCell = 'exact only', deepest = 'all child boards', available = GEOHASH_MAX_NOTE_DEPTH} = {}) {
+  const level = clampNoteDepth(depth, available);
   if (!level) return ownCell;
   if (level >= GEOHASH_MAX_NOTE_DEPTH) return deepest;
   return `${level} level${level === 1 ? '' : 's'} deeper`;
@@ -557,11 +590,15 @@ export function noteDepthLabel(depth, {ownCell = 'exact only', deepest = 'all ch
  * The reach a saved draft names, in whichever shape it was saved. A draft written before the
  * rung control carried the old boolean, and an exact draft was rung 0 — reading it here keeps a
  * saved local note from widening to no cap when it is finally finished.
+ *
+ * `available` is what the cells the draft will be pinned to actually leave: a draft saved on a
+ * wider board can name a rung the cell it is restored on does not have, and a draft that names no
+ * reach at all opens at the full depth of the cells it will land on.
  */
-export function draftNoteDepth(draft) {
+export function draftNoteDepth(draft, available = GEOHASH_MAX_NOTE_DEPTH) {
   const depth = draft?.noteDepth;
-  if (depth !== undefined && depth !== null && Number.isFinite(Number(depth))) return clampNoteDepth(depth);
-  return draft?.exactGeohash ? 0 : GEOHASH_MAX_NOTE_DEPTH;
+  if (depth !== undefined && depth !== null && Number.isFinite(Number(depth))) return clampNoteDepth(depth, available);
+  return draft?.exactGeohash ? 0 : clampNoteDepth(available);
 }
 
 /**

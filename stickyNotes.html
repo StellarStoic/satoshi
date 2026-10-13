@@ -286,8 +286,11 @@
       <label class="hashtag-field" for="noteHashtags"><span>Hashtags <small>up to 3, separated by commas</small></span><input id="noteHashtags" type="text" maxlength="100" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mountains, quote, #sausage" aria-describedby="hashtagStatus"></label>
       <div id="hashtagStatus" class="hashtag-status" role="status" aria-live="polite"></div>
       <div class="note-reach" role="group" aria-labelledby="noteReachLabel">
-        <div class="note-reach__head"><span id="noteReachLabel">Seen on boards</span><output id="noteReachValue" for="noteReachSlider">All child boards</output></div>
-        <input id="noteReachSlider" class="note-reach__slider" type="range" min="0" max="6" step="1" value="6" aria-label="How far above this cell the note is shown" aria-describedby="noteReachHint">
+        <div class="note-reach__head"><span id="noteReachLabel">Seen on boards</span><output id="noteReachValue" for="noteReachSlider">Here only</output></div>
+        <!-- The range ships closed on the note's own board: how many levels exist under the selected cell is
+             only known once a cell is chosen, and the page opens the slider to exactly that many (a 6-character
+             cell leaves three, a 9-character cell none). Nothing above the cell is ever offered. -->
+        <input id="noteReachSlider" class="note-reach__slider" type="range" min="0" max="0" step="1" value="0" aria-label="How far above this cell the note is shown" aria-describedby="noteReachHint">
         <div id="noteReachTicks" class="note-reach__ticks" aria-hidden="true"></div>
       </div>
       <p id="noteReachHint" class="note-reach__hint"></p>

@@ -28,6 +28,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   spentAmberHandOver,
   GEOHASH_MAX_NOTE_DEPTH,
   clampNoteDepth,
+  availableNoteDepth,
   noteDepthFromTag,
   noteDepthLabel,
   draftNoteDepth,} from '../stickyNotesModel.mjs';
@@ -322,6 +323,76 @@ test('a reach is clamped into the real range, however stale the value', () => {
   assert.equal(draftNoteDepth({exactGeohash: false}), 6);
   assert.equal(draftNoteDepth({}), 6, 'a draft naming nothing keeps the no-cap default');
   assert.equal(draftNoteDepth(null), 6);
+});
+
+test('the rungs a cell has are the levels inside it, so a deeper cell offers fewer', () => {
+  // A reach is a number of levels inside the chosen cell, so what is left under it is 9 minus its
+  // length. This is the rule that stopped a 6-character board from offering six levels it has not.
+  assert.equal(availableNoteDepth('u24'), 6, 'three characters leave six levels');
+  assert.equal(availableNoteDepth('u24je'), 4);
+  assert.equal(availableNoteDepth('u24j'), 5);
+  assert.equal(availableNoteDepth('u24jed'), 3, 'u24jed leaves only 7, 8 and 9');
+  assert.equal(availableNoteDepth('u0qj7z0y1'), 0, 'nine characters leave nothing under them');
+  assert.equal(availableNoteDepth(['u24jed']), 3, 'one cell reads like a list of one');
+  assert.equal(availableNoteDepth([]), 0, 'no cell chosen has nothing under it to offer');
+  assert.equal(availableNoteDepth(''), 0);
+  assert.equal(availableNoteDepth('not a geohash'), 0);
+  // A clump is cut to one depth, but a set read back from an older note can name cells of different
+  // lengths: the longest cell has the least room under it, and the reach has to hold for every cell
+  // the note sits on, so the longest one governs the group.
+  assert.equal(availableNoteDepth(['u24', 'u24jed']), 3, 'the longest cell governs the group');
+  assert.equal(availableNoteDepth(['u24jed', 'u24je']), 3);
+  assert.equal(availableNoteDepth(['u24je', 'u24je']), 4);
+  assert.equal(availableNoteDepth(['u24', 'u24je']), 4);
+});
+
+test('a reach too large for the cell comes down to the rung the cell has', () => {
+  assert.equal(clampNoteDepth(6, 3), 3, 'a six kept from a wider board comes down to three');
+  assert.equal(clampNoteDepth(6, 0), 0, 'a 9-character cell has no rung above its own board');
+  assert.equal(clampNoteDepth(2, 3), 2, 'a rung inside the range is left alone');
+  assert.equal(clampNoteDepth(11, 3), 3);
+  assert.equal(clampNoteDepth(-1, 3), 0);
+  assert.equal(clampNoteDepth('3', 1), 1);
+  assert.equal(clampNoteDepth(6, null), 6, 'a caller with no cell in hand keeps the full range');
+  assert.equal(clampNoteDepth(6), 6);
+  // A saved draft written on a wider board carries a rung the cell it is restored on may not have.
+  assert.equal(draftNoteDepth({noteDepth: 6}, 3), 3, 'a restored draft is clamped the same way');
+  assert.equal(draftNoteDepth({noteDepth: 6}, 0), 0);
+  assert.equal(draftNoteDepth({}, 3), 3, 'a draft naming nothing opens at the full depth of its cell');
+  assert.equal(draftNoteDepth({exactGeohash: true}, 3), 0, 'the old local draft stays local');
+  // The words never name the deepest rung when the rungs on offer stop short of the full range: on
+  // a 6-character cell the top rung is its third level, not 'all child boards'.
+  assert.equal(noteDepthLabel(3, {ownCell: 'Here only', available: 3}), '3 levels deeper');
+  assert.equal(noteDepthLabel(3, {ownCell: 'Here only', available: 6}), '3 levels deeper');
+  assert.equal(noteDepthLabel(6, {ownCell: 'Here only', available: 6}), 'all child boards');
+  assert.equal(noteDepthLabel(0, {ownCell: 'Here only', available: 0}), 'Here only');
+  assert.equal(noteDepthLabel(6, {ownCell: 'Here only', available: 3}), '3 levels deeper');
+});
+
+test('a changed selection re-clamps the reach, and a wider one never raises it back', () => {
+  // The editor opens on the full depth its cell leaves: what 'no cap' means inside that cell.
+  let cells = ['u24'];
+  let available = availableNoteDepth(cells);
+  let rung = clampNoteDepth(GEOHASH_MAX_NOTE_DEPTH, available);
+  assert.equal(available, 6);
+  assert.equal(rung, 6, 'a new note starts as deep as its cell allows');
+  // The reader picks a deeper cell in the group: the range shrinks and the rung that no longer fits
+  // drops with it, which is what the live re-clamp does under the open composer.
+  cells = ['u24', 'u24jed'];
+  available = availableNoteDepth(cells);
+  rung = clampNoteDepth(rung, available);
+  assert.equal(available, 3);
+  assert.equal(rung, 3, 'the rung follows the range down');
+  // Dropping the deeper cell widens the range again, and the value must not rise on its own.
+  cells = ['u24'];
+  available = availableNoteDepth(cells);
+  assert.equal(available, 6);
+  assert.equal(clampNoteDepth(rung, available), 3, 'a wide range does not widen the note by itself');
+  // Down to the deepest cell there is: nothing is offered past its own board.
+  cells = ['u0qj7z0y1'];
+  available = availableNoteDepth(cells);
+  assert.equal(available, 0);
+  assert.equal(clampNoteDepth(rung, available), 0);
 });
 
 test('a note’s rung reads as digits, and the two words of the old flag still read', () => {
@@ -692,23 +763,53 @@ test('the reader’s board dropdown and the note’s reach control use the same 
   assert.match(script, /boardDepth = clampNoteDepth\(localStorage\.getItem\(BOARD_DEPTH_KEY\)\)/);
   assert.match(script, /boardDepth = clampNoteDepth\(elements\.boardDepth\.value\)/);
   assert.match(script, /noteDepthLabel\(boardDepth\)/);
-  // The note's own control is a rung slider where the checkbox used to be, and it starts at the
-  // deepest rung: the old unchecked box meant no cap, so nothing new becomes local-only.
-  assert.match(html, /id="noteReachSlider"[^>]*type="range"[^>]*min="0"[^>]*max="6"[^>]*step="1"[^>]*value="6"/);
+  // The note's own control is a rung slider where the checkbox used to be. The markup ships it
+  // closed — no cell is chosen at load, so no level under one can be offered — and the page opens
+  // it to exactly the levels the selected cell has, so a 6-character cell offers three.
+  assert.match(html, /id="noteReachSlider"[^>]*type="range"[^>]*min="0"[^>]*max="0"[^>]*step="1"[^>]*value="0"/);
+  assert.doesNotMatch(html, /id="noteReachSlider"[^>]*max="6"/, 'the markup never claims the full range');
   assert.match(html, /id="noteReachValue"/);
   assert.match(html, /id="noteReachTicks"/);
   assert.match(html, /id="noteReachHint"/);
   assert.doesNotMatch(html, /id="exactGeohashNote"/);
   assert.match(script, /let selectedNoteDepth = GEOHASH_MAX_NOTE_DEPTH/, 'a new note defaults to no cap');
   assert.match(script, /elements\.noteReach\.addEventListener\('input'/);
-  assert.match(script, /noteDepthLabel\(selectedNoteDepth, \{ownCell: 'Here only'\}\)/);
+  assert.match(script, /noteDepthLabel\(selectedNoteDepth, \{ownCell: 'Here only', available: limit\}\)/);
   // The desk is told the reach as a digit, through the same field it was always told through.
   assert.match(script, /geohashMode: String\(noteDepth\)/);
   assert.doesNotMatch(script, /exactGeohash \? 'exact' : 'prefix'/);
   // The draft carries the number, and one saved with the old boolean still opens and finishes
-  // at its own rung.
+  // at its own rung — brought into the range the cells it is finishing on actually have.
   assert.match(script, /geohashes: \[\.\.\.activeGeohashes\], noteDepth, contentHash/);
-  assert.match(script, /noteDepth: draftNoteDepth\(pending\)/);
+  assert.match(script, /const reach = draftNoteDepth\(pending, availableNoteDepth\(pending\.geohashes \?\? pending\.geohash\)\)/);
+  assert.match(script, /noteDepth: reach/);
+});
+
+test('the note’s reach control is cut to the levels the selected cell(s) really have', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The control measures the selection every time it is set, so the rungs, the range and the words
+  // are all the ones the cells leave rather than the whole range a cell of three characters has.
+  assert.match(script, /function renderNoteReach\(cells = activeGeohashes\) \{\s+selectNoteDepth\(selectedNoteDepth, cells\);/);
+  assert.match(script, /function selectNoteDepth\(depth, cells = activeGeohashes\) \{\s+const limit = availableNoteDepth\(cells\);/);
+  assert.match(script, /selectedNoteDepth = clampNoteDepth\(depth, limit\)/);
+  assert.match(script, /noteDepthLabel\(selectedNoteDepth, \{ownCell: 'Here only', available: limit\}\)/);
+  assert.match(script, /noteReachHintText\(selectedNoteDepth, limit\)/);
+  // The maximum is written before the value: a range clamps whatever it is given into its own
+  // range, so a value set while the maximum was still the old one would stand as that maximum.
+  const setMax = script.indexOf('elements.noteReach.max = String(limit)');
+  const setValue = script.indexOf('elements.noteReach.value = String(selectedNoteDepth)');
+  assert.ok(setMax > 0 && setValue > setMax, 'the range narrows before the value is written into it');
+  // One tick per rung on offer: ticks left over from a wider selection would offer levels the cell
+  // does not have, which is the same offer the maximum has to withhold.
+  assert.match(script, /elements\.noteReachTicks\.childElementCount !== limit \+ 1/);
+  assert.match(script, /elements\.noteReachTicks\.replaceChildren\(\.\.\.Array\.from\(\{length: limit \+ 1\}/);
+  // A new selection re-measures the reach, so picking a deeper cell shrinks the range under the
+  // composer and a rung that no longer fits comes down with it.
+  assert.match(script, /updateBoardControl\(\);[\s\S]{0,300}renderNoteReach\(\);/,
+    'the reach is measured again whenever the board changes');
+  // The rung the event carries is read against the cells the note is going on, not against the
+  // number the control happens to be on.
+  assert.match(script, /const noteDepth = clampNoteDepth\(selectedNoteDepth, availableNoteDepth\(activeGeohashes\)\)/);
 });
 
 test('an expired note never reaches the board, whichever path asked for it', async () => {
