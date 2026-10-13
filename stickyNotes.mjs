@@ -30,6 +30,7 @@ import {
   normaliseGeohashes,
   makeStickyTemplate, mentionFilterAvailability, mentionLabel, stickyTextParts, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   geohashMatchesBoard,
+  geohashBoardChain,
   GEOHASH_MAX_NOTE_DEPTH,
   clampNoteDepth,
   availableNoteDepth,
@@ -1545,10 +1546,11 @@ function noteAtPlacement(note, placement) {
 
 function noteBelongsToBoard(sticky) {
   // Either side may be a clump: a note belongs to a board when any of the note's
-  // cells is one of the board's cells, or deeper inside one of them. The note's own
-  // depth is handed over too, so a note that kept itself close cannot be widened by a
-  // reader who opened the board out — both limits have to allow the reach.
-  return geohashMatchesBoard(sticky.geohashes ?? sticky.geohash, activeGeohashes, boardDepth, sticky.noteDepth);
+  // cells is one of the board's cells, or deeper inside one of them. A note written
+  // by this board carries its reach inward, so it is on a board at or inside its own
+  // cell and on no wider one; whether the reader is looking deep enough into their
+  // board is the reader's own setting and the model holds both ends apart.
+  return geohashMatchesBoard(sticky.geohashes ?? sticky.geohash, activeGeohashes, boardDepth, sticky.noteDepth, sticky.inwardReach);
 }
 
 function updateBoardControl() {
@@ -2173,8 +2175,12 @@ function connectBoard(version = boardConnectionVersion) {
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);
   socket.addEventListener('open', () => {
     // A board of several cells asks the relay for all of them at once: "any of
-    // these" is what the filter means, and the notes decide the rest.
-    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': [...activeGeohashes], limit: 500};
+    // these" is what the filter means, and the notes decide the rest. The boards
+    // above the cells are asked for too, because a note written on one of them names
+    // only its own cell and is listed inside it: a reader standing one level down is
+    // inside that note's cell and only receives it by asking for the wider cell.
+    // Each note's own rung then decides whether it is shown here.
+    const noteFilter = {kinds: [1], '#t': [STICKY_TOPIC], '#g': geohashBoardChain(activeGeohashes), limit: 500};
     socket.send(JSON.stringify(['REQ', subscription, noteFilter]));
   });
   socket.addEventListener('message', message => {
@@ -2283,7 +2289,7 @@ function noteReachHintText(depth, limit = GEOHASH_MAX_NOTE_DEPTH) {
   const capped = limit < GEOHASH_MAX_NOTE_DEPTH && level >= limit
     ? ` That is every board inside this cell: ${limit} level${limit === 1 ? '' : 's'} is all the room it has.`
     : '';
-  return `Also shown on the boards up to ${level} level${level === 1 ? '' : 's'} above it, as long as whoever opens them includes boards this deep.${capped}`;
+  return `Also shown on the boards up to ${level} level${level === 1 ? '' : 's'} inside it, and on no board above it.${capped}`;
 }
 
 function selectNoteDepth(depth, cells = activeGeohashes) {

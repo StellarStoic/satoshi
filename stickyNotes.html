@@ -289,8 +289,9 @@
         <div class="note-reach__head"><span id="noteReachLabel">Seen on boards</span><output id="noteReachValue" for="noteReachSlider">Here only</output></div>
         <!-- The range ships closed on the note's own board: how many levels exist under the selected cell is
              only known once a cell is chosen, and the page opens the slider to exactly that many (a 6-character
-             cell leaves three, a 9-character cell none). Nothing above the cell is ever offered. -->
-        <input id="noteReachSlider" class="note-reach__slider" type="range" min="0" max="0" step="1" value="0" aria-label="How far above this cell the note is shown" aria-describedby="noteReachHint">
+             cell leaves three, a 9-character cell none). Nothing above the cell is ever offered, and a rung
+             counts the boards inside the cell, never the wider boards it sits in. -->
+        <input id="noteReachSlider" class="note-reach__slider" type="range" min="0" max="0" step="1" value="0" aria-label="How far inside this cell the note is shown" aria-describedby="noteReachHint">
         <div id="noteReachTicks" class="note-reach__ticks" aria-hidden="true"></div>
       </div>
       <p id="noteReachHint" class="note-reach__hint"></p>

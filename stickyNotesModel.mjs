@@ -96,6 +96,13 @@ export const EXPIRATION_TAG = 'expiration';
 // the same rules, in the same order; a change here has to be made there too.
 export const MENTION_TAG = 'p';
 export const MENTION_MAX = 5;
+// The direction a note's reach runs, carried beside the depth digit. `["reach","inside"]` says the
+// note is listed on the boards inside the cells it sits on and on no wider one — the rule the
+// board writes by. A note without the marker (everything published before it existed) is read the
+// other way round, exactly as it was written, because its tags are fixed in the relay and the
+// depth it carries counted the boards above its cell.
+export const STICKY_REACH_TAG = 'reach';
+export const STICKY_REACH_INSIDE = 'inside';
 const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const BECH32_GENERATORS = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
 
@@ -603,23 +610,57 @@ export function draftNoteDepth(draft, available = GEOHASH_MAX_NOTE_DEPTH) {
 
 /**
  * Does a note belong on a board? Either side may be a clump, because a note or a board can
- * cover several touching cells: a note is on the board when any of its cells is the board
- * cell or deeper inside it. Two limits meet here and neither overrides the other — the
- * board's own depth is how far the reader is looking in, and the note's depth is how far up
- * it lets itself be seen. A note is shown only when both reach far enough.
+ * cover several touching cells. Two directions meet here and each is owned by one side of it.
+ *
+ * A note written by this board carries `inwardReach`: its cell is the widest board it is on, and
+ * its depth says how many levels INSIDE that cell it is listed — so it is on a board only when the
+ * board is its own cell or a cell deeper inside it, up to the note's own rung, and never on a
+ * board above it. That direction cannot live in the tags: a cell has 32 children and no tag can
+ * name a level's worth of them, so the rung the event carries is what the reader's filter reads.
+ *
+ * Every other note — everything published before the marker existed — is read the way it was
+ * written: its cells are at or below the board the reader opened, the reader's own depth says how
+ * far into the board the reader is looking, and the note's depth says how far it lets itself be
+ * seen. Neither overrides the other there: both have to allow the same reach.
  */
-export function geohashMatchesBoard(noteGeohash, boardGeohash, boardDepth = 0, noteDepth = GEOHASH_MAX_NOTE_DEPTH) {
+export function geohashMatchesBoard(noteGeohash, boardGeohash, boardDepth = 0, noteDepth = GEOHASH_MAX_NOTE_DEPTH, inwardReach = false) {
   const notes = geohashCells(noteGeohash);
   const boards = geohashCells(boardGeohash);
   if (!notes.length || !boards.length) return false;
   const forReader = clampNoteDepth(boardDepth);
   const forNote = clampNoteDepth(noteDepth);
   return notes.some(note => boards.some(board => {
-    if (!note.startsWith(board)) return false;
     if (note === board) return true;
-    const reach = note.length - board.length;
-    return reach <= forReader && reach <= forNote;
+    if (note.startsWith(board)) {
+      // The board is above the note's cell. A note that reaches inward only is on no wider board
+      // at all — that is the whole point of the rung — and the note's own tags agree, because a
+      // wider board's query cannot match a note that names only its own cells.
+      if (inwardReach) return false;
+      const reach = note.length - board.length;
+      return reach <= forReader && reach <= forNote;
+    }
+    // The board is deeper than the note's cell: the rung the note carries is the only limit here,
+    // because this board is not inside one the reader opened and the reader's own depth says
+    // nothing about how deep a note lets itself be seen inside its own cell.
+    return inwardReach && board.startsWith(note) && board.length - note.length <= forNote;
   }));
+}
+
+/**
+ * The boards a search has to name to receive every note that belongs on the cell(s) it covers:
+ * each cell and every board above it, as far up as boards go (three characters — shorter than that
+ * a code is a region). A note on `u0m71d` names that cell and nothing else, so a reader standing
+ * inside it on `u0m71d1` only receives it by asking for the wider cells too; each note's own rung
+ * then decides whether it is shown there.
+ */
+export function geohashBoardChain(value) {
+  const boards = new Set();
+  for (const cell of geohashCells(value)) {
+    for (const prefix of geohashPrefixes(cell)) {
+      if (prefix.length >= GEOHASH_MIN_LENGTH) boards.add(prefix);
+    }
+  }
+  return [...boards];
 }
 
 export function encodeGeohash(latitude, longitude, precision = 9) {
@@ -1023,24 +1064,23 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   }
   const cells = normaliseGeohashes(choice);
   const primary = cells[0];
-  // A note names the boards it is willing to be seen on, and that is its own depth: rung 0
-  // names only the cells it sits on, and each rung above adds the parent one level up, so a
-  // board that is not named here never even fetches the note. The chain stops at three
-  // characters, because below that a code is a region and the desk refuses one outright.
+  // The reach counts the boards INSIDE the cell: rung N lists the note on the boards 1..N levels
+  // deeper than the cells it sits on (and on those cells themselves), and on no wider board.
+  // The only cells named are therefore the note's own ones. A board above them is never named —
+  // that is what used to put one note on every wider board at once — and the deeper boards cannot
+  // be named either: a level down is 32 cells and a tag can carry one, so what the rung does on
+  // the wire is the depth digit beside the marker that says which way it counts; the reader's
+  // filter (geohashMatchesBoard) is where a level of boards inside a cell is turned into boards.
   const reach = clampNoteDepth(noteDepth);
-  const namedCells = reach === 0
-    ? cells
-    : [...new Set(cells.flatMap(cell => geohashPrefixes(cell).filter(prefix => cell.length - prefix.length <= reach)))]
-      .filter(prefix => prefix.length >= GEOHASH_MIN_LENGTH)
-      .sort((left, right) => right.length - left.length);
   const tags = [
     ['t', STICKY_TOPIC],
     ...hashtagList.map(tag => ['t', tag]),
     ['client', 'satoshi.si'],
-    ...namedCells.map(prefix => ['g', prefix]),
+    ...cells.map(cell => ['g', cell]),
     ['i', `geo:${primary}`],
     ['k', 'geo'],
     ['geohash', String(reach)],
+    [STICKY_REACH_TAG, STICKY_REACH_INSIDE],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
     ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment this note stops existing, relay-side.
@@ -1067,9 +1107,12 @@ export function parseStickyEvent(event) {
   if (!content || stickyNoteLength(content) > STICKY_MAX_CHARACTERS) return null;
   const named = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
   if (!named.length) return null;
-  // The deepest tags are the cells the note was pinned to; anything shallower is a
-  // board above them, named so the note surfaces there too. Matching the shorter
-  // ones as if they were cells would put every note on every ancestor board.
+  // The deepest tags are the cells the note was pinned to. On a note written before the reach
+  // marker existed, anything shallower than them is a board above the cells, named so the note
+  // surfaces there too; matching the shorter ones as if they were cells would put every note on
+  // every ancestor board. On a note that carries the marker there are no such tags at all — its
+  // reach runs inward — and the depth it carries is read that way by geohashMatchesBoard.
+  const inwardReach = event.tags.some(tag => tag?.[0] === STICKY_REACH_TAG && tag[1] === STICKY_REACH_INSIDE);
   const depth = Math.max(...named.map(value => value.length));
   const geohashes = [...new Set(named.filter(value => value.length === depth))];
   const uri = event.tags.find(tag => tag?.[0] === 'i' && String(tag[1] || '').startsWith('geo:'))?.[1];
@@ -1095,6 +1138,7 @@ export function parseStickyEvent(event) {
     geohash,
     geohashes,
     noteDepth: noteDepthFromTag(scope),
+    inwardReach,
     expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
     mentions: mentionPubkeys(event.tags),
