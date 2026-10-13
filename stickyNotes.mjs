@@ -60,6 +60,7 @@ import {
   boardTextureTile,
   boardPlateFontSize,
   boardLampCount,
+  boardLampLit,
   BOARD_LAMP_SOCKETS,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
@@ -1572,9 +1573,10 @@ function lampStrips() {
 /**
  * Light the two lamp plates on the side rails. Every plate carries all six sockets a cell has levels
  * under it, always, and boardLampCount says how many of them burn - six at three characters, three at
- * six, none at nine. The lit ones are the head of the plate, in the same order on both rails, so the
- * two plates read alike rather than mirrored and the far end goes dark as the board deepens: a gauge
- * for the depth still open below the board, and nothing more - no per-note or selection state.
+ * six, none at nine. boardLampLit then says which of the six: the levels left under the board are the
+ * ones nearest to it, so the plate fills from its foot up. Both rails are built in that same order, so
+ * the two plates read alike rather than mirrored: a gauge for the levels still open below the board,
+ * and nothing more - no per-note or selection state.
  */
 function renderBoardLamps() {
   const lit = boardLampCount(activeGeohash);
@@ -1584,7 +1586,7 @@ function renderBoardLamps() {
     strip.hidden = !activeGeohash;
     strip.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
       const lamp = document.createElement('span');
-      lamp.className = index < lit ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
+      lamp.className = boardLampLit(index, lit) ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
       return lamp;
     }));
   }

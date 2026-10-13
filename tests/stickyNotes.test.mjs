@@ -19,6 +19,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkHref,
   boardPlateFontSize,
   boardLampCount,
+  boardLampLit,
   BOARD_LAMP_SOCKETS,
   GEOHASH_MAX_LENGTH,
   GEOHASH_MAX_BOARD_DEPTH,
@@ -1895,10 +1896,11 @@ test('the board plate separator and the plate itself are styled as metal, not as
 });
 
 test('a brass plate on each side rail carries all six sockets, and the depth lights them', async () => {
-  const [markup, script, css] = await Promise.all([
+  const [markup, script, css, model] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8'),
   ]);
 
   // Six sockets, always: a cell is three to nine characters, so six levels lie under the shallowest
@@ -1917,6 +1919,24 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   for (const length of [GEOHASH_MIN_LENGTH, 4, 5, 6, 7, 8, 9]) {
     assert.equal(boardLampCount(TEST_GEOHASH.slice(0, length)), 9 - length,
       `${length} characters leaves ${9 - length} levels open, and so ${9 - length} lit`);
+  }
+
+  // Which end of the plate burns, read in the order the page builds the sockets: the first socket in
+  // the DOM is the one at the head of the plate and the last is the one at its foot, since both
+  // plates are built as a column in that order. The levels still open under the board are the ones
+  // nearest to it, so they light from the foot up: a six-character cell lights the last three
+  // sockets and leaves the top three dark, three characters light all six, nine light none of them.
+  const socketsFor = cell => Array.from({length: BOARD_LAMP_SOCKETS},
+    (unused, index) => boardLampLit(index, boardLampCount(cell)));
+  assert.deepEqual(socketsFor('u0qj7z'), [false, false, false, true, true, true],
+    'a six-character cell lights the bottom three sockets, not the top three');
+  assert.deepEqual(socketsFor(''), Array.from({length: BOARD_LAMP_SOCKETS}, () => false),
+    'and no cell at all lights nothing');
+  for (const length of [GEOHASH_MIN_LENGTH, 4, 5, 6, 7, 8, 9]) {
+    assert.deepEqual(socketsFor(TEST_GEOHASH.slice(0, length)),
+      [...Array.from({length: length - GEOHASH_MIN_LENGTH}, () => false),
+        ...Array.from({length: 9 - length}, () => true)],
+      `${length} characters lights the bottom ${9 - length} sockets and leaves the top dark`);
   }
 
   // The plates are chrome on the side rails: one per side, inside the frame, which never takes a
@@ -1938,13 +1958,15 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   assert.match(css, /\.board-frame__lamps--right \{ right: calc\(var\(--board-frame, 26px\) \/ 2\); translate: 50% -50%; \}/,
     'the right plate is the left one mirrored, not shifted back with it');
 
-  // The same six sockets are built on every board, and the first `lit` of them are the ones that burn.
+  // The same six sockets are built on every board, and boardLampLit says which of them burn.
   assert.match(script, /const lit = boardLampCount\(activeGeohash\);/);
   assert.match(script, /Array\.from\(\{length: BOARD_LAMP_SOCKETS\}/,
     'the plate is cut to all six sockets whatever the board');
   assert.match(script,
-    /lamp\.className = index < lit \? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';/,
-    'the lit ones are the head of the plate, the same end on both rails');
+    /lamp\.className = boardLampLit\(index, lit\) \? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';/,
+    'both rails light their sockets by the one rule, in the order they build them');
+  assert.match(model, /export function boardLampLit\(index, lit\) \{/,
+    'and which end of the plate burns is stated once, in the model');
   // The unlit socket is a real, drawn socket rather than a level struck off the plate.
   assert.match(css, /\.board-frame__lamp \{[^}]*radial-gradient\(circle at 38% 30%, #6b4a24/,
     'an unlit socket is dark, and still drawn');
@@ -1969,18 +1991,30 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   // it. The sizes are read off the plates themselves rather than pinned, so the six sockets and the
   // air between them still have to fit inside whatever measure the two plaques are cut to next.
   const namePlate = /\.board-plate \{[^}]*width: (\d+)px; height: (\d+)px/.exec(css);
-  const lampPlate = /\.board-frame__lamps \{[^}]*gap: (\d+)px; width: (\d+)px; height: (\d+)px; padding: (\d+)px 0/.exec(css);
+  const lampPlate = /\.board-frame__lamps \{[^}]*align-items: center; justify-content: space-evenly; width: (\d+)px; height: (\d+)px; \}/.exec(css);
   const socket = /\.board-frame__lamp \{ flex: none; width: (\d+)px; height: (\d+)px/.exec(css);
+  assert.match(css, /\.board-frame__lamps \{[^}]*justify-content: space-evenly/,
+    'the six sockets are spread over the plate, not gathered in the middle of it');
   assert.ok(namePlate && lampPlate && socket, 'both plaques and the socket carry their measure in the CSS');
   const [nameWidth, nameHeight] = [Number(namePlate[1]), Number(namePlate[2])];
-  const [lampGap, lampWidth, lampLength, lampPadding] = [Number(lampPlate[1]), Number(lampPlate[2]), Number(lampPlate[3]), Number(lampPlate[4])];
+  const [lampWidth, lampLength] = [Number(lampPlate[1]), Number(lampPlate[2])];
   const [lampDiameter, lampAcross] = [Number(socket[1]), Number(socket[2])];
   assert.equal(lampWidth, nameHeight, 'the lamp plate is as thick across its rail as the name plate');
   assert.equal(lampLength, nameWidth, 'and as long down the rail as the name plate is wide');
   assert.equal(lampDiameter, lampAcross, 'a socket is round');
   assert.ok(lampDiameter + 2 <= lampWidth, 'a socket fits across the plate it is set in');
-  assert.ok(BOARD_LAMP_SOCKETS * lampDiameter + (BOARD_LAMP_SOCKETS - 1) * lampGap + 2 * lampPadding <= lampLength,
-    'all six sockets sit inside the plate, with the plate\u2019s own padding to spare');
+  // The six sockets are spread over the plate's whole length rather than gathered in the middle of it:
+  // the brass the six leave is cut into seven equal parts - the two ends and the five between - so the
+  // gauge stands as a row of sockets down the plate, the same brass above the first as below the last,
+  // and each socket still centred across the plate's width.
+  assert.doesNotMatch(css, /\.board-frame__lamps \{[^}]*\b(?:gap|padding): /,
+    'no fixed air between the sockets or at the ends, which would break the even split');
+  const lampSpaces = BOARD_LAMP_SOCKETS + 1;
+  const freeBrass = lampLength - BOARD_LAMP_SOCKETS * lampDiameter;
+  assert.ok(freeBrass > 0, 'the six sockets still fit inside the plate');
+  const brassPerSpace = freeBrass / lampSpaces;
+  assert.ok(brassPerSpace >= lampDiameter,
+    `each of the seven spaces is at least a socket wide: ${brassPerSpace.toFixed(2)}px against ${lampDiameter}px`);
 });
 
 test('the top rail wears the bottom rail\u2019s plate, and both of them share the board', async () => {

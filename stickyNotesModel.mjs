@@ -1169,6 +1169,17 @@ export function boardLampCount(cell) {
 }
 
 /**
+ * Whether the socket at `index` burns, in the order the plate is built: index 0 is the socket at the
+ * head of the plate and the last index is the one at its foot. A board's open levels are the ones
+ * nearest to the board itself, so they light from the foot up: the last `lit` sockets of a plate
+ * burn. Both rails build their plate in this same order, so the two carry the same reading rather
+ * than one being the other's mirror.
+ */
+export function boardLampLit(index, lit) {
+  return index >= BOARD_LAMP_SOCKETS - lit;
+}
+
+/**
  * The link a board is shared by: the page the desk serves for that board, which carries the board's
  * own picture so a chat unfurls the board itself instead of the site's generic card. An empty set
  * of cells has no board to point at, so there is no link.

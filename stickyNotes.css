@@ -90,8 +90,14 @@
    size on every board and only the light on it changes with the board's own depth: six lit at three
    characters, three at six, none at all at nine - the deepest board wears its plate with every socket
    dark rather than going without one. Lit in the site's own green, the colour it already uses where
-   something is active. */
-.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 46px; height: 620px; padding: 20px 0; }
+   something is active.
+   The six sockets are spread evenly down the plate's whole length rather than gathered in its middle
+   with bare brass above and below them: space-evenly cuts what the six leave - 510 of the plate's
+   618px inside its 1px edge - into the same share at the ends as between them, 72.86px each, so the
+   gauge reads as a row of sockets standing down the plate. Nothing is pinned for the ends to hold
+   instead: a fixed gap or padding would make those shares unequal, and space-between would put the
+   outer sockets flush against the plate's rolled edge. */
+.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; width: 46px; height: 620px; }
 .board-frame__lamps--left { left: calc(var(--board-frame, 26px) / 2); }
 /* The right plate is the left one's mirror about the board's centre: hung off its own rail by the same
    distance. The -50% the two plates share shifts a box leftwards, which on this side pulled the plate a
