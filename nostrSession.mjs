@@ -411,7 +411,14 @@ export async function adoptAmberSignature({silent = false, onStatus = null} = {}
     return stop('invalid', error.message);
   }
   // Spend the request only after the return has been rebuilt and verified, exactly as the callback
-  // route does: a half-read return must not consume the attempt still on its way back.
+  // route does: a half-read return must not consume the attempt still on its way back. And spend it
+  // only if it is *still* parked, because two reads of one clipboard can overlap - a poll tick and
+  // the reader's tap - and the signature is compact and identical in both: the read that no longer
+  // finds the request is the loser, and it hands back nothing rather than a second copy of an answer
+  // that is already on its way to the desk.
+  if (localStorage.getItem(waiting.key) === null) {
+    return stop('spent', 'That signature was already handed over.');
+  }
   localStorage.removeItem(waiting.key);
   return {action: 'sign', event, context: waiting.state.context};
 }

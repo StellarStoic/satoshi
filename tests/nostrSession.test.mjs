@@ -918,3 +918,46 @@ test('a copy signing read says where it stopped, and never adopts the page marke
   assert.deepEqual(codes, ['copied'], 'a value that is not the page marker is what the read is about to judge');
   assert.equal(sessionModule.amberSignaturePending(), false, 'the request is spent only on the answer');
 });
+
+test('two reads of one clipboard cannot both hand the same signature over', async () => {
+  const storage = memoryStorage();
+  const pubkey = 'a'.repeat(64);
+  const valid = 'b'.repeat(128);
+  const eventId = 'c'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'amber', npub: `npub1${'a'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://satoshi.si', pathname: '/stickyNotes.html', search: '', hash: '', href: '', assign: () => {},
+  };
+  globalThis.window = {
+    dispatchEvent() {},
+    NostrTools: {
+      nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`},
+      getEventHash: () => eventId,
+      verifyEvent: event => event.id === eventId && event.sig === valid,
+    },
+  };
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => valid}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-race=${Date.now()}`);
+  sessionModule.beginAmberSigning({kind: 1, created_at: 1_700_000_000, content: 'a paid note', tags: []},
+    {action: 'pin', orderId: 'order-1'}, {copy: true});
+
+  // A poll tick and the reader's own tap can read the same clipboard at the same moment, and the
+  // signature is identical in both reads. They must not both rebuild the event and both publish it.
+  const [first, second] = await Promise.all([
+    sessionModule.adoptAmberSignature({silent: true}),
+    sessionModule.adoptAmberSignature({silent: true}),
+  ]);
+  const handed = [first, second].filter(answer => answer?.action === 'sign');
+  assert.equal(handed.length, 1, 'exactly one of the two reads hands the signature over');
+  assert.equal(handed[0].event.sig, valid);
+  assert.equal([first, second].filter(answer => answer === null).length, 1, 'the loser is handed nothing');
+  assert.equal(sessionModule.amberSignaturePending(), false, 'the request is spent once');
+  // A third read after that is not an answer either: the request it belonged to is gone.
+  assert.equal(await sessionModule.adoptAmberSignature({silent: true}), null);
+});
