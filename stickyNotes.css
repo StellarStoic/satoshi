@@ -89,13 +89,10 @@
 .sticky-dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
 /* Amber, step two. With nothing handed between the two apps the answer arrives on the clipboard,
    which is a hand-over a reader cannot guess: it gets a dialog in the middle of the screen with the
-   steps in it, rather than a button appearing under the login form. */
-.amber-steps { margin: 4px 0 16px; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; color: #d7d9d7; }
-.amber-steps strong { color: #f3f3f1; }
+   one button that always works, and one line above it carrying the reader's sentence - the place
+   every hand-over message replaces, so the dialog stays that small whatever the round trip says.
+   The steps and the paragraph this dialog used to carry are gone; the wording rides the line. */
 .amber-paste { width: 100%; justify-content: center; }
-/* The sentence that tells a reader where Amber's answer actually goes (its clipboard, not this
-   page), shown only for a signing hand-over; a sign-in keeps the steps above alone. */
-.amber-note { margin: 0 0 14px; padding: 10px 12px; border-left: 3px solid var(--accent, #f2a900); border-radius: 4px; background: #101213; color: #e6e7e4; font-size: 13px; line-height: 1.5; }
 .nostr-connect-qr { display: flex; justify-content: center; padding: 12px; margin: 4px 0 12px; background: #ffffff; border-radius: 8px; }
 .nostr-connect-qr__canvas { width: min(300px, 66vw); height: auto; image-rendering: pixelated; }
 .nostr-connect-open { width: 100%; justify-content: center; margin-bottom: 10px; }

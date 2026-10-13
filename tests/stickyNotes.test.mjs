@@ -1718,7 +1718,7 @@ test('one Amber button, with the hand-over in a dialog and a code for desktops',
   assert.match(markup, /<dialog id="nostrConnectDialog" class="sticky-dialog"/, 'the code has a dialog too');
   assert.match(markup, /<script src="\/qrCodeGenerator_1_4_4\.js"/, 'the QR generator is loaded on this page');
   assert.match(css, /\.nostr-connect-qr__canvas/, 'the code is styled as squares on white');
-  assert.match(css, /\.amber-steps/, 'the dialog carries the steps');
+  assert.doesNotMatch(css, /\.amber-steps/, 'the step list the dialog no longer shows is unstyled too');
 
   // Android gets the intent, a desktop gets the code - one button, decided by what the reader has.
   assert.match(script, /if \(!\/Android\/i\.test\(navigator\.userAgent \|\| ''\)\) \{ await showNostrConnectDialog\(\); return; \}/);
@@ -2128,9 +2128,78 @@ test('the copied signature is polled for, because Android fires no return event'
 
   // The manual step in front of the reader still exists, and it names where the signature goes.
   assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
-  assert.match(script, /elements\.amberCopyNote\.textContent = 'Amber copies the signature instead of returning it to this page\./);
-  assert.match(markup, /<p id="amberCopyNote" class="amber-note amber-copy-note" hidden><\/p>/);
   assert.match(script, /elements\.amberPaste\.addEventListener\('click'/);
+});
+
+test('the hand-over dialog is one line and one button, and every message rides that line', async () => {
+  const [markup, script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // The dialog carries exactly three things: a short title, one line, and the button. The steps the
+  // reader never read, and the paragraph that repeated them, are gone from the page itself.
+  const dialog = markup.slice(markup.indexOf('<dialog id="amberCopyDialog"'),
+    markup.indexOf('<dialog id="nostrConnectDialog"'));
+  assert.match(dialog, /<h2 id="amberCopyTitle">Finish signing in with Amber<\/h2>/);
+  assert.match(dialog,
+    /<div id="amberCopyStatus" class="inline-status" role="status" aria-live="polite">Amber has it on your clipboard\. Tap the button to hand it over\.<\/div>/,
+    "the dialog's one line carries the reader's own sentence verbatim");
+  assert.match(dialog,
+    /<button type="button" id="amberPaste" class="primary-action amber-paste"><i class="lni lni-clipboard" aria-hidden="true"><\/i><span>Paste what Amber copied<\/span><\/button>/,
+    'the button is named verbatim');
+  assert.equal(dialog.match(/id="amberCopyStatus"/g).length, 1, 'exactly one line element is in there');
+  assert.doesNotMatch(dialog, /amber-steps|amberCopyNote|amber-note/, 'the step list and the paragraph are gone');
+  assert.equal(dialog.match(/<(p|ol|li)\b/g), null, 'no prose is left in the dialog');
+
+  // Nothing styles what is no longer there, and nothing in the page reaches for the removed note:
+  // the one line is the only surface the round trip speaks through inside the dialog.
+  assert.doesNotMatch(css, /\.amber-steps/);
+  assert.doesNotMatch(css, /\.amber-note/);
+  assert.doesNotMatch(script, /amberCopyNote/, 'no code writes a note element that no longer exists');
+  assert.match(script, /amberCopyStatus: document\.getElementById\('amberCopyStatus'\),/);
+
+  // The copy that was removed does not come back through the page: neither the steps nor the
+  // explanation that said what the one line now says.
+  for (const gone of [
+    /Approve the request in Amber\./,
+    /Nothing is handed between the two apps/,
+    /This page fills it in by itself/,
+    /Amber copies the signature instead of returning it to this page\./,
+  ]) {
+    assert.doesNotMatch(markup, gone, `removed copy is still in the page: ${gone}`);
+    assert.doesNotMatch(script, gone, `removed copy is still in the script: ${gone}`);
+  }
+
+  // Each progress and failure sentence replaces that line's text rather than adding to it.
+  for (const message of [
+    /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
+    /sayAmberRoundTrip\('Signature verified - pinning your note'\)/,
+    /sayAmberOutcome\('Your note is pinned'\)/,
+    /The browser would not let the page read the clipboard\./,
+    /Nothing valid on the clipboard yet\./,
+    /That signature did not match your note\./,
+    /The server refused the pin: \$\{outcome\.message\}/,
+    /Amber never handed a signature back\. Tap Pin again, or use the paste button\./,
+  ]) assert.match(script, message);
+
+  // A refusal is still named in that one line - the read the browser turned down, and any error the
+  // paste tap itself threw - and the same failure still reaches the board's own line, so closing the
+  // dialog cannot hide it.
+  const paste = script.slice(script.indexOf("elements.amberPaste.addEventListener('click'"),
+    script.indexOf("elements.nostrConnectCopy.addEventListener"));
+  assert.match(paste, /status\(elements\.amberCopyStatus, error\.message, true\);/,
+    'a refused paste tap says so in the dialog line');
+  assert.match(paste, /sayAmberRoundTrip\(spent\.message, spent\.error\);/);
+  assert.match(script, /status\(elements\.amberCopyStatus, 'Reading what Amber copied\.\.\.'\)/);
+  const complete = script.slice(script.indexOf('async function completeAmberSignature'),
+    script.indexOf('function showAmberHandOver'));
+  assert.match(complete, /notice\(mismatch\);/,
+    'the mismatch survives the dialog being closed, on the board line');
+  const publish = script.slice(script.indexOf('async function publishPinnedNote'), script.indexOf('function closeNoteMenu'));
+  assert.match(publish, /status\(elements\.boardStatus, error\.message, true\);/,
+    'the desk refusing the pin is on the board line as well as the dialog line');
 });
 
 test('a phone hands its NIP-46 invitation straight to Amber, and a reload keeps it', async () => {
@@ -2189,8 +2258,8 @@ test('the hand-over control is in front of the reader the moment a copy request 
     'only the Amber route opens the hand-over, and only for a live request');
 
   // The wording says what to do, in the order the reader has to do it.
-  assert.match(script, /Approve the note in Amber, come back here, and tap the button below/,
-    'the reader must be told to approve, come back, and tap');
+  assert.match(script, /Approve the note in Amber, then come back to this page/,
+    'the reader must be told to approve and come back to the hand-over');
 
   // Every way the poll starts surfaces the control first, so a reloaded page or a resume gets it too
   // without waiting for an event this device never fires.

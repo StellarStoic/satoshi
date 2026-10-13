@@ -177,7 +177,6 @@ const elements = {
   amberPaste: document.getElementById('amberPaste'),
   amberDialog: document.getElementById('amberCopyDialog'),
   amberCopyTitle: document.getElementById('amberCopyTitle'),
-  amberCopyNote: document.getElementById('amberCopyNote'),
   amberCopyStatus: document.getElementById('amberCopyStatus'),
   nostrConnect: document.getElementById('nostrConnectDialog'),
   nostrConnectQr: document.getElementById('nostrConnectQr'),
@@ -484,16 +483,15 @@ let nostrConnectRequest = null;
 /**
  * The step between tapping Amber and being signed in. With nothing handed between the two apps the
  * signer answers by copying the identity to the clipboard, and the browser gives that up on its own
- * terms - which is exactly what a reader cannot guess. So the dialog says what to do, and carries the
- * one button that always works.
+ * terms - which is exactly what a reader cannot guess. So the dialog says what to do on its one line,
+ * and carries the one button that always works.
  */
 function showAmberCopyDialog() {
   if (elements.login.open) elements.login.close();
   if (!elements.amberDialog.open) elements.amberDialog.showModal();
   // One dialog carries both hand-overs, so its heading names which one this is: a sign-in here, a
-  // signature in showAmberHandOver(). The signature sentence belongs to the signing step alone.
+  // signature in showAmberHandOver(). The wording belongs to the signing step alone.
   elements.amberCopyTitle.textContent = 'Finish signing in with Amber';
-  elements.amberCopyNote.hidden = true;
   status(elements.amberCopyStatus, amberClipboardPending() ? 'Approve it in Amber, then come back to this page.' : '');
 }
 
@@ -4511,12 +4509,11 @@ async function completeAmberSignature(answer) {
 function showAmberHandOver(message) {
   if (elements.login.open) elements.login.close();
   if (!elements.amberDialog.open) elements.amberDialog.showModal();
-  // This step is a signature, and the dialog has to say where a signature actually goes: Amber copies
-  // it to the clipboard, it does not call this page back. A reader who is not told waits for a return
-  // that never comes.
+  // This step is a signature, and the front of the dialog has to say which one it is: a sign-in and a
+  // signature are the same clipboard step. Where the signature actually goes is named on the dialog's
+  // one line, in the messages that pass through here - Amber copies it rather than calling this page
+  // back, which is not something a reader can guess.
   elements.amberCopyTitle.textContent = 'Finish signing with Amber';
-  elements.amberCopyNote.hidden = false;
-  elements.amberCopyNote.textContent = 'Amber copies the signature instead of returning it to this page. Approve the note in Amber, come back here, and tap the button below — it reads the signature inside your tap.';
   status(elements.amberCopyStatus, message);
 }
 

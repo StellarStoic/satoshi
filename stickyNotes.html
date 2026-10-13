@@ -226,14 +226,8 @@
     <div class="dialog-inner">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="amberCopyTitle">Finish signing in with Amber</h2>
-      <ol class="amber-steps">
-        <li><strong>Approve the request in Amber.</strong> It shows what it is about to use, and asks for nothing else.</li>
-        <li><strong>Come back to this page.</strong> Nothing is handed between the two apps, so Amber puts its answer on your clipboard instead of sending it back.</li>
-        <li><strong>This page fills it in by itself</strong> where the browser allows that read. When it does not, tap the button below.</li>
-      </ol>
-      <p id="amberCopyNote" class="amber-note amber-copy-note" hidden></p>
+      <div id="amberCopyStatus" class="inline-status" role="status" aria-live="polite">Amber has it on your clipboard. Tap the button to hand it over.</div>
       <button type="button" id="amberPaste" class="primary-action amber-paste"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Paste what Amber copied</span></button>
-      <div id="amberCopyStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>
   <dialog id="nostrConnectDialog" class="sticky-dialog" aria-labelledby="nostrConnectTitle">
