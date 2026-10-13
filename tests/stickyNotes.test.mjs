@@ -19,6 +19,8 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkHref,
   boardPlateFontSize,
   boardLampCount,
+  BOARD_LAMP_SOCKETS,
+  GEOHASH_MAX_LENGTH,
   boardShareUrl,
   linkMatches,
   AMBER_HAND_OVER_WAITING_LINE,
@@ -1957,58 +1959,81 @@ test('the board plate separator and the plate itself are styled as metal, not as
   const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
   assert.match(css, /\.board-plate__cell \{[^}]*text-shadow: 0 1px rgba\(255, 248, 220, \.55\)/,
     'the letters are cut into the metal, with the light catching the lower edge');
-  assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'the plate is a slab of aged brass');
+  assert.match(css, /\.board-plate,\n\.board-frame__lamps \{[^}]*linear-gradient\(168deg/, 'the plate is a slab of aged brass, worn by the lamps too');
   assert.match(css, /\.board-plate\[hidden\] \{ display: none; \}/, 'a board with no cells shows no plate');
 });
 
-test('a rail of lamps lights one for each level still open under the board, and none at the deepest', async () => {
+test('a brass plate on each side rail carries all six sockets, and the depth lights them', async () => {
   const [markup, script, css] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
 
-  // The rule, worked out once: a cell is three to nine characters, so what is left under it is
-  // nine minus its own length. Three characters, the shallowest board, lights all six.
-  assert.equal(boardLampCount('u0q'), 6, 'a three-character board has every level below it');
-  assert.equal(boardLampCount('u0qj7z'), 3, 'a six-character board has three');
-  assert.equal(boardLampCount('u0qj7z0y8'), 0, 'the deepest board has none, so the strip is empty');
+  // Six sockets, always: a cell is three to nine characters, so six levels lie under the shallowest
+  // board and the plate is cut to all of them. What the board's own depth changes is how many burn.
+  assert.equal(BOARD_LAMP_SOCKETS, 6, 'six levels lie below the shallowest board');
+  assert.equal(BOARD_LAMP_SOCKETS, GEOHASH_MAX_LENGTH - GEOHASH_MIN_LENGTH);
+
+  // The gauge, worked out once: what is lit is nine minus the cell's own length, so three characters
+  // lights all six, six characters lights three, and the deepest board lights none of its six.
+  assert.equal(boardLampCount('u0q'), 6, 'a three-character board lights every socket it has');
+  assert.equal(boardLampCount('u0qj7z'), 3, 'a six-character board lights three');
+  assert.equal(boardLampCount('u0qj7z0y8'), 0, 'the deepest board lights none of them');
   assert.equal(boardLampCount('u0qj7z0y'), 1);
-  assert.equal(boardLampCount(''), 0, 'no cell, no lamps');
+  assert.equal(boardLampCount(''), 0, 'no cell, no light');
   assert.equal(boardLampCount('not a place'), 0, 'and a string that is not a geohash lights nothing');
   for (const length of [GEOHASH_MIN_LENGTH, 4, 5, 6, 7, 8, 9]) {
     assert.equal(boardLampCount(TEST_GEOHASH.slice(0, length)), 9 - length,
-      `${length} characters leaves ${9 - length} levels open`);
+      `${length} characters leaves ${9 - length} levels open, and so ${9 - length} lit`);
   }
 
-  // The strips are chrome on the side rails: one per side, inside the frame, which never takes a
+  // The plates are chrome on the side rails: one per side, inside the frame, which never takes a
   // click - so a lamp can never swallow a pan or a tap meant for the board.
   assert.equal((markup.match(/class="board-frame__lamps board-frame__lamps--/g) || []).length, 2,
-    'a strip of lamps on each side rail');
+    'a lamp plate on each side rail');
   const frame = markup.indexOf('id="boardFrame"');
   const rightRail = markup.indexOf('board-frame__rail--right');
   const lamps = markup.indexOf('id="boardLampsLeft"');
   assert.ok(frame < rightRail && rightRail < lamps && lamps < markup.indexOf('id="boardPlate"'),
-    'the lamps hang inside the frame, on its rails');
+    'the plates hang inside the frame, on its rails');
   assert.match(css, /\.board-frame \{ position: absolute;[^}]*pointer-events: none/,
     'and the frame they live in only ever reads, never takes a click');
   assert.match(css, /\.board-frame__lamps \{ position: absolute; top: 50%/);
   assert.match(css, /\.board-frame__lamps--left \{ left: calc\(var\(--board-frame, 26px\)/,
-    'each strip is centred on its own rail');
-  assert.match(css, /\.board-frame__lamps--right \{ right: calc\(var\(--board-frame, 26px\)/);
+    'each plate is centred on its own rail');
+  // And the right one is the left one's mirror about the board's centre: the shared -50% shifted both
+  // plates leftwards, which left the right plate a whole plate-width in and hanging over the board.
+  assert.match(css, /\.board-frame__lamps--right \{ right: calc\(var\(--board-frame, 26px\) \/ 2\); translate: 50% -50%; \}/,
+    'the right plate is the left one mirrored, not shifted back with it');
 
-  // One lamp per level, built to that length: there is no unlit lamp to put out, so a shallower
-  // board simply wears more of them and the deepest wears none.
-  assert.match(script, /const lit = boardLampCount\(activeGeohash\);/,
-    'the strip is as long as the board is shallow');
-  assert.match(script, /Array\.from\(\{length: lit\}/);
-  assert.match(script, /lamp\.className = 'board-frame__lamp';/);
+  // The same six sockets are built on every board, and the first `lit` of them are the ones that burn.
+  assert.match(script, /const lit = boardLampCount\(activeGeohash\);/);
+  assert.match(script, /Array\.from\(\{length: BOARD_LAMP_SOCKETS\}/,
+    'the plate is cut to all six sockets whatever the board');
+  assert.match(script,
+    /lamp\.className = index < lit \? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';/,
+    'the lit ones are the head of the plate, the same end on both rails');
+  // The unlit socket is a real, drawn socket rather than a level struck off the plate.
+  assert.match(css, /\.board-frame__lamp \{[^}]*radial-gradient\(circle at 38% 30%, #6b4a24/,
+    'an unlit socket is dark, and still drawn');
+  assert.match(css, /\.board-frame__lamp--lit \{[^}]*#62c986/, 'the lit ones burn green');
   assert.doesNotMatch(css, /board-frame__lamp--(off|dark|unlit|expired)/,
-    'no socket is ever left standing dark');
-  assert.match(css, /\.board-frame__lamps:empty \{ display: none; \}/,
-    'and a board with no level below it shows no strip at all');
-  // Lit, and in the site's own green rather than a hue invented for it.
-  assert.match(css, /\.board-frame__lamp \{[^}]*#62c986/, 'the lamps burn green');
+    'the dark socket is the plate\'s own socket, not a second state invented for it');
+  // Nothing hides the plate for having nothing lit: only a board with no cell at all shows none.
+  assert.doesNotMatch(css, /\.board-frame__lamps:empty/,
+    'the plate is not hidden for being empty at the deepest level');
+  assert.match(script, /strip\.hidden = !activeGeohash;/,
+    'and it is only the board with no cell at all that wears no plate');
+  assert.match(css, /\.board-frame__lamps\[hidden\] \{ display: none; \}/);
+  assert.equal((css.match(/\.board-frame__lamps\[hidden\] \{ display: none; \}/g) || []).length, 1);
+
+  // The lamp plate is the board's name plate: one brass, declared once and worn by both.
+  assert.match(css,
+    /\.board-plate,\n\.board-frame__lamps \{ box-sizing: border-box; border: 1px solid rgba\(52, 30, 10, \.82\);[^}]*linear-gradient\(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%\)[^}]*inset 0 0 22px rgba\(60, 34, 8, \.3\)/,
+    'the lamps are mounted on the same brass the board\'s own plate is made of');
+  assert.match(css, /\.board-frame__lamps \{[^}]*width: calc\(var\(--board-frame, 26px\) - 6px\)/,
+    'the plate is a body on the rail, not a bare row of lights');
 });
 
 test('the top rail wears the bottom rail\u2019s plate, and both of them share the board', async () => {
@@ -2026,7 +2051,7 @@ test('the top rail wears the bottom rail\u2019s plate, and both of them share th
     'carrying the same engraved line');
   assert.match(css, /\.board-plate--top \{ top: calc\(8px - var\(--board-frame, 26px\)\); bottom: auto; \}/,
     'the same material, hung from the other rail');
-  assert.match(css, /\.board-plate \{[^}]*linear-gradient\(168deg/, 'which is the brass the bottom one is made of');
+  assert.match(css, /\.board-plate,\n\.board-frame__lamps \{[^}]*linear-gradient\(168deg/, 'which is the brass the bottom one is made of');
 
   // Both plaques are engraved from the board's cells, in the one pass.
   const render = script.slice(script.indexOf('function renderBoardPlate()'), script.indexOf('function selectBoard('));

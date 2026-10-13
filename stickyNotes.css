@@ -61,11 +61,17 @@
 .board-frame__rail--right { right: 0; }
 .board-status { position: absolute; inset: 50% auto auto 50%; z-index: 5; translate: -50% -50%; padding: 8px 12px; color: rgba(255,255,255,.72); background: rgba(32, 20, 12, .5); border-radius: 4px; pointer-events: none; }
 .login-confirmation { position: absolute; inset: 50% auto auto 50%; z-index: 30; translate: -50% -50%; max-width: min(88vw, 420px); padding: 12px 16px; color: #fff; background: rgba(22, 18, 14, .9); border: 1px solid rgba(242, 169, 0, .55); border-radius: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .28); text-align: center; pointer-events: none; }
+/* The board's brass, declared once and worn by both plaques: the name plates on the top and bottom
+   rails and the lamp plates on the side rails are the same metal, so the edge, the bevel and the wear
+   are written here rather than invented a second time for the lamps. Only the size and what sits on
+   the plate differ - an engraved line, or a column of sockets. */
+.board-plate,
+.board-frame__lamps { box-sizing: border-box; border: 1px solid rgba(52, 30, 10, .82); border-radius: 5px; background: linear-gradient(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 3px 8px rgba(18, 10, 2, .6), 0 1px 2px rgba(18, 10, 2, .5), inset 0 1px rgba(255, 246, 214, .45), inset 0 -2px rgba(52, 28, 7, .5), inset 0 0 0 3px rgba(255, 240, 200, .07), inset 0 0 22px rgba(60, 34, 8, .3); }
 /* The board's own name, engraved on a small brass plate on the bottom rail - the one place on the
    board that says which place this is. It is a fixed plaque, so the type is cut to fit rather than
    the plate growing (see renderBoardPlate). It sits in the transformed canvas, above the texture and
    the rail but below the notes, because a note is paper lying on the plate. */
-.board-plate { position: absolute; left: 50%; bottom: calc(8px - var(--board-frame, 26px)); translate: -50% 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 620px; height: 46px; padding: 0 30px; overflow: hidden; border: 1px solid rgba(52, 30, 10, .82); border-radius: 5px; background: linear-gradient(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 3px 8px rgba(18, 10, 2, .6), 0 1px 2px rgba(18, 10, 2, .5), inset 0 1px rgba(255, 246, 214, .45), inset 0 -2px rgba(52, 28, 7, .5), inset 0 0 0 3px rgba(255, 240, 200, .07), inset 0 0 22px rgba(60, 34, 8, .3); color: #3d2509; font-family: 'Roboto Slab', 'Noto Serif', serif; font-size: 46px; font-weight: 700; letter-spacing: .1em; line-height: 1; white-space: nowrap; user-select: none; appearance: none; cursor: pointer; }
+.board-plate { position: absolute; left: 50%; bottom: calc(8px - var(--board-frame, 26px)); translate: -50% 0; display: flex; align-items: center; justify-content: center; width: 620px; height: 46px; padding: 0 30px; overflow: hidden; color: #3d2509; font-family: 'Roboto Slab', 'Noto Serif', serif; font-size: 46px; font-weight: 700; letter-spacing: .1em; line-height: 1; white-space: nowrap; user-select: none; appearance: none; cursor: pointer; }
 .board-plate[hidden] { display: none; }
 .board-plate__line { display: flex; align-items: center; gap: .55em; flex: none; }
 .board-plate__cell { text-shadow: 0 1px rgba(255, 248, 220, .55), 0 -1px rgba(52, 28, 8, .45), 0 0 1px rgba(40, 22, 5, .35); }
@@ -76,17 +82,26 @@
    both of them are the control that shares it: one plate, worn twice, rather than a second look
    invented for the same job. Only the edge it hangs from differs. */
 .board-plate--top { top: calc(8px - var(--board-frame, 26px)); bottom: auto; }
-/* The lamps on the side rails: one for each level the board's own cell still has under it. Every
-   lamp in a strip is lit, so a deeper cell simply carries a shorter strip and a nine-character one
-   carries none at all -- an empty plate, not a row of dark sockets. Lit in the site's own green,
-   the colour it already uses where something is active. */
-.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; box-sizing: border-box; padding: 5px 3px; border: 1px solid rgba(52, 30, 10, .82); border-radius: 12px; background: radial-gradient(ellipse at 42% 14%, transparent 0 2px, rgba(70, 39, 18, .3) 3px 4px, transparent 5px), linear-gradient(90deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 2px 5px rgba(18, 10, 2, .55), inset 0 1px rgba(255, 246, 214, .45), inset 0 -1px rgba(52, 28, 7, .45), inset 0 0 12px rgba(60, 34, 8, .3); }
+/* The brass lamp plate on each side rail, the same plaque the board's name is engraved on. It carries
+   all six sockets a cell has levels under it, always, so the plate is the same length on every board
+   and only the light on it changes with the board's own depth: six lit at three characters, three at
+   six, none at all at nine - the deepest board wears its plate with every socket dark rather than
+   going without one. Lit in the site's own green, the colour it already uses where something is active. */
+.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: calc(var(--board-frame, 26px) - 6px); padding: 6px 0; }
 .board-frame__lamps--left { left: calc(var(--board-frame, 26px) / 2); }
-.board-frame__lamps--right { right: calc(var(--board-frame, 26px) / 2); }
-/* A board cut to the deepest cell lights nothing, so there is no plate to show either. */
-.board-frame__lamps:empty { display: none; }
-.board-frame__lamp { flex: none; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #eafff2 0%, #93efb4 32%, #62c986 66%, #2f7d4c 100%); box-shadow: 0 0 5px rgba(98, 201, 134, .85), inset 0 1px rgba(255, 255, 255, .7), inset 0 -1px rgba(20, 60, 34, .55); }
-/* Opening a board changes how many lamps there are, and that is a change worth seeing where the
+/* The right plate is the left one's mirror about the board's centre: hung off its own rail by the same
+   distance. The -50% the two plates share shifts a box leftwards, which on this side pulled the plate a
+   whole plate-width in from the rail and left it over the board's own surface, so its own half-width
+   runs the other way instead. */
+.board-frame__lamps--right { right: calc(var(--board-frame, 26px) / 2); translate: 50% -50%; }
+/* A socket in the plate. Unlit is a socket with nothing left to open below it: dark, recessed into the
+   brass, and still drawn, so the plate reads as a gauge that has run down rather than one that is gone. */
+.board-frame__lamp { flex: none; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #6b4a24 0%, #472d13 52%, #241605 100%); box-shadow: inset 0 1px 2px rgba(20, 10, 2, .7), inset 0 0 0 1px rgba(52, 30, 10, .55), 0 1px rgba(255, 246, 214, .3); }
+.board-frame__lamp--lit { background: radial-gradient(circle at 38% 30%, #eafff2 0%, #93efb4 32%, #62c986 66%, #2f7d4c 100%); box-shadow: 0 0 5px rgba(98, 201, 134, .85), inset 0 1px rgba(255, 255, 255, .7), inset 0 -1px rgba(20, 60, 34, .55); }
+/* A board with no cell at all has no depth to read, so there is no plate to show either. A board cut to
+   the deepest cell is not that case: its plate stays on the rail with all six sockets dark. */
+.board-frame__lamps[hidden] { display: none; }
+/* Opening a board changes how many sockets burn, and that is a change worth seeing where the
    reader is already looking. One flash, then still. */
 .board-frame__lamps.is-pulsing { animation: board-lamps-pulse .55s ease-out 1; }
 @keyframes board-lamps-pulse { 0%, 100% { filter: brightness(1); } 45% { filter: brightness(1.85) saturate(1.25); } }

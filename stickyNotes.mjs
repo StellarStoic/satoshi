@@ -63,6 +63,7 @@ import {
   boardTextureTile,
   boardPlateFontSize,
   boardLampCount,
+  BOARD_LAMP_SOCKETS,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
   spentAmberHandOver,} from './stickyNotesModel.mjs';
@@ -1578,17 +1579,21 @@ function lampStrips() {
 }
 
 /**
- * Light the two side rails: one lamp for each level the board's own cell still has under it, as
- * boardLampCount reads it - six at three characters, three at six, none at nine. The lamps are
- * built to that length rather than hidden and shown, so every lamp in the strip burns and a deeper
- * board simply wears a shorter strip: no socket is left dark for a level that has been closed off.
+ * Light the two lamp plates on the side rails. Every plate carries all six sockets a cell has levels
+ * under it, always, and boardLampCount says how many of them burn - six at three characters, three at
+ * six, none at nine. The lit ones are the head of the plate, in the same order on both rails, so the
+ * two plates read alike rather than mirrored and the far end goes dark as the board deepens: a gauge
+ * for the depth still open below the board, and nothing more - no per-note or selection state.
  */
 function renderBoardLamps() {
   const lit = boardLampCount(activeGeohash);
   for (const strip of lampStrips()) {
-    strip.replaceChildren(...Array.from({length: lit}, () => {
+    // No cell at all is no board, so there is no depth to read and no plate to show. A board cut to
+    // the deepest cell is not that case: it keeps its plate, all six sockets dark.
+    strip.hidden = !activeGeohash;
+    strip.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
       const lamp = document.createElement('span');
-      lamp.className = 'board-frame__lamp';
+      lamp.className = index < lit ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
       return lamp;
     }));
   }
@@ -1600,8 +1605,8 @@ function pulseLamps() {
     strip.classList.remove('is-pulsing');
     // The layout is read back between the two: a browser restarts an animation only when the
     // animation property really changed, so putting the class on over itself would leave the next
-    // board unpulsed. One of these per board change, not per frame. A board that lights nothing
-    // still gets its pulse - there is simply no lamp left for it to show on.
+    // board unpulsed. One of these per board change, not per frame. A board whose gauge reads empty
+    // still gets its pulse - its plate is on the rail with every socket dark.
     void strip.offsetWidth;
     strip.classList.add('is-pulsing');
   }

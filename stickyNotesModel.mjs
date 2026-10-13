@@ -1200,11 +1200,19 @@ export function boardPlateFontSize(innerWidth, measuredWidth, maximum) {
 }
 
 /**
- * The lamps a plate carries for a board's own cell: one for each level still open below it. A cell
- * is GEOHASH_MIN_LENGTH to GEOHASH_MAX_LENGTH characters, so a three-character board has all six
- * of them under it and a nine-character one has none - the count is literally
- * GEOHASH_MAX_LENGTH - cell.length, so the strip is exactly as long as what is left to open and
- * there is no dark socket standing in for a level that is gone.
+ * The sockets a lamp plate always carries: one for each level a cell has under it. A cell is
+ * GEOHASH_MIN_LENGTH to GEOHASH_MAX_LENGTH characters, so six levels lie below the shallowest board
+ * and the plate is cut to that - the same six sockets on every board, so the plate never changes
+ * length as the board deepens and the reader never has to count what is missing from it.
+ */
+export const BOARD_LAMP_SOCKETS = GEOHASH_MAX_LENGTH - GEOHASH_MIN_LENGTH;
+
+/**
+ * How many of those six sockets burn for a board's own cell: one for each level still open below it,
+ * so a three-character board lights all six, a six-character one lights three and a nine-character
+ * one lights none at all - the count is literally GEOHASH_MAX_LENGTH - cell.length, and the deepest
+ * board is the one whose gauge reads empty rather than the one whose plate is gone. A cell that
+ * cannot be read lights nothing.
  */
 export function boardLampCount(cell) {
   const length = normaliseGeohash(cell).length;
