@@ -1156,6 +1156,15 @@ export function boardShareUrl(cells, origin = PINSTR_SHARE_ORIGIN) {
 }
 
 /**
+ * The line the hand-over step shows while the signature is on the clipboard: what the reader has,
+ * and the one button that hands it over. Three routes arrive at this state - the pin that sends the
+ * request, the pin that loses its callback, and the page resumed before the callback lands - and one
+ * of them grew its own wording once, so the sentence is written down here and every waiting-state
+ * call site reads it from here. The failure lines that replace it are each written where they happen.
+ */
+export const AMBER_HAND_OVER_WAITING_LINE = 'Amber has it on your clipboard. Tap the button to hand it over.';
+
+/**
  * The line the hand-over step shows for a signature that is already gone. A verified signature
  * spends the request that carried it, so a second tap has nothing to read and nothing to sign in
  * for, and the last line the hand-over left stands as it was.

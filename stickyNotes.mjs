@@ -58,6 +58,7 @@ import {
   boardTextureLabel,
   boardTextureTile,
   boardPlateFontSize,
+  AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
   spentAmberHandOver,} from './stickyNotesModel.mjs';
 import {
@@ -2820,7 +2821,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // back through no focus and no visibility event — and the button it carries reads the clipboard
     // inside the reader's own tap, where user activation permits the read.
     if (!resumedEvent && getNostrSession()?.method === 'amber') {
-      showAmberHandOver('Approve the note in Amber, then come back to this page and tap the button below. Amber copies the signature instead of returning it.');
+      showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
     }
     const event = resumedEvent || await signNostrEvent(template, {orderId: pending.orderId, action: 'pin'});
     // A signing request that travels through Amber hands nothing back here: the answer arrives on the
@@ -2830,7 +2831,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // waited for.
     if (!event) {
       if (amberSignaturePending()) {
-        showAmberHandOver('Approve the note in Amber, then come back to this page. Amber copies the signature instead of returning it, and the note pins itself.');
+        showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
         startAmberClipboardPoll();
       }
       return;
@@ -4510,9 +4511,8 @@ function showAmberHandOver(message) {
   if (elements.login.open) elements.login.close();
   if (!elements.amberDialog.open) elements.amberDialog.showModal();
   // This step is a signature, and the front of the dialog has to say which one it is: a sign-in and a
-  // signature are the same clipboard step. Where the signature actually goes is named on the dialog's
-  // one line, in the messages that pass through here - Amber copies it rather than calling this page
-  // back, which is not something a reader can guess.
+  // signature are the same clipboard step. What is waiting and what to tap are named on the dialog's
+  // one line, in the messages that pass through here.
   elements.amberCopyTitle.textContent = 'Finish signing with Amber';
   status(elements.amberCopyStatus, message);
 }
@@ -4642,7 +4642,7 @@ function startAmberClipboardPoll() {
   // path does. The poll still watches the clipboard in the background: the reader may never come back
   // to the dialog, and an answer Amber has already copied must not be left unread.
   if (!elements.amberDialog.open) {
-    showAmberHandOver('Approve the note in Amber, then come back to this page and tap the button below. Amber copies the signature instead of returning it.');
+    showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
   }
   amberClipboardDeadline = Date.now() + AMBER_CLIPBOARD_POLL_TIMEOUT_MS;
   if (amberClipboardTimer) return;
@@ -4695,7 +4695,7 @@ async function resumeExternalFlow() {
         // when it is not.
         await completeAmberSignature(automatic);
       } else {
-        showAmberHandOver('Amber has the signature on your clipboard. Tap the button to hand it over.');
+        showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
         // A resume is not the reader coming back for certain - Android fires none of these events on
         // the way home - so the clipboard keeps being watched rather than the answer being left for an
         // event that will not come.

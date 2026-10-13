@@ -20,6 +20,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   boardPlateFontSize,
   boardShareUrl,
   linkMatches,
+  AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
   spentAmberHandOver,} from '../stickyNotesModel.mjs';
 
@@ -2019,7 +2020,8 @@ test('a signature that is copied, not called back, is finished or sent again thr
   assert.match(resume, /const automatic = await adoptParkedSignature\(\);/);
   assert.match(resume, /if \(automatic\?\.action === 'sign'\) \{[\s\S]{0,300}await completeAmberSignature\(automatic\);/,
     'a resume that read the signature finishes the round trip; the hand-over stays up until it does');
-  assert.match(resume, /showAmberHandOver\('Amber has the signature on your clipboard\. Tap the button to hand it over\.'\)/);
+  assert.match(resume, /showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\);/,
+    'a resumed page waiting on the clipboard gets the one waiting-state sentence');
   assert.match(resume, /'The signer did not come back with a signature\. Your note is still here — pin it again\.'/);
   assert.match(resume, /showAmberHandOver\('Amber did not come back with a signature\. Tap the button to send the request again\.'\)/);
   // A resume that did not finish starts the poll, because the resume event may itself be a false
@@ -2072,10 +2074,12 @@ test('a pin that is waiting on Amber says so instead of returning in silence', a
   const board = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
 
   // In Amber both buttons close the app, so a page that says nothing is indistinguishable from a
-  // page that is broken. The reader is told what to expect and what to do.
+  // page that is broken. The reader is told what they have and what to tap: one sentence, written
+  // once, because this state is reached by more than one route.
   assert.match(board, /if \(!event\) \{\s*if \(amberSignaturePending\(\)\) \{/, 'a pending Amber signature must not return silently');
-  assert.match(board, /Amber copies the signature instead of returning it/, 'the reader must be told where the signature goes');
-  assert.match(board, /then come back to this page/, 'the reader must be told what to do');
+  assert.match(board, /showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\);/, 'the reader must be told where the signature is waiting');
+  assert.equal(AMBER_HAND_OVER_WAITING_LINE, 'Amber has it on your clipboard. Tap the button to hand it over.',
+    'the waiting-state sentence is the reader\'s own words, verbatim');
 });
 
 test('the copied signature is polled for, because Android fires no return event', async () => {
@@ -2120,7 +2124,7 @@ test('the copied signature is polled for, because Android fires no return event'
 
   // Started where a copy-route request is made and where a reloaded page finds one still parked,
   // stopped when the request is spent, when the reader closes the step, and on the timeout.
-  assert.match(script, /showAmberHandOver\('Approve the note in Amber[\s\S]{0,220}startAmberClipboardPoll\(\);/);
+  assert.match(script, /showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\);[\s\S]{0,220}startAmberClipboardPoll\(\);/);
   assert.match(script, /beginAmberSigning\(parked\.template, parked\.context, \{copy: true\}\);[\s\S]{0,240}startAmberClipboardPoll\(\);/);
   assert.match(script, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/);
   assert.match(script, /stopAmberClipboardPoll\(\);\s+status\(elements\.amberCopyStatus, ''\);/);
@@ -2160,13 +2164,24 @@ test('the hand-over dialog is one line and one button, and every message rides t
   assert.doesNotMatch(script, /amberCopyNote/, 'no code writes a note element that no longer exists');
   assert.match(script, /amberCopyStatus: document\.getElementById\('amberCopyStatus'\),/);
 
-  // The copy that was removed does not come back through the page: neither the steps nor the
-  // explanation that said what the one line now says.
+  // The waiting-state sentence is the reader's own words, written down once in the model and read
+  // at every call site that reaches that state. Three routes arrive there - the pin that sends the
+  // request, the pin that loses its callback, and the page resumed before the callback lands - and
+  // one of them used to carry a sentence of its own, which is how the wording the reader asked for
+  // stopped reaching them.
+  assert.equal(AMBER_HAND_OVER_WAITING_LINE, 'Amber has it on your clipboard. Tap the button to hand it over.');
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 4,
+    'every waiting-state call site writes the one waiting-state sentence');
+
+  // The copy that was removed does not come back through the page: neither the steps, nor the
+  // explanation that said what the one line now says, nor the two-sentence waiting copy that the
+  // dialog was handed at the moment it opened and the reader therefore never read.
   for (const gone of [
     /Approve the request in Amber\./,
     /Nothing is handed between the two apps/,
     /This page fills it in by itself/,
-    /Amber copies the signature instead of returning it to this page\./,
+    /Approve the note in Amber, then come back to this page/,
+    /Amber copies the signature instead of returning it/,
   ]) {
     assert.doesNotMatch(markup, gone, `removed copy is still in the page: ${gone}`);
     assert.doesNotMatch(script, gone, `removed copy is still in the script: ${gone}`);
@@ -2257,9 +2272,13 @@ test('the hand-over control is in front of the reader the moment a copy request 
   assert.match(pin, /if \(!resumedEvent && getNostrSession\(\)\?\.method === 'amber'\) \{\s+showAmberHandOver\(/,
     'only the Amber route opens the hand-over, and only for a live request');
 
-  // The wording says what to do, in the order the reader has to do it.
-  assert.match(script, /Approve the note in Amber, then come back to this page/,
-    'the reader must be told to approve and come back to the hand-over');
+  // The wording says what the reader has and what to tap, in that order: the signature is already on
+  // the clipboard, and the one button hands it over. It is the same sentence every route to this
+  // state writes, read from the one place it is written down.
+  assert.match(pin, /showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/,
+    'the reader must be told the signature is on the clipboard and which button hands it over');
+  assert.equal(AMBER_HAND_OVER_WAITING_LINE, 'Amber has it on your clipboard. Tap the button to hand it over.',
+    'the waiting-state sentence is the reader\'s own words, verbatim');
 
   // Every way the poll starts surfaces the control first, so a reloaded page or a resume gets it too
   // without waiting for an event this device never fires.
