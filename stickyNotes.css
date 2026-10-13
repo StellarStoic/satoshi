@@ -63,8 +63,8 @@
 .login-confirmation { position: absolute; inset: 50% auto auto 50%; z-index: 30; translate: -50% -50%; max-width: min(88vw, 420px); padding: 12px 16px; color: #fff; background: rgba(22, 18, 14, .9); border: 1px solid rgba(242, 169, 0, .55); border-radius: 6px; box-shadow: 0 12px 34px rgba(0, 0, 0, .28); text-align: center; pointer-events: none; }
 /* The board's brass, declared once and worn by both plaques: the name plates on the top and bottom
    rails and the lamp plates on the side rails are the same metal, so the edge, the bevel and the wear
-   are written here rather than invented a second time for the lamps. Only the size and what sits on
-   the plate differ - an engraved line, or a column of sockets. */
+   are written here rather than invented a second time for the lamps. Only what sits on the plate
+   differs - an engraved line, or a column of sockets - and both are cut to the same measure. */
 .board-plate,
 .board-frame__lamps { box-sizing: border-box; border: 1px solid rgba(52, 30, 10, .82); border-radius: 5px; background: linear-gradient(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 3px 8px rgba(18, 10, 2, .6), 0 1px 2px rgba(18, 10, 2, .5), inset 0 1px rgba(255, 246, 214, .45), inset 0 -2px rgba(52, 28, 7, .5), inset 0 0 0 3px rgba(255, 240, 200, .07), inset 0 0 22px rgba(60, 34, 8, .3); }
 /* The board's own name, engraved on a small brass plate on the bottom rail - the one place on the
@@ -82,12 +82,16 @@
    both of them are the control that shares it: one plate, worn twice, rather than a second look
    invented for the same job. Only the edge it hangs from differs. */
 .board-plate--top { top: calc(8px - var(--board-frame, 26px)); bottom: auto; }
-/* The brass lamp plate on each side rail, the same plaque the board's name is engraved on. It carries
-   all six sockets a cell has levels under it, always, so the plate is the same length on every board
-   and only the light on it changes with the board's own depth: six lit at three characters, three at
-   six, none at all at nine - the deepest board wears its plate with every socket dark rather than
-   going without one. Lit in the site's own green, the colour it already uses where something is active. */
-.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: calc(var(--board-frame, 26px) - 6px); padding: 6px 0; }
+/* The brass lamp plate on each side rail, the same plaque the board's name is engraved on - and worn
+   at the same size, so the two read as one piece of furniture rather than a wide plaque and a thin
+   one. The name plate measures 620px along its rail by 46px across it, so this plate wears that
+   measure turned on its side: the same cross-section across the rail it hangs from, the same length
+   down it. It carries all six sockets a cell has levels under it, always, so the plate is the same
+   size on every board and only the light on it changes with the board's own depth: six lit at three
+   characters, three at six, none at all at nine - the deepest board wears its plate with every socket
+   dark rather than going without one. Lit in the site's own green, the colour it already uses where
+   something is active. */
+.board-frame__lamps { position: absolute; top: 50%; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 46px; height: 620px; padding: 20px 0; }
 .board-frame__lamps--left { left: calc(var(--board-frame, 26px) / 2); }
 /* The right plate is the left one's mirror about the board's centre: hung off its own rail by the same
    distance. The -50% the two plates share shifts a box leftwards, which on this side pulled the plate a
@@ -96,7 +100,7 @@
 .board-frame__lamps--right { right: calc(var(--board-frame, 26px) / 2); translate: 50% -50%; }
 /* A socket in the plate. Unlit is a socket with nothing left to open below it: dark, recessed into the
    brass, and still drawn, so the plate reads as a gauge that has run down rather than one that is gone. */
-.board-frame__lamp { flex: none; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #6b4a24 0%, #472d13 52%, #241605 100%); box-shadow: inset 0 1px 2px rgba(20, 10, 2, .7), inset 0 0 0 1px rgba(52, 30, 10, .55), 0 1px rgba(255, 246, 214, .3); }
+.board-frame__lamp { flex: none; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #6b4a24 0%, #472d13 52%, #241605 100%); box-shadow: inset 0 1px 2px rgba(20, 10, 2, .7), inset 0 0 0 1px rgba(52, 30, 10, .55), 0 1px rgba(255, 246, 214, .3); }
 .board-frame__lamp--lit { background: radial-gradient(circle at 38% 30%, #eafff2 0%, #93efb4 32%, #62c986 66%, #2f7d4c 100%); box-shadow: 0 0 5px rgba(98, 201, 134, .85), inset 0 1px rgba(255, 255, 255, .7), inset 0 -1px rgba(20, 60, 34, .55); }
 /* A board with no cell at all has no depth to read, so there is no plate to show either. A board cut to
    the deepest cell is not that case: its plate stays on the rail with all six sockets dark. */

@@ -1963,8 +1963,24 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   assert.match(css,
     /\.board-plate,\n\.board-frame__lamps \{ box-sizing: border-box; border: 1px solid rgba\(52, 30, 10, \.82\);[^}]*linear-gradient\(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%\)[^}]*inset 0 0 22px rgba\(60, 34, 8, \.3\)/,
     'the lamps are mounted on the same brass the board\'s own plate is made of');
-  assert.match(css, /\.board-frame__lamps \{[^}]*width: calc\(var\(--board-frame, 26px\) - 6px\)/,
-    'the plate is a body on the rail, not a bare row of lights');
+  // And it is worn at the name plate's own size rather than as a thinner variant of it: the name
+  // plate measures 620px along its rail by 46px across it, so the lamp plate wears that measure
+  // turned on its side - the same cross-section across the rail it hangs from, the same length down
+  // it. The sizes are read off the plates themselves rather than pinned, so the six sockets and the
+  // air between them still have to fit inside whatever measure the two plaques are cut to next.
+  const namePlate = /\.board-plate \{[^}]*width: (\d+)px; height: (\d+)px/.exec(css);
+  const lampPlate = /\.board-frame__lamps \{[^}]*gap: (\d+)px; width: (\d+)px; height: (\d+)px; padding: (\d+)px 0/.exec(css);
+  const socket = /\.board-frame__lamp \{ flex: none; width: (\d+)px; height: (\d+)px/.exec(css);
+  assert.ok(namePlate && lampPlate && socket, 'both plaques and the socket carry their measure in the CSS');
+  const [nameWidth, nameHeight] = [Number(namePlate[1]), Number(namePlate[2])];
+  const [lampGap, lampWidth, lampLength, lampPadding] = [Number(lampPlate[1]), Number(lampPlate[2]), Number(lampPlate[3]), Number(lampPlate[4])];
+  const [lampDiameter, lampAcross] = [Number(socket[1]), Number(socket[2])];
+  assert.equal(lampWidth, nameHeight, 'the lamp plate is as thick across its rail as the name plate');
+  assert.equal(lampLength, nameWidth, 'and as long down the rail as the name plate is wide');
+  assert.equal(lampDiameter, lampAcross, 'a socket is round');
+  assert.ok(lampDiameter + 2 <= lampWidth, 'a socket fits across the plate it is set in');
+  assert.ok(BOARD_LAMP_SOCKETS * lampDiameter + (BOARD_LAMP_SOCKETS - 1) * lampGap + 2 * lampPadding <= lampLength,
+    'all six sockets sit inside the plate, with the plate\u2019s own padding to spare');
 });
 
 test('the top rail wears the bottom rail\u2019s plate, and both of them share the board', async () => {
