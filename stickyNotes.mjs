@@ -2805,7 +2805,7 @@ function discardPendingNote() {
   setTimeout(() => { elements.boardStatus.hidden = true; }, 4500);
 }
 
-async function publishPinnedNote(resumedEvent = null) {
+async function publishPinnedNote(resumedEvent = null, report = null) {
   let published = false;
   try {
     elements.pin.disabled = true;
@@ -2850,6 +2850,9 @@ async function publishPinnedNote(resumedEvent = null) {
     // Signal before clearing the shared draft. Amber may have returned into a browser tab
     // while the installed PWA is still visible; this lets that original board finish too.
     signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
+    // The flow that launched this publish hears the outcome before anything else, so it can retire
+    // its own wait even when this page's reader has already looked away.
+    report?.(true, result.message || 'Your note is pinned.');
     savePending(null);
     elements.editor.textContent = '';
     elements.hashtags.value = '';
@@ -2874,11 +2877,15 @@ async function publishPinnedNote(resumedEvent = null) {
       status(elements.boardStatus, 'Your note is pinned.');
       elements.boardStatus.hidden = false;
       published = true;
+      report?.(true, 'Your note is pinned.');
       if (activeGeohash) connectBoard();
       return;
     }
     status(elements.boardStatus, error.message, true);
     elements.boardStatus.hidden = false;
+    // The desk refused the publish, or the page never reached it. Either way the round trip that
+    // handed the signature over has to say so where it was being watched.
+    report?.(false, error.message);
   } finally {
     elements.pin.disabled = published;
   }
@@ -3779,10 +3786,10 @@ elements.amberPaste.addEventListener('click', async () => {
     // the clipboard, the one return path Android cannot drop. Anything else is an ordinary sign-in.
     const parked = pendingAmberRequest();
     if (parked?.action === 'sign' && parked.copy) {
-      status(elements.amberCopyStatus, 'Reading what Amber copied...');
+      // The read happens here, inside the reader's own tap, which is the only place the browser is
+      // guaranteed to allow it — this is the read that cannot be refused.
+      sayAmberRoundTrip('Amber has copied a signature - reading it');
       const answer = await adoptAmberSignature();
-      status(elements.amberCopyStatus, '');
-      if (elements.amberDialog.open) elements.amberDialog.close();
       await completeAmberSignature(answer);
       return;
     }
@@ -4442,7 +4449,8 @@ async function applySignerReturn() {
  * Apply a signature that came back through the clipboard, exactly as the callback route does: tell
  * the flow that launched the request, then publish the paid note the signature belongs to. A
  * signature for another note is named rather than dropped - that note is paid for and one tap from
- * being pinned.
+ * being pinned. Every stage of the round trip is written where the reader is looking, and the last
+ * line stays up: a round trip between two apps has to be diagnosable from the page.
  */
 async function completeAmberSignature(answer) {
   if (!answer || answer.action !== 'sign') return false;
@@ -4450,14 +4458,34 @@ async function completeAmberSignature(answer) {
   stopAmberClipboardPoll();
   // A note that is already pinned leaves nothing to finish here, and a duplicate of its own signature
   // arriving from a second path must not be announced as a signature for some other note.
-  if (!pending?.orderId) return false;
-  if (pending?.orderId !== answer.context?.orderId) {
-    notice('That signature was for a different note. Your note is still here — pin it again.');
+  if (!pending?.orderId) {
+    // The signature was handed over twice, or the note is already pinned. Saying so beats going quiet
+    // on a reader who is watching this line.
+    sayAmberRoundTrip('This signature was already handed over - there is nothing left to pin.');
     return false;
   }
+  if (pending?.orderId !== answer.context?.orderId) {
+    const mismatch = 'That signature did not match your note. Your note is still here - pin it again.';
+    sayAmberRoundTrip(mismatch, true);
+    notice(mismatch);
+    return false;
+  }
+  sayAmberRoundTrip('Signature verified - pinning your note');
   signalStickyFlow('signed', {orderId: pending.orderId});
-  await publishPinnedNote(answer.event);
-  return true;
+  // The publish is the last thing that can refuse, and its own words are what the reader gets,
+  // prefixed so it is clear the signature was good and it was the desk that said no.
+  let outcome = null;
+  await publishPinnedNote(answer.event, (published, message) => { outcome = {published, message}; });
+  if (outcome?.published) {
+    sayAmberRoundTrip('Your note is pinned');
+    // The hand-over has done its job; the board's own line about the pin is the one that stays.
+    if (elements.amberDialog.open) elements.amberDialog.close();
+  } else if (outcome?.message) {
+    sayAmberRoundTrip(`The server refused the pin: ${outcome.message}`, true);
+  } else {
+    sayAmberRoundTrip('The pin did not finish. Your note is still here - try again.', true);
+  }
+  return Boolean(outcome?.published);
 }
 
 /**
@@ -4541,7 +4569,12 @@ async function adoptParkedSignature() {
   amberAdoptRunning = true;
   amberLastReadCode = '';
   try {
-    return await adoptAmberSignature({silent: true, onStatus: code => { amberLastReadCode = code; }});
+    return await adoptAmberSignature({silent: true, onStatus: code => {
+      amberLastReadCode = code;
+      // The one code that means the round trip may be finishing: something that is not this page's
+      // own marker is on the clipboard, and it is about to be judged.
+      if (code === 'copied') sayAmberRoundTrip('Amber has copied a signature - reading it');
+    }});
   } catch { return null; } finally { amberAdoptRunning = false; }
 }
 
@@ -4575,7 +4608,6 @@ async function pollAmberClipboard() {
     return;
   }
   stopAmberClipboardPoll();
-  if (elements.amberDialog.open) elements.amberDialog.close();
   await completeAmberSignature(answer);
 }
 
@@ -4637,7 +4669,9 @@ async function resumeExternalFlow() {
       // allows the read; where it does not, the button that always works is put in front of the reader.
       const automatic = await adoptParkedSignature();
       if (automatic?.action === 'sign') {
-        if (elements.amberDialog.open) elements.amberDialog.close();
+        // The hand-over stays up through the publish so the reader can see each stage of it;
+        // completeAmberSignature closes it once the note is pinned, and leaves it up with the reason
+        // when it is not.
         await completeAmberSignature(automatic);
       } else {
         showAmberHandOver('Amber has the signature on your clipboard. Tap the button to hand it over.');

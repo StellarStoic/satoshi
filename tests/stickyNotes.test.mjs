@@ -2015,7 +2015,8 @@ test('a signature that is copied, not called back, is finished or sent again thr
     script.indexOf("window.addEventListener('hashchange'"));
   assert.match(resume, /amberSignaturePending\(\)/);
   assert.match(resume, /const automatic = await adoptParkedSignature\(\);/);
-  assert.match(resume, /if \(automatic\?\.action === 'sign'\) \{\s+if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\);\s+await completeAmberSignature\(automatic\);/);
+  assert.match(resume, /if \(automatic\?\.action === 'sign'\) \{[\s\S]{0,300}await completeAmberSignature\(automatic\);/,
+    'a resume that read the signature finishes the round trip; the hand-over stays up until it does');
   assert.match(resume, /showAmberHandOver\('Amber has the signature on your clipboard\. Tap the button to hand it over\.'\)/);
   assert.match(resume, /'The signer did not come back with a signature\. Your note is still here — pin it again\.'/);
   assert.match(resume, /showAmberHandOver\('Amber did not come back with a signature\. Tap the button to send the request again\.'\)/);
@@ -2040,7 +2041,8 @@ test('a signature that is copied, not called back, is finished or sent again thr
     script.indexOf('function showAmberHandOver'));
   assert.match(complete, /pending\?\.orderId !== answer\.context\?\.orderId/);
   assert.match(complete, /signalStickyFlow\('signed', \{orderId: pending\.orderId\}\)/);
-  assert.match(complete, /await publishPinnedNote\(answer\.event\)/);
+  assert.match(complete, /await publishPinnedNote\(answer\.event,/,
+    'the publish reports its own outcome back to the round trip');
 });
 
 
@@ -2120,7 +2122,7 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(script, /beginAmberSigning\(parked\.template, parked\.context, \{copy: true\}\);[\s\S]{0,240}startAmberClipboardPoll\(\);/);
   assert.match(script, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/);
   assert.match(script, /stopAmberClipboardPoll\(\);\s+status\(elements\.amberCopyStatus, ''\);/);
-  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,200}if \(!pending\?\.orderId\) return false;[\s\S]{0,120}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
+  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,200}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
 
   // The manual step in front of the reader still exists, and it names where the signature goes.
   assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
@@ -2201,4 +2203,49 @@ test('the hand-over control is in front of the reader the moment a copy request 
     script.indexOf("elements.nostrConnectCopy.addEventListener"));
   assert.match(paste, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/,
     'a refused tap read restarts the watch');
+});
+
+test('the clipboard round trip says on the page where it got to', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const complete = script.slice(script.indexOf('async function completeAmberSignature'),
+    script.indexOf('function showAmberHandOver'));
+
+  // Each stage of the round trip writes one line, and the last one stays up.
+  assert.match(script, /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
+    'the stage where a value is being read');
+  assert.match(complete, /sayAmberRoundTrip\('Signature verified - pinning your note'\)/);
+  assert.match(complete, /sayAmberRoundTrip\('Your note is pinned'\)/);
+
+  // The poll ticks twice a second, so the same sentence must be written once, not re-announced.
+  const say = script.slice(script.indexOf('function sayAmberRoundTrip'), script.indexOf('function amberReadFailure'));
+  assert.match(say, /if \(elements\.amberCopyStatus\.textContent === message/);
+
+  // Each failure point gets its own sentence, so a round trip that stops says where it stopped.
+  assert.match(script, /The browser would not let the page read the clipboard\. Tap the button below to read what Amber copied\./,
+    'a read the browser refused');
+  assert.match(script, /This page cannot read the clipboard while it is in the background\. Tap the button below to read what Amber copied\./,
+    'a read refused while the page does not claim focus');
+  assert.match(script, /Nothing valid on the clipboard yet\. Approve the note in Amber, then come back and tap the button below\./);
+  assert.match(complete, /That signature did not match your note\. Your note is still here - pin it again\./,
+    'a signature that belongs to another note');
+  assert.match(complete, /The server refused the pin: \$\{outcome\.message\}/,
+    "the desk's own words are what the reader gets when the publish is refused");
+  assert.match(complete, /The pin did not finish\. Your note is still here - try again\./);
+
+  // The publish is the last thing that can refuse, and it reports back to the round trip that is
+  // watching, including the already-pinned answer a second Android context can produce.
+  const publish = script.slice(script.indexOf('async function publishPinnedNote'), script.indexOf('function closeNoteMenu'));
+  assert.match(publish, /report\?\.\(true, result\.message \|\| 'Your note is pinned\.'\);/);
+  assert.match(publish, /report\?\.\(true, 'Your note is pinned\.'\);/);
+  assert.match(publish, /report\?\.\(false, error\.message\);/);
+
+  // The hand-over stays up through the publish so those lines can be read: it is closed on success
+  // only, and the poll no longer closes it on the way in.
+  assert.match(complete, /if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\);/);
+  const poll = script.slice(script.indexOf('async function pollAmberClipboard'),
+    script.indexOf('function startAmberClipboardPoll'));
+  assert.doesNotMatch(poll, /amberDialog\.close\(\)/,
+    'the poll leaves the hand-over up so the publish stages are visible');
+  // The 120 s timeout state is unchanged.
+  assert.match(script, /AMBER_CLIPBOARD_POLL_TIMEOUT_MS = 120000;/);
 });
