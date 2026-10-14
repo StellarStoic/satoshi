@@ -268,6 +268,7 @@
 .draft-note.sticky-note--dense .sticky-editor { left: 1em; right: 1em; max-height: calc(100% - 2.84em); }
 .sticky-editor:empty::before { content: attr(data-placeholder); color: rgba(38,35,30,.42); }
 .color-swatches { display: flex; gap: 12px; margin: 4px 0 8px; }.swatch { width: 30px; height: 30px; border: 2px solid transparent; border-radius: 50%; background: #f7dc63; cursor: pointer; }.swatch--pink { background:#f3a7c4 }.swatch--blue { background:#91d2eb }.swatch--green { background:#acd986 }.swatch--orange { background:#f4b266 }.swatch.is-selected { border-color: #fff; box-shadow: 0 0 0 2px var(--accent, #f2a900); }
+.draft-note[hidden], .composer-count[hidden] { display: none; }
 .composer-count { min-height: 22px; margin: 4px 0 10px; color: #aeb0ae; font-size: .8rem; }.composer-count #noteCapacity { transition: color .16s ease, text-shadow .16s ease; }.composer-count #noteCapacity.is-almost-full { color: var(--accent, #f2a900); }.composer-count #noteCapacity.is-full { color: #ff625b; font-weight: 700; text-shadow: 0 0 10px rgba(255,98,91,.25); }.pay-button { width: min(280px, 100%); margin-top: 8px; }
 /* The two things a note can be, and the picture side of the composer. The grades are drawn
    here, from the very list the desk is told about, so what the reader picks between is a look

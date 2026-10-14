@@ -266,21 +266,21 @@
   <dialog id="composerDialog" class="sticky-dialog composer-dialog" aria-labelledby="composerTitle">
     <div class="dialog-inner composer-inner">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
-      <h2 id="composerTitle">Write your note</h2>
+      <h2 id="composerTitle">Pin a note</h2>
       <div class="note-kind" id="noteKind" role="group" aria-label="What to pin">
-        <button type="button" class="note-kind__button is-selected" data-note-kind="text" aria-pressed="true"><i class="lni lni-text-format" aria-hidden="true"></i><span>Written note</span></button>
-        <button type="button" class="note-kind__button" data-note-kind="image" aria-pressed="false"><i class="lni lni-image-1" aria-hidden="true"></i><span>Pinned picture</span></button>
+        <button type="button" class="note-kind__button is-selected" data-note-kind="text" aria-pressed="true"><i class="lni lni-text-format" aria-hidden="true"></i><span>Note</span></button>
+        <button type="button" class="note-kind__button" data-note-kind="image" aria-pressed="false"><i class="lni lni-image-1" aria-hidden="true"></i><span>Picture</span></button>
       </div>
       <div id="draftNote" class="sticky-note sticky-note--yellow draft-note">
         <div id="stickyEditor" class="sticky-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Type here..." spellcheck="true"></div>
       </div>
-      <div class="composer-count"><span id="noteCapacity">The paper is empty</span></div>
+      <div class="composer-count" id="composerCount"><span id="noteCapacity">The paper is empty</span></div>
       <div id="mentionMenu" class="mention-menu" hidden>
         <ul id="mentionOptions" class="mention-menu__list" role="listbox" aria-label="People you can tag"></ul>
         <div id="mentionMenuStatus" class="mention-menu__status" role="status" aria-live="polite"></div>
       </div>
       <div id="noteImage" class="note-image" hidden>
-        <p class="note-image__lead">The site presses this into a vintage print and keeps it for as long as the note lives. The paper carries the picture and your signature, so words are optional — write them only if you want them in the note.</p>
+        <p class="note-image__lead">The site presses this into a vintage print and keeps it for as long as the note lives. The paper carries the picture and your signature, and no words on it.</p>
         <label class="note-image__pick" for="noteImageFile"><span>Choose a picture <small id="noteImageLimit">up to 7 MB</small></span>
           <input id="noteImageFile" type="file" accept="image/*" aria-describedby="noteImageStatus">
         </label>

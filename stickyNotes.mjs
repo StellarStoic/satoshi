@@ -172,6 +172,8 @@ const elements = {
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
   noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
+  draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
+  composerTitle: document.getElementById('composerTitle'),
   noteImageFile: document.getElementById('noteImageFile'), noteImageStatus: document.getElementById('noteImageStatus'),
   noteImageLimit: document.getElementById('noteImageLimit'), noteImageGradeList: document.getElementById('noteImageGradeList'),
   noteImagePreview: document.getElementById('noteImagePreview'), noteImagePreviewLabel: document.getElementById('noteImagePreviewLabel'),
@@ -2552,7 +2554,14 @@ function selectNoteKind(kind) {
     button.setAttribute('aria-pressed', String(chosen));
   });
   if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
-  elements.editor.setAttribute('data-placeholder', noteKind === 'image' ? 'A few words, if you like...' : 'Type here...');
+  // A picture note has no words on it, so the paper and the counter are offered to a written note
+  // only: an empty text box, or a placeholder asking for words, invites typing that the print
+  // would never show anyone.
+  if (elements.draftNote) elements.draftNote.hidden = noteKind === 'image';
+  if (elements.composerCount) elements.composerCount.hidden = noteKind === 'image';
+  // The heading says what is being pinned, in the word this board uses everywhere else for it.
+  if (elements.composerTitle) elements.composerTitle.textContent = noteKind === 'image' ? 'Pin a picture' : 'Pin a note';
+  elements.editor.setAttribute('data-placeholder', 'Type here...');
   if (noteKind === 'image') renderImageGrades();
   requestAnimationFrame(() => { fitDraftTypography(); updateCapacity(); });
 }
@@ -2682,15 +2691,18 @@ async function startPayment() {
       throw new Error('Choose the geohash board again, then reopen the note.');
     }
     await ensureReadySigner();
-    const mentions = editorMentions();
-    const content = normaliseStickyText(editorContent());
+    // A picture note carries no words at all: its paper is not even offered, and whatever a
+    // written draft left in it is not part of the note — the print has no words on it, so they
+    // would be paid for, published, and never shown to anyone.
+    const pictureComing = noteKind === 'image';
+    const mentions = pictureComing ? [] : editorMentions();
+    const content = pictureComing ? '' : normaliseStickyText(editorContent());
     // A written note has to say something. A pinned picture is the note itself, so it may be
     // placed with no words at all — but never with no picture: that is asked here, before
     // anything is ordered, so an empty note cannot reach the desk without one.
-    const pictureComing = noteKind === 'image';
     if (!content && !pictureComing) throw new Error('Write something on the note first.');
     if (pictureComing && !pickedImage && !pending?.image) throw new Error('Choose the picture first, then place it.');
-    if (editorOverflows()) throw new Error('The note is too full.');
+    if (!pictureComing && editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
     status(elements.paymentStatus, quotedPrice === 0 ? 'Checking your subscription...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
