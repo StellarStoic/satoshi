@@ -985,7 +985,9 @@ export function normaliseStickyHashtags(input) {
 
 export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], image = '', liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
-  if (!text) throw new Error('Write something on the note first.');
+  // Words are what a written note is; a pinned picture is the note itself and needs none.
+  // With neither the note would be blank paper, which is what the desk refuses too.
+  if (!text && !image) throw new Error('Write something on the note first.');
   if (stickyNoteLength(text) > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
@@ -1036,7 +1038,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment this note stops existing, relay-side.
     [EXPIRATION_TAG, String(createdAt + rung.seconds)],
-    ['alt', 'A Pinstr note pinned on satoshi.si'],
+    ['alt', picture ? 'A picture pinned on this board' : 'A Pinstr note pinned on satoshi.si'],
   ];
   if (anonymous) tags.push(['anonymous', '24h-local-key']);
   return {
@@ -1055,7 +1057,13 @@ export function parseStickyEvent(event) {
   const font = sticky[6] || 'typewriter';
   if (!STICKY_FONTS.includes(font)) return null;
   const content = normaliseStickyText(event.content);
-  if (!content || stickyNoteLength(content) > STICKY_MAX_CHARACTERS) return null;
+  // The picture the note points at, read through the same door as it is written through:
+  // an address outside the site's own print path is dropped, so a note drawn from an
+  // untrusted relay cannot make this board fetch a picture from somewhere else.
+  const image = stickyImageUrl(event.tags.find(tag => tag?.[0] === STICKY_IMAGE_TAG)?.[1]);
+  // A published note carries words, or a picture, or both — a pinned picture is the note
+  // itself and may have no words at all. Anything with neither is not a note this board shows.
+  if ((!content && !image) || stickyNoteLength(content) > STICKY_MAX_CHARACTERS) return null;
   const named = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
   if (!named.length) return null;
   // The deepest tags are the cells the note was pinned to; anything shallower is a
@@ -1067,10 +1075,6 @@ export function parseStickyEvent(event) {
   const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
   const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
-  // The picture the note points at, read through the same door as it is written through:
-  // an address outside the site's own print path is dropped, so a note drawn from an
-  // untrusted relay cannot make this board fetch a picture from somewhere else.
-  const image = stickyImageUrl(event.tags.find(tag => tag?.[0] === STICKY_IMAGE_TAG)?.[1]);
   // A note that names no moment is not a note this board shows. Every note is
   // temporary (NIP-40), so one without an expiration tag is either older than the
   // rule or written past the desk — either way it would sit on the relay forever,
@@ -1100,11 +1104,28 @@ export function parseStickyEvent(event) {
   };
 }
 
-export async function stickyContentHash(content, color, font = 'typewriter', cryptoObject = globalThis.crypto) {
+export async function stickyContentHash(content, color, font = 'typewriter', cryptoObject = globalThis.crypto, { picture = false } = {}) {
   const text = normaliseStickyText(content);
-  if (!text || !STICKY_COLORS.includes(color) || !STICKY_FONTS.includes(font)) throw new Error('The note is incomplete.');
+  // The commitment that is paid for. A written note must say something; a pinned picture is
+  // the note itself, so with no words it commits to the picture instead — the desk checks the
+  // same emptiness on its side, against the order that already holds the stored print.
+  if ((!text && !picture) || !STICKY_COLORS.includes(color) || !STICKY_FONTS.includes(font)) throw new Error('The note is incomplete.');
   const bytes = new TextEncoder().encode(`${STICKY_VERSION}\n${color}\n${font}\n${text}`);
   const digest = await cryptoObject.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The digest of the picture file the reader picked, as the desk's pay-once rule needs it.
+ *
+ * Deliberately not part of what is paid for, and never checked against the stored print:
+ * uploading re-encodes the picture, so the stored bytes are not these bytes and the two digests
+ * can never agree. It is sent for one reason — with no words a picture note commits to nothing
+ * but the paper and the font, so without it the desk cannot tell two wordless pictures apart and
+ * would refuse the second one as "already pinned" while the first was still live.
+ */
+export async function stickyPictureDigest(file, cryptoObject = globalThis.crypto) {
+  const digest = await cryptoObject.subtle.digest('SHA-256', new Uint8Array(await file.arrayBuffer()));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 

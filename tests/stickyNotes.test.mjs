@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {webcrypto} from 'node:crypto';
+import {webcrypto, createHash} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
-  geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
+  geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyPictureDigest, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
   boardPatternScale,
   BOARD_TILE_PX,
@@ -2756,7 +2756,7 @@ test('the six grade mockups are drawn in the browser from those grades, and neve
   assert.match(html, /data-note-kind="image"/);
 });
 
-test('a picture note carries its address in exactly one image tag, and nothing else about the note changes', async () => {
+test('a picture note carries its address in exactly one image tag, and leaves every other tag alone', async () => {
   const pictured = makeStickyTemplate({content: 'A morning in the hills', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, image: PICTURE_URL});
   assert.deepEqual(pictured.tags.find(tag => tag[0] === STICKY_IMAGE_TAG), [STICKY_IMAGE_TAG, PICTURE_URL]);
   assert.equal(pictured.tags.filter(tag => tag[0] === STICKY_IMAGE_TAG).length, 1);
@@ -2766,13 +2766,51 @@ test('a picture note carries its address in exactly one image tag, and nothing e
   // One tag added, and every tag a written note carries left exactly as it was: the picture
   // must not disturb the cells, the reach, the expiry, the mention tags or the commitment.
   const written = makeStickyTemplate({content: 'A morning in the hills', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH});
-  assert.deepEqual(pictured.tags.filter(tag => tag[0] !== STICKY_IMAGE_TAG), written.tags);
+  assert.deepEqual(pictured.tags.filter(tag => !['image', 'alt'].includes(tag[0])),
+    written.tags.filter(tag => tag[0] !== 'alt'));
   assert.equal(written.tags.some(tag => tag[0] === STICKY_IMAGE_TAG), false, 'a written note gains nothing');
   assert.equal(parseStickyEvent({...written, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).image, '');
+  // The one deliberate difference is the alt line: a picture note may have no words for another
+  // client to read, so that line names the picture there instead of them.
+  assert.equal(pictured.tags.find(tag => tag[0] === 'alt')[1], 'A picture pinned on this board');
+  assert.equal(written.tags.find(tag => tag[0] === 'alt')[1], 'A Pinstr note pinned on satoshi.si');
   // The paid commitment is text, colour and font; the picture is outside it, so a picture
   // note costs and fingerprints exactly what the same words would.
   assert.equal(await stickyContentHash('A morning in the hills', 'yellow', 'typewriter'),
     await stickyContentHash(parsed.content, parsed.color, parsed.font));
+});
+
+test('a pinned picture needs no words, and blank paper is still refused', async () => {
+  // The picture is the note: placed with no words at all it is still a note on the way out and
+  // on the way back in, and the desk allows the same emptiness against the order that already
+  // holds the stored print (see the desk's own suite).
+  const wordless = makeStickyTemplate({content: '   ', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, image: PICTURE_URL});
+  assert.equal(wordless.content, '', 'nothing is written on the paper');
+  const readBack = parseStickyEvent({...wordless, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(readBack.image, PICTURE_URL, 'the picture is what the reader gets');
+  assert.equal(readBack.content, '');
+  // A wordless note commits to its colour and its font alone, and that commitment is stable —
+  // it is what the board pays for and what the desk recomputes from the published event.
+  const commitment = await stickyContentHash('', 'yellow', 'typewriter', globalThis.crypto, {picture: true});
+  assert.match(commitment, /^[0-9a-f]{64}$/);
+  assert.equal(await stickyContentHash(wordless.content, 'yellow', 'typewriter', globalThis.crypto, {picture: true}), commitment,
+    'the same nothing hashes the same every time');
+  assert.notEqual(await stickyContentHash('', 'blue', 'typewriter', globalThis.crypto, {picture: true}), commitment,
+    'and the colour is part of what is paid for');
+  await assert.rejects(() => stickyContentHash('', 'yellow', 'typewriter'), /incomplete/i,
+    'a written note still has to say something');
+  // Blank paper: no words and no picture is refused on the way out and dropped on the way in,
+  // and an address the print host does not serve is not a picture either.
+  assert.throws(() => makeStickyTemplate({content: '  ', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH}), /Write something/);
+  const wordlessEvent = {...wordless, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)};
+  assert.equal(parseStickyEvent({...wordlessEvent,
+    tags: wordless.tags.filter(tag => tag[0] !== STICKY_IMAGE_TAG)}), null,
+  'a note with neither words nor a picture is not a note');
+  assert.equal(parseStickyEvent({...wordlessEvent,
+    tags: wordless.tags.map(tag => (tag[0] === STICKY_IMAGE_TAG ? [STICKY_IMAGE_TAG, 'https://example.com/i/abc.webp'] : tag))}), null,
+  'and a picture from somewhere else is not one this board draws');
 });
 
 test('an address that is not this site’s own print is refused on the way out and dropped on the way in', () => {
@@ -2805,26 +2843,66 @@ test('a picture note is drawn as an instant print in the note’s own footprint'
   assert.doesNotMatch(printRule, /(?:^|[;\s])(?:width|height|aspect-ratio):/,
     'the print brings no footprint of its own, so it is the note’s');
   // The border geometry: an even side border and a deeper band at the foot, which is where the
-  // note's own words are printed
+  // note's own signature sits — nothing is printed on a print but the picture.
   const padding = /padding: (\d+)px (\d+)px (\d+)px/.exec(printRule);
   assert.ok(padding, 'the print is padded, which is the white border');
   assert.equal(padding[1], padding[2], 'the sides and the top are the same border');
   assert.ok(Number(padding[3]) > Number(padding[1]), 'the foot is the deeper band of an instant print');
   assert.match(css, /\.sticky-note__print-image \{[^}]*width: 100%;[^}]*height: 100%;[^}]*object-fit: cover/);
-  assert.match(css, /\.sticky-note__print-caption \{[^}]*position: absolute;[^}]*bottom: -34px;/);
+  // The picture is laid over the mat rather than laid out in it: as a percentage of a parent
+  // sized by aspect-ratio the browser measured 157px where the mat leaves 148px, so the picture
+  // ran into the band the signature sits in. The mat is one measure written twice — the padding
+  // and the inset — and this pins the two together.
+  const inset = /\.sticky-note--print \.sticky-note__print \{[^}]*inset: (\d+)px (\d+)px (\d+)px/.exec(css);
+  assert.ok(inset, 'the picture is inset over the mat');
+  assert.deepEqual([inset[1], inset[2], inset[3]], [padding[1], padding[2], padding[3]],
+    'the same measure as the padding, or the mat is not even');
+  assert.match(css, /\.sticky-note--print \.sticky-note__print \{[^}]*width: auto; height: auto;/,
+    'and it brings no size of its own to the note’s box');
+  assert.doesNotMatch(css, /sticky-note__print-caption/, 'a print carries no words of its own');
+  assert.match(css, /\.sticky-note--print \.sticky-note__author \{[^}]*bottom: \d+px/,
+    'the note’s signature sits in the print’s foot band, exactly as it does on a written note');
   // Drawn by the one funnel every note is drawn by, and appended to the note itself, so a print
   // sits in the board's own sticky layer and pans, zooms and expires with the paper beside it.
   assert.match(script, /note\.classList\.toggle\('sticky-note--print', Boolean\(picture\)\)/);
   assert.match(script, /const print = document\.createElement\('figure'\);\s+print\.className = 'sticky-note__print';/);
   assert.match(script, /photo\.className = 'sticky-note__print-image';/);
-  assert.match(script, /print\.append\(photo, text\);\s+text\.className = 'sticky-note__print-caption';/);
-  assert.match(script, /note\.appendChild\(print\);/);
+  assert.match(script, /print\.append\(photo\);\s+note\.appendChild\(print\);/,
+    'the paper holds the picture and nothing else');
+  assert.match(script, /\} else \{\s+note\.appendChild\(text\);/,
+    'only a written note has its words attached — a print never does');
+  assert.doesNotMatch(script, /print-caption/, 'and nothing prints the note’s words on it');
+  assert.match(script, /labelNoteAuthor\(author, sticky\);/, 'a print is signed like every other note');
   // and it is the note that carries the picture, so the print is inside the note's own box
   assert.match(script, /elements\.canvas\.insertBefore\(note, nextNewer \|\| placingNote \|\| null\)/);
   // A print is the same note on the same board, so it must not skip the placement or the filters
   const render = script.slice(script.indexOf('function renderNote('), script.indexOf('function dropExpiredNotes('));
   assert.match(render, /noteAtPlacement\(note, sticky\);/);
   assert.match(render, /if \(!temporary\) applyNoteFilters\(\);/);
+});
+
+test('a picture note tells the desk which picture it is', async () => {
+  // A wordless note commits to the paper and the font alone, so the file's own digest is the only
+  // thing that tells two of them apart. It is the digest of the bytes the reader picked, nothing
+  // else — the desk can never check it against the stored print, which is re-encoded on upload.
+  const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+  const one = await stickyPictureDigest(new Blob([bytes]));
+  assert.match(one, /^[0-9a-f]{64}$/);
+  assert.equal(await stickyPictureDigest(new Blob([bytes])), one, 'the same file hashes the same');
+  assert.notEqual(await stickyPictureDigest(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 1, 2, 3, 4])])), one,
+    'another file does not');
+  assert.equal(one, createHash('sha256').update(bytes).digest('hex'), 'and it is the file itself, digest for digest');
+
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // Sent with the order, and only for a picture.
+  assert.match(script, /const pictureHash = pictureComing && pickedImage \? await stickyPictureDigest\(pickedImage\) : ''/);
+  assert.match(script, /\.\.\.\(pictureHash \? \{pictureHash\} : \{\}\)/);
+  // The desk's own record that it stored a print is `imageHash`, and it is the one thing that lets
+  // a wordless note publish at all: the board must never send that field, or a client could hand
+  // itself a print it never uploaded. This is the guard against that.
+  assert.doesNotMatch(script, /imageHash/, 'the board never sets the desk’s own record of a stored print');
+  assert.doesNotMatch(await readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8'), /imageHash/,
+    'and nothing in the model names it either');
 });
 
 test('an expired picture note is not rendered, exactly like an expired written one', async () => {

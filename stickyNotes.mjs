@@ -37,6 +37,7 @@ import {
   normaliseStickyText,
   parseStickyEvent,
   stickyContentHash,
+  stickyPictureDigest,
   stickyOrderPrice,
   stickyPaymentRails,
   STICKY_LIVELINESS,
@@ -2108,9 +2109,10 @@ function renderNote(sticky, event = null, temporary = false) {
   renderNoteContent(textContent, sticky.content);
   text.appendChild(textContent);
   if (picture) {
-    // The words printed in the deep band at the foot of the print are the note's own text: a
-    // picture note is still a note, and the desk refuses an empty one. The picture takes the
-    // rest of the paper, so the two share one footprint instead of stacking two.
+    // A print is the picture and nothing else. The paper holds the image and the note's own
+    // signature sits in the band at its foot, exactly as it does on a written note; the words
+    // are not printed on it, because a pinned picture needs none. The text element is therefore
+    // never attached here, and the picture takes the whole paper instead of sharing it.
     const print = document.createElement('figure');
     print.className = 'sticky-note__print';
     const photo = document.createElement('img');
@@ -2119,8 +2121,7 @@ function renderNote(sticky, event = null, temporary = false) {
     photo.loading = 'lazy';
     photo.alt = sticky.content ? `A pinned picture: ${sticky.content}` : 'A picture pinned on this board';
     photo.src = picture;
-    print.append(photo, text);
-    text.className = 'sticky-note__print-caption';
+    print.append(photo);
     note.appendChild(print);
   } else {
     note.appendChild(text);
@@ -2551,7 +2552,7 @@ function selectNoteKind(kind) {
     button.setAttribute('aria-pressed', String(chosen));
   });
   if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
-  elements.editor.setAttribute('data-placeholder', noteKind === 'image' ? 'Say a few words about it...' : 'Type here...');
+  elements.editor.setAttribute('data-placeholder', noteKind === 'image' ? 'A few words, if you like...' : 'Type here...');
   if (noteKind === 'image') renderImageGrades();
   requestAnimationFrame(() => { fitDraftTypography(); updateCapacity(); });
 }
@@ -2683,12 +2684,22 @@ async function startPayment() {
     await ensureReadySigner();
     const mentions = editorMentions();
     const content = normaliseStickyText(editorContent());
-    if (!content) throw new Error('Write something on the note first.');
+    // A written note has to say something. A pinned picture is the note itself, so it may be
+    // placed with no words at all — but never with no picture: that is asked here, before
+    // anything is ordered, so an empty note cannot reach the desk without one.
+    const pictureComing = noteKind === 'image';
+    if (!content && !pictureComing) throw new Error('Write something on the note first.');
+    if (pictureComing && !pickedImage && !pending?.image) throw new Error('Choose the picture first, then place it.');
     if (editorOverflows()) throw new Error('The note is too full.');
     elements.pay.disabled = true;
     status(elements.paymentStatus, quotedPrice === 0 ? 'Checking your subscription...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
-    const contentHash = await stickyContentHash(content, selectedColor, selectedFont);
+    const contentHash = await stickyContentHash(content, selectedColor, selectedFont, globalThis.crypto, {picture: pictureComing});
+    // The picture's own digest, when the note has one. A wordless note commits to nothing but the
+    // paper and the font, so the desk needs this to tell two of them apart and to keep letting a
+    // reader pin picture after picture (see stickyPictureDigest and the desk's duplicateLivePin).
+    // Not sent for a written note: there the words are the difference.
+    const pictureHash = pictureComing && pickedImage ? await stickyPictureDigest(pickedImage) : '';
     const exactGeohash = elements.exactGeohash.checked;
     const liveliness = livelinessRung().key;
     const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions, hashtags,
@@ -2706,6 +2717,7 @@ async function startPayment() {
         method: 'POST',
         body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
           geohash: activeGeohash, geohashes: [...activeGeohashes],
+          ...(pictureHash ? {pictureHash} : {}),
           geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
       });
     } catch (error) {

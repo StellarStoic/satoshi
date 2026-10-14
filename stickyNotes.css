@@ -131,13 +131,20 @@
 .sticky-note--placing:active { cursor: grabbing; }
 /* A pinned picture is printed rather than written: white paper, an even border on three
    sides and a deeper band at the foot — the instant-print shape — which is where the note's
-   own words go. Its footprint is deliberately NOT set here: the print keeps the note's own
-   width and square, so it pans, zooms and vanishes with the paper beside it. */
-.sticky-note--print { --note: #fdfcf7; padding: 12px 12px 42px; background: var(--note); }
+   own signature goes. No words are printed on it: a pinned picture needs none, so the band
+   holds only the author label at its right, and the image takes the rest of the paper.
+   The picture is laid OVER the mat rather than laid out in it: left in the flow its height is
+   a percentage of a parent sized by aspect-ratio, which the browser resolved to 157px where the
+   mat leaves 148px — so the picture ran into the band the signature sits in rather than stopping
+   at it. Insetting it pins the picture to the mat exactly, on any browser and at any note width.
+   The mat is therefore one measure written twice — the padding and the picture's inset — and
+   the suite pins the two to each other. Its footprint is deliberately NOT set here: the print
+   keeps the note's own width and square. */
+.sticky-note--print { --note: #fdfcf7; padding: 12px 12px 30px; background: var(--note); }
 .sticky-note--print::before { opacity: .07; }
 .sticky-note__print { position: relative; z-index: 1; display: block; width: 100%; height: 100%; margin: 0; }
+.sticky-note--print .sticky-note__print { position: absolute; inset: 12px 12px 30px; width: auto; height: auto; }
 .sticky-note__print-image { display: block; width: 100%; height: 100%; object-fit: cover; background: #d9d4c8; }
-.sticky-note__print-caption { position: absolute; right: 0; bottom: -34px; left: 0; height: 30px; overflow: hidden; padding: 0 34px; color: #3a352c; font-family: 'Caveat', 'Noto Sans', cursive; font-size: .82rem; line-height: 1.15; text-align: center; }
 .sticky-note--print .sticky-note__author { bottom: 9px; }
 .sticky-dialog { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #4b4d4d; border-radius: 8px; background: #17191a; color: #f3f3f1; box-shadow: 0 24px 75px rgba(0,0,0,.64); }
 .sticky-dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
