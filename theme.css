@@ -169,10 +169,27 @@ button, a, input, select, textarea { touch-action: manipulation; }
 p, h1, h2, h3, h4, a, code { overflow-wrap: anywhere; }
 #menu { max-width: calc(100vw - 32px); }
 #menu { max-height: calc(100dvh - 110px); overflow-y: auto; }
+#menu a,
+#menu .submenu li a,
+#menu .has-submenu > a::after { color: #fff; }
+html[data-theme="ice"] #menu a,
+html[data-theme="ice"] #menu .submenu li a,
+html[data-theme="ice"] #menu .has-submenu > a::after { color: #111820; }
+#menu li a:hover,
+#menu li a:focus,
+html[data-theme="ice"] #menu li a:hover,
+html[data-theme="ice"] #menu li a:focus { color: var(--accent-contrast); }
 #menu .submenu { position: static; min-width: 0; width: 100%; }
 #menu .has-submenu.active .submenu { max-height: 45dvh; }
 #menu a { min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .submenu li a { white-space: normal; }
+@media (max-width: 768px) {
+    #menu {
+        left: 12px;
+        width: calc(100vw - 24px);
+        max-width: none;
+    }
+}
 .footer {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);

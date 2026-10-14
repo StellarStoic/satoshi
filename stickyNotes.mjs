@@ -2299,7 +2299,7 @@ function livelinessRung(key = selectedLiveliness) {
 function livelinessHintText(rung) {
   const when = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'})
     .format(stickyExpiration(Math.floor(Date.now() / 1000), rung.key) * 1000);
-  return `The relay deletes it around ${when}. Other relays that already carry it keep their own copy.`;
+  return `Satoshi.si stops showing it around ${when} and deletes its relay copy. Other relays, apps, archives, or screenshots may keep it.`;
 }
 
 function selectLiveliness(key) {

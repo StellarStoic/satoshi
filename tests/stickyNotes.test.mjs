@@ -897,7 +897,7 @@ test('every note carries exactly one expiration tag, in unix seconds', () => {
     geohash: TEST_GEOHASH, createdAt});
   assert.equal(fallback.tags.find(tag => tag[0] === 'expiration')[1], String(createdAt + 30 * 86400));
   assert.throws(() => makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
-    geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long the note should live/);
+    geohash: TEST_GEOHASH, liveliness: 'forever', createdAt}), /how long satoshi\.si should show the note/);
 });
 
 test('the board has a wooden rail, and it sits outside the board', async () => {
@@ -980,7 +980,9 @@ test('the composer asks how long a note lives, and the menu counts down until it
   assert.match(html, /id="noteLivelinessValue"/);
   assert.match(html, /id="noteLivelinessTicks"/);
   assert.match(html, /id="noteLivelinessHint"/);
-  assert.match(html, /Disappears after/);
+  assert.match(html, /Hidden here after/);
+  assert.match(script, /Other relays, apps, archives, or screenshots may keep it/,
+    'the composer does not promise global deletion of a public Nostr event');
   assert.match(html, /id="noteExpiresAt"/, 'the note menu shows when a note goes');
   assert.match(html, /id="noteExpiryCountdown"/, 'the note menu shows time remaining');
   assert.doesNotMatch(html, /id="removeSticky"/, 'natural expiration replaces early deletion');

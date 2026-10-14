@@ -74,11 +74,9 @@ export const STICKY_FONTS = Object.freeze([
   'open-sans', 'source-sans', 'ubuntu', 'pt-sans', 'pt-serif', 'fira-mono',
   'ibm-plex-mono', 'merriweather', 'atkinson', 'serif',
 ]);
-// A note here is a temporary thing. Every one carries the NIP-40 expiration
-// tag, and the relay drops it once that moment passes — so the ladder below is
-// the whole life of a note, not a preference. The payment service enforces the
-// same range at publish time, so a client cannot hand itself a note that
-// outlives a year.
+// A note is temporary on this board. Every one carries the NIP-40 expiration
+// tag, and our relay stops serving it once that moment passes. Other Nostr
+// relays and clients may retain copies of the public event.
 export const STICKY_LIVELINESS = Object.freeze([
   Object.freeze({key: '1d', label: '1 day', short: '1d', seconds: 86400}),
   Object.freeze({key: '1w', label: '1 week', short: '1w', seconds: 7 * 86400}),
@@ -357,7 +355,7 @@ export function stickyLiveliness(key) {
   return STICKY_LIVELINESS.find(rung => rung.key === key) || null;
 }
 
-/** The NIP-40 moment a note written then, to live that long, disappears. */
+/** The NIP-40 moment a note written then stops being shown on this board. */
 export function stickyExpiration(createdAt = Math.floor(Date.now() / 1000), liveliness = STICKY_DEFAULT_LIVELINESS) {
   const rung = stickyLiveliness(liveliness) || stickyLiveliness(STICKY_DEFAULT_LIVELINESS);
   return createdAt + rung.seconds;
@@ -1008,10 +1006,9 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   if (stickyNoteLength(text) > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
   if (!STICKY_COLORS.includes(color)) throw new Error('Choose an available note color.');
   if (!STICKY_FONTS.includes(font)) throw new Error('Choose an available note font.');
-  // Mandatory on purpose: a note with no expiry would sit on the relay forever,
-  // and the desk refuses one.
+  // Mandatory on purpose: without it our board and relay would keep serving the note.
   const rung = stickyLiveliness(liveliness);
-  if (!rung) throw new Error('Choose how long the note should live: a day, a week, a month, six months or a year.');
+  if (!rung) throw new Error('Choose how long satoshi.si should show the note: a day, a week, a month, six months or a year.');
   const wanted = mentions.map(key => String(key || '').toLowerCase());
   if (wanted.some(key => !isPubkey(key))) throw new Error('That is not a valid Nostr public key.');
   const mentionProblem = mentionIssue(text, wanted);
@@ -1053,7 +1050,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
     ...(picture ? [[STICKY_IMAGE_TAG, picture]] : []),
     ...mentionList.map(key => [MENTION_TAG, key]),
-    // NIP-40: the moment this note stops existing, relay-side.
+    // NIP-40: the moment our relay stops serving its copy.
     [EXPIRATION_TAG, String(createdAt + rung.seconds)],
     ['alt', picture ? 'A picture pinned on this board' : 'A Pinstr note pinned on satoshi.si'],
   ];
@@ -1101,10 +1098,8 @@ export function parseStickyEvent(event) {
   const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
   const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
-  // A note that names no moment is not a note this board shows. Every note is
-  // temporary (NIP-40), so one without an expiration tag is either older than the
-  // rule or written past the desk — either way it would sit on the relay forever,
-  // which is the one thing this board does not publish. Ignored on the way in.
+  // A note that names no cutoff is not a note this board shows. This is a local
+  // display and relay-retention rule, not a claim that other Nostr copies vanish.
   const expires = Number(event.tags.find(tag => tag?.[0] === EXPIRATION_TAG)?.[1]);
   if (!Number.isFinite(expires) || expires <= 0) return null;
   return {

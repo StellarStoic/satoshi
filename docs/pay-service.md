@@ -243,8 +243,8 @@ The desk checks, in this order, **before** anything reaches the relay:
 
 Then it publishes to `wss://nostr.satoshi.si`, and reports what actually happened.
 
-**`200`** — published. The note is on the relay until the signed NIP-40 expiration chosen
-by its author:
+**`200`** — published. The satoshi.si relay serves the note until the signed NIP-40
+expiration chosen by its author. Other relays or clients may retain the public event:
 
 ```json
 { "ok": true, "status": "published", "publishedEventId": "…", "action": "pin" }
@@ -312,7 +312,7 @@ the event no longer matches the paid commitment.
 | `k`       | `geo`                                                        | exactly one |
 | `geohash` | order's `exact` or `prefix` mode                             | exactly one |
 | `sticky`  | `v1`, color, x, y, rotation, font                            | exactly one |
-| `expiration` | unix seconds, NIP-40: the moment the note is deleted       | exactly one |
+| `expiration` | unix seconds, NIP-40: when satoshi.si stops serving it     | exactly one |
 | `p`       | the public key of somebody the note names (NIP-27)           | up to five  |
 | `alt`     | `A Pinstr note pinned on satoshi.si`                          | exactly one |
 | `anonymous` | `24h-local-key`                                             | anonymous orders only |
@@ -338,15 +338,17 @@ above one, and any mode mismatch. The `i` and `k` pair follows NIP-73's external
 identifier, naming one of the cells that was paid for. These tags sort public events into
 boards; they do not encrypt a note or restrict who can fetch it.
 
-Every note is temporary. `["expiration", "<unix seconds>"]` is **mandatory** (NIP-40): the
-moment the note stops existing, computed as the event's `created_at` plus the term the writer
+Every Pinstr note is temporary on satoshi.si. `["expiration", "<unix seconds>"]` is
+**mandatory** (NIP-40): the moment this board and relay stop serving it, computed as the event's `created_at` plus the term the writer
 chose from the ladder the board offers — a day, a week, a month (30 days), six months (180
 days) or a year (365 days). There is no third option and no way to ask for longer. The desk
 enforces the **range**, not the rungs, so a frontend may compute a month its own way: the term
 `expiration - created_at` must fall between one day and 365 days, allowing two minutes of clock
 skew, and the moment itself must still be in the future when the note is published. The relay
 drops an event that arrives expired, never serves an expired event, and deletes expired events
-from its store, so a note published after its own moment would be paid for and lost.
+from its own store. NIP-40 does not make a public event disappear from other relays, clients,
+archives, screenshots, or copies. A note published after its own moment would be paid for but
+not appear on satoshi.si.
 
 Mentions are the other half of what the text says. A note may tag **up to five** people, each a
 different 64-hex key, and each one has to be named in the note's own text as its **canonical npub**

@@ -70,11 +70,11 @@ export const PAGE_HELP = Object.freeze({
                     + ' to limit any of those views to people they follow. That choice stays in this browser. A green'
                     + ' outline around the sort button means a filter is active. Filtered notes become faint blank paper'
                     + ' with no pin: hold the paper for four seconds to reveal one note for a minute.',
-                    'Every note is temporary, and you choose how temporary. A slider offers a day, a week, a month, six'
-                    + ' months or a year, and it starts at a month. The note states the exact moment it will go, and the'
-                    + ' relay that holds it deletes it then, so the board stays a board people walk past rather than an'
-                    + ' archive of everything ever written. You cannot extend a note after it is pinned — pin it again'
-                    + ' if you need it for longer — and a year is the longest this board offers.',
+                    'You choose how long a note stays on this board: a day, a week, a month, six months or a year.'
+                    + ' Satoshi.si stops showing it at the chosen time and deletes its relay copy. Nostr is public,'
+                    + ' so another relay, app, archive, screenshot or person may keep a copy. The timer is not a promise'
+                    + ' that the event vanishes everywhere. You cannot extend the board time after pinning — pin it again'
+                    + ' if you need it here for longer — and a year is the longest this board offers.',
                     'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
                     + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like.'
                     + ' If you own a satoshi.si name such as yourname@satoshi.si,'
@@ -86,8 +86,8 @@ export const PAGE_HELP = Object.freeze({
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
                     + ' so an interrupted payment or publication can finish. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
-                    'When a pass runs out, it does not change notes you already pinned. They remain until the lifetime'
-                    + ' you chose for each note ends; only new notes need another pass.',
+                    'When a pass runs out, it does not change notes you already pinned. Satoshi.si keeps showing them'
+                    + ' until their chosen board time ends; only new notes need another pass.',
                     'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
                     + ' private key or controls your wallet. The payment service receives only the quoted payment and'
                     + ' keeps a record of the pass that the board checks when you post.',
@@ -111,8 +111,9 @@ export const PAGE_HELP = Object.freeze({
                     + ' from the ladder — a day, a week, a month, six months or a year, and no longer. The payment'
                     + ' service refuses a pin without that tag, one whose term falls outside the ladder, and one whose'
                     + ' moment has already passed by the time it is published, because the relay drops an event that'
-                    + ' arrives expired. The relay never serves an expired event, and a cleanup deletes expired events'
-                    + ' from its store every ten minutes. The note menu shows the exact moment and a live countdown.'
+                    + ' arrives expired. The satoshi.si relay never serves an expired event, and a cleanup deletes its'
+                    + ' stored copy every ten minutes. NIP-40 is advisory across Nostr: it cannot make another relay,'
+                    + ' client, archive or person erase a copy. The note menu shows the local cutoff and a live countdown.'
                     + ' A note on the'
                     + ' relay that names no expiration at all is not drawn either: this board shows only notes that'
                     + ' say when they go, so a note written past the desk is invisible here rather than permanent.',
