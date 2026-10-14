@@ -3316,6 +3316,8 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // Signal before clearing the shared draft. Amber may have returned into a browser tab
     // while the installed PWA is still visible; this lets that original board finish too.
     signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
+    // The pin is done on this page, so the hand-over that asked for the signature comes down with it.
+    retireAmberHandOver();
     // The flow that launched this publish hears the outcome before anything else, so it can retire
     // its own wait even when this page's reader has already looked away.
     report?.(true, result.message || 'Your note is pinned.');
@@ -3336,6 +3338,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // is authoritative: an already-published answer means this paid note is complete.
     if (resumedEvent && ['already_pinned', 'already_published'].includes(error.reason)) {
       signalStickyFlow('published', {orderId: pending?.orderId || '', event: resumedEvent, message: 'Your note is pinned.'});
+      retireAmberHandOver();
       savePending(null);
       placingNote?.remove(); placingNote = null;
       elements.placementControls.hidden = true;
@@ -4828,6 +4831,10 @@ window.addEventListener('storage', event => {
     return;
   }
   if (flow.type !== 'published' || !flow.event) return;
+  // The pin succeeded in the other context and that context has signalled it. This page was waiting on
+  // the same note with its own hand-over in front of the reader, so it comes down here too: the
+  // signature it is asking for has already been used, in the tab the reader is now looking at.
+  retireAmberHandOver();
   const sticky = parseStickyEvent(flow.event);
   if (pending.anonymous) markAnonymousNotePublished(flow.event.id);
   placingNote?.remove(); placingNote = null;
@@ -4974,9 +4981,11 @@ async function completeAmberSignature(answer) {
   let outcome = null;
   await publishPinnedNote(answer.event, (published, message) => { outcome = {published, message}; });
   if (outcome?.published) {
-    // The last line stays up: this is the surface the reader is looking at, and the hand-over is
-    // theirs to close. The board's own line about the pin sits underneath it either way.
-    sayAmberOutcome('Your note is pinned');
+    // The signature has been used and the note is on the board, so the hand-over is retired rather
+    // than left up for the reader to close: the step it was describing is over. What it said is still
+    // written down, so the dialog repeating it on a later tap is the same sentence, not a silence.
+    noteAmberHandOverOutcome('Your note is pinned');
+    retireAmberHandOver();
   } else if (outcome?.message) {
     sayAmberOutcome(`The server refused the pin: ${outcome.message}`, true);
   } else {
@@ -4999,6 +5008,22 @@ function showAmberHandOver(message) {
   // one line, in the messages that pass through here.
   elements.amberCopyTitle.textContent = 'Finish signing with Amber';
   status(elements.amberCopyStatus, message);
+}
+
+/**
+ * Retire the clipboard hand-over: the pin is done, so there is nothing left to ask for and nothing
+ * left to watch.
+ *
+ * A successful pin can be known in two places - here, on the page the reader was looking at, and in
+ * another context that finished it and signalled (Amber opens its own tab even when the request came
+ * from the installed app). Both call this. The dialog closes rather than staying up with its last
+ * line for the reader to dismiss, and the clipboard poll stops with it, so no page goes on reading the
+ * clipboard every half second to watch for a signature it already has. The board's own line - "Your
+ * note is pinned." - is what the reader is left looking at, and it is the whole of the news.
+ */
+function retireAmberHandOver() {
+  stopAmberClipboardPoll();
+  if (elements.amberDialog.open) elements.amberDialog.close();
 }
 
 // How a copy-route signature gets home once the reader has left the page. Android fires no

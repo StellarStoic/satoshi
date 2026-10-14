@@ -2474,11 +2474,14 @@ test('the hand-over dialog is one line and one button, and every message rides t
     assert.doesNotMatch(script, gone, `removed copy is still in the script: ${gone}`);
   }
 
-  // Each progress and failure sentence replaces that line's text rather than adding to it.
+  // The one message that no longer rides that line: a pin that succeeded takes the dialog down
+  // rather than leaving its last line for the reader to dismiss, so the sentence is written down for
+  // a later tap to repeat instead of shown. Every other progress and failure sentence replaces that
+  // line's text rather than adding to it.
+  assert.match(script, /noteAmberHandOverOutcome\('Your note is pinned'\)/);
   for (const message of [
     /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
     /sayAmberRoundTrip\('Signature verified - pinning your note'\)/,
-    /sayAmberOutcome\('Your note is pinned'\)/,
     /The browser would not let the page read the clipboard\./,
     /Nothing valid on the clipboard yet\./,
     /That signature did not match your note\./,
@@ -2591,9 +2594,9 @@ test('the clipboard round trip says on the page where it got to', async () => {
   assert.match(script, /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
     'the stage where a value is being read');
   assert.match(complete, /sayAmberRoundTrip\('Signature verified - pinning your note'\)/);
-  // The round trip's last line is written through sayAmberOutcome, so it is both what the reader
-  // sees and what a later tap on the hand-over button repeats instead of a sign-in.
-  assert.match(complete, /sayAmberOutcome\('Your note is pinned'\)/);
+  // The round trip's last line is written down rather than shown: a pin that succeeded closes the
+  // hand-over, so this sentence is what a later tap on that button repeats instead of a sign-in.
+  assert.match(complete, /noteAmberHandOverOutcome\('Your note is pinned'\)/);
 
   // The poll ticks twice a second, so the same sentence must be written once, not re-announced.
   const say = script.slice(script.indexOf('function sayAmberRoundTrip'), script.indexOf('function amberReadFailure'));
@@ -2812,6 +2815,45 @@ test('a picture note carries its address in exactly one image tag, and leaves ev
   // note costs and fingerprints exactly what the same words would.
   assert.equal(await stickyContentHash('A morning in the hills', 'yellow', 'typewriter'),
     await stickyContentHash(parsed.content, parsed.color, parsed.font));
+});
+
+test('the hand-over comes down the moment a pin succeeds, in whichever context did it', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // One helper retires it, and it does both halves: the dialog that was asking for a signature
+  // closes, and the clipboard poll behind it stops, so no page goes on reading the clipboard twice a
+  // second to watch for a signature it already has.
+  const helper = script.slice(script.indexOf('function retireAmberHandOver()'),
+    script.indexOf('// How a copy-route signature gets home'));
+  assert.match(helper, /stopAmberClipboardPoll\(\)/);
+  assert.match(helper, /if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\)/);
+
+  // Four moments know a pin succeeded, and every one of them retires the hand-over:
+  const calls = script.match(/retireAmberHandOver\(\);/g) || [];
+  assert.equal(calls.length, 4, 'the four callers, one per way a pin is known to be done');
+
+  // (1) the page that published it,
+  const publishSignal = script.indexOf("signalStickyFlow('published', {orderId, event,");
+  assert.ok(script.slice(publishSignal, publishSignal + 400).includes('retireAmberHandOver();'),
+    'the page that published keeps its dialog');
+  // (2) the desk answering that the note was already pinned, which is the same news,
+  const alreadyPinned = script.indexOf("if (resumedEvent && ['already_pinned', 'already_published']");
+  assert.ok(script.slice(alreadyPinned, alreadyPinned + 400).includes('retireAmberHandOver();'),
+    'an already-pinned answer keeps its dialog');
+  // (3) the resume that finished the round trip here — and it REMEMBERS what it said, so the dialog
+  // repeating the sentence on a later tap is the same sentence rather than a silence,
+  const resumed = script.slice(script.indexOf('async function completeAmberSignature'),
+    script.indexOf('function showAmberHandOver'));
+  assert.match(resumed, /if \(outcome\?\.published\) \{[\s\S]*noteAmberHandOverOutcome\('Your note is pinned'\);[\s\S]*retireAmberHandOver\(\);/,
+    'a successful round trip must retire the hand-over and still remember its last line');
+  // and (4) the other context's own signal arriving on this page. This is the case that leaves a
+  // dialog standing over a reader whose note is already on the board: the tab Amber opened finished
+  // the pin, this page never hears about it any other way.
+  const storageListener = script.indexOf("window.addEventListener('storage', event => {");
+  const listener = script.slice(storageListener, storageListener + 3000);
+  const retired = listener.indexOf('retireAmberHandOver();');
+  assert.ok(retired > -1, 'the other context\'s signal must retire this page\'s dialog');
+  assert.ok(retired < listener.indexOf('const sticky = parseStickyEvent(flow.event);'),
+    'and retire it before drawing the note, not after');
 });
 
 test('a picture note carries its own print as its content, and the board reads that as no words', async () => {
