@@ -38,6 +38,7 @@ import {
   parseStickyEvent,
   stickyContentHash,
   stickyPictureDigest,
+  stickyImageUrl,
   stickyOrderPrice,
   stickyPaymentRails,
   STICKY_LIVELINESS,
@@ -3272,7 +3273,11 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     elements.pin.disabled = true;
     if (!resumedEvent) await ensureReadySigner();
     const placement = currentPlacement();
-    const template = makeStickyTemplate({...pending, ...placement, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
+    // A picture note's content is its print's own address: that is what makes any other Nostr
+    // client show the picture instead of an empty note, and the desk checks it against the print it
+    // stored for this order. A written note's content stays its words.
+    const pictureAddress = pending.image ? stickyImageUrl(pending.image) : '';
+    const template = makeStickyTemplate({...pending, ...placement, content: pictureAddress || pending.content, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
     // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
     // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
     // one this device is known to complete. The navigation to the signer happens inside

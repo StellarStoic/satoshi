@@ -458,6 +458,21 @@ export function stickyImageUrl(value) {
   return match ? `${STICKY_IMAGE_ORIGIN}${STICKY_IMAGE_PATH}${match[1].toLowerCase()}.webp` : '';
 }
 
+/**
+ * The print a picture address names: the 64-hex hash in `https://<print host>/i/<hash>.webp`, or
+ * an empty string for anything else.
+ *
+ * The desk's twin of this function decides whether a paid order may publish the note it is handed,
+ * by comparing this hash against the print it stored for that order. So the two sides have to agree
+ * on exactly what an address is, and they do: the same host list, the same shape, and a hash whose
+ * case does not matter.
+ */
+export function stickyPictureToken(value) {
+  const match = /^https:\/\/(?:www\.)?(?:pinstr\.si|satoshi\.si)\/i\/([0-9a-f]{64})\.webp$/i
+    .exec(String(value || '').trim());
+  return match ? match[1].toLowerCase() : '';
+}
+
 // Codes are 3 to 9 characters: below 3 the cell is a region rather than a
 // useful board, and 9 is as deep as the grid is useful. Within that range a board may
 // be a clump of touching cells, which is what lets one note cover a building
@@ -1065,7 +1080,16 @@ export function parseStickyEvent(event) {
   const image = stickyImageUrl(event.tags.find(tag => tag?.[0] === STICKY_IMAGE_TAG)?.[1]);
   // A published note carries words, or a picture, or both — a pinned picture is the note
   // itself and may have no words at all. Anything with neither is not a note this board shows.
-  if ((!content && !image) || stickyNoteLength(content) > STICKY_MAX_CHARACTERS) return null;
+  // A picture note carries its print's own address as its content, which is what makes any other
+  // Nostr client show the picture rather than an empty note. On this board that address is not
+  // words: a print is the picture and a signature with nothing printed on it. So a note whose
+  // content is simply its own picture's address parses with no words at all, and every place that
+  // draws a note's words — the paper, the note menu, the ledger — draws none for it. The picture
+  // is required for this: without one there is no address for the content to be, and an empty
+  // token would otherwise match an ordinary note's words and silence every note on the board.
+  const words = image && content && stickyPictureToken(content) === stickyPictureToken(image)
+    ? '' : content;
+  if ((!words && !image) || stickyNoteLength(words) > STICKY_MAX_CHARACTERS) return null;
   const named = event.tags.filter(tag => tag?.[0] === 'g').map(tag => normaliseGeohash(tag[1])).filter(Boolean);
   if (!named.length) return null;
   // The deepest tags are the cells the note was pinned to; anything shallower is a
@@ -1087,7 +1111,7 @@ export function parseStickyEvent(event) {
     id: event.id,
     pubkey: event.pubkey,
     createdAt: event.created_at,
-    content,
+    content: words,
     color: sticky[2],
     font,
     x: clampPlacement(sticky[3]),

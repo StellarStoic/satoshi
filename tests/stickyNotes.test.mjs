@@ -2814,6 +2814,41 @@ test('a picture note carries its address in exactly one image tag, and leaves ev
     await stickyContentHash(parsed.content, parsed.color, parsed.font));
 });
 
+test('a picture note carries its own print as its content, and the board reads that as no words', async () => {
+  // What the board writes when it publishes a picture: the print's own address as the content, so
+  // any other Nostr client shows the picture instead of an empty note, and the same address in the
+  // picture tag. The desk checks the two against the print it stored for that order.
+  const digest = 'c'.repeat(64);
+  const address = `https://pinstr.si/i/${digest}.webp`;
+  const pictured = makeStickyTemplate({content: address, color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, image: address});
+  const event = {...pictured, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)};
+  // On this board that address is not words: a print is the picture and a signature with nothing
+  // printed on it. It parses with no words, so the paper, the menu and the ledger draw none for it.
+  assert.equal(parseStickyEvent(event).content, '', 'a print has no words in its content');
+  assert.equal(parseStickyEvent(event).image, address, 'and it still names its picture');
+  // The desk hands back the address its own base URL makes and the board rewrites it to its own
+  // origin, so the same print arrives spelled two ways: either spelling is still not words.
+  const otherOrigin = {...pictured, content: `https://satoshi.si/i/${digest}.webp`, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)};
+  assert.equal(parseStickyEvent(otherOrigin).content, '', 'the same print under the other origin');
+  assert.equal(parseStickyEvent(otherOrigin).image, address, 'and it names the picture either way');
+  // Words beside a picture are still words, and a note with no picture is never silenced: the rule
+  // needs a picture AND an address, so an ordinary note's words cannot be mistaken for one.
+  const mixed = {...pictured, content: 'A morning in the hills'};
+  assert.equal(parseStickyEvent({...mixed, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).content, 'A morning in the hills');
+  const written = makeStickyTemplate({content: 'A morning in the hills', color: 'yellow', x: .5, y: .5,
+    rotation: 0, geohash: TEST_GEOHASH});
+  assert.equal(parseStickyEvent({...written, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).content,
+    'A morning in the hills', 'a written note keeps every word it has');
+  const linked = {...written, content: `https://pinstr.si/i/${digest}.webp`};
+  assert.equal(parseStickyEvent({...linked, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).content,
+    `https://pinstr.si/i/${digest}.webp`, 'an address with no picture to name stays text');
+  // And the publish path is where the address is put in: pinned to the call, not to a memory of it.
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /content: pictureAddress \|\| pending\.content/,
+    'a picture note publishes with its print address as its content');
+});
+
 test('a pinned picture needs no words, and blank paper is still refused', async () => {
   // The picture is the note: placed with no words at all it is still a note on the way out and
   // on the way back in, and the desk allows the same emptiness against the order that already
