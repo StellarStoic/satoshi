@@ -389,9 +389,13 @@ export function stickyExpiryCountdown(expiration, now = Date.now() / 1000) {
 // address the desk hands back. What travels in the note is therefore one small tag, and
 // the board draws whatever that address serves — the same way a link is an address in the
 // text rather than the page behind it.
-export const STICKY_IMAGE_TAG = 'image';               // ["image", "https://satoshi.si/i/<hash>.webp"]
-// The desk's own address for a stored print: hash-named, WebP, on the site the note is read from.
-export const STICKY_IMAGE_ORIGIN = 'https://satoshi.si';
+export const STICKY_IMAGE_TAG = 'image';               // ["image", "<the address the desk handed back>"]
+// The address a stored print is served from: hash-named, WebP, and deliberately NOT
+// satoshi.si. satoshi.si is GitHub Pages, which serves files out of a repository and cannot
+// run the desk, so /i/ there would 404 — the prints are served by the payment host's own
+// origin instead, which is the one host that really has them. On the pinstr.si copy of this
+// board that also makes the picture same-origin with the page that draws it.
+export const STICKY_IMAGE_ORIGIN = 'https://pinstr.si';
 export const STICKY_IMAGE_PATH = '/i/';
 // What a picture may weigh before it is refused here, so a 40 MB phone photo never leaves
 // the device and never occupies the reader's uplink while an order waits. The desk has its
@@ -412,7 +416,7 @@ export const STICKY_IMAGE_GRADES = Object.freeze([
   Object.freeze({id: 'sepia', label: 'Sepia', filter: 'sepia(.78) contrast(1.05)', grain: .12, tint: 'rgba(112,74,32,.1)'}),
   Object.freeze({id: 'faded', label: 'Faded instant print', filter: 'sepia(.42) saturate(.7) brightness(1.16) contrast(.82)', grain: .1, tint: 'rgba(255,244,220,.16)'}),
   Object.freeze({id: 'grain', label: 'Heavy grain', filter: 'contrast(1.3) saturate(.6) brightness(1.04)', grain: .55, tint: ''}),
-  Object.freeze({id: 'mono', label: 'Black and white', filter: 'grayscale(1) contrast(1.15)', grain: .18, tint: ''}),
+  Object.freeze({id: 'bw', label: 'Black and white', filter: 'grayscale(1) contrast(1.15)', grain: .18, tint: ''}),
   Object.freeze({id: 'cool', label: 'Cool cyan', filter: 'hue-rotate(-25deg) saturate(1.25) brightness(1.03)', grain: .1, tint: 'rgba(36,124,156,.18)'}),
 ]);
 export const STICKY_IMAGE_DEFAULT_GRADE = 'original';
@@ -441,12 +445,14 @@ export function stickyImageIssue(size, max = STICKY_IMAGE_MAX_BYTES) {
 
 /**
  * The address of a stored print, normalised, or '' when it is not one this board will draw.
- * Only an https address under the site's own print path survives: a note is public and its
- * tag is whatever a signer was handed, so nothing else may be rendered as a picture here.
+ * Only an https address under the print host's own print path survives: a note is public and
+ * its tag is whatever a signer was handed, so nothing else may be rendered as a picture here.
+ * satoshi.si is accepted on the way in, because a note signed before the prints moved there
+ * would have carried it, but it is normalised onto the host that actually serves them.
  */
 export function stickyImageUrl(value) {
   const raw = String(value || '').trim();
-  const match = /^https:\/\/(?:www\.)?satoshi\.si\/i\/([0-9a-z]+)\.webp$/i.exec(raw);
+  const match = /^https:\/\/(?:www\.)?(?:pinstr\.si|satoshi\.si)\/i\/([0-9a-z]+)\.webp$/i.exec(raw);
   return match ? `${STICKY_IMAGE_ORIGIN}${STICKY_IMAGE_PATH}${match[1].toLowerCase()}.webp` : '';
 }
 
@@ -998,9 +1004,9 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   // A picture rides in one tag beside the text, never inside it: the desk stored the WebP
   // this address names, so the note stays the small event it has always been and the reader's
   // browser fetches the picture from the site rather than from the relay. An address that is
-  // not one satoshi.si serves under /i/ is refused rather than written into a public event.
+  // not one the print host serves under /i/ is refused rather than written into a public event.
   const picture = image ? stickyImageUrl(image) : '';
-  if (image && !picture) throw new Error('That picture address is not one satoshi.si serves.');
+  if (image && !picture) throw new Error(`That picture address is not one ${STICKY_IMAGE_ORIGIN} serves.`);
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {

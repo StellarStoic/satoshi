@@ -2686,7 +2686,7 @@ test('the hand-over button answers a spent hand-over in its own flow, never as a
 // carries one tag pointing at it. Everything below holds that seam — the guard before the
 // bytes leave, the six grades and their mockups, the exact tag that is emitted, the print's
 // footprint on the board, and the fact that a picture note expires like any other.
-const PICTURE_URL = `https://satoshi.si/i/${'ab12cd34'.repeat(8)}.webp`;
+const PICTURE_URL = `https://pinstr.si/i/${'ab12cd34'.repeat(8)}.webp`;
 
 test('a picture over seven megabytes is refused here, before a byte is sent', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
@@ -2715,7 +2715,7 @@ test('a picture over seven megabytes is refused here, before a byte is sent', as
 
 test('the composer offers the six vintage grades, each with the id the desk is told', () => {
   assert.equal(STICKY_IMAGE_GRADES.length, 6);
-  assert.deepEqual(STICKY_IMAGE_GRADES.map(grade => grade.id), ['original', 'sepia', 'faded', 'grain', 'mono', 'cool']);
+  assert.deepEqual(STICKY_IMAGE_GRADES.map(grade => grade.id), ['original', 'sepia', 'faded', 'grain', 'bw', 'cool']);
   assert.equal(STICKY_IMAGE_DEFAULT_GRADE, 'original');
   for (const grade of STICKY_IMAGE_GRADES) {
     assert.ok(grade.label, `${grade.id} has a name a reader can read`);
@@ -2783,7 +2783,7 @@ test('an address that is not this site’s own print is refused on the way out a
     assert.equal(stickyImageUrl(hostile), '', `${hostile} is not a print this board will draw`);
   }
   assert.throws(() => makeStickyTemplate({content: 'hi', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH,
-    image: 'https://evil.example/i/x.webp'}), /satoshi\.si/);
+    image: 'https://evil.example/i/x.webp'}), /pinstr\.si/);
   // A note arriving from a relay is read through the same door, so a hostile relay cannot make
   // this board fetch a picture from somewhere else.
   const template = makeStickyTemplate({content: 'hi', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, image: PICTURE_URL});
