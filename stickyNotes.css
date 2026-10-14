@@ -129,6 +129,16 @@
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
 .sticky-note--placing:active { cursor: grabbing; }
+/* A pinned picture is printed rather than written: white paper, an even border on three
+   sides and a deeper band at the foot — the instant-print shape — which is where the note's
+   own words go. Its footprint is deliberately NOT set here: the print keeps the note's own
+   width and square, so it pans, zooms and vanishes with the paper beside it. */
+.sticky-note--print { --note: #fdfcf7; padding: 12px 12px 42px; background: var(--note); }
+.sticky-note--print::before { opacity: .07; }
+.sticky-note__print { position: relative; z-index: 1; display: block; width: 100%; height: 100%; margin: 0; }
+.sticky-note__print-image { display: block; width: 100%; height: 100%; object-fit: cover; background: #d9d4c8; }
+.sticky-note__print-caption { position: absolute; right: 0; bottom: -34px; left: 0; height: 30px; overflow: hidden; padding: 0 34px; color: #3a352c; font-family: 'Caveat', 'Noto Sans', cursive; font-size: .82rem; line-height: 1.15; text-align: center; }
+.sticky-note--print .sticky-note__author { bottom: 9px; }
 .sticky-dialog { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #4b4d4d; border-radius: 8px; background: #17191a; color: #f3f3f1; box-shadow: 0 24px 75px rgba(0,0,0,.64); }
 .sticky-dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
 /* Amber, step two. With nothing handed between the two apps the answer arrives on the clipboard,
@@ -252,6 +262,30 @@
 .sticky-editor:empty::before { content: attr(data-placeholder); color: rgba(38,35,30,.42); }
 .color-swatches { display: flex; gap: 12px; margin: 4px 0 8px; }.swatch { width: 30px; height: 30px; border: 2px solid transparent; border-radius: 50%; background: #f7dc63; cursor: pointer; }.swatch--pink { background:#f3a7c4 }.swatch--blue { background:#91d2eb }.swatch--green { background:#acd986 }.swatch--orange { background:#f4b266 }.swatch.is-selected { border-color: #fff; box-shadow: 0 0 0 2px var(--accent, #f2a900); }
 .composer-count { min-height: 22px; margin: 4px 0 10px; color: #aeb0ae; font-size: .8rem; }.composer-count #noteCapacity { transition: color .16s ease, text-shadow .16s ease; }.composer-count #noteCapacity.is-almost-full { color: var(--accent, #f2a900); }.composer-count #noteCapacity.is-full { color: #ff625b; font-weight: 700; text-shadow: 0 0 10px rgba(255,98,91,.25); }.pay-button { width: min(280px, 100%); margin-top: 8px; }
+/* The two things a note can be, and the picture side of the composer. The grades are drawn
+   here, from the very list the desk is told about, so what the reader picks between is a look
+   rather than a description — and it is drawn on a sample picture, never on theirs. */
+.note-kind { display: flex; gap: 4px; margin: 0 0 10px; padding: 3px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(18,19,19,.5); }
+.note-kind__button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 0; border-radius: 6px; background: none; color: #c9cbc8; font: inherit; font-size: .84rem; cursor: pointer; }
+.note-kind__button.is-selected { background: linear-gradient(168deg, #cbab6c 0%, #b6944f 40%, #9c7b3c 100%); color: #26190a; box-shadow: inset 0 1px rgba(255,246,214,.45); }
+.note-image { width: min(320px, 100%); margin: 2px 0 8px; }
+.note-image__lead { margin: 0 0 8px; color: #aeb0ae; font-size: .78rem; line-height: 1.45; text-align: left; }
+.note-image__pick { display: grid; gap: 5px; margin-bottom: 6px; text-align: left; }
+.note-image__pick > span { color: #c9cbc8; font-size: .82rem; }
+.note-image__pick small { color: #8f918e; }
+.note-image__pick input { width: 100%; padding: 7px; border: 1px dashed rgba(255,255,255,.26); border-radius: 6px; background: rgba(0,0,0,.25); color: #d7d9d6; font: inherit; font-size: .76rem; }
+.note-image__grades-label { display: block; color: #c9cbc8; font-size: .82rem; text-align: left; }
+.note-image__grade-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 5px 0 0; }
+.note-image__grade { display: grid; gap: 3px; padding: 3px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; background: none; cursor: pointer; }
+.note-image__grade.is-selected { border-color: var(--accent, #f2a900); box-shadow: 0 0 0 1px var(--accent, #f2a900); }
+.note-image__grade canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 3px; }
+.note-image__grade span { color: #b9bbb8; font-size: .6rem; line-height: 1.2; }
+.note-image__grades-hint { margin: 5px 0 0; color: #8f918e; font-size: .68rem; text-align: left; }
+/* The chosen grade drawn as the print it will become: white ground, even sides and a deeper
+   foot, the same shape the board gives it. */
+.note-image__preview { width: 132px; margin: 12px auto 2px; padding: 7px 7px 24px; border: 0; background: #fdfcf7; box-shadow: 0 5px 14px rgba(0,0,0,.42); }
+.note-image__preview-print { display: block; width: 100%; aspect-ratio: 1; background: #d9d4c8; }
+.note-image__preview-label { margin-top: 5px; color: #4a443a; font-family: 'Caveat', 'Noto Sans', cursive; font-size: .78rem; text-align: center; }
 .payment-dialog { width:min(360px,calc(100vw - 24px)); }.sticky-payment { display:grid; justify-items:center; gap:10px; padding:24px; background:#101112; }.sticky-payment [hidden] { display:none; }.sticky-payment strong { padding-right:38px; color:var(--accent,#f2a900); font-size:1.05rem; }.sticky-payment img { width:min(230px,70vw); aspect-ratio:1; border:8px solid #fff; background:#fff; image-rendering:pixelated; }.sticky-payment code { display:block; width:100%; overflow:hidden; color:#aeb0ae; font-size:.68rem; text-overflow:ellipsis; white-space:nowrap; }.sticky-payment .secondary-action { min-height:36px; padding:6px 10px; }.sticky-payment p { margin:0; color:#aeb0ae; font-size:.78rem; }
 .rail-tabs { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; }.rail-tabs[hidden] { display:none; }.rail-tab { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:38px; border:1px solid #505354; border-radius:5px; background:#101112; color:#d5d6d3; font:inherit; font-size:.86rem; cursor:pointer; }.rail-tab:hover { border-color:#8a8c8a; }.rail-tab.is-active { border-color:var(--accent,#f2a900); color:#fff; box-shadow:inset 0 0 0 1px var(--accent,#f2a900); }
 .font-choice { display:grid; gap:6px; width:min(320px,100%); margin:7px 0; color:#c5c7c5; font-size:.78rem; }.note-font-select { width:100%; min-height:42px; border:1px solid #505354; border-radius:5px; padding:7px 36px 7px 10px; background:#101112; color:#f2f2ef; font-size:1rem; cursor:pointer; }.note-font-select:hover, .note-font-select:focus-visible { border-color:var(--accent,#f2a900); outline:none; box-shadow:0 0 0 2px rgba(242,169,0,.15); }.note-font-select option { background:#101112; color:#f2f2ef; font-size:1rem; }

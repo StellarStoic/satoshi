@@ -27,7 +27,14 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   linkMatches,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
-  spentAmberHandOver,} from '../stickyNotesModel.mjs';
+  spentAmberHandOver,
+  STICKY_IMAGE_GRADES,
+  STICKY_IMAGE_TAG,
+  STICKY_IMAGE_DEFAULT_GRADE,
+  STICKY_IMAGE_MAX_BYTES,
+  stickyImageGrade,
+  stickyImageIssue,
+  stickyImageUrl,} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -1355,7 +1362,7 @@ test('a temporary identity cannot buy a plan, and a refusal is not hidden with i
 
   // The note records the identity it was written under, and a mismatch surviving a reload
   // is named rather than signed by whoever happens to be logged in.
-  assert.match(script, /pubkey: session\.pubkey, anonymous: session\.method === 'anonymous'\}/);
+  assert.match(script, /pubkey: session\.pubkey, anonymous: session\.method === 'anonymous',/);
   assert.match(script, /pending\?\.action === 'pin' \? String\(pending\.pubkey \|\| ''\) : ''\)/);
   assert.match(script, /error\.code = 'identity_changed';/);
 
@@ -2672,4 +2679,171 @@ test('the hand-over button answers a spent hand-over in its own flow, never as a
   assert.match(script, /sayAmberOutcome\(AMBER_HANDED_OVER_LINE\);/);
   assert.match(script, /function sayAmberOutcome\(message, error = false\) \{\s+sayAmberRoundTrip\(message, error\);\s+noteAmberHandOverOutcome\(message, error\);/);
   assert.match(script, /sayAmberOutcome\(`The server refused the pin: \$\{outcome\.message\}`, true\);/);
+});
+
+// ------------------------------------------------------------ pinned pictures
+// A picture is pinned as an address, not as pixels: the desk stores the print and the note
+// carries one tag pointing at it. Everything below holds that seam — the guard before the
+// bytes leave, the six grades and their mockups, the exact tag that is emitted, the print's
+// footprint on the board, and the fact that a picture note expires like any other.
+const PICTURE_URL = `https://satoshi.si/i/${'ab12cd34'.repeat(8)}.webp`;
+
+test('a picture over seven megabytes is refused here, before a byte is sent', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.equal(STICKY_IMAGE_MAX_BYTES, 7 * 1024 * 1024);
+  assert.equal(stickyImageIssue(STICKY_IMAGE_MAX_BYTES), '', 'exactly the limit is still allowed');
+  assert.equal(stickyImageIssue(1024), '');
+  const refusal = stickyImageIssue(STICKY_IMAGE_MAX_BYTES + 1);
+  assert.match(refusal, /7 MB/, 'the refusal names the limit it broke');
+  assert.match(stickyImageIssue(Math.round(8.5 * 1024 * 1024)), /8\.5 MB/, 'and what the picture actually weighs');
+  assert.match(stickyImageIssue(Math.round(20.5 * 1024 * 1024)), /20\.5 MB/);
+  assert.match(stickyImageIssue(0), /empty/i);
+  assert.match(stickyImageIssue('nonsense'), /empty/i);
+  // The guard is measured on the file's own size, at the moment it is chosen and again in
+  // front of the upload, so an oversized picture never leaves the device and never costs the
+  // reader any of their uplink while an order waits.
+  const choose = script.slice(script.indexOf('function chooseNoteImage('), script.indexOf('async function uploadPinnedImage('));
+  assert.match(choose, /const problem = stickyImageIssue\(file\.size\);/);
+  assert.match(choose, /if \(problem\) \{\s+setImageStatus\(problem, true\);/);
+  const upload = script.slice(script.indexOf('async function uploadPinnedImage('), script.indexOf('async function ensureReadySigner('));
+  assert.match(upload, /const problem = stickyImageIssue\(file\.size\);\s+if \(problem\) throw new Error\(problem\);/,
+    'the same guard runs again before the bytes go');
+  // The body is the picture itself — raw bytes, not a form.
+  assert.match(upload, /body: file,/);
+  assert.doesNotMatch(script, /FormData/);
+});
+
+test('the composer offers the six vintage grades, each with the id the desk is told', () => {
+  assert.equal(STICKY_IMAGE_GRADES.length, 6);
+  assert.deepEqual(STICKY_IMAGE_GRADES.map(grade => grade.id), ['original', 'sepia', 'faded', 'grain', 'mono', 'cool']);
+  assert.equal(STICKY_IMAGE_DEFAULT_GRADE, 'original');
+  for (const grade of STICKY_IMAGE_GRADES) {
+    assert.ok(grade.label, `${grade.id} has a name a reader can read`);
+    assert.equal(stickyImageGrade(grade.id), grade);
+  }
+  assert.equal(stickyImageGrade('nonsense'), null);
+  assert.equal(stickyImageGrade(''), null);
+  // Each grade is a look of its own: six distinct filters, so the mockups a reader picks
+  // between visibly differ rather than being six names for one picture.
+  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.filter)).size, 6,
+    'no two grades share a filter');
+  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.label)).size, 6);
+});
+
+test('the six grade mockups are drawn in the browser from those grades, and never from a picture of the reader’s', async () => {
+  const [script, html] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+  // The list the desk is told about is the list the mockups are drawn from, so a look the
+  // reader picked cannot be a look the desk does not know.
+  assert.match(script, /elements\.noteImageGradeList\.replaceChildren\(\.\.\.STICKY_IMAGE_GRADES\.map\(/);
+  assert.match(script, /paintGradeMockup\(canvas, grade\)/);
+  assert.match(script, /if \(grade\.filter && grade\.filter !== 'none'\) context\.filter = grade\.filter;/);
+  // Drawn, not fetched: the sample picture is painted in code, and nothing in the mockup path
+  // reaches the network or touches the file the reader chose.
+  const mockups = script.slice(script.indexOf('function paintMockupSample('), script.indexOf('async function uploadPinnedImage('));
+  assert.match(mockups, /function paintMockupSample\(context, size\)/);
+  assert.doesNotMatch(mockups, /fetch\(|new Image\(|createObjectURL|FileReader/,
+    'a mockup is drawn from a sample in code, so it appears offline and reads no file');
+  assert.doesNotMatch(mockups, /elements\.noteImageFile\.files/,
+    'the reader’s own picture is never read to draw a mockup');
+  // A file input is what a reader chooses the picture with, and the panel is what the kind
+  // toggle reveals.
+  assert.match(html, /<input id="noteImageFile" type="file" accept="image\/\*"/);
+  assert.match(html, /<div id="noteImage" class="note-image" hidden>/);
+  assert.match(html, /<div class="note-kind" id="noteKind" role="group" aria-label="What to pin">/);
+  assert.match(html, /data-note-kind="image"/);
+});
+
+test('a picture note carries its address in exactly one image tag, and nothing else about the note changes', async () => {
+  const pictured = makeStickyTemplate({content: 'A morning in the hills', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, image: PICTURE_URL});
+  assert.deepEqual(pictured.tags.find(tag => tag[0] === STICKY_IMAGE_TAG), [STICKY_IMAGE_TAG, PICTURE_URL]);
+  assert.equal(pictured.tags.filter(tag => tag[0] === STICKY_IMAGE_TAG).length, 1);
+  const parsed = parseStickyEvent({...pictured, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(parsed.image, PICTURE_URL);
+  assert.equal(parsed.content, 'A morning in the hills', 'the words are still the note’s own text');
+  // One tag added, and every tag a written note carries left exactly as it was: the picture
+  // must not disturb the cells, the reach, the expiry, the mention tags or the commitment.
+  const written = makeStickyTemplate({content: 'A morning in the hills', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH});
+  assert.deepEqual(pictured.tags.filter(tag => tag[0] !== STICKY_IMAGE_TAG), written.tags);
+  assert.equal(written.tags.some(tag => tag[0] === STICKY_IMAGE_TAG), false, 'a written note gains nothing');
+  assert.equal(parseStickyEvent({...written, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).image, '');
+  // The paid commitment is text, colour and font; the picture is outside it, so a picture
+  // note costs and fingerprints exactly what the same words would.
+  assert.equal(await stickyContentHash('A morning in the hills', 'yellow', 'typewriter'),
+    await stickyContentHash(parsed.content, parsed.color, parsed.font));
+});
+
+test('an address that is not this site’s own print is refused on the way out and dropped on the way in', () => {
+  assert.equal(stickyImageUrl(PICTURE_URL), PICTURE_URL);
+  assert.equal(stickyImageUrl(`https://www.satoshi.si/i/${'ab12cd34'.repeat(8)}.webp`), PICTURE_URL);
+  for (const hostile of ['https://evil.example/i/x.webp', 'http://satoshi.si/i/x.webp',
+    'https://satoshi.si/i/x.png', 'javascript:alert(1)', 'data:image/webp;base64,AAAA', '']) {
+    assert.equal(stickyImageUrl(hostile), '', `${hostile} is not a print this board will draw`);
+  }
+  assert.throws(() => makeStickyTemplate({content: 'hi', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH,
+    image: 'https://evil.example/i/x.webp'}), /satoshi\.si/);
+  // A note arriving from a relay is read through the same door, so a hostile relay cannot make
+  // this board fetch a picture from somewhere else.
+  const template = makeStickyTemplate({content: 'hi', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, image: PICTURE_URL});
+  const hostile = {...template, tags: template.tags.map(tag => (tag[0] === STICKY_IMAGE_TAG ? [STICKY_IMAGE_TAG, 'https://evil.example/i/x.webp'] : tag))};
+  assert.equal(parseStickyEvent({...hostile, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).image, '');
+});
+
+test('a picture note is drawn as an instant print in the note’s own footprint', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  // Same size as a note: the print keeps the note's own width and square, because the print
+  // rule adds paper and a border and no size at all.
+  assert.match(css, /\.sticky-note \{[^}]*width: 220px; aspect-ratio: 1;/);
+  const printRule = css.match(/\.sticky-note--print \{([^}]*)\}/)[1];
+  assert.match(printRule, /--note: #fdfcf7/, 'the print is white paper, whatever colour the note is');
+  assert.match(printRule, /background: var\(--note\)/);
+  assert.doesNotMatch(printRule, /(?:^|[;\s])(?:width|height|aspect-ratio):/,
+    'the print brings no footprint of its own, so it is the note’s');
+  // The border geometry: an even side border and a deeper band at the foot, which is where the
+  // note's own words are printed
+  const padding = /padding: (\d+)px (\d+)px (\d+)px/.exec(printRule);
+  assert.ok(padding, 'the print is padded, which is the white border');
+  assert.equal(padding[1], padding[2], 'the sides and the top are the same border');
+  assert.ok(Number(padding[3]) > Number(padding[1]), 'the foot is the deeper band of an instant print');
+  assert.match(css, /\.sticky-note__print-image \{[^}]*width: 100%;[^}]*height: 100%;[^}]*object-fit: cover/);
+  assert.match(css, /\.sticky-note__print-caption \{[^}]*position: absolute;[^}]*bottom: -34px;/);
+  // Drawn by the one funnel every note is drawn by, and appended to the note itself, so a print
+  // sits in the board's own sticky layer and pans, zooms and expires with the paper beside it.
+  assert.match(script, /note\.classList\.toggle\('sticky-note--print', Boolean\(picture\)\)/);
+  assert.match(script, /const print = document\.createElement\('figure'\);\s+print\.className = 'sticky-note__print';/);
+  assert.match(script, /photo\.className = 'sticky-note__print-image';/);
+  assert.match(script, /print\.append\(photo, text\);\s+text\.className = 'sticky-note__print-caption';/);
+  assert.match(script, /note\.appendChild\(print\);/);
+  // and it is the note that carries the picture, so the print is inside the note's own box
+  assert.match(script, /elements\.canvas\.insertBefore\(note, nextNewer \|\| placingNote \|\| null\)/);
+  // A print is the same note on the same board, so it must not skip the placement or the filters
+  const render = script.slice(script.indexOf('function renderNote('), script.indexOf('function dropExpiredNotes('));
+  assert.match(render, /noteAtPlacement\(note, sticky\);/);
+  assert.match(render, /if \(!temporary\) applyNoteFilters\(\);/);
+});
+
+test('an expired picture note is not rendered, exactly like an expired written one', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const template = makeStickyTemplate({content: 'Gone by tomorrow', color: 'blue', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, image: PICTURE_URL, liveliness: '1d'});
+  const parsed = parseStickyEvent({...template, id: 'c'.repeat(64), pubkey: 'd'.repeat(64)});
+  assert.equal(parsed.image, PICTURE_URL, 'the picture survives the round trip');
+  assert.equal(isStickyExpired(parsed, template.created_at), false);
+  assert.equal(isStickyExpired(parsed, template.created_at + 86400), true, 'its own moment is the end of it');
+  assert.equal(isStickyExpired(parsed, template.created_at + 2 * 86400), true);
+  // The expiry check is in front of the picture: the same one funnel every render passes
+  // through drops an expired note before a print is ever built.
+  const render = script.slice(script.indexOf('function renderNote('), script.indexOf('function dropExpiredNotes('));
+  assert.match(render, /if \(isStickyExpired\(sticky\)\) return null;/);
+  assert.ok(render.indexOf('if (isStickyExpired(sticky)) return null;') < render.indexOf("note.classList.toggle('sticky-note--print'"),
+    'an expired note never reaches the line that builds the print');
+  // A note that crosses its moment while the page is open is taken off the board too.
+  assert.match(script, /function dropExpiredNotes\(\)/);
+  assert.match(script, /if \(dropExpiredNotes\(\)\) applyNoteFilters\(\)/);
+  assert.match(script, /if \(!sticky \|\| isStickyExpired\(sticky\) \|\| !noteBelongsToBoard\(sticky\)\) return;/);
 });

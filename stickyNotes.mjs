@@ -64,7 +64,12 @@ import {
   BOARD_LAMP_SOCKETS,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
-  spentAmberHandOver,} from './stickyNotesModel.mjs';
+  spentAmberHandOver,
+  STICKY_IMAGE_GRADES,
+  STICKY_IMAGE_DEFAULT_GRADE,
+  STICKY_IMAGE_MAX_BYTES,
+  stickyImageGrade,
+  stickyImageIssue,} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -165,6 +170,10 @@ const elements = {
   hashtags: document.getElementById('noteHashtags'), hashtagStatus: document.getElementById('hashtagStatus'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
+  noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
+  noteImageFile: document.getElementById('noteImageFile'), noteImageStatus: document.getElementById('noteImageStatus'),
+  noteImageLimit: document.getElementById('noteImageLimit'), noteImageGradeList: document.getElementById('noteImageGradeList'),
+  noteImagePreview: document.getElementById('noteImagePreview'), noteImagePreviewLabel: document.getElementById('noteImagePreviewLabel'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
   discardBin: document.getElementById('discardBin'), discardDialog: document.getElementById('discardDialog'),
   discardWarning: document.getElementById('discardWarning'), discardConfirm: document.getElementById('discardNoteConfirm'),
@@ -221,6 +230,12 @@ let selectedColor = 'yellow';
 let selectedFont = 'typewriter';
 let selectedLiveliness = STICKY_DEFAULT_LIVELINESS;
 let lastValidEditor = '';
+// The composer's other half: whether this note is written or carries a picture, the file the
+// reader chose (kept in memory only — it is never read, only sent), and the grade they picked
+// for it. All three are per-note state and none of them is part of what a written note is.
+let noteKind = 'text';
+let pickedImage = null;
+let selectedImageGrade = STICKY_IMAGE_DEFAULT_GRADE;
 let pending = readPending();
 // Early note deletion is no longer a Pinstr action. Do not resume a stale removal
 // left by an older frontend; published deletion events are still read from the relay.
@@ -2078,6 +2093,12 @@ function renderNote(sticky, event = null, temporary = false) {
   const note = document.createElement('article');
   note.className = `sticky-note sticky-note--${sticky.color} sticky-note--font-${sticky.font || 'typewriter'}${temporary ? ' sticky-note--placing' : ''}`;
   note.classList.toggle('sticky-note--dense', stickyNoteLength(sticky.content) > 280);
+  // A note that carries a picture is drawn as the print that picture was pressed into. The
+  // footprint is deliberately the note's own — the class adds the white paper and the
+  // instant-print border, never a size — so a print sits in the same sticky layer as the
+  // paper beside it, and pans, zooms and expires with it rather than beside it.
+  const picture = String(sticky.image || '');
+  note.classList.toggle('sticky-note--print', Boolean(picture));
   if (sticky.id) note.dataset.eventId = sticky.id;
   note.dataset.createdAt = String(sticky.createdAt || 0);
   note.tabIndex = temporary ? 0 : -1;
@@ -2086,7 +2107,24 @@ function renderNote(sticky, event = null, temporary = false) {
   const textContent = document.createElement('span');
   renderNoteContent(textContent, sticky.content);
   text.appendChild(textContent);
-  note.appendChild(text);
+  if (picture) {
+    // The words printed in the deep band at the foot of the print are the note's own text: a
+    // picture note is still a note, and the desk refuses an empty one. The picture takes the
+    // rest of the paper, so the two share one footprint instead of stacking two.
+    const print = document.createElement('figure');
+    print.className = 'sticky-note__print';
+    const photo = document.createElement('img');
+    photo.className = 'sticky-note__print-image';
+    photo.decoding = 'async';
+    photo.loading = 'lazy';
+    photo.alt = sticky.content ? `A pinned picture: ${sticky.content}` : 'A picture pinned on this board';
+    photo.src = picture;
+    print.append(photo, text);
+    text.className = 'sticky-note__print-caption';
+    note.appendChild(print);
+  } else {
+    note.appendChild(text);
+  }
   if (!temporary) {
     installFilteredNoteLongPress(note, sticky.id);
     const pin = document.createElement('span');
@@ -2123,10 +2161,14 @@ function renderNote(sticky, event = null, temporary = false) {
   const nextNewer = [...elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)')]
     .find(existing => Number(existing.dataset.createdAt || 0) > Number(sticky.createdAt || 0));
   elements.canvas.insertBefore(note, nextNewer || placingNote || null);
-  fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
-  document.fonts?.ready?.then(() => {
-    if (note.isConnected) fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
-  });
+  // A print's words sit in a fixed band at the foot, in the caption's own size: there is
+  // nothing to fit there, and measuring it would only shrink a paper that has no text on it.
+  if (!picture) {
+    fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
+    document.fonts?.ready?.then(() => {
+      if (note.isConnected) fitPublishedTypography(note, text, textContent, sticky.font || 'typewriter');
+    });
+  }
   if (!temporary && event) noteEvents.set(sticky.id, {event, sticky, element: note});
   // Limits such as "last 5" must be recalculated whenever a newer note arrives.
   if (!temporary) applyNoteFilters();
@@ -2370,6 +2412,205 @@ function validateHashtags() {
   return {issue, tags};
 }
 
+// ---------------------------------------------------------------- pinned pictures
+// The six grades come from the model (STICKY_IMAGE_GRADES), which is also what the upload
+// query names, so the look the reader picks is the look the desk applies. The mockups are
+// drawn here from that same list, on a fixed sample picture painted in code: never on the
+// reader's picture. That is why the choice can be made before anything is sent, offline, and
+// without the file ever being read into the page.
+const MOCKUP_PIXELS = 120;
+
+/** The one sample every grade is drawn on: a small vintage postcard, painted in code. */
+function paintMockupSample(context, size) {
+  const sky = context.createLinearGradient(0, 0, 0, size * .7);
+  sky.addColorStop(0, '#8fc6e8');
+  sky.addColorStop(1, '#f4d9a6');
+  context.fillStyle = sky;
+  context.fillRect(0, 0, size, size * .7);
+  context.fillStyle = '#f6e7b0';
+  context.beginPath();
+  context.arc(size * .68, size * .26, size * .11, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = '#6d8f5a';
+  context.beginPath();
+  context.moveTo(0, size * .72);
+  context.lineTo(size * .36, size * .42);
+  context.lineTo(size * .72, size * .72);
+  context.closePath();
+  context.fill();
+  context.fillStyle = '#4f6b42';
+  context.beginPath();
+  context.moveTo(size * .42, size * .74);
+  context.lineTo(size * .78, size * .5);
+  context.lineTo(size, size * .74);
+  context.closePath();
+  context.fill();
+  context.fillStyle = '#c9b48b';
+  context.fillRect(0, size * .74, size, size * .26);
+  context.strokeStyle = '#8d7a55';
+  context.lineWidth = Math.max(1, size / 60);
+  for (let index = 0; index < 4; index += 1) {
+    const post = size * (.12 + index * .24);
+    context.beginPath();
+    context.moveTo(post, size * .76);
+    context.lineTo(post, size);
+    context.stroke();
+  }
+}
+
+/**
+ * One grade, drawn: the sample through that grade's own filter, then its tint and its grain.
+ * The filter is set on the context, so a browser without canvas filters shows the sample
+ * ungraded rather than nothing — the tint and the grain still tell the grades apart.
+ */
+function paintGradeMockup(canvas, grade) {
+  const size = Number(canvas.width) || MOCKUP_PIXELS;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, size, size);
+  context.save();
+  if (grade.filter && grade.filter !== 'none') context.filter = grade.filter;
+  paintMockupSample(context, size);
+  context.restore();
+  if (grade.tint) {
+    context.save();
+    context.fillStyle = grade.tint;
+    context.fillRect(0, 0, size, size);
+    context.restore();
+  }
+  if (grade.grain) {
+    context.save();
+    const specks = Math.round(size * size * grade.grain * .04);
+    for (let index = 0; index < specks; index += 1) {
+      context.fillStyle = index % 2 ? 'rgba(28,22,14,.3)' : 'rgba(255,255,255,.32)';
+      context.fillRect(Math.random() * size, Math.random() * size, 1, 1);
+    }
+    context.restore();
+  }
+}
+
+/** The six mockups, built once, as the radio group the reader picks a look from. */
+function renderImageGrades() {
+  if (!elements.noteImageGradeList || elements.noteImageGradeList.childElementCount) return;
+  elements.noteImageGradeList.replaceChildren(...STICKY_IMAGE_GRADES.map(grade => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = grade.id === selectedImageGrade ? 'note-image__grade is-selected' : 'note-image__grade';
+    button.dataset.grade = grade.id;
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(grade.id === selectedImageGrade));
+    const canvas = document.createElement('canvas');
+    canvas.width = MOCKUP_PIXELS;
+    canvas.height = MOCKUP_PIXELS;
+    canvas.setAttribute('aria-hidden', 'true');
+    paintGradeMockup(canvas, grade);
+    const label = document.createElement('span');
+    label.textContent = grade.label;
+    button.append(canvas, label);
+    button.addEventListener('click', () => selectImageGrade(grade.id));
+    return button;
+  }));
+  paintImagePreview();
+}
+
+/** Light the grade the reader picked, and redraw the print below the list to match. */
+function selectImageGrade(id) {
+  const grade = stickyImageGrade(id) || stickyImageGrade(STICKY_IMAGE_DEFAULT_GRADE);
+  selectedImageGrade = grade.id;
+  elements.noteImageGradeList?.querySelectorAll('[data-grade]').forEach(button => {
+    const chosen = button.dataset.grade === grade.id;
+    button.classList.toggle('is-selected', chosen);
+    button.setAttribute('aria-checked', String(chosen));
+  });
+  if (elements.noteImagePreviewLabel) elements.noteImagePreviewLabel.textContent = grade.label;
+  paintImagePreview();
+}
+
+/** The chosen grade drawn as the print it will become, so a look is chosen, not a name. */
+function paintImagePreview() {
+  const grade = stickyImageGrade(selectedImageGrade);
+  if (grade && elements.noteImagePreview?.getContext) paintGradeMockup(elements.noteImagePreview, grade);
+}
+
+function setImageStatus(message = '', error = false) {
+  if (!elements.noteImageStatus) return;
+  elements.noteImageStatus.textContent = message;
+  elements.noteImageStatus.classList.toggle('is-error', Boolean(error));
+}
+
+/**
+ * Written note or pinned picture. Both put the same note on the same board for the same
+ * price and the same term; the difference is only where the picture lives — the desk stores
+ * it and the note points at it, so the note itself stays as small as a written one.
+ */
+function selectNoteKind(kind) {
+  noteKind = kind === 'image' ? 'image' : 'text';
+  elements.noteKind?.querySelectorAll('[data-note-kind]').forEach(button => {
+    const chosen = button.dataset.noteKind === noteKind;
+    button.classList.toggle('is-selected', chosen);
+    button.setAttribute('aria-pressed', String(chosen));
+  });
+  if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
+  elements.editor.setAttribute('data-placeholder', noteKind === 'image' ? 'Say a few words about it...' : 'Type here...');
+  if (noteKind === 'image') renderImageGrades();
+  requestAnimationFrame(() => { fitDraftTypography(); updateCapacity(); });
+}
+
+/**
+ * Forget the picture of a note that is done or gone, so the next note starts written and no
+ * file the reader chose once can ride along onto something else.
+ */
+function forgetPinnedPicture() {
+  selectNoteKind('text');
+  chooseNoteImage(null);
+  selectImageGrade(STICKY_IMAGE_DEFAULT_GRADE);
+}
+
+/** The guard runs on the file's own size, so an oversized picture never leaves the device. */
+function chooseNoteImage(file) {
+  pickedImage = null;
+  setImageStatus('');
+  if (!file) {
+    // Nothing chosen is a clean input as well, so the field cannot keep showing a file that
+    // belongs to a note that is finished or gone.
+    if (elements.noteImageFile) elements.noteImageFile.value = '';
+    return;
+  }
+  const problem = stickyImageIssue(file.size);
+  if (problem) {
+    setImageStatus(problem, true);
+    elements.noteImageFile.value = '';
+    return;
+  }
+  pickedImage = file;
+  setImageStatus(`${file.name || 'Picture'} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+}
+
+/**
+ * Hand the picture to the desk, before the note is pinned. The body is the picture itself —
+ * raw bytes, not a form — and the grade and the order the publish belongs to travel in the
+ * query. Everything else is the desk's work: it reads the picture, strips its metadata, cuts
+ * it down, writes the WebP and applies the grade, then answers with the address the note will
+ * carry. The page never sends a processed picture and never keeps one.
+ */
+async function uploadPinnedImage(file, {orderId, grade}) {
+  const problem = stickyImageIssue(file.size);
+  if (problem) throw new Error(problem);
+  if (!orderId) throw new Error('This note has no order for the picture to belong to.');
+  const query = new URLSearchParams({order: orderId, grade});
+  const response = await fetch(`${API}/images?${query}`, {
+    method: 'POST',
+    headers: {'content-type': file.type || 'application/octet-stream'},
+    body: file,
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body.ok || !body.url) {
+    // The desk's own words, so a refusal reads here exactly as the desk wrote it.
+    throw new Error(body.error || `The picture was refused (${response.status}).`);
+  }
+  return String(body.url);
+}
+
 async function ensureReadySigner() {
   if (await signerReady().catch(() => false)) return true;
   showDialog(elements.login);
@@ -2452,7 +2693,13 @@ async function startPayment() {
     const liveliness = livelinessRung().key;
     const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions, hashtags,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
-      pubkey: session.pubkey, anonymous: session.method === 'anonymous'};
+      pubkey: session.pubkey, anonymous: session.method === 'anonymous',
+      // A picture note points at what the desk stored. The address rides in the draft with
+      // everything else, so a reload between paying and pinning does not lose it; a written
+      // note carries none. The grade is kept here too, for the composer's own memory only —
+      // it is baked into the stored picture and never travels in the note.
+      image: noteKind === 'image' ? String(pending?.image || '') : '',
+      imageGrade: noteKind === 'image' ? selectedImageGrade : ''};
     let order;
     try {
       order = await api('/orders', {
@@ -2478,6 +2725,16 @@ async function startPayment() {
       throw new Error(`Anonymous posting is waiting for the ${STICKY_ANONYMOUS_PRICE_SATS}-sat price update on the payment service. No invoice was shown.`);
     }
     const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_SUB_WEEK_SATS);
+    // The picture goes to the site before anything is placed: the note carries the address the
+    // desk hands back, so that address has to exist first. It is the same order as the note —
+    // one note, one order — and the guard runs again here, measured on the file itself. A
+    // draft that came back without its file (the tab was reclaimed while a wallet app paid)
+    // says so rather than pinning a note that points at nothing.
+    if (noteKind === 'image' && !notePending.image) {
+      if (!pickedImage) throw new Error('Choose the picture again: this page no longer holds the file you picked.');
+      status(elements.paymentStatus, 'Sending the picture to the site...');
+      notePending.image = await uploadPinnedImage(pickedImage, {orderId: order.id, grade: selectedImageGrade});
+    }
     if (sats === 0) {
       // Covered by the subscription the desk just confirmed: nothing to pay, and
       // the publish token is already there, so the note goes straight to placing.
@@ -2643,6 +2900,11 @@ function restoreSavedDraft() {
   elements.hashtags.value = (pending.hashtags || []).join(', ');
   validateHashtags();
   selectLiveliness(pending.liveliness || STICKY_DEFAULT_LIVELINESS);
+  // A saved note comes back as whatever it was. A picture note keeps the address the desk
+  // already gave it — the file itself cannot survive a reload, and does not have to: the
+  // picture lives on the site from the moment it was stored, and the note only points at it.
+  selectNoteKind(pending.image ? 'image' : 'text');
+  selectImageGrade(pending.imageGrade || STICKY_IMAGE_DEFAULT_GRADE);
   elements.editor.textContent = pending.content;
   lastValidEditor = pending.content;
   composingPubkey = pending.pubkey;
@@ -2881,6 +3143,7 @@ function discardPendingNote() {
   elements.editor.textContent = '';
   elements.hashtags.value = '';
   validateHashtags();
+  forgetPinnedPicture();
   lastValidEditor = '';
   elements.pay.disabled = false;
   updateCapacity();
@@ -2943,6 +3206,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     elements.editor.textContent = '';
     elements.hashtags.value = '';
     validateHashtags();
+    forgetPinnedPicture();
     lastValidEditor = '';
     elements.pay.disabled = false;
     published = true;
@@ -3215,7 +3479,12 @@ function openComposer() {
   // Opening on a stale quote is how the buttons came to describe the wrong identity, so
   // the composer asks again every time it opens.
   refreshPriceQuote(session).catch(() => {});
-  if (!restoredDraft && !pending?.orderId) elements.exactGeohash.checked = false;
+  if (!restoredDraft && !pending?.orderId) {
+    elements.exactGeohash.checked = false;
+    // A fresh note starts written. The picture side is cleared with it, so a file chosen for a
+    // note that was never pinned cannot quietly ride along on the next one.
+    forgetPinnedPicture();
+  }
   if (!restoredDraft && !pending?.orderId) elements.hashtags.value = '';
   if (!restoredDraft) selectLiveliness(pending?.liveliness || selectedLiveliness);
   validateHashtags();
@@ -4371,6 +4640,14 @@ elements.editor.addEventListener('paste', event => {
   fitDraftTypography();
 });
 elements.hashtags.addEventListener('input', validateHashtags);
+elements.noteKind?.addEventListener('click', event => {
+  const button = event.target.closest('[data-note-kind]');
+  if (button) selectNoteKind(button.dataset.noteKind);
+});
+elements.noteImageFile?.addEventListener('change', () => chooseNoteImage(elements.noteImageFile.files?.[0] || null));
+// The size the reader is told they may send comes from the same constant the guard measures
+// against, so the promise and the refusal can never drift apart.
+if (elements.noteImageLimit) elements.noteImageLimit.textContent = `up to ${STICKY_IMAGE_MAX_BYTES / (1024 * 1024)} MB`;
 elements.pay.addEventListener('click', startPayment);
 elements.planPicker?.addEventListener('click', event => {
   const button = event.target.closest('[data-plan]');

@@ -383,6 +383,73 @@ export function stickyExpiryCountdown(expiration, now = Date.now() / 1000) {
   return `[${parts.join(' ')} left]`;
 }
 
+// ------------------------------------------------------------ pinned pictures
+// A picture is pinned as an address, never as pixels: the desk downscales it, strips its
+// metadata, writes a WebP and applies the vintage grade, and the note carries only the
+// address the desk hands back. What travels in the note is therefore one small tag, and
+// the board draws whatever that address serves — the same way a link is an address in the
+// text rather than the page behind it.
+export const STICKY_IMAGE_TAG = 'image';               // ["image", "https://satoshi.si/i/<hash>.webp"]
+// The desk's own address for a stored print: hash-named, WebP, on the site the note is read from.
+export const STICKY_IMAGE_ORIGIN = 'https://satoshi.si';
+export const STICKY_IMAGE_PATH = '/i/';
+// What a picture may weigh before it is refused here, so a 40 MB phone photo never leaves
+// the device and never occupies the reader's uplink while an order waits. The desk has its
+// own ceiling; this is the guard the page owes the reader before it spends their bytes.
+export const STICKY_IMAGE_MAX_BYTES = 7 * 1024 * 1024;
+/**
+ * The six grades a writer may choose between, in the order the composer offers them. The id
+ * is the whole contract with the desk — it names the look and travels in the upload query —
+ * and the label is what the reader reads. The desk bakes the grade into the stored picture,
+ * so no note has to carry it and the board does not have to know it.
+ *
+ * `filter`, `grain` and `tint` are how the composer draws that grade on its own sample
+ * picture: a mockup of the look, made in the browser, so the choice can be made before
+ * anything is sent and with no picture of the reader's ever leaving the device.
+ */
+export const STICKY_IMAGE_GRADES = Object.freeze([
+  Object.freeze({id: 'original', label: 'Original', filter: 'none', grain: 0, tint: ''}),
+  Object.freeze({id: 'sepia', label: 'Sepia', filter: 'sepia(.78) contrast(1.05)', grain: .12, tint: 'rgba(112,74,32,.1)'}),
+  Object.freeze({id: 'faded', label: 'Faded instant print', filter: 'sepia(.42) saturate(.7) brightness(1.16) contrast(.82)', grain: .1, tint: 'rgba(255,244,220,.16)'}),
+  Object.freeze({id: 'grain', label: 'Heavy grain', filter: 'contrast(1.3) saturate(.6) brightness(1.04)', grain: .55, tint: ''}),
+  Object.freeze({id: 'mono', label: 'Black and white', filter: 'grayscale(1) contrast(1.15)', grain: .18, tint: ''}),
+  Object.freeze({id: 'cool', label: 'Cool cyan', filter: 'hue-rotate(-25deg) saturate(1.25) brightness(1.03)', grain: .1, tint: 'rgba(36,124,156,.18)'}),
+]);
+export const STICKY_IMAGE_DEFAULT_GRADE = 'original';
+
+/** The grade with this id, or null when nothing here is called that. */
+export function stickyImageGrade(id) {
+  return STICKY_IMAGE_GRADES.find(grade => grade.id === String(id || '')) || null;
+}
+
+function imageMegabytes(bytes) {
+  return Number((bytes / (1024 * 1024)).toFixed(1));
+}
+
+/**
+ * Why a chosen picture may not be uploaded yet, or an empty string when it may. Measured
+ * before a single byte is sent, so the refusal costs the reader nothing.
+ */
+export function stickyImageIssue(size, max = STICKY_IMAGE_MAX_BYTES) {
+  const bytes = Number(size);
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'That picture is empty. Choose another one.';
+  if (bytes > max) {
+    return `That picture weighs ${imageMegabytes(bytes)} MB and the most one may weigh is ${imageMegabytes(max)} MB. Choose a smaller one.`;
+  }
+  return '';
+}
+
+/**
+ * The address of a stored print, normalised, or '' when it is not one this board will draw.
+ * Only an https address under the site's own print path survives: a note is public and its
+ * tag is whatever a signer was handed, so nothing else may be rendered as a picture here.
+ */
+export function stickyImageUrl(value) {
+  const raw = String(value || '').trim();
+  const match = /^https:\/\/(?:www\.)?satoshi\.si\/i\/([0-9a-z]+)\.webp$/i.exec(raw);
+  return match ? `${STICKY_IMAGE_ORIGIN}${STICKY_IMAGE_PATH}${match[1].toLowerCase()}.webp` : '';
+}
+
 // Codes are 3 to 9 characters: below 3 the cell is a region rather than a
 // useful board, and 9 is as deep as the grid is useful. Within that range a board may
 // be a clump of touching cells, which is what lets one note cover a building
@@ -910,7 +977,7 @@ export function normaliseStickyHashtags(input) {
     .filter(tag => tag && tag !== STICKY_TOPIC))];
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], image = '', liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   if (!text) throw new Error('Write something on the note first.');
   if (stickyNoteLength(text) > STICKY_MAX_CHARACTERS) throw new Error('The note is full.');
@@ -928,6 +995,12 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   const hashtagProblem = stickyHashtagIssue(hashtags);
   if (hashtagProblem) throw new Error(hashtagProblem);
   const hashtagList = normaliseStickyHashtags(hashtags);
+  // A picture rides in one tag beside the text, never inside it: the desk stored the WebP
+  // this address names, so the note stays the small event it has always been and the reader's
+  // browser fetches the picture from the site rather than from the relay. An address that is
+  // not one satoshi.si serves under /i/ is refused rather than written into a public event.
+  const picture = image ? stickyImageUrl(image) : '';
+  if (image && !picture) throw new Error('That picture address is not one satoshi.si serves.');
   const choice = geohashes ?? geohash;
   const issue = geohashSetIssue(choice);
   if (issue) {
@@ -953,6 +1026,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ['k', 'geo'],
     ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
+    ...(picture ? [[STICKY_IMAGE_TAG, picture]] : []),
     ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment this note stops existing, relay-side.
     [EXPIRATION_TAG, String(createdAt + rung.seconds)],
@@ -987,6 +1061,10 @@ export function parseStickyEvent(event) {
   const namedPrimary = normaliseGeohash(String(uri || '').slice(4));
   const geohash = geohashes.includes(namedPrimary) ? namedPrimary : geohashes[0];
   const scope = event.tags.find(tag => tag?.[0] === 'geohash')?.[1];
+  // The picture the note points at, read through the same door as it is written through:
+  // an address outside the site's own print path is dropped, so a note drawn from an
+  // untrusted relay cannot make this board fetch a picture from somewhere else.
+  const image = stickyImageUrl(event.tags.find(tag => tag?.[0] === STICKY_IMAGE_TAG)?.[1]);
   // A note that names no moment is not a note this board shows. Every note is
   // temporary (NIP-40), so one without an expiration tag is either older than the
   // rule or written past the desk — either way it would sit on the relay forever,
@@ -1005,6 +1083,7 @@ export function parseStickyEvent(event) {
     rotation: clampRotation(sticky[5]),
     geohash,
     geohashes,
+    image,
     exactGeohash: scope !== 'prefix',
     expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),

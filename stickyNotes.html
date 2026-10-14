@@ -267,6 +267,10 @@
     <div class="dialog-inner composer-inner">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="composerTitle">Write your note</h2>
+      <div class="note-kind" id="noteKind" role="group" aria-label="What to pin">
+        <button type="button" class="note-kind__button is-selected" data-note-kind="text" aria-pressed="true"><i class="lni lni-text-format" aria-hidden="true"></i><span>Written note</span></button>
+        <button type="button" class="note-kind__button" data-note-kind="image" aria-pressed="false"><i class="lni lni-image-1" aria-hidden="true"></i><span>Pinned picture</span></button>
+      </div>
       <div id="draftNote" class="sticky-note sticky-note--yellow draft-note">
         <div id="stickyEditor" class="sticky-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Type here..." spellcheck="true"></div>
       </div>
@@ -274,6 +278,22 @@
       <div id="mentionMenu" class="mention-menu" hidden>
         <ul id="mentionOptions" class="mention-menu__list" role="listbox" aria-label="People you can tag"></ul>
         <div id="mentionMenuStatus" class="mention-menu__status" role="status" aria-live="polite"></div>
+      </div>
+      <div id="noteImage" class="note-image" hidden>
+        <p class="note-image__lead">The site presses this into a vintage print and keeps it for as long as the note lives. The words on the paper are printed under the picture, so keep them short.</p>
+        <label class="note-image__pick" for="noteImageFile"><span>Choose a picture <small id="noteImageLimit">up to 7 MB</small></span>
+          <input id="noteImageFile" type="file" accept="image/*" aria-describedby="noteImageStatus">
+        </label>
+        <div id="noteImageStatus" class="inline-status note-image__status" role="status" aria-live="polite"></div>
+        <div class="note-image__grades">
+          <span id="noteImageGradesLabel" class="note-image__grades-label">Grade</span>
+          <div id="noteImageGradeList" class="note-image__grade-list" role="radiogroup" aria-labelledby="noteImageGradesLabel"></div>
+          <p class="note-image__grades-hint">A mockup of each look on a sample picture, not on yours.</p>
+        </div>
+        <figure class="note-image__preview">
+          <canvas id="noteImagePreview" class="note-image__preview-print" width="192" height="192" role="img" aria-label="Mockup of the chosen grade as it will be printed"></canvas>
+          <figcaption id="noteImagePreviewLabel" class="note-image__preview-label">Original</figcaption>
+        </figure>
       </div>
       <div class="color-swatches" id="colorSwatches" aria-label="Note color">
         <button type="button" class="swatch swatch--yellow is-selected" data-color="yellow" aria-label="Yellow"></button>
