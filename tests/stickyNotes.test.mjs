@@ -2713,47 +2713,81 @@ test('a picture over seven megabytes is refused here, before a byte is sent', as
   assert.doesNotMatch(script, /FormData/);
 });
 
-test('the composer offers the six vintage grades, each with the id the desk is told', () => {
-  assert.equal(STICKY_IMAGE_GRADES.length, 6);
-  assert.deepEqual(STICKY_IMAGE_GRADES.map(grade => grade.id), ['original', 'sepia', 'faded', 'grain', 'bw', 'cool']);
-  assert.equal(STICKY_IMAGE_DEFAULT_GRADE, 'original');
+test('the composer offers the five vintage looks, each with the id the desk is told', () => {
+  assert.equal(STICKY_IMAGE_GRADES.length, 5);
+  assert.deepEqual(STICKY_IMAGE_GRADES.map(grade => grade.id), ['sepia', 'faded', 'grain', 'bw', 'cool']);
+  // Nothing pinnable is ungraded. A print is a treated picture, so "as it was taken" is not a
+  // look: it is not offered here, `stickyImageGrade` does not know the id, and the desk refuses
+  // it - three separate places, because a look a reader can pick but the desk refuses would be
+  // a note that cannot be placed.
+  assert.equal(stickyImageGrade('original'), null);
+  assert.ok(STICKY_IMAGE_GRADES.every(grade => grade.filter && grade.filter !== 'none'),
+    'every look changes the picture');
+  // And the default is one of them, so a picture note can never be ordered with no look at all.
+  assert.equal(STICKY_IMAGE_DEFAULT_GRADE, 'sepia');
+  assert.ok(STICKY_IMAGE_GRADES.some(grade => grade.id === STICKY_IMAGE_DEFAULT_GRADE));
   for (const grade of STICKY_IMAGE_GRADES) {
     assert.ok(grade.label, `${grade.id} has a name a reader can read`);
     assert.equal(stickyImageGrade(grade.id), grade);
   }
   assert.equal(stickyImageGrade('nonsense'), null);
   assert.equal(stickyImageGrade(''), null);
-  // Each grade is a look of its own: six distinct filters, so the mockups a reader picks
-  // between visibly differ rather than being six names for one picture.
-  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.filter)).size, 6,
+  // Each grade is a look of its own: five distinct filters, so the previews a reader picks
+  // between visibly differ rather than being five names for one picture.
+  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.filter)).size, 5,
     'no two grades share a filter');
-  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.label)).size, 6);
+  assert.equal(new Set(STICKY_IMAGE_GRADES.map(grade => grade.label)).size, 5);
 });
 
-test('the six grade mockups are drawn in the browser from those grades, and never from a picture of the reader’s', async () => {
+test('the looks are drawn in the browser, on the reader’s own picture once they choose one', async () => {
   const [script, html] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
   ]);
-  // The list the desk is told about is the list the mockups are drawn from, so a look the
+  // The list the desk is told about is the list the previews are drawn from, so a look the
   // reader picked cannot be a look the desk does not know.
   assert.match(script, /elements\.noteImageGradeList\.replaceChildren\(\.\.\.STICKY_IMAGE_GRADES\.map\(/);
-  assert.match(script, /paintGradeMockup\(canvas, grade\)/);
+  assert.match(script, /paintGradePreview\(canvas, grade\)/);
   assert.match(script, /if \(grade\.filter && grade\.filter !== 'none'\) context\.filter = grade\.filter;/);
-  // Drawn, not fetched: the sample picture is painted in code, and nothing in the mockup path
-  // reaches the network or touches the file the reader chose.
-  const mockups = script.slice(script.indexOf('function paintMockupSample('), script.indexOf('async function uploadPinnedImage('));
-  assert.match(mockups, /function paintMockupSample\(context, size\)/);
-  assert.doesNotMatch(mockups, /fetch\(|new Image\(|createObjectURL|FileReader/,
-    'a mockup is drawn from a sample in code, so it appears offline and reads no file');
-  assert.doesNotMatch(mockups, /elements\.noteImageFile\.files/,
-    'the reader’s own picture is never read to draw a mockup');
+  const previews = script.slice(script.indexOf('function paintSamplePicture('), script.indexOf('async function uploadPinnedImage('));
+  // The reader's own picture carries every look, drawn to fill the mat as the print is; the
+  // sample painted in code is only what stands in before a picture is chosen, so the list still
+  // works offline and no file is read before there is one to read.
+  assert.match(previews, /if \(pickedPreview\) drawCovered\(context, pickedPreview, size\);[\s\S]*?else paintSamplePicture\(context, size\);/);
+  assert.match(previews, /function drawCovered\(context, source, size\)/);
+  assert.match(previews, /async function loadPickedPreview\(file\) \{/);
+  assert.match(previews, /pickedPreview = image;/);
+  assert.match(previews, /URL\.revokeObjectURL\(pickedPreviewUrl\)/, 'the chosen file is let go with its note');
+  // Grain lands in the same place on every repaint, or the same look would shimmer between two
+  // views of it, and nothing here is fetched.
+  assert.match(previews, /function speckle\(index\)/);
+  assert.doesNotMatch(previews, /Math\.random\(/);
+  assert.doesNotMatch(previews, /fetch\(/);
+  // A file just chosen takes up its preview, and a file let go puts the sample back.
+  assert.match(script, /loadPickedPreview\(file\)\.then\(repaintImagePreviews\);/);
+  assert.match(script, /loadPickedPreview\(null\)\.then\(repaintImagePreviews\);/);
+  assert.match(script, /elements\.noteImageGradesHint\.textContent = pickedPreview/);
   // A file input is what a reader chooses the picture with, and the panel is what the kind
   // toggle reveals.
-  assert.match(html, /<input id="noteImageFile" type="file" accept="image\/\*"/);
+  assert.match(html, /<input id="noteImageFile" type="file" accept="image\/\*,\.gif"/);
   assert.match(html, /<div id="noteImage" class="note-image" hidden>/);
   assert.match(html, /<div class="note-kind" id="noteKind" role="group" aria-label="What to pin">/);
   assert.match(html, /data-note-kind="image"/);
+});
+
+test('a GIF is a picture here, and it is promised to keep moving', async () => {
+  // A GIF is accepted by the desk's magic-byte sniffer like any other picture, and the print
+  // keeps its motion: the desk stores the animation (as WebP), so what the board draws is not a
+  // still of the one frame this page happened to preview. The page says so rather than leaving
+  // the reader to find out.
+  const html = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  assert.match(html, /Choose a picture or a GIF/);
+  assert.match(html, /A GIF keeps moving, with the look you pick applied to every frame\./);
+  assert.doesNotMatch(html, /Mockup/, 'nothing calls a preview a mockup of someone else’s picture');
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // A chosen GIF is decoded the same way as any picture: the browser animates it wherever it is
+  // shown, and the canvas draws the frame it is on.
+  assert.match(script, /image\.decode \? image\.decode\(\)/);
 });
 
 test('a picture note carries its address in exactly one image tag, and leaves every other tag alone', async () => {

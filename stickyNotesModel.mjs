@@ -411,15 +411,17 @@ export const STICKY_IMAGE_MAX_BYTES = 7 * 1024 * 1024;
  * picture: a mockup of the look, made in the browser, so the choice can be made before
  * anything is sent and with no picture of the reader's ever leaving the device.
  */
+// Five looks, and no ungraded one: a print is a treated picture, so "as it was taken" is not a
+// look a reader may pin. The desk refuses `original` for the same reason, and the two lists are
+// checked against each other.
 export const STICKY_IMAGE_GRADES = Object.freeze([
-  Object.freeze({id: 'original', label: 'Original', filter: 'none', grain: 0, tint: ''}),
   Object.freeze({id: 'sepia', label: 'Sepia', filter: 'sepia(.78) contrast(1.05)', grain: .12, tint: 'rgba(112,74,32,.1)'}),
   Object.freeze({id: 'faded', label: 'Faded instant print', filter: 'sepia(.42) saturate(.7) brightness(1.16) contrast(.82)', grain: .1, tint: 'rgba(255,244,220,.16)'}),
   Object.freeze({id: 'grain', label: 'Heavy grain', filter: 'contrast(1.3) saturate(.6) brightness(1.04)', grain: .55, tint: ''}),
   Object.freeze({id: 'bw', label: 'Black and white', filter: 'grayscale(1) contrast(1.15)', grain: .18, tint: ''}),
   Object.freeze({id: 'cool', label: 'Cool cyan', filter: 'hue-rotate(-25deg) saturate(1.25) brightness(1.03)', grain: .1, tint: 'rgba(36,124,156,.18)'}),
 ]);
-export const STICKY_IMAGE_DEFAULT_GRADE = 'original';
+export const STICKY_IMAGE_DEFAULT_GRADE = 'sepia';
 
 /** The grade with this id, or null when nothing here is called that. */
 export function stickyImageGrade(id) {

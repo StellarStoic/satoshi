@@ -280,18 +280,18 @@
         <div id="mentionMenuStatus" class="mention-menu__status" role="status" aria-live="polite"></div>
       </div>
       <div id="noteImage" class="note-image" hidden>
-        <p class="note-image__lead">The site presses this into a vintage print and keeps it for as long as the note lives. The paper carries the picture and your signature, and no words on it.</p>
-        <label class="note-image__pick" for="noteImageFile"><span>Choose a picture <small id="noteImageLimit">up to 7 MB</small></span>
-          <input id="noteImageFile" type="file" accept="image/*" aria-describedby="noteImageStatus">
+        <p class="note-image__lead">The site presses this into a vintage print and keeps it for as long as the note lives. The paper carries the picture and your signature, and no words on it. A GIF keeps moving, with the look you pick applied to every frame.</p>
+        <label class="note-image__pick" for="noteImageFile"><span>Choose a picture or a GIF <small id="noteImageLimit">up to 7 MB</small></span>
+          <input id="noteImageFile" type="file" accept="image/*,.gif" aria-describedby="noteImageStatus">
         </label>
         <div id="noteImageStatus" class="inline-status note-image__status" role="status" aria-live="polite"></div>
         <div class="note-image__grades">
           <span id="noteImageGradesLabel" class="note-image__grades-label">Grade</span>
           <div id="noteImageGradeList" class="note-image__grade-list" role="radiogroup" aria-labelledby="noteImageGradesLabel"></div>
-          <p class="note-image__grades-hint">A mockup of each look on a sample picture, not on yours.</p>
+          <p id="noteImageGradesHint" class="note-image__grades-hint">Every look is drawn on a sample picture until you choose yours.</p>
         </div>
         <figure class="note-image__preview">
-          <canvas id="noteImagePreview" class="note-image__preview-print" width="192" height="192" role="img" aria-label="Mockup of the chosen grade as it will be printed"></canvas>
+          <canvas id="noteImagePreview" class="note-image__preview-print" width="192" height="192" role="img" aria-label="The chosen look, as the print will carry it"></canvas>
           <figcaption id="noteImagePreviewLabel" class="note-image__preview-label">Original</figcaption>
         </figure>
       </div>

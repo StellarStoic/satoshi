@@ -173,6 +173,7 @@ const elements = {
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
   noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
   draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
+  noteImageGradesHint: document.getElementById('noteImageGradesHint'),
   composerTitle: document.getElementById('composerTitle'),
   noteImageFile: document.getElementById('noteImageFile'), noteImageStatus: document.getElementById('noteImageStatus'),
   noteImageLimit: document.getElementById('noteImageLimit'), noteImageGradeList: document.getElementById('noteImageGradeList'),
@@ -2416,15 +2417,20 @@ function validateHashtags() {
 }
 
 // ---------------------------------------------------------------- pinned pictures
-// The six grades come from the model (STICKY_IMAGE_GRADES), which is also what the upload
-// query names, so the look the reader picks is the look the desk applies. The mockups are
-// drawn here from that same list, on a fixed sample picture painted in code: never on the
-// reader's picture. That is why the choice can be made before anything is sent, offline, and
-// without the file ever being read into the page.
-const MOCKUP_PIXELS = 120;
+// The five grades come from the model (STICKY_IMAGE_GRADES), which is also what the upload
+// query names, so the look the reader picks is the look the desk applies. The previews are
+// drawn here from that same list, on the reader's OWN picture as soon as they have chosen one,
+// so a look is judged on the picture it will be printed on. Until then they are drawn on a
+// sample painted in code: the choice can be made before anything is sent, offline, and without
+// a file ever being read into the page.
+const PREVIEW_PIXELS = 120;
 
-/** The one sample every grade is drawn on: a small vintage postcard, painted in code. */
-function paintMockupSample(context, size) {
+/** The reader's own picture, decoded once for the previews; null until they choose one. */
+let pickedPreview = null;
+let pickedPreviewUrl = '';
+
+/** The one sample every grade is drawn on until a picture is chosen: a postcard, painted in code. */
+function paintSamplePicture(context, size) {
   const sky = context.createLinearGradient(0, 0, 0, size * .7);
   sky.addColorStop(0, '#8fc6e8');
   sky.addColorStop(1, '#f4d9a6');
@@ -2462,18 +2468,41 @@ function paintMockupSample(context, size) {
 }
 
 /**
- * One grade, drawn: the sample through that grade's own filter, then its tint and its grain.
- * The filter is set on the context, so a browser without canvas filters shows the sample
+ * Cover the whole mat with the picture, as the print itself does: what is stored keeps the
+ * photograph's own shape and is drawn to fill, so a preview that letterboxed would be showing
+ * a different picture than the one the board ends up with.
+ */
+function drawCovered(context, source, size) {
+  const width = Number(source.naturalWidth) || Number(source.width) || size;
+  const height = Number(source.naturalHeight) || Number(source.height) || size;
+  const scale = Math.max(size / width, size / height);
+  context.drawImage(source, (size - width * scale) / 2, (size - height * scale) / 2, width * scale, height * scale);
+}
+
+/**
+ * Speckle that lands in the same place every time. A preview is repainted whenever the reader
+ * changes their mind, and grain that moved between repaints would make two views of one look
+ * look like two looks.
+ */
+function speckle(index) {
+  const value = Math.sin(index * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+/**
+ * One grade, drawn: the picture through that grade's own filter, then its tint and its grain.
+ * The filter is set on the context, so a browser without canvas filters shows the picture
  * ungraded rather than nothing — the tint and the grain still tell the grades apart.
  */
-function paintGradeMockup(canvas, grade) {
-  const size = Number(canvas.width) || MOCKUP_PIXELS;
+function paintGradePreview(canvas, grade) {
+  const size = Number(canvas.width) || PREVIEW_PIXELS;
   const context = canvas.getContext('2d');
   if (!context) return;
   context.clearRect(0, 0, size, size);
   context.save();
   if (grade.filter && grade.filter !== 'none') context.filter = grade.filter;
-  paintMockupSample(context, size);
+  if (pickedPreview) drawCovered(context, pickedPreview, size);
+  else paintSamplePicture(context, size);
   context.restore();
   if (grade.tint) {
     context.save();
@@ -2486,9 +2515,58 @@ function paintGradeMockup(canvas, grade) {
     const specks = Math.round(size * size * grade.grain * .04);
     for (let index = 0; index < specks; index += 1) {
       context.fillStyle = index % 2 ? 'rgba(28,22,14,.3)' : 'rgba(255,255,255,.32)';
-      context.fillRect(Math.random() * size, Math.random() * size, 1, 1);
+      context.fillRect(speckle(index * 2) * size, speckle(index * 2 + 1) * size, 1, 1);
     }
     context.restore();
+  }
+}
+
+/**
+ * Take up the picture the reader chose, or let it go. A GIF is decoded like any other picture:
+ * the browser animates it wherever it is shown in the page, and a canvas — which is a still —
+ * draws the frame it is on when the grade is drawn. The print keeps its motion because the desk
+ * stores the animation itself, not this still.
+ */
+async function loadPickedPreview(file) {
+  releasePickedPreview();
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+  image.src = url;
+  try {
+    await (image.decode ? image.decode() : new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    }));
+  } catch {
+    // A file the browser cannot draw is not refused here — the desk has the last word on what
+    // it will take — and the grades simply keep showing the sample.
+    URL.revokeObjectURL(url);
+    return;
+  }
+  pickedPreview = image;
+  pickedPreviewUrl = url;
+}
+
+/** Let the picture go with its object URL, so a chosen file is not held after its note is done. */
+function releasePickedPreview() {
+  if (pickedPreviewUrl) URL.revokeObjectURL(pickedPreviewUrl);
+  pickedPreview = null;
+  pickedPreviewUrl = '';
+}
+
+/** Draw every look again: over the picture just chosen, or back over the sample. */
+function repaintImagePreviews() {
+  elements.noteImageGradeList?.querySelectorAll('[data-grade]').forEach(button => {
+    const grade = stickyImageGrade(button.dataset.grade);
+    const canvas = button.querySelector('canvas');
+    if (grade && canvas) paintGradePreview(canvas, grade);
+  });
+  paintImagePreview();
+  if (elements.noteImageGradesHint) {
+    elements.noteImageGradesHint.textContent = pickedPreview
+      ? 'Every look is drawn on your picture, as the print would carry it.'
+      : 'Every look is drawn on a sample picture until you choose yours.';
   }
 }
 
@@ -2503,10 +2581,10 @@ function renderImageGrades() {
     button.setAttribute('role', 'radio');
     button.setAttribute('aria-checked', String(grade.id === selectedImageGrade));
     const canvas = document.createElement('canvas');
-    canvas.width = MOCKUP_PIXELS;
-    canvas.height = MOCKUP_PIXELS;
+    canvas.width = PREVIEW_PIXELS;
+    canvas.height = PREVIEW_PIXELS;
     canvas.setAttribute('aria-hidden', 'true');
-    paintGradeMockup(canvas, grade);
+    paintGradePreview(canvas, grade);
     const label = document.createElement('span');
     label.textContent = grade.label;
     button.append(canvas, label);
@@ -2532,7 +2610,7 @@ function selectImageGrade(id) {
 /** The chosen grade drawn as the print it will become, so a look is chosen, not a name. */
 function paintImagePreview() {
   const grade = stickyImageGrade(selectedImageGrade);
-  if (grade && elements.noteImagePreview?.getContext) paintGradeMockup(elements.noteImagePreview, grade);
+  if (grade && elements.noteImagePreview?.getContext) paintGradePreview(elements.noteImagePreview, grade);
 }
 
 function setImageStatus(message = '', error = false) {
@@ -2584,16 +2662,19 @@ function chooseNoteImage(file) {
     // Nothing chosen is a clean input as well, so the field cannot keep showing a file that
     // belongs to a note that is finished or gone.
     if (elements.noteImageFile) elements.noteImageFile.value = '';
+    loadPickedPreview(null).then(repaintImagePreviews);
     return;
   }
   const problem = stickyImageIssue(file.size);
   if (problem) {
     setImageStatus(problem, true);
     elements.noteImageFile.value = '';
+    loadPickedPreview(null).then(repaintImagePreviews);
     return;
   }
   pickedImage = file;
   setImageStatus(`${file.name || 'Picture'} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+  loadPickedPreview(file).then(repaintImagePreviews);
 }
 
 /**
