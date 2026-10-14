@@ -3038,7 +3038,10 @@ function withdrawPlacement() {
  * brings it straight back.
  */
 function syncPlacementWithSession() {
-  if (pending?.action === 'pin' && pending?.status === 'paid' && pending?.content && pendingBelongsToSession()) {
+  // A picture note has no words, so "has something to place" is its words OR the picture the
+  // desk stored for it. Waiting on words alone meant a paid picture note never came back to
+  // the board after a reload, and could not be placed at all.
+  if (pending?.action === 'pin' && pending?.status === 'paid' && (pending?.content || pending?.image) && pendingBelongsToSession()) {
     beginPlacement();
     return true;
   }
@@ -3047,7 +3050,11 @@ function syncPlacementWithSession() {
 }
 
 function beginPlacement() {
-  if (pending?.action !== 'pin' || !pending?.content || pending.status !== 'paid') return;
+  // The same rule as the resume above: words, or the picture that is the whole note. Without
+  // the picture in this test the composer closed on "Place your note", the placement never
+  // appeared, and there was nothing for the reader to pin - the note was paid for, the print
+  // was stored, and no publish request was ever made.
+  if (pending?.action !== 'pin' || (!pending?.content && !pending?.image) || pending.status !== 'paid') return;
   if (!pendingBelongsToSession()) return;
   placingNote?.remove();
   // The render below inserts before the placement note, so a reference to the node just

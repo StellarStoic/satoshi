@@ -2847,6 +2847,22 @@ test('a pinned picture needs no words, and blank paper is still refused', async 
   'and a picture from somewhere else is not one this board draws');
 });
 
+test('a paid picture note can still be placed, words or none', async () => {
+  // The placement was gated on the note having words, and a picture note has none: the
+  // composer closed on "Place your note", no placement appeared, and the reader had nothing
+  // to pin - one order paid for, one print stored, and no publish request ever made. Both
+  // gates now ask for words OR the picture the desk stored, which is the whole note.
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /if \(pending\?\.action === 'pin' && pending\?\.status === 'paid' && \(pending\?\.content \|\| pending\?\.image\) && pendingBelongsToSession\(\)\)/);
+  assert.match(script, /if \(pending\?\.action !== 'pin' \|\| \(!pending\?\.content && !pending\?\.image\) \|\| pending\.status !== 'paid'\) return;/);
+  // No gate on a note's words is left anywhere that decides whether a note may be placed.
+  const placement = script.slice(script.indexOf('function syncPlacementWithSession()'), script.indexOf('function currentPlacement()'));
+  assert.doesNotMatch(placement, /!pending\?\.content[^&]/, 'words alone must not decide whether a note can be placed');
+  // And the picture rides in the draft with everything else, so a reload between paying and
+  // pinning cannot lose it.
+  assert.match(script, /image: noteKind === 'image' \? String\(pending\?\.image \|\| ''\) : ''/);
+});
+
 test('the composer offers a note or a picture, and asks only a note for words', async () => {
   // The two kinds are named what they are, and the words field is offered to a written note only:
   // a picture note has no words on it, so a text box (or a placeholder asking for them) is an
