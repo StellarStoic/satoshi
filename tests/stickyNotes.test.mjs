@@ -2857,7 +2857,9 @@ test('a paid picture note can still be placed, words or none', async () => {
   assert.match(script, /if \(pending\?\.action !== 'pin' \|\| \(!pending\?\.content && !pending\?\.image\) \|\| pending\.status !== 'paid'\) return;/);
   // No gate on a note's words is left anywhere that decides whether a note may be placed.
   const placement = script.slice(script.indexOf('function syncPlacementWithSession()'), script.indexOf('function currentPlacement()'));
-  assert.doesNotMatch(placement, /!pending\?\.content[^&]/, 'words alone must not decide whether a note can be placed');
+  // Nothing left in there may decide on the words ALONE: an empty content is only ever
+  // allowed through as the first half of "no words and no picture".
+  assert.doesNotMatch(placement, /!pending\?\.content(?!\s*&&)/, 'words alone must not decide whether a note can be placed');
   // And the picture rides in the draft with everything else, so a reload between paying and
   // pinning cannot lose it.
   assert.match(script, /image: noteKind === 'image' \? String\(pending\?\.image \|\| ''\) : ''/);
