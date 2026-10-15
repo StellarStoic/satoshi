@@ -3353,6 +3353,20 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.match(css, /\.note-gift__qr/);
 });
 
+test('a gift is published where the reader reads, not to relays they never chose', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The list is read at the moment of sending, so a relay added in the settings counts from then on.
+  assert.match(page, /function giftRelays\(\) \{/);
+  assert.match(page, /return \[RELAY, \.\.\.userRelays\];/);
+  assert.equal(/const GIFT_RELAYS\b/.test(page), false,
+    'no public relay is hard-wired into the gift path any more');
+  assert.match(page, /function publishToRelays\(event, urls = giftRelays\(\)\)/);
+  assert.match(page, /relays: giftRelays\(\)/, 'the zap request carries the same list as its hints');
+  // The reader's list has to be declared before anything reads it, or a gift sends nothing extra.
+  assert.ok(page.indexOf('let userRelays') < page.indexOf('function giftRelays()'),
+    'the reader\u2019s relays are declared before the gift list reads them');
+});
+
 test('a reader can add up to three relays of their own, and no more', () => {
   const own = {defaultRelay: 'wss://nostr.satoshi.si'};
   const first = addUserRelay([], 'relay.example.com', own);

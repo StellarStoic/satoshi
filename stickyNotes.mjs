@@ -3905,7 +3905,16 @@ function keepNoteMenuOnScreen() {
  * readers look. A reaction nobody else can read is not a reaction, so the two public relays the
  * board already reads authors from are asked as well.
  */
-const GIFT_RELAYS = [RELAY, 'wss://nos.lol', 'wss://relay.damus.io'];
+/**
+ * Where a gift goes: the board's own relay, plus whatever relays the reader added in the settings.
+ *
+ * A reaction or a zap is the reader's own act, so it is published where the reader reads - not
+ * scattered across public relays they never chose. Read as a function rather than a constant,
+ * because the reader's list can change while the page is open.
+ */
+function giftRelays() {
+  return [RELAY, ...userRelays];
+}
 
 /**
  * Where a zap waits between being signed and becoming an invoice.
@@ -3942,7 +3951,7 @@ function setGiftStatus(message, error = false) {
  * A relay that says nothing, refuses, or is simply not there is not an error worth showing on its
  * own — what matters is whether *any* of them holds the event, so the count is the answer.
  */
-function publishToRelays(event, urls = GIFT_RELAYS) {
+function publishToRelays(event, urls = giftRelays()) {
   const attempts = (urls || []).map(url => new Promise(resolve => {
     let socket = null;
     let settled = false;
@@ -4087,7 +4096,7 @@ async function sendGiftZap(sats) {
   try {
     const template = zapRequestTemplate({
       noteId: giftNoteId, noteKind: record.event?.kind || 1, authorPubkey: record.event?.pubkey,
-      amountSats: fit.sats, relays: GIFT_RELAYS, pubkey: getNostrSession()?.pubkey || '',
+      amountSats: fit.sats, relays: giftRelays(), pubkey: getNostrSession()?.pubkey || '',
     });
     const signed = await signNostrEvent(template, {action: 'zap', noteId: giftNoteId, sats: fit.sats});
     if (!signed) {
