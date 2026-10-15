@@ -37,6 +37,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageIssue,
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
+  USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
 } from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
@@ -3348,4 +3349,90 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.doesNotMatch(page, /kind: 7,/, 'nor is the reaction');
   assert.match(css, /\.note-gift__reactions button \{/);
   assert.match(css, /\.note-gift__qr/);
+});
+
+test('a reader can add up to three relays of their own, and no more', () => {
+  const own = {defaultRelay: 'wss://nostr.satoshi.si'};
+  const first = addUserRelay([], 'relay.example.com', own);
+  assert.deepEqual(first, {ok: true, relays: ['wss://relay.example.com']});
+  const second = addUserRelay(first.relays, 'wss://nos.lol/', own);
+  assert.deepEqual(second.relays, ['wss://relay.example.com', 'wss://nos.lol']);
+  const third = addUserRelay(second.relays, 'wss://relay.damus.io', own);
+  assert.equal(third.relays.length, USER_RELAY_LIMIT);
+  const fourth = addUserRelay(third.relays, 'wss://relay.primal.net', own);
+  assert.equal(fourth.ok, false);
+  assert.match(fourth.reason, /limit of 3/);
+  // The same relay twice is one relay, however it is written.
+  assert.equal(addUserRelay(first.relays, 'relay.example.com', {defaultRelay: ''}).ok, false);
+  assert.match(addUserRelay(first.relays, 'wss://relay.example.com', {defaultRelay: ''}).reason, /already on the list/);
+  // And the board\u2019s own relay is not something to add: every note goes there anyway.
+  assert.match(addUserRelay([], 'wss://nostr.satoshi.si', own).reason, /own relay/);
+});
+
+test('a relay address is taken as typed, and refused with a reason when it cannot be one', () => {
+  assert.equal(normaliseUserRelay('relay.example.com').relay, 'wss://relay.example.com');
+  assert.equal(normaliseUserRelay('  wss://Relay.Example.COM/path/ ').relay, 'wss://relay.example.com/path');
+  assert.equal(normaliseUserRelay('relay.example.com:443').ok, true, 'a port is allowed');
+  const ws = normaliseUserRelay('ws://relay.example.com');
+  assert.equal(ws.ok, false, 'a ws relay is blocked as mixed content on an https page');
+  assert.match(ws.reason, /wss/);
+  assert.equal(normaliseUserRelay('https://relay.example.com').ok, false);
+  assert.equal(normaliseUserRelay('').ok, false);
+  assert.match(normaliseUserRelay('').reason, /Type a relay/);
+  assert.equal(normaliseUserRelay('not a relay').ok, false);
+  assert.equal(normaliseUserRelay('localhost').ok, false);
+  assert.equal(normaliseUserRelay('x'.repeat(400)).ok, false);
+});
+
+test('the lamp says how the relay answered, and says so when it did not', () => {
+  assert.equal(relayLampFor(90).id, 'green');
+  assert.equal(relayLampFor(399).id, 'green');
+  assert.equal(relayLampFor(400).id, 'yellow');
+  assert.equal(relayLampFor(899).id, 'yellow');
+  assert.equal(relayLampFor(900).id, 'orange');
+  assert.equal(relayLampFor(1999).id, 'orange');
+  assert.equal(relayLampFor(2000).id, 'red');
+  assert.equal(relayLampFor(12000).id, 'red');
+  assert.equal(relayLampFor(123.6).ms, 124, 'the number shown is rounded');
+  assert.deepEqual(relayLampFor(null), {id: 'red', label: 'no answer', ms: null});
+  assert.deepEqual(relayLampFor(undefined), {id: 'red', label: 'no answer', ms: null});
+  assert.equal(relayHostLabel('wss://relay.example.com/path'), 'relay.example.com');
+  assert.deepEqual(removeUserRelay(['wss://a.com', 'wss://b.com'], 'wss://a.com'), ['wss://b.com']);
+  assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
+});
+
+test('the settings let a reader add three relays, and show them as lamps with milliseconds', async () => {
+  const [html, css, page] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  const section = html.match(/<section class="user-relays"[\s\S]*?<\/section>/);
+  assert.ok(section, 'the relay section exists');
+  const dialog = html.match(/<dialog id="boardStyleDialog"[\s\S]*?<\/dialog>/)[0];
+  assert.ok(dialog.includes('id="userRelayInput"'), 'it is in the settings dialog');
+  assert.ok(dialog.includes('id="userRelayList"'), 'with a list to show the relays in');
+  // The explainer is a dropdown, names the default relay, and says more can be added here.
+  assert.match(section[0], /<details/);
+  assert.match(section[0], /wss:\/\/nostr\.satoshi\.si/);
+  assert.match(section[0], /by default/);
+  assert.match(section[0], /up to 3/);
+  // Four lamp colours, a lamp per row, and the number beside it.
+  for (const colour of ['green', 'yellow', 'orange', 'red']) {
+    assert.match(css, new RegExp(`\\.user-relays__lamp--${colour}`), `${colour} is a lamp`);
+  }
+  assert.match(page, /relayLampFor\(ping\)/);
+  assert.match(page, /no answer/);
+  // The ping is a real socket, timed, with a timeout so "no answer" is a state that can happen.
+  assert.match(page, /function pingRelay\(url\)[\s\S]{0,700}new WebSocket\(url\)/);
+  assert.match(page, /RELAY_PING_TIMEOUT_MS/);
+  assert.match(page, /setTimeout\(\(\) => finish\(null\), RELAY_PING_TIMEOUT_MS\)/);
+  // The limit is enforced where a test can reach it, not only by a disabled button.
+  assert.match(page, /addUserRelay\(userRelays, elements\.userRelayInput\.value, \{defaultRelay: RELAY\}\)/);
+  // A pinned note goes to them as well, and a relay refusing it is not a failed pin.
+  assert.match(page, /publishToUserRelays\(event\)/);
+  assert.match(page, /publishToUserRelays\(resumedEvent\)/);
+  assert.match(page, /publishToRelays\(event, userRelays\)\.catch\(\(\) => \{\}\)/);
+  // The panel draws and measures itself when it opens.
+  assert.match(page, /renderUserRelays\(\);\n  checkUserRelays\(\);/);
 });

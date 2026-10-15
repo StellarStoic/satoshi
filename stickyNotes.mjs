@@ -79,7 +79,7 @@ import {
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
-import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS} from './stickyNotesModel.mjs';
+import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
@@ -247,6 +247,9 @@ const elements = {
   notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
   noteGift: document.getElementById('noteGiftDialog'), noteGiftAuthor: document.getElementById('noteGiftAuthor'),
   noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftReactions: document.getElementById('noteGiftReactions'),
+  userRelayList: document.getElementById('userRelayList'), userRelayCount: document.getElementById('userRelayCount'),
+  userRelayInput: document.getElementById('userRelayInput'), userRelayStatus: document.getElementById('userRelayStatus'),
+  addUserRelay: document.getElementById('addUserRelay'), checkUserRelays: document.getElementById('checkUserRelays'),
   noteGiftZapTarget: document.getElementById('noteGiftZapTarget'), noteGiftAmounts: document.getElementById('noteGiftAmounts'),
   noteGiftCustom: document.getElementById('noteGiftCustom'), noteGiftZap: document.getElementById('noteGiftZap'),
   noteGiftInvoice: document.getElementById('noteGiftInvoice'), noteGiftQr: document.getElementById('noteGiftQr'),
@@ -1973,11 +1976,147 @@ function renderBoardTextures() {
   }
 }
 
+/* ------------------------------------------------------------------------- your relays ---- */
+
+/**
+ * The relays this reader added, and what each one last answered.
+ *
+ * The board's own relay is not in this list and cannot be: every note is published there because
+ * that is where the board reads, so an entry for it would be a setting that does nothing. These are
+ * the extras - places the reader chose, written to as well.
+ */
+const USER_RELAYS_KEY = 'satoshi:sticky:relays:v1';
+const RELAY_PING_TIMEOUT_MS = 6000;
+
+let userRelays = readUserRelays();
+const userRelayPings = new Map();
+
+function readUserRelays() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(USER_RELAYS_KEY) || '[]');
+    return Array.isArray(saved)
+      ? saved.filter(url => typeof url === 'string' && url).slice(0, USER_RELAY_LIMIT)
+      : [];
+  } catch { return []; }
+}
+
+function saveUserRelays() {
+  try { localStorage.setItem(USER_RELAYS_KEY, JSON.stringify(userRelays)); } catch {}
+}
+
+function sayUserRelays(message, error = false) {
+  status(elements.userRelayStatus, message || '', error);
+}
+
+/**
+ * How long a relay takes to answer, measured as the time its socket takes to open.
+ *
+ * A relay has no ping of its own, so this is the round trip a reader actually waits on. No answer
+ * at all - refused, silent, or past the timeout - comes back as null rather than a number, because
+ * "no answer" and "3000 ms" are different things to show someone.
+ */
+function pingRelay(url) {
+  return new Promise(resolve => {
+    let socket = null;
+    let settled = false;
+    const started = Date.now();
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      try { socket?.close(); } catch {}
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), RELAY_PING_TIMEOUT_MS);
+    try { socket = new WebSocket(url); } catch { clearTimeout(timer); resolve(null); return; }
+    socket.addEventListener('open', () => { clearTimeout(timer); finish(Date.now() - started); });
+    socket.addEventListener('error', () => { clearTimeout(timer); finish(null); });
+    socket.addEventListener('close', () => { clearTimeout(timer); finish(null); });
+  });
+}
+
+/** Check every relay at once, redrawing as the answers land rather than at the end. */
+async function checkUserRelays() {
+  if (!userRelays.length) return;
+  userRelays.forEach(url => userRelayPings.set(url, undefined));
+  renderUserRelays();
+  await Promise.all(userRelays.map(async url => {
+    userRelayPings.set(url, await pingRelay(url));
+    renderUserRelays();
+  }));
+}
+
+/** The list as rows: a lamp, the host, what it answered, and the way to take it off. */
+function renderUserRelays() {
+  elements.userRelayList.replaceChildren(...userRelays.map(url => {
+    const ping = userRelayPings.get(url);
+    const lamp = relayLampFor(ping);
+    const row = document.createElement('li');
+    const dot = document.createElement('span');
+    dot.className = `user-relays__lamp user-relays__lamp--${lamp.id}`;
+    dot.title = lamp.label;
+    const host = document.createElement('span');
+    host.className = 'user-relays__host';
+    host.textContent = relayHostLabel(url);
+    host.title = url;
+    const ms = document.createElement('span');
+    ms.className = 'user-relays__ms';
+    ms.textContent = ping === undefined
+      ? 'checking\u2026'
+      : (Number.isFinite(ping) ? `${lamp.ms} ms` : 'no answer');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'user-relays__remove';
+    remove.setAttribute('aria-label', `Remove ${relayHostLabel(url)}`);
+    remove.textContent = '\u2715';
+    remove.addEventListener('click', () => {
+      userRelays = removeUserRelay(userRelays, url);
+      userRelayPings.delete(url);
+      saveUserRelays();
+      renderUserRelays();
+      sayUserRelays('Removed. Every note still goes to the board\u2019s own relay.');
+    });
+    row.append(dot, host, ms, remove);
+    return row;
+  }));
+  elements.userRelayCount.textContent = `${userRelays.length} of ${USER_RELAY_LIMIT} added`;
+  elements.addUserRelay.disabled = userRelays.length >= USER_RELAY_LIMIT;
+  elements.userRelayInput.disabled = userRelays.length >= USER_RELAY_LIMIT;
+}
+
+/** Take what is in the field, then measure it. */
+async function addRelayFromField() {
+  const result = addUserRelay(userRelays, elements.userRelayInput.value, {defaultRelay: RELAY});
+  if (!result.ok) { sayUserRelays(result.reason, true); return; }
+  userRelays = result.relays;
+  saveUserRelays();
+  elements.userRelayInput.value = '';
+  sayUserRelays('');
+  const added = userRelays[userRelays.length - 1];
+  userRelayPings.set(added, undefined);
+  renderUserRelays();
+  userRelayPings.set(added, await pingRelay(added));
+  renderUserRelays();
+}
+
+/**
+ * A note the reader pinned goes to their relays too.
+ *
+ * Sent after the board has taken it, and quietly: the note is already stored where the board reads,
+ * so a relay in the reader's own list refusing it is not a failure of the pin and must not be
+ * reported as one.
+ */
+function publishToUserRelays(event) {
+  if (!userRelays.length || !event?.id) return;
+  publishToRelays(event, userRelays).catch(() => {});
+}
+
 function openBoardStyle() {
   renderBoardTextures();
   elements.boardTextureUrl.value = boardTextureChoice;
   sayBoardStyle('');
   showDialog(elements.boardStyleDialog);
+  renderUserRelays();
+  checkUserRelays();
   requestAnimationFrame(() => elements.boardTextureUrl.focus());
 }
 
@@ -3618,6 +3757,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // Signal before clearing the shared draft. Amber may have returned into a browser tab
     // while the installed PWA is still visible; this lets that original board finish too.
     signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
+    publishToUserRelays(event);
     // The pin is done on this page, so the hand-over that asked for the signature comes down with it.
     retireAmberHandOver();
     // The flow that launched this publish hears the outcome before anything else, so it can retire
@@ -3640,6 +3780,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // is authoritative: an already-published answer means this paid note is complete.
     if (resumedEvent && ['already_pinned', 'already_published'].includes(error.reason)) {
       signalStickyFlow('published', {orderId: pending?.orderId || '', event: resumedEvent, message: 'Your note is pinned.'});
+      publishToUserRelays(resumedEvent);
       retireAmberHandOver();
       savePending(null);
       placingNote?.remove(); placingNote = null;
@@ -3738,8 +3879,8 @@ function setGiftStatus(message, error = false) {
  * A relay that says nothing, refuses, or is simply not there is not an error worth showing on its
  * own — what matters is whether *any* of them holds the event, so the count is the answer.
  */
-function publishGiftEvent(event) {
-  const attempts = GIFT_RELAYS.map(url => new Promise(resolve => {
+function publishToRelays(event, urls = GIFT_RELAYS) {
+  const attempts = (urls || []).map(url => new Promise(resolve => {
     let socket = null;
     let settled = false;
     const finish = took => {
@@ -3861,7 +4002,7 @@ async function sendGiftReaction(reaction) {
       return;
     }
     setGiftStatus('Sending your reaction\u2026');
-    const took = await publishGiftEvent(signed);
+    const took = await publishToRelays(signed);
     setGiftStatus(took ? 'Reaction sent.' : 'No relay took the reaction. Try again in a moment.', !took);
   } catch (error) {
     setGiftStatus(error.message || 'That reaction could not be sent.', true);
@@ -3911,7 +4052,7 @@ async function finishGiftFromSigner(amber) {
   openNoteGiftDialog(noteId, null);
   if (context.action === 'react') {
     setGiftStatus('Sending your reaction\u2026');
-    const took = await publishGiftEvent(amber.event);
+    const took = await publishToRelays(amber.event);
     setGiftStatus(took ? 'Reaction sent.' : 'No relay took the reaction. Try again in a moment.', !took);
     return;
   }
@@ -5005,6 +5146,11 @@ elements.nostrConnect.addEventListener('close', () => {
   if (!getNostrSession() && !elements.login.open) elements.login.showModal();
 });
 elements.stickySettings.addEventListener('click', openBoardStyle);
+elements.addUserRelay.addEventListener('click', () => { addRelayFromField(); });
+elements.checkUserRelays.addEventListener('click', () => { checkUserRelays(); });
+elements.userRelayInput.addEventListener('keydown', key => {
+  if (key.key === 'Enter') { key.preventDefault(); addRelayFromField(); }
+});
 elements.resetBoardTexture.addEventListener('click', () => applyBoardTexture(''));
 elements.boardStyleForm.addEventListener('submit', event => {
   event.preventDefault();

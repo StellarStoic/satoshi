@@ -97,6 +97,27 @@
         <button type="submit" class="primary-action">Use it</button>
       </div>
       <div id="boardStyleStatus" class="inline-status" role="status" aria-live="polite"></div>
+
+      <section class="user-relays" aria-labelledby="userRelaysTitle">
+        <h3 id="userRelaysTitle">Your relays</h3>
+        <details class="user-relays__explainer">
+          <summary>Where your notes are kept</summary>
+          <p>Every note and image you pin is stored on <code>wss://nostr.satoshi.si</code> by default, because that
+          is the relay this board reads. You can always add more here — up to 3 — and a note you pin is
+          published to each of them as well, so it also lives somewhere you chose. The lamps are how long each
+          relay took to answer just now, in milliseconds.</p>
+        </details>
+        <label class="user-relays__field" for="userRelayInput"><span>Add a relay</span>
+          <input id="userRelayInput" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="300" placeholder="wss://relay.example.com">
+        </label>
+        <div class="user-relays__actions">
+          <button type="button" id="addUserRelay" class="secondary-action"><span>Add relay</span></button>
+          <button type="button" id="checkUserRelays" class="secondary-action"><span>Check them</span></button>
+        </div>
+        <ul id="userRelayList" class="user-relays__list"></ul>
+        <p id="userRelayCount" class="user-relays__count"></p>
+        <div id="userRelayStatus" class="inline-status" role="status" aria-live="polite"></div>
+      </section>
     </form>
   </dialog>
 

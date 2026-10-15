@@ -1522,6 +1522,101 @@ export function boardLampLit(index, lit) {
  */
 export const PINSTR_SHARE_ORIGIN = 'https://pinstr.si';
 
+/**
+ * Where a reader can keep their notes besides the board's own relay.
+ *
+ * Every note is published to `wss://nostr.satoshi.si` because that is where the board reads from;
+ * the relays a reader adds here are written to as well, so a note lives somewhere they chose. The
+ * limit is three: each one is a socket this page keeps, and a list nobody bounds becomes a page
+ * that opens a dozen connections to show one note.
+ */
+export const USER_RELAY_LIMIT = 3;
+
+/**
+ * The lamps a relay's answer is read as, from quickest to slowest.
+ *
+ * A relay has no ping of its own, so what is measured is how long the socket took to open. That is
+ * what a reader waiting on a connection actually feels, and it is honest about being a round trip
+ * to *that* relay rather than to the network in general.
+ */
+export const RELAY_LAMPS = Object.freeze([
+  {id: 'green', max: 400, label: 'quick'},
+  {id: 'yellow', max: 900, label: 'fine'},
+  {id: 'orange', max: 2000, label: 'slow'},
+  {id: 'red', max: Number.POSITIVE_INFINITY, label: 'very slow'},
+]);
+
+/** The lamp for a measured answer, or the red one when there was no answer at all. */
+export function relayLampFor(pingMs) {
+  // Null and empty are "no answer", not zero: Number(null) is 0, and a relay that never replied
+  // must not be shown as an instant one.
+  if (pingMs === null || pingMs === undefined || pingMs === '') return {id: 'red', label: 'no answer', ms: null};
+  const ms = Number(pingMs);
+  if (!Number.isFinite(ms) || ms < 0) return {id: 'red', label: 'no answer', ms: null};
+  const lamp = RELAY_LAMPS.find(step => ms < step.max) || RELAY_LAMPS[RELAY_LAMPS.length - 1];
+  return {id: lamp.id, label: lamp.label, ms: Math.round(ms)};
+}
+
+/** The readable name of a relay: its host, without the scheme or the path. */
+export function relayHostLabel(url) {
+  const value = String(url || '').trim();
+  const withoutScheme = value.replace(/^wss?:\/\//i, '');
+  return withoutScheme.split('/')[0].toLowerCase();
+}
+
+/**
+ * Whatever the reader typed, as a relay URL — or the reason it cannot be one.
+ *
+ * A bare hostname is taken as the intent it is (`relay.example.com` means the wss endpoint), and a
+ * plain `ws://` is refused rather than quietly upgraded: a page is served over https, so a ws
+ * socket is blocked as mixed content, and telling the reader that is better than a relay that
+ * never answers.
+ */
+export function normaliseUserRelay(input, {defaultRelay = ''} = {}) {
+  const raw = String(input || '').trim();
+  if (!raw) return {ok: false, reason: 'Type a relay address first.'};
+  if (raw.length > 300) return {ok: false, reason: 'That address is too long to be a relay.'};
+  if (/\s/.test(raw)) return {ok: false, reason: 'A relay address has no spaces in it.'};
+
+  const scheme = raw.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+  if (scheme && scheme[1].toLowerCase() === 'ws') {
+    return {ok: false, reason: 'This page is served over https, so only wss:// relays work.'};
+  }
+  if (scheme && scheme[1].toLowerCase() !== 'wss') {
+    return {ok: false, reason: 'A relay address starts with wss://.'};
+  }
+  const body = scheme ? raw.slice(scheme[0].length) : raw;
+  const [host, ...rest] = body.split('/');
+  const name = host.toLowerCase();
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$/.test(name)) {
+    return {ok: false, reason: 'That does not look like a relay address.'};
+  }
+  const relay = `wss://${name}${rest.length ? `/${rest.join('/')}` : ''}`.replace(/\/+$/, '');
+  if (defaultRelay && relayHostLabel(relay) === relayHostLabel(defaultRelay)) {
+    return {ok: false, reason: 'That is the board\u2019s own relay \u2014 every note goes there already.'};
+  }
+  return {ok: true, relay};
+}
+
+/** The list with this relay on the end, or the reason it cannot be. */
+export function addUserRelay(list, input, {defaultRelay = ''} = {}) {
+  const current = (Array.isArray(list) ? list : []).filter(url => typeof url === 'string' && url);
+  if (current.length >= USER_RELAY_LIMIT) {
+    return {ok: false, reason: `That is the limit of ${USER_RELAY_LIMIT}. Remove one to add another.`};
+  }
+  const normalised = normaliseUserRelay(input, {defaultRelay});
+  if (!normalised.ok) return normalised;
+  if (current.some(url => relayHostLabel(url) === relayHostLabel(normalised.relay))) {
+    return {ok: false, reason: 'That relay is already on the list.'};
+  }
+  return {ok: true, relays: [...current, normalised.relay]};
+}
+
+/** The list without that relay. */
+export function removeUserRelay(list, url) {
+  return (Array.isArray(list) ? list : []).filter(item => item !== url);
+}
+
 export function boardShareUrl(cells, origin = PINSTR_SHARE_ORIGIN) {
   const clean = (cells || []).filter(cell => typeof cell === 'string' && cell);
   if (!clean.length) return '';

@@ -156,6 +156,32 @@
 .note-gift__invoice code { display: block; max-height: 66px; overflow: auto; margin: 6px 0; padding: 6px 8px; background: #101212; color: #ddd; font-size: .68rem; word-break: break-all; }
 .note-gift__invoice .secondary-action { width: 100%; }
 .note-gift-dialog button:disabled { opacity: .5; cursor: default; }
+
+/* Your relays: the one setting here that is about the network rather than the paper. Each row is a
+   lamp, the relay's host, its answer in milliseconds, and the way to take it off the list. */
+.user-relays { margin-top: 16px; padding-top: 12px; border-top: 1px solid #333; }
+.user-relays h3 { margin: 0 0 8px; color: #989b99; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
+.user-relays__explainer { margin-bottom: 10px; color: #c9cbc9; font-size: .76rem; }
+.user-relays__explainer summary { color: var(--accent, #f2a900); cursor: pointer; }
+.user-relays__explainer p { margin: 6px 0 0; }
+.user-relays__explainer code { color: #ddd; }
+.user-relays__field { display: block; margin-bottom: 8px; }
+.user-relays__field span { display: block; margin-bottom: 4px; color: #989b99; font-size: .72rem; text-transform: uppercase; }
+.user-relays__field input { width: 100%; min-height: 38px; padding: 6px 8px; border: 1px solid #4b4d4d; border-radius: 6px; background: #101212; color: inherit; font-size: .8rem; }
+.user-relays__actions { display: flex; gap: 6px; }
+.user-relays__actions .secondary-action { flex: 1; }
+.user-relays__list { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.user-relays__list li { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #3a3d3d; border-radius: 6px; background: #1b1e1f; }
+.user-relays__lamp { width: 10px; height: 10px; border-radius: 50%; background: #6b6f6f; box-shadow: 0 0 7px currentColor; color: #6b6f6f; }
+.user-relays__lamp--green { background: #46b96a; color: #46b96a; }
+.user-relays__lamp--yellow { background: #d8c34a; color: #d8c34a; }
+.user-relays__lamp--orange { background: #e08a3c; color: #e08a3c; }
+.user-relays__lamp--red { background: #d0503f; color: #d0503f; }
+.user-relays__host { overflow: hidden; color: #ddd; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.user-relays__ms { color: #989b99; font-size: .72rem; white-space: nowrap; }
+.user-relays__remove { padding: 4px; border: 0; background: transparent; color: #989b99; cursor: pointer; }
+.user-relays__remove:hover { color: #d0503f; }
+.user-relays__count { margin: 8px 0 0; color: #989b99; font-size: .72rem; }
 .note-event-json .secondary-action { margin-top: 9px; }
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
