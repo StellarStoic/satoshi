@@ -4,6 +4,7 @@ import {webcrypto, createHash} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, STICKY_MEMBER_TIERS, stickyMemberTier, stickyTierPrice, stickyDiscountSentence, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyPictureDigest, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
+ stickyPowOffer, stickyPowSentence, stickyPowProgress, stickyPowDifficulty,
   boardBitmapSize,
   boardPatternScale,
   BOARD_TILE_PX,
@@ -3117,4 +3118,70 @@ test('an expired picture note is not rendered, exactly like an expired written o
   assert.match(script, /function dropExpiredNotes\(\)/);
   assert.match(script, /if \(dropExpiredNotes\(\)\) applyNoteFilters\(\)/);
   assert.match(script, /if \(!sticky \|\| isStickyExpired\(sticky\) \|\| !noteBelongsToBoard\(sticky\)\) return;/);
+});
+
+
+// ------------------------------------------- posting with work instead of sats
+test('mining is offered to a key with a name, and never to a throwaway', () => {
+  // A name on any domain, not only this board's own: the desk cannot resolve somebody
+  // else's domain, and does not try — the work on the id is what it enforces, so offering
+  // the route is a presentation rule while accepting it is a checked one.
+  const ours = stickyPowOffer({method: 'extension', nip05: 'one@satoshi.si', bits: 25});
+  assert.equal(ours.offered, true);
+  assert.equal(ours.bits, 25);
+  assert.equal(ours.name, 'one@satoshi.si');
+
+  const theirs = stickyPowOffer({method: 'bunker', nip05: 'glavca@example.com', bits: 25});
+  assert.equal(theirs.offered, true, 'a name on another domain is a name');
+
+  // A NIP-05 that arrives as a URL, or as the `_@` wildcard, is still the same name.
+  assert.equal(stickyPowOffer({method: 'extension', nip05: 'https://example.com', bits: 25}).offered, false);
+  assert.equal(stickyPowOffer({method: 'extension', nip05: '', bits: 25}).reason, 'no_name');
+  assert.equal(stickyPowOffer({method: 'extension', bits: 25}).reason, 'no_name');
+
+  // The throwaway tier pays per note, flat, and that is the whole of it.
+  const anon = stickyPowOffer({method: 'anonymous', nip05: 'one@satoshi.si', bits: 25});
+  assert.equal(anon.offered, false);
+  assert.equal(anon.reason, 'anonymous');
+  assert.match(anon.sentence, /pays per note/);
+
+  // Nothing is offered when the desk has published no difficulty: the board must never
+  // invent one, because a board offering 20 bits to a desk checking 25 mines for ever.
+  for (const bits of [null, undefined, 0, -1, 65, 25.5, '25']) {
+    const offer = stickyPowOffer({method: 'extension', nip05: 'one@satoshi.si', bits});
+    assert.equal(offer.offered, false, `bits ${JSON.stringify(bits)} is not a difficulty`);
+    assert.equal(offer.reason, 'no_difficulty');
+  }
+});
+
+test('the difficulty is read from the desk, and only from the desk', () => {
+  assert.equal(stickyPowDifficulty({pow: {bits: 25}}), 25);
+  assert.equal(stickyPowDifficulty({pow: {bits: 1}}), 1);
+  assert.equal(stickyPowDifficulty({pow: {bits: 64}}), 64);
+  for (const config of [null, undefined, {}, {pow: {}}, {pow: {bits: 0}}, {pow: {bits: 65}},
+    {pow: {bits: '25'}}, {pow: {bits: null}}, {bits: 25}]) {
+    assert.equal(stickyPowDifficulty(config), null, JSON.stringify(config));
+  }
+});
+
+test('what the reader is told about mining', () => {
+  // The cost in tries, and that it is their own device's time rather than sats.
+  const sentence = stickyPowSentence(25);
+  assert.match(sentence, /34 million hashes/);
+  assert.match(sentence, /nothing to pay/);
+  assert.match(stickyPowSentence(20), /1 million/);
+  assert.match(stickyPowSentence(10), /1024/);
+
+  // While it runs: what has been tried, the best seen, and what is left — and it always
+  // says to keep the page open, because a backgrounded tab is throttled to a crawl.
+  const running = stickyPowProgress({hashes: 1_500_000, rate: 120000, best: 14, bits: 25,
+    secondsLeft: 'about 4 minutes'});
+  assert.match(running, /1500k hashes/);
+  assert.match(running, /best 14 of 25 bits/);
+  assert.match(running, /about 4 minutes left/);
+  assert.match(running, /Keep this page open/);
+  // Nothing measured yet: no invented estimate, and no "0k hashes".
+  const starting = stickyPowProgress({});
+  assert.match(starting, /starting/);
+  assert.doesNotMatch(starting, /left/);
 });

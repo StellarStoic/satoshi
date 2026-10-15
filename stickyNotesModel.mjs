@@ -849,6 +849,18 @@ export function stickyMemberTier(nameLength) {
  * still shows the right number against a desk that has not been updated yet.
  * Null for a plan that does not exist.
  */
+/**
+ * The mining difficulty the desk published, or null.
+ *
+ * Read from the same config that carries the subscription prices, so the board offers the
+ * number of bits that desk will actually check, and a board that cannot reach the config
+ * simply does not offer mining rather than inventing a difficulty.
+ */
+export function stickyPowDifficulty(config) {
+  const bits = config?.pow?.bits;
+  return Number.isInteger(bits) && bits > 0 && bits <= 64 ? bits : null;
+}
+
 export function stickySubscriptionPrice(plan, { member = false, offPercent = null } = {}) {
   if (plan !== 'week' && plan !== 'year') return null;
   if (Number.isFinite(offPercent)) return stickyTierPrice(plan, offPercent);
@@ -964,6 +976,61 @@ export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);
  * instead of showing a tab that cannot pay. `uri` is what the QR encodes, and
  * `copyValue` is what the buyer pastes into a wallet.
  */
+/**
+ * Whether this session may post by mining instead of paying, and what the board says.
+ *
+ * Mining is offered to a key with a NIP-05 name of its own — on any domain, not only
+ * satoshi.si — and never to a throwaway anonymous identity, whose price is sats per note
+ * and whose whole point is that it has no name to mine under. That is a presentation rule,
+ * not an enforced one: no desk can resolve a name on somebody else's domain without
+ * fetching a stranger's address on request. What the desk enforces is the work, and the
+ * work is the part that cannot be faked — it is counted from the event's own id.
+ *
+ * `reason` is the honest answer when the offer does not appear, so the page can explain
+ * rather than silently omit a route the reader has heard about.
+ */
+export function stickyPowOffer({ method = '', nip05 = '', bits = null } = {}) {
+  if (method === 'anonymous') {
+    return { offered: false, reason: 'anonymous',
+      sentence: 'A temporary anonymous identity pays per note — mining is for NIP-05 names.' };
+  }
+  if (!getNip05Name(nip05)) {
+    return { offered: false, reason: 'no_name',
+      sentence: 'Add a NIP-05 name to your Nostr profile and you can post free by mining instead.' };
+  }
+  if (!Number.isInteger(bits) || bits <= 0 || bits > 64) {
+    return { offered: false, reason: 'no_difficulty',
+      sentence: 'The payment service has not published a mining difficulty, so it is not offered.' };
+  }
+  return { offered: true, reason: '', bits, name: getNip05Name(nip05).toLowerCase(), sentence: stickyPowSentence(bits) };
+}
+
+/** The label a NIP-05 name is shown under: the name and its domain, without the wildcard. */
+function getNip05Name(value) {
+  const name = String(value || '').trim().replace(/^https?:\/\//, '');
+  return name.includes('@') && !name.startsWith('@') ? name : '';
+}
+
+/** What mining costs in plain words: the expected tries, and what that is worth in minutes. */
+export function stickyPowSentence(bits) {
+  const tries = Math.round(2 ** bits);
+  const millions = tries >= 1e6 ? `${Math.round(tries / 1e6)} million` : `${tries}`;
+  return `Free with POW: mine about ${millions} hashes on your own device — a few minutes `
+    + 'with this page open, and nothing to pay.';
+}
+
+/**
+ * The line shown while a note is being mined. Progress is honest about what is known: the
+ * best difficulty seen so far, and an estimate that only appears once a rate can be measured.
+ */
+export function stickyPowProgress({ hashes = 0, rate = 0, secondsLeft = null, best = 0, bits = 25 } = {}) {
+  const done = Number.isFinite(hashes) && hashes > 0 ? `${Math.round(hashes / 1000)}k hashes` : 'starting';
+  const share = Number.isFinite(best) ? `best ${best} of ${bits} bits` : '';
+  const wait = secondsLeft === 'a moment' || !secondsLeft ? ''
+    : ` — about ${secondsLeft} left`;
+  return `Mining this note: ${done}, ${share}${wait}. Keep this page open.`;
+}
+
 export function stickyPaymentRails(order) {
   const payment = order?.payment || {};
   const rails = [];

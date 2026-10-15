@@ -71,7 +71,12 @@ import {
   STICKY_IMAGE_DEFAULT_GRADE,
   STICKY_IMAGE_MAX_BYTES,
   stickyImageGrade,
-  stickyImageIssue,} from './stickyNotesModel.mjs';
+  stickyImageIssue,
+  stickyPowOffer,
+  stickyPowSentence,
+  stickyPowProgress,
+  stickyPowDifficulty,} from './stickyNotesModel.mjs';
+import {mineNote, describeSeconds} from './powMining.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -171,6 +176,7 @@ const elements = {
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
   hashtags: document.getElementById('noteHashtags'), hashtagStatus: document.getElementById('hashtagStatus'),
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
+  mine: document.getElementById('mineForSticky'), powOffer: document.getElementById('powOffer'),
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
   noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
   draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
@@ -272,6 +278,24 @@ let revealedFilteredNoteUntil = 0;
 let revealedFilteredNoteTimer = null;
 let placementGestureController = null;
 let quotedPrice = STICKY_SUB_WEEK_SATS;
+
+// The mining difficulty, from the desk's own /config. `undefined` is "not asked yet" and
+// null is "this desk publishes none", which are different answers: the first is worth a
+// request, the second means mining is simply not offered.
+let powBits;
+async function miningDifficulty() {
+  if (powBits !== undefined) return powBits;
+  try { powBits = stickyPowDifficulty(await api('/config')); } catch { powBits = null; }
+  return powBits;
+}
+
+// A tap on "Free with POW" is a request to pay for the next order with work instead of
+// sats. It only ever turns a route on for one attempt: the order the desk creates is what
+// carries it, and the note that gets published has to carry the work itself.
+let miningRequested = false;
+
+/** What the reader is told while a note is mined, and how to stop. */
+let mining = null;
 let quotedPubkey = '';
 // The desk's answer to GET /pinstr/v1/subscription for the signed-in key, and the
 // plan the picker is on. `actionInfo` is the pure description of what the buttons
@@ -1525,6 +1549,65 @@ async function selectRail(id) {
       elements.paymentQr.src = qr.createDataURL(6, 8);
       elements.paymentQr.hidden = false;
     } catch { elements.paymentQr.removeAttribute('src'); }
+  }
+}
+
+/**
+ * Show or hide the mining offer. `null` clears it: once a mined order exists the offer has
+ * done its job, and a button that starts nothing is worse than no button.
+ */
+function showPowOffer(offer) {
+  const shown = Boolean(offer && offer.offered);
+  elements.mine.hidden = !shown;
+  elements.mine.querySelector('span').textContent = shown ? `Free with POW · ${offer.bits} bits` : 'Free with POW';
+  elements.powOffer.hidden = !offer || !offer.sentence;
+  elements.powOffer.textContent = offer && offer.sentence ? offer.sentence : '';
+  if (shown) miningRequested = false;
+}
+
+elements.mine.addEventListener('click', () => {
+  // One attempt, in work instead of sats. The desk prices the order that comes back, and
+  // everything after this point is the ordinary path to placing the note.
+  miningRequested = true;
+  elements.mine.disabled = true;
+  status(elements.paymentStatus, 'Ordering a note you can pay for with work...');
+  Promise.resolve(startPayment()).finally(() => { elements.mine.disabled = false; });
+});
+
+/**
+ * Mine the finished note, in front of the reader, and put the winning nonce tag into the
+ * template so the signature covers it. Returns null when the reader stops it, so the caller
+ * leaves the note placed and unpublished rather than signing work the desk would refuse.
+ *
+ * The note has to be finished before this runs: the placement, the words and the moment it
+ * was written all feed the id, so mining an unfinished note would be work on a different id.
+ */
+async function mineThisNote(template, bits) {
+  mining = new AbortController();
+  elements.pin.querySelector('span').textContent = 'Stop mining';
+  try {
+    const outcome = await mineNote({
+      template, bits, signal: mining.signal,
+      onProgress: progress => {
+        status(elements.boardStatus, stickyPowProgress({
+          hashes: progress.hashes, rate: progress.rate, best: progress.best, bits,
+          secondsLeft: progress.secondsLeft ? describeSeconds(progress.secondsLeft) : null,
+        }));
+        elements.boardStatus.hidden = false;
+      },
+    });
+    if (outcome.cancelled) {
+      status(elements.boardStatus, 'Mining stopped. The note is still here: pin it again when you are ready, and keep this page open while it mines.');
+      return null;
+    }
+    if (!outcome.ok) throw new Error('Mining did not finish. The note was not published.');
+    // Appended last, which is the order the miner hashed: the tag array is part of the id.
+    template.tags = [...template.tags, ['nonce', String(outcome.nonce), String(bits)]];
+    status(elements.boardStatus, `Mined at ${outcome.bits} bits. Signing the note...`);
+    return outcome;
+  } finally {
+    mining = null;
+    elements.pin.querySelector('span').textContent = 'Pin note';
   }
 }
 
@@ -2821,17 +2904,30 @@ async function startPayment() {
         body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
           geohash: activeGeohash, geohashes: [...activeGeohashes],
           ...(pictureHash ? {pictureHash} : {}),
+          ...(miningRequested ? {pow: true, powName: String(session.profile?.nip05 || '').trim()} : {}),
           geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
       });
     } catch (error) {
       // 402 is the desk saying "this key is registered but has no subscription".
       // Buy one now and come back to this note; anything else is a real failure.
       if (!shouldBuySubscription(error, session)) throw error;
+      // Mining is the other way to pay for one note, and it is offered here — before the
+      // plan chooser is insisted on — because a reader with a NIP-05 name who cannot or
+      // will not subscribe has a way to post that costs them time rather than sats. The
+      // desk decides whether the work is enough; this only decides whether to offer it.
+      const offer = stickyPowOffer({
+        method: session.method,
+        nip05: session.profile?.nip05,
+        bits: await miningDifficulty(),
+      });
+      showPowOffer(offer);
       if (!subscriptionResolved) {
         subscription = {active: false, prices: error.body?.prices || {}};
         subscriptionResolved = true;
         renderQuotedPrice();
-        throw new Error('Choose weekly or yearly, then tap Subscribe & place.');
+        throw new Error(offer.offered
+          ? 'Choose weekly or yearly and subscribe, or tap "Free with POW" to mine this note instead.'
+          : 'Choose weekly or yearly, then tap Subscribe & place.');
       }
       await buySubscriptionThen(session, notePending, elements.paymentStatus);
       return;
@@ -2851,18 +2947,29 @@ async function startPayment() {
       notePending.image = await uploadPinnedImage(pickedImage, {orderId: order.id, grade: selectedImageGrade});
     }
     if (sats === 0) {
-      // Covered by the subscription the desk just confirmed: nothing to pay, and
-      // the publish token is already there, so the note goes straight to placing.
-      if (!order.paid || !order.publishToken) throw new Error('The subscription on the payment service did not cover this note. No note was published.');
+      // Covered by the subscription the desk just confirmed, or admitted by the mining this
+      // order asked for: either way nothing is due, the publish token is already there, and
+      // the note goes straight to placing. A mined note is not published yet — the work is
+      // counted when "Pin note" is tapped, on the finished note, because the placement and
+      // the moment it was written are both part of the id the work has to cover.
+      if (!order.paid || !order.publishToken) throw new Error('The payment service did not settle this note. No note was published.');
       stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
-      savePending({...notePending, orderId: order.id, sats, status: 'paid', publishToken: order.publishToken});
+      const powBits = miningRequested ? stickyPowDifficulty({pow: {bits: order.powBits}}) : null;
+      miningRequested = false;
+      if (miningRequested && !powBits) throw new Error('The payment service did not confirm the mining difficulty. No note was published.');
+      if (miningRequested) showPowOffer(null);
+      savePending({...notePending, orderId: order.id, sats, status: 'paid', publishToken: order.publishToken,
+        ...(powBits ? {powBits} : {})});
       if (elements.composer.open) elements.composer.close();
-      status(elements.boardStatus, 'Included in your subscription. Place the note on the board.');
+      status(elements.boardStatus, powBits
+        ? 'Place the note on the board — it will be mined when you pin it.'
+        : 'Included in your subscription. Place the note on the board.');
       elements.boardStatus.hidden = false;
       beginPlacement();
       return;
     }
+    miningRequested = false;   // this attempt is being paid for in sats, not in work
     savePending({...notePending, orderId: order.id, sats, status: 'waiting'});
     if (!elements.paymentDialog.open) showPaymentPreparing(sats);
     const railReady = await renderPayment(order);
@@ -3293,6 +3400,14 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // signNostrEvent, so a dialog surfaced only after it returns is never seen on a phone that comes
     // back through no focus and no visibility event — and the button it carries reads the clipboard
     // inside the reader's own tap, where user activation permits the read.
+    // Paying with work: the note is complete here — placed, written, and with the moment it
+    // was written — so this is the first id that means anything, and the last chance to mine
+    // before the signature fixes it. A resumed signature (Amber handed it back) was already
+    // mined before it left, so it is not mined again.
+    if (!resumedEvent && pending.powBits) {
+      const mined = await mineThisNote(template, pending.powBits);
+      if (!mined) { elements.pin.disabled = false; return; }
+    }
     if (!resumedEvent && getNostrSession()?.method === 'amber') {
       showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
     }
@@ -4789,7 +4904,12 @@ elements.placementControls.addEventListener('click', event => {
   const rotate = event.target.closest('[data-rotate]');
   if (rotate) setPlacement({...currentPlacement(), rotation: currentPlacement().rotation + Number(rotate.dataset.rotate)});
 });
-elements.pin.addEventListener('click', () => publishPinnedNote());
+elements.pin.addEventListener('click', () => {
+  // While a note is being mined this button is the way out of it: stopping costs nothing,
+  // and the note stays where it was placed, ready to mine again.
+  if (mining) { mining.abort(); return; }
+  publishPinnedNote();
+});
 elements.discardBin.addEventListener('click', () => openDiscardDialog());
 elements.discardConfirm.addEventListener('click', () => discardPendingNote());
 elements.discardCancel.addEventListener('click', () => keepDiscardedNote());

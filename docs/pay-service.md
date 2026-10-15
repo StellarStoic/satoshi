@@ -522,3 +522,37 @@ offered, and the gate is the only thing that decides.
 Consequences worth stating plainly: a buyer's key never joins any list, a throwaway anonymous key
 never joins any list, and a paid note is admissible only from the moment the desk registers it until
 the first write that uses that registration.
+
+
+## Posting one note with work instead of sats
+
+A key with a NIP-05 name — its own, on any domain — may post a single note by mining its
+event instead of paying for a pass. The board offers it in the composer as **Free with POW**,
+and the desk prices that order at nothing: `POST /pinstr/v1/orders` with `pow: true` and
+`powName: "name@domain"` comes back already settled, with a publish token and no rail.
+
+The difficulty is `POW_BITS` (25) in `src/sticky.mjs`, published by `/pinstr/v1/config` as
+`pow.bits` so the board offers exactly the number the desk checks. 25 bits is 2^25 ≈ 33.5
+million sha256 tries expected: measured with the board's miner, about a minute on a desktop
+and two to five minutes on a phone, in four workers.
+
+Two facts make it safe to accept from a key this desk has never seen:
+
+* **The work is on the note itself.** An event's id is the sha256 of its content, tags,
+  pubkey and timestamp, so an id carrying 25 leading zero bits proves the effort went into
+  this note and no other. Change a word, move the note, or re-time it, and the work is gone —
+  which is why the board mines at "Pin note", on the finished note, and not earlier.
+* **The desk counts it from the event.** `verifyPublishEvent` requires exactly one
+  `["nonce","<value>","<bits>"]` tag (NIP-13), a claim of at least the ordered difficulty,
+  and then recomputes `leadingZeroBits(event.id)` — after `verifyEvent` has checked that id
+  against the signature. A note mined at one difficulty cannot be published at another, a
+  tag that claims more than its id carries is refused (`insufficient_pow`), and a note with
+  no tag is refused (`bad_pow`).
+
+A throwaway anonymous identity is **not** offered this route, and the desk refuses it
+(`anonymous_no_pow`): that tier's price is 69 sats per note, which is the whole point of it.
+Nothing is unverifiable about the work. The NIP-05 *claim* is a different matter — a desk
+cannot resolve a name on somebody else's domain without fetching an address a stranger chose,
+so the claim is recorded on the order (`powName`) and the work is what decides the note. The
+board checks the name it can see and never offers the route without one; the enforced part,
+for every key, is the hashes.

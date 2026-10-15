@@ -80,7 +80,12 @@ export const PAGE_HELP = Object.freeze({
                     + ' A satoshi.si name makes the same pass cheaper, and how short the name is decides how much:'
                     + ' three characters post free, four characters pay half (5 sats a week or 205 a year), and five or'
                     + ' more pay three quarters (7 sats a week or 308 a year). The name is what was bought, and shorter'
-                    + ' names cost more to begin with — which is why three characters are the tier that pays nothing.',
+                    + ' names cost more to begin with — which is why three characters are the tier that pays nothing.'
+                    + ' A pass is not the only way in: with a NIP-05 name of your own, on any domain, you can instead'
+                    + ' pay for one note with work. The button offers Free with POW, and pinning then finds 25 bits of'
+                    + ' work on the note\'s own id — about 34 million hashes, a few minutes on a phone with the page open,'
+                    + ' and nothing to pay. The work has to be on the exact note you publish, so the mining happens when'
+                    + ' you press Pin note, after you place it; a note you move afterwards has to be mined again.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
