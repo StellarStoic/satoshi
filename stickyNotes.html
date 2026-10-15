@@ -207,6 +207,32 @@
     </div>
   </dialog>
 
+  <dialog id="noteGiftDialog" class="sticky-dialog note-gift-dialog" aria-labelledby="noteGiftTitle">
+    <button type="button" id="closeNoteGift" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    <h2 id="noteGiftTitle">React or zap this note</h2>
+    <p id="noteGiftAuthor" class="note-gift__author"></p>
+    <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
+    <div class="note-gift__block">
+      <h3>React</h3>
+      <div id="noteGiftReactions" class="note-gift__reactions" role="group" aria-label="Pick a reaction"></div>
+    </div>
+    <div class="note-gift__block">
+      <h3>Zap</h3>
+      <p id="noteGiftZapTarget" class="note-gift__hint"></p>
+      <div id="noteGiftAmounts" class="note-gift__amounts" role="group" aria-label="Zap amount"></div>
+      <div class="note-gift__custom">
+        <input id="noteGiftCustom" type="number" min="1" step="1" inputmode="numeric" placeholder="sats" aria-label="Custom amount in sats">
+        <button type="button" id="noteGiftZap" class="secondary-action"><span>Zap</span></button>
+      </div>
+      <div id="noteGiftInvoice" class="note-gift__invoice" hidden>
+        <div id="noteGiftQr" class="note-gift__qr" aria-hidden="true"></div>
+        <p id="noteGiftInvoiceHint" class="note-gift__hint"></p>
+        <code id="noteGiftInvoiceText"></code>
+        <button type="button" id="copyNoteGiftInvoice" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy invoice</span></button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="loginDialog" class="sticky-dialog" aria-labelledby="loginTitle">
     <div class="dialog-inner">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>

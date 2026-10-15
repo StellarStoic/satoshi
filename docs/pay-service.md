@@ -526,6 +526,40 @@ the first write that uses that registration.
 
 ## How a note says it was paid for
 
+## Giving a note something back
+
+The signature at a note's foot is a button, and what it opens is the two things a reader can give
+the writer: a reaction, or sats.
+
+A **reaction** is a NIP-25 `kind 7`, signed by the reader and published to the board's relay and two
+public ones — the board's first, because that is where the note itself lives. Its `content` is the
+emoji, `e` names the note with the relay and author as hints, `p` names the author, and `k` says a
+note was reacted to. The row of reactions is data (`REACTION_SET` in `noteGifts.mjs`), so a NIP-30
+custom emoji — `content: ":shortcode:"` plus one `["emoji", shortcode, image-url]` tag — is a
+one-line addition once its image exists; until then every reaction offered is plain Unicode, which
+needs no emoji tag at all.
+
+A **zap** is NIP-57. The board reads the author's `lud16` (or their `lud06`, decoded) out of their
+kind 0 from the same three relays it already asks about authors, fetches their LNURL-pay endpoint,
+and reads what that endpoint will accept. It fits the reader's amount into that range — raising 21
+sats to a 100-sat floor is not an error, it is what the reader meant — then builds a `kind 9734`
+zap request, signs it, and sends it to the endpoint's callback as a GET with `amount` (millisats),
+`nostr` (the signed request, URI-encoded) and `lnurl` (the endpoint, bech32-encoded). The request is
+never published; the answer's `pr` is the invoice, which the board shows as a QR to pay from any
+lightning wallet. Whether the payment is *recorded on nostr* depends on the recipient's server: only
+an endpoint that answers `allowsNostr: true` with a `nostrPubkey` will publish a `kind 9735` receipt,
+and the board says which of the two it is looking at rather than implying a receipt that will not
+come.
+
+Because the request must be signed before the recipient's server will take it, the flow parks its
+intent in `localStorage` (`satoshi:sticky:gift-park:v1`) across the signer hand-off — a phone leaves
+the page for the signer and comes back to a reload — and clears it once the invoice has been asked
+for. A park older than thirty minutes, or one for a note that is no longer on the board, is dropped
+with a sentence instead of being used.
+
+A **nutzap** (NIP-61) is not here yet: it is the next pass, and it is a wallet rather than a button,
+because the sender has to hold ecash on a mint the recipient's `kind 10019` names.
+
 A note's details say how it was paid for, in a row under its event id: a hammer if it was
 mined, the Bitcoin mark if it was paid for with Bitcoin, a coin if it was paid for in cash. A
 note published before the mark existed shows nothing there, and neither does a note published

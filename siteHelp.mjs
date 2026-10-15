@@ -91,7 +91,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' you press Pin note, after you place it; a note you move afterwards has to be mined again.'
                     + ' A note\'s details then say how it was paid for, under its event id: a hammer if it was mined,'
                     + ' the Bitcoin mark if it was paid for with Bitcoin, and a coin if it was paid for in cash. A note'
-                    + ' published before the mark existed shows nothing there — which is what an empty row means.',
+                    + ' published before the mark existed shows nothing there — which is what an empty row means.'
+                    + ' The signature at a note\'s foot is a button: press it to react to that note, or to zap its writer'
+                    + ' sats. A reaction is signed by you and published where the note lives; a zap is paid from any'
+                    + ' lightning wallet you hold, and the writer\'s own server records the receipt.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',

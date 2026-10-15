@@ -80,6 +80,12 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS} from './stickyNotesModel.mjs';
+// What a reader can give a note. The event building and the lnurl arithmetic live in their own
+// module so they can be tested against the specs without a browser anywhere near them.
+import {
+  REACTION_SET, ZAP_AMOUNTS, reactionTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
+  parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
+} from './noteGifts.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -239,6 +245,13 @@ const elements = {
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
   notePaidBadge: document.getElementById('notePaidBadge'), notePaidBadgeIcon: document.getElementById('notePaidBadgeIcon'),
   notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
+  noteGift: document.getElementById('noteGiftDialog'), noteGiftAuthor: document.getElementById('noteGiftAuthor'),
+  noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftReactions: document.getElementById('noteGiftReactions'),
+  noteGiftZapTarget: document.getElementById('noteGiftZapTarget'), noteGiftAmounts: document.getElementById('noteGiftAmounts'),
+  noteGiftCustom: document.getElementById('noteGiftCustom'), noteGiftZap: document.getElementById('noteGiftZap'),
+  noteGiftInvoice: document.getElementById('noteGiftInvoice'), noteGiftQr: document.getElementById('noteGiftQr'),
+  noteGiftInvoiceHint: document.getElementById('noteGiftInvoiceHint'), noteGiftInvoiceText: document.getElementById('noteGiftInvoiceText'),
+  copyNoteGiftInvoice: document.getElementById('copyNoteGiftInvoice'), closeNoteGift: document.getElementById('closeNoteGift'),
   noteMenuStatus: document.getElementById('noteMenuStatus'),
 };
 
@@ -2389,6 +2402,24 @@ function renderNote(sticky, event = null, temporary = false) {
     const author = document.createElement('span');
     author.className = 'sticky-note__author';
     labelNoteAuthor(author, sticky);
+    // The signature is the one place on the paper that is about the writer, so it is where a reader
+    // can give them something: a reaction, or sats. It takes the pointer and swallows the event so
+    // the board does not read the tap as the start of a drag, the way the pin already does.
+    author.setAttribute('role', 'button');
+    author.tabIndex = 0;
+    author.setAttribute('aria-label', `React to or zap ${author.textContent || 'this note'}`);
+    author.title = `${author.textContent || 'this note'} — react or zap`;
+    author.addEventListener('pointerdown', press => press.stopPropagation());
+    author.addEventListener('click', press => {
+      press.stopPropagation();
+      openNoteGiftDialog(sticky.id, author);
+    });
+    author.addEventListener('keydown', key => {
+      if (key.key === 'Enter' || key.key === ' ') {
+        key.preventDefault();
+        openNoteGiftDialog(sticky.id, author);
+      }
+    });
     note.appendChild(author);
   }
   noteAtPlacement(note, sticky);
@@ -3661,6 +3692,333 @@ function keepNoteMenuOnScreen() {
   }
 }
 
+/* ------------------------------------------------------------------- react or zap a note ---- */
+
+/**
+ * The relays a reaction and a zap receipt should be findable on.
+ *
+ * The board's own relay comes first, because that is where the note itself lives and where its
+ * readers look. A reaction nobody else can read is not a reaction, so the two public relays the
+ * board already reads authors from are asked as well.
+ */
+const GIFT_RELAYS = [RELAY, 'wss://nos.lol', 'wss://relay.damus.io'];
+
+/**
+ * Where a zap waits between being signed and becoming an invoice.
+ *
+ * A zap request has to be signed before the recipient's server will take it, and on a phone the
+ * signature comes back through another app — by which time this page has been reloaded and every
+ * variable with it. The park therefore lives in storage, expires on its own, and is cleared only
+ * once the invoice has been asked for.
+ */
+const GIFT_PARK_KEY = 'satoshi:sticky:gift-park:v1';
+const GIFT_PARK_MS = 30 * 60 * 1000;
+
+let giftNoteId = '';
+let giftAmountSats = 0;
+let giftPay = null;
+let giftWired = false;
+
+function readGiftPark() {
+  try {
+    const park = JSON.parse(localStorage.getItem(GIFT_PARK_KEY) || 'null');
+    if (!park || !park.noteId || !park.callback) return null;
+    if (Date.now() - Number(park.createdAt || 0) > GIFT_PARK_MS) return null;
+    return park;
+  } catch { return null; }
+}
+
+function setGiftStatus(message, error = false) {
+  status(elements.noteGiftStatus, message || '', error);
+}
+
+/**
+ * Publish one signed event to the relays that should know about it, and report how many took it.
+ *
+ * A relay that says nothing, refuses, or is simply not there is not an error worth showing on its
+ * own — what matters is whether *any* of them holds the event, so the count is the answer.
+ */
+function publishGiftEvent(event) {
+  const attempts = GIFT_RELAYS.map(url => new Promise(resolve => {
+    let socket = null;
+    let settled = false;
+    const finish = took => {
+      if (settled) return;
+      settled = true;
+      try { socket?.close(); } catch {}
+      resolve(took ? 1 : 0);
+    };
+    const timer = setTimeout(() => finish(false), 6000);
+    try { socket = new WebSocket(url); } catch { clearTimeout(timer); resolve(0); return; }
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['EVENT', event])));
+    socket.addEventListener('message', message => {
+      try {
+        const data = JSON.parse(message.data);
+        if (data[0] === 'OK' && data[1] === event.id) {
+          clearTimeout(timer);
+          finish(data[2] !== false);
+        }
+      } catch {}
+    });
+    socket.addEventListener('error', () => { clearTimeout(timer); finish(false); });
+    socket.addEventListener('close', () => { clearTimeout(timer); finish(false); });
+  }));
+  return Promise.all(attempts).then(counts => counts.reduce((total, count) => total + count, 0));
+}
+
+/**
+ * The author's own statement of where they can be paid.
+ *
+ * Read from their kind 0 as published, from the same relays the board already asks about authors.
+ * `lud16` is the lightning address; `lud06` is an `lnurl` string, which is the same thing said in
+ * another dialect and decodes to the endpoint directly.
+ */
+async function resolveAuthorZapTarget(pubkey) {
+  const results = await Promise.allSettled([
+    readAuthorProfilesFromRelay(RELAY, [pubkey]),
+    readAuthorProfilesFromRelay('wss://nos.lol', [pubkey]),
+    readAuthorProfilesFromRelay('wss://relay.damus.io', [pubkey]),
+  ]);
+  let newest = null;
+  results.filter(result => result.status === 'fulfilled').forEach(result => {
+    const event = result.value.get(pubkey);
+    if (event && (!newest || event.created_at > newest.created_at)) newest = event;
+  });
+  if (!newest) return {ok: false, error: 'Could not read this author\u2019s profile just now. Try again in a moment.'};
+  let profile = {};
+  try { profile = JSON.parse(newest.content || '{}'); } catch {}
+  const address = String(profile.lud16 || '').trim();
+  if (address) return {ok: true, address};
+  const encoded = String(profile.lud06 || '').trim();
+  if (encoded) {
+    try { return {ok: true, address: '', url: lnurlDecode(encoded)}; } catch {}
+  }
+  return {ok: false, error: 'This author has not published a lightning address, so there is nowhere to send a zap.'};
+}
+
+/** The LNURL-pay answer behind an address: what it will accept, and whether it knows nostr. */
+async function readZapEndpoint(target) {
+  let url;
+  try { url = target.url || lud16ToLnurlpUrl(target.address); }
+  catch (error) { return {ok: false, error: error.message}; }
+  let response;
+  try { response = await fetch(url, {headers: {Accept: 'application/json'}}); }
+  catch { return {ok: false, error: 'Could not reach that lightning address just now.'}; }
+  if (!response.ok) return {ok: false, error: `That lightning address answered ${response.status}.`};
+  let payload;
+  try { payload = await response.json(); }
+  catch { return {ok: false, error: 'That lightning address did not answer with JSON.'}; }
+  const pay = parseLnurlPay(payload);
+  if (!pay.ok) return pay;
+  try { return {...pay, lnurl: lnurlEncode(url)}; }
+  catch { return {...pay, lnurl: ''}; }
+}
+
+/** Show the invoice the recipient's server made, with the code the reader scans. */
+function showGiftInvoice(invoice, parked, address) {
+  elements.noteGiftInvoice.hidden = false;
+  elements.noteGiftInvoiceText.textContent = invoice;
+  drawQrCode(elements.noteGiftQr, invoice);
+  elements.noteGiftInvoiceHint.textContent = parked.allowsNostr
+    ? 'Pay it from any lightning wallet. The receipt is published by their server, so it is recorded on nostr.'
+    : (address ? `Pay it from any lightning wallet. ${address} does not record zaps on nostr, so this payment stays between the two of you.`
+      : 'Pay it from any lightning wallet.');
+}
+
+/**
+ * The second half of a zap: a signed request becomes an invoice.
+ *
+ * The request is never published — the spec has it sent to the recipient's callback and nowhere
+ * else — which is also why the board cannot show a zap until the reader has paid it.
+ */
+async function finishZap(signed, parked) {
+  setGiftStatus('Asking for an invoice\u2026');
+  let response;
+  try { response = await fetch(zapCallbackUrl({callback: parked.callback, amountSats: parked.sats, event: signed, lnurl: parked.lnurl}), {headers: {Accept: 'application/json'}}); }
+  catch { setGiftStatus('Could not reach that lightning address to ask for an invoice.', true); return; }
+  if (!response.ok) { setGiftStatus(`That lightning address answered ${response.status} when asked for an invoice.`, true); return; }
+  const payload = await response.json().catch(() => null);
+  const invoice = parseInvoice(payload);
+  if (!invoice.ok) { setGiftStatus(invoice.error, true); return; }
+  showGiftInvoice(invoice.invoice, parked, parked.address || '');
+  setGiftStatus(`Zapping ${parked.sats} sats.`);
+  if (parked.clamped) setGiftStatus(`Zapping ${parked.sats} sats \u2014 the amount their address accepts.`);
+}
+
+/** Sign and send a reaction. Nothing is stored: a reaction is finished the moment it is out. */
+async function sendGiftReaction(reaction) {
+  const record = noteEvents.get(giftNoteId);
+  if (!record) return;
+  setGiftStatus('');
+  try {
+    const template = reactionTemplate({
+      noteId: giftNoteId, noteKind: record.event?.kind || 1, authorPubkey: record.event?.pubkey,
+      reaction, relay: RELAY, pubkey: getNostrSession()?.pubkey || '',
+    });
+    const signed = await signNostrEvent(template, {action: 'react', noteId: giftNoteId, reactionId: reaction.id});
+    if (!signed) {
+      setGiftStatus('Approve the reaction in your signer, then come back to this page.');
+      return;
+    }
+    setGiftStatus('Sending your reaction\u2026');
+    const took = await publishGiftEvent(signed);
+    setGiftStatus(took ? 'Reaction sent.' : 'No relay took the reaction. Try again in a moment.', !took);
+  } catch (error) {
+    setGiftStatus(error.message || 'That reaction could not be sent.', true);
+  }
+}
+
+/** Sign and send a zap request, then show the invoice it earns. */
+async function sendGiftZap(sats) {
+  const record = noteEvents.get(giftNoteId);
+  if (!record || !giftPay) return;
+  setGiftStatus('');
+  const fit = clampZapAmount(sats, giftPay);
+  if (!fit.ok) { setGiftStatus(fit.error, true); return; }
+  const parked = {
+    noteId: giftNoteId, sats: fit.sats, callback: giftPay.callback, lnurl: giftPay.lnurl || '',
+    allowsNostr: giftPay.allowsNostr, address: giftPay.address || '', clamped: Boolean(fit.raised || fit.lowered),
+    createdAt: Date.now(),
+  };
+  try {
+    const template = zapRequestTemplate({
+      noteId: giftNoteId, noteKind: record.event?.kind || 1, authorPubkey: record.event?.pubkey,
+      amountSats: fit.sats, relays: GIFT_RELAYS, pubkey: getNostrSession()?.pubkey || '',
+    });
+    const signed = await signNostrEvent(template, {action: 'zap', noteId: giftNoteId, sats: fit.sats});
+    if (!signed) {
+      // The signer is another app: the request waits in storage and the reader comes back to it.
+      localStorage.setItem(GIFT_PARK_KEY, JSON.stringify(parked));
+      setGiftStatus('Approve the zap in your signer, then come back to this page for the invoice.');
+      return;
+    }
+    await finishZap(signed, parked);
+  } catch (error) {
+    setGiftStatus(error.message || 'That zap could not be sent.', true);
+  }
+}
+
+/** What a signature that came back from a signer is for, and what to do with it. */
+async function finishGiftFromSigner(amber) {
+  const context = amber?.context || {};
+  const noteId = String(context.noteId || '');
+  const record = noteEvents.get(noteId);
+  if (!record) {
+    status(elements.boardStatus, 'That signature was for a note that is no longer on this board.', true);
+    elements.boardStatus.hidden = false;
+    return;
+  }
+  openNoteGiftDialog(noteId, null);
+  if (context.action === 'react') {
+    setGiftStatus('Sending your reaction\u2026');
+    const took = await publishGiftEvent(amber.event);
+    setGiftStatus(took ? 'Reaction sent.' : 'No relay took the reaction. Try again in a moment.', !took);
+    return;
+  }
+  const parked = readGiftPark();
+  if (!parked || parked.noteId !== noteId) {
+    setGiftStatus('That zap request has expired. Pick an amount again.', true);
+    return;
+  }
+  localStorage.removeItem(GIFT_PARK_KEY);
+  await finishZap(amber.event, parked);
+}
+
+/** Open the dialog on a note, and let it read what the author can be paid on. */
+async function openNoteGiftDialog(eventId, opener = null) {
+  const record = noteEvents.get(eventId);
+  if (!record) return;
+  giftNoteId = eventId;
+  giftAmountSats = 0;
+  giftPay = null;
+
+  elements.noteGiftInvoice.hidden = true;
+  elements.noteGiftQr.replaceChildren();
+  elements.noteGiftInvoiceText.textContent = '';
+  elements.noteGiftCustom.value = '';
+  elements.noteGiftAuthor.textContent = authorLabels.get(record.event?.pubkey) || `~${shortAuthor(record.event?.pubkey || '')}`;
+
+  const session = getNostrSession();
+  elements.noteGiftReactions.replaceChildren(...REACTION_SET.map(reaction => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = reaction.emoji;
+    button.title = reaction.label;
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', 'false');
+    button.setAttribute('aria-label', reaction.label);
+    button.disabled = !session;
+    button.addEventListener('click', () => {
+      elements.noteGiftReactions.querySelectorAll('button').forEach(other => other.setAttribute('aria-checked', String(other === button)));
+      sendGiftReaction(reaction);
+    });
+    return button;
+  }));
+  elements.noteGiftAmounts.replaceChildren(...ZAP_AMOUNTS.map(amount => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = String(amount);
+    button.setAttribute('aria-pressed', 'false');
+    button.disabled = !session;
+    button.addEventListener('click', () => {
+      giftAmountSats = amount;
+      elements.noteGiftCustom.value = '';
+      elements.noteGiftAmounts.querySelectorAll('button').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+    });
+    return button;
+  }));
+  elements.noteGiftZap.disabled = true;
+  elements.noteGiftCustom.disabled = !session;
+
+  if (!elements.noteGift.open) elements.noteGift.showModal();
+  if (!session) {
+    setGiftStatus('Log in first: both of these are signed by you.');
+    elements.noteGiftZapTarget.textContent = '';
+    return;
+  }
+  setGiftStatus('');
+  elements.noteGiftZapTarget.textContent = 'Reading how this author accepts sats\u2026';
+  const target = await resolveAuthorZapTarget(record.event?.pubkey);
+  if (!target.ok) {
+    elements.noteGiftZapTarget.textContent = target.error;
+    return;
+  }
+  const pay = await readZapEndpoint(target);
+  if (!pay.ok) {
+    elements.noteGiftZapTarget.textContent = pay.error;
+    return;
+  }
+  giftPay = {...pay, address: target.address || ''};
+  const floor = Math.ceil(pay.minSendable / 1000);
+  const ceiling = Math.floor(pay.maxSendable / 1000);
+  elements.noteGiftZapTarget.textContent = `${target.address || 'This author'} accepts ${floor}\u2013${ceiling} sats${pay.allowsNostr ? ', and records zaps on nostr' : ', and does not record zaps on nostr'}.`;
+  elements.noteGiftZap.disabled = false;
+}
+
+/** One-time wiring for the dialog's own controls. */
+function wireNoteGiftDialog() {
+  if (giftWired) return;
+  giftWired = true;
+  elements.closeNoteGift.addEventListener('click', () => elements.noteGift.close());
+  elements.noteGiftZap.addEventListener('click', () => {
+    const typed = Number(elements.noteGiftCustom.value);
+    sendGiftZap(Number.isFinite(typed) && typed > 0 ? typed : giftAmountSats);
+  });
+  elements.copyNoteGiftInvoice.addEventListener('click', async () => {
+    const invoice = elements.noteGiftInvoiceText.textContent || '';
+    if (!invoice) return;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(invoice);
+      else throw new Error('no clipboard');
+      elements.copyNoteGiftInvoice.querySelector('span').textContent = 'Invoice copied';
+      setTimeout(() => { elements.copyNoteGiftInvoice.querySelector('span').textContent = 'Copy invoice'; }, 1800);
+    } catch {
+      setGiftStatus('Could not copy the invoice. Select it above and copy it by hand.', true);
+    }
+  });
+  elements.noteGift.addEventListener('close', () => setGiftStatus(''));
+}
+
 function openNoteMenu(eventId, pin) {
   const record = noteEvents.get(eventId);
   if (!record) return;
@@ -3785,7 +4143,7 @@ function installBoardNavigation() {
     // Ordinary paper is part of the board surface: dragging or pinching on it must move
     // the board too. A pin and a note's own link remain buttons, while concealed paper owns a
     // four-second hold.
-    if (event.target.closest('.sticky-note__pin, .sticky-note__link, .board-plate')
+    if (event.target.closest('.sticky-note__pin, .sticky-note__link, .board-plate, .sticky-note__author')
         || event.target.closest('.sticky-note--filtered-out:not(.sticky-note--filter-revealed)')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
@@ -5111,6 +5469,7 @@ elements.discardDialog.addEventListener('close', () => { if (discardRestore) kee
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
 elements.copyNoteJson.addEventListener('click', copySelectedNoteJson);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
+wireNoteGiftDialog();
 elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationFrame(keepNoteMenuOnScreen));
 document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu') && !event.target.closest('.sticky-note__pin')) closeNoteMenu();
@@ -5248,6 +5607,11 @@ async function applySignerReturn() {
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
+    } else if (amber?.action === 'sign' && (amber.context?.action === 'react' || amber.context?.action === 'zap')) {
+      // A reaction or a zap came back: it is not the note flow's, so it goes to its own handler
+      // rather than falling through to the "that was for a different note" arm below.
+      applied = true;
+      await finishGiftFromSigner(amber);
     } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
       applied = true;
       signalStickyFlow('signed', {orderId: pending.orderId});

@@ -693,8 +693,8 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
   assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
     'one two-finger gesture zooms the board and rotates the note');
-  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)[\s\S]{0,180}return;/,
-    'the pin, a note link and the board plate keep their own click instead of dragging the board');
+  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)[\s\S]{0,180}return;/,
+    'the pin, a note link, the board plate and the signature keep their own click instead of dragging the board');
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   // The board is a pattern drawn into a canvas inside the transformed element, not a repeating
   // background on the 2048px board element. That tiled form has to be produced at device resolution
@@ -2151,8 +2151,8 @@ test('the top rail wears the bottom rail\u2019s plate, and both of them share th
   // It also has to survive a board switch, and the pan guard already names the plate's class.
   assert.match(script,
     /\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate, elements\.boardPlateTop\]\.filter\(Boolean\)\)/);
-  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)/,
-    'so a press on either plaque reaches the button rather than the pan');
+  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)/,
+    'so a press on either plaque, or on a signature, reaches the button rather than the pan');
 });
 
 test('the lamps pulse once when the board changes, and the first strip is left still', async () => {
@@ -2362,7 +2362,7 @@ test('a board is shared by the link that carries its picture', async () => {
   assert.match(page, /<button type="button" id="boardPlate"/,
     'the plate names the board, so the plate is what opens the share dialog');
   assert.ok(!/<div id="boardPlate"/.test(page), 'and it is no longer a div that cannot be pressed');
-  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate'\)/,
+  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)/,
     'a control on the board is unreachable unless the pan guard names it');
   assert.doesNotMatch(css, /\.board-plate \{[^}]*pointer-events: none/,
     'and the plate must stop swallowing its own clicks');
@@ -3313,4 +3313,39 @@ test('the note details say how the note was paid for, and can copy its own JSON'
   // And the mark has left the note's own paper: no class, no rule.
   assert.doesNotMatch(css, /sticky-note__paid/);
   assert.doesNotMatch(page, /sticky-note__paid/);
+});
+
+test('the signature opens the react-or-zap dialog, and the board stops dragging from it', async () => {
+  const [html, css, page, gifts] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../noteGifts.mjs', import.meta.url), 'utf8'),
+  ]);
+  // The dialog is a real dialog with a row of reactions and a zap row that can show an invoice.
+  const dialog = html.match(/<dialog id="noteGiftDialog"[\s\S]*?<\/dialog>/);
+  assert.ok(dialog, 'the dialog exists');
+  for (const id of ['noteGiftAuthor', 'noteGiftStatus', 'noteGiftReactions', 'noteGiftAmounts', 'noteGiftZap',
+    'noteGiftInvoice', 'noteGiftQr', 'noteGiftInvoiceText', 'copyNoteGiftInvoice']) {
+    assert.match(dialog[0], new RegExp(`id="${id}"`), `${id} is in the dialog`);
+  }
+  assert.match(dialog[0], /id="noteGiftInvoice"[^>]*hidden/, 'no invoice is shown until one is asked for');
+  // The signature is a button that takes the pointer before the board can read the tap as a drag.
+  assert.match(page, /author\.setAttribute\('role', 'button'\)/);
+  assert.match(page, /author\.addEventListener\('pointerdown', press => press\.stopPropagation\(\)\)/);
+  assert.match(page, /openNoteGiftDialog\(sticky\.id, author\)/);
+  assert.match(page, /\.board-plate, \.sticky-note__author'\)/, 'the board ignores a drag begun on the signature');
+  assert.match(page, /wireNoteGiftDialog\(\);/, 'its controls are wired');
+  // A signature that comes back from a signer goes to the gift flow, not to the note flow's arm.
+  assert.match(page, /amber\.context\?\.action === 'react' \|\| amber\.context\?\.action === 'zap'/);
+  // A zap waits in storage across the hand-off, because the phone comes back to a reloaded page.
+  assert.match(page, /localStorage\.setItem\(GIFT_PARK_KEY/);
+  assert.match(page, /Date\.now\(\) - Number\(park\.createdAt/);
+  // The page builds no event itself: what it sends comes from the module the specs were tested in.
+  assert.match(page, /from '\.\/noteGifts\.mjs'/);
+  assert.match(gifts, /export const REACTION_SET/);
+  assert.doesNotMatch(page, /kind: 9734/, 'the zap request is not spelled out in the page');
+  assert.doesNotMatch(page, /kind: 7,/, 'nor is the reaction');
+  assert.match(css, /\.note-gift__reactions button \{/);
+  assert.match(css, /\.note-gift__qr/);
 });

@@ -132,6 +132,30 @@
 .note-menu__paid { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: #ddd; font-size: .78rem; }
 .note-menu__paid[hidden] { display: none; }
 .note-menu__paid i { color: var(--accent, #f2a900); font-size: .95rem; }
+
+/* React or zap: what the signature opens. Everything in here is a choice, so it is built as rows
+   of buttons, and the invoice gets a block of its own so a code is never drawn half beside it. */
+.note-gift-dialog { width: min(420px, calc(100vw - 24px)); padding: 18px; }
+.note-gift-dialog h2 { margin: 0 34px 4px 0; font-size: 1rem; }
+.note-gift-dialog h3 { margin: 14px 0 6px; color: #989b99; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+.note-gift__author { margin: 0 0 8px; overflow: hidden; color: #ddd; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+.note-gift__hint { margin: 0 0 6px; color: #989b99; font-size: .75rem; }
+.note-gift__reactions, .note-gift__amounts { display: flex; flex-wrap: wrap; gap: 6px; }
+.note-gift__reactions button { min-width: 48px; min-height: 42px; border: 1px solid #4b4d4d; border-radius: 6px; background: #1f2223; color: inherit; font-size: 1.15rem; cursor: pointer; }
+.note-gift__reactions button:hover:not(:disabled) { border-color: var(--accent, #f2a900); }
+.note-gift__reactions button[aria-checked="true"] { border-color: var(--accent, #f2a900); background: #26292a; }
+.note-gift__amounts button { min-height: 38px; padding: 6px 10px; border: 1px solid #4b4d4d; border-radius: 6px; background: #1f2223; color: inherit; font-size: .8rem; cursor: pointer; }
+.note-gift__amounts button:hover:not(:disabled) { border-color: var(--accent, #f2a900); }
+.note-gift__amounts button[aria-pressed="true"] { border-color: var(--accent, #f2a900); background: #26292a; }
+.note-gift__custom { display: flex; gap: 6px; margin-top: 8px; }
+.note-gift__custom input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 8px; border: 1px solid #4b4d4d; border-radius: 6px; background: #101212; color: inherit; font-size: .8rem; }
+.note-gift__invoice { margin-top: 12px; padding-top: 10px; border-top: 1px solid #333; }
+.note-gift__qr { display: grid; place-items: center; }
+.note-gift__qr:empty { display: none; }
+.note-gift__qr canvas, .note-gift__qr img { image-rendering: pixelated; }
+.note-gift__invoice code { display: block; max-height: 66px; overflow: auto; margin: 6px 0; padding: 6px 8px; background: #101212; color: #ddd; font-size: .68rem; word-break: break-all; }
+.note-gift__invoice .secondary-action { width: 100%; }
+.note-gift-dialog button:disabled { opacity: .5; cursor: default; }
 .note-event-json .secondary-action { margin-top: 9px; }
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
