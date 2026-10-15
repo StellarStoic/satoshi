@@ -524,6 +524,32 @@ never joins any list, and a paid note is admissible only from the moment the des
 the first write that uses that registration.
 
 
+## How a note says it was paid for
+
+Every note's own foot carries a small mark in the corner, across from the writer's signature,
+saying how that note was paid for: a hammer if it was mined, the Bitcoin mark if it was paid
+for with Bitcoin, a coin if it was paid for in cash. A note published before the mark existed
+carries none, and so do notes published by a board that predates it.
+
+The word is the **desk's**, not the board's. The desk is the only side that knows what an
+order actually cost, so it decides the badge in `paymentBadge(order)` in `src/sticky.mjs`,
+sends it with the order as `paidBadge`, and publishes the vocabulary at `/pinstr/v1/config`
+under `paid`. A note then echoes it in a `["paid","<word>"]` tag, which rides inside the
+event's id — so it cannot be added or changed after signing.
+
+`verifyPublishEvent` checks the echo against the order: a note may not say it was mined when
+it was paid for, nor that it was paid for when it was mined, and a word the desk does not
+sell under is refused (`bad_payment`) rather than published and drawn as nothing. A note that
+says nothing at all is still published — a board that predates the badge has no word to send,
+and refusing a note somebody has already paid for over a missing decoration would be the worse
+failure of the two. The board refuses to draw a word it does not know, so a note that reaches
+the board from anywhere else carries no mark rather than a made-up one.
+
+Both words mean what they say: `bitcoin` covers a pass, a plan a short name makes free, and a
+per-note anonymous post, because every rail this desk sells on is Bitcoin — and `paymentMethod`
+is the extension point, so the first rail that is not Bitcoin adds one word here and one icon
+on the board, and nothing else changes.
+
 ## Posting one note with work instead of sats
 
 A key with a NIP-05 name — its own, on any domain — may post a single note by mining its

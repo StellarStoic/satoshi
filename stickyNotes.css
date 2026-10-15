@@ -126,6 +126,16 @@
 .sticky-note__text { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; text-align: center; }
 .sticky-note__pin { position: absolute; top: -36px; left: var(--pin-left, 50%); z-index: 3; width: 40px; height: 40px; translate: -50% 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; cursor: pointer; }
 .sticky-note__pin-art { position: absolute; top: 0; left: -4px; width: 48px; max-width: none; height: auto; pointer-events: none; }
+/* The other corner of the note's foot: how it was paid for, facing the writer's own
+   signature. Small and quiet — it is a fact about the note, not a label on it — and it takes
+   the note's ink colour rather than a brand colour, so it sits on the paper instead of on
+   top of it. */
+.sticky-note__paid { position: absolute; left: 10px; bottom: 7px; z-index: 2; display: inline-flex; align-items: center; color: rgba(38,35,30,.5); font-size: .78rem; line-height: 1; }
+.sticky-note__paid i { font-size: .78rem; line-height: 1; }
+.sticky-note__paid--bitcoin { color: rgba(146,86,10,.72); }
+.sticky-note__paid--pow { color: rgba(38,35,30,.58); }
+.sticky-note__paid--cash { color: rgba(28,88,54,.7); }
+.sticky-note--print .sticky-note__paid { bottom: 9px; }
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
 .sticky-note--placing:active { cursor: grabbing; }
@@ -396,7 +406,8 @@
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) { opacity:.16; filter:grayscale(.65); cursor:progress; user-select:none; }
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed)::before,
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__text,
-.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__author { opacity:0; }
+.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__author,
+.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__paid { opacity:0; }
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__pin { display:none; }
 .sticky-note--filter-revealed { z-index:490; opacity:1; filter:none; outline:2px solid #7cfc00; box-shadow:0 0 18px rgba(124,252,0,.3),2px 5px 12px rgba(31,16,5,.3); }
 .sticky-note__reveal-countdown { position:absolute; top:8px; right:9px; z-index:4; min-width:34px; border:1px solid rgba(38,35,30,.3); border-radius:12px; padding:2px 7px; background:rgba(255,255,255,.72); color:#20231d; font-family:var(--site-font,monospace); font-size:.68rem; font-weight:700; line-height:1.4; text-align:center; }

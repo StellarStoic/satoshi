@@ -77,6 +77,9 @@ import {
   stickyPowProgress,
   stickyPowDifficulty,} from './stickyNotesModel.mjs';
 import {mineNote, describeSeconds} from './powMining.mjs';
+// The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
+// desk sells under live in one place rather than being spelled again in the page.
+import {stickyPaymentBadge} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -2246,6 +2249,22 @@ function renderNote(sticky, event = null, temporary = false) {
     author.className = 'sticky-note__author';
     labelNoteAuthor(author, sticky);
     note.appendChild(author);
+    // How this note was paid for, in the foot's other corner: the signature on the right is
+    // the writer's, this on the left is the reader's. It is drawn from the note's own tag,
+    // never from anything this browser remembers, and a word the board does not know draws
+    // nothing at all rather than a payment that was never made.
+    const badge = stickyPaymentBadge(sticky.paid);
+    if (badge) {
+      const paid = document.createElement('span');
+      paid.className = `sticky-note__paid sticky-note__paid--${badge.id}`;
+      paid.title = badge.title;
+      paid.setAttribute('aria-label', badge.title);
+      const icon = document.createElement('i');
+      icon.className = `lni ${badge.icon}`;
+      icon.setAttribute('aria-hidden', 'true');
+      paid.appendChild(icon);
+      note.appendChild(paid);
+    }
   }
   noteAtPlacement(note, sticky);
   const nextNewer = [...elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)')]
@@ -2812,7 +2831,8 @@ async function buySubscriptionThen(session, notePending, statusElement) {
     body: JSON.stringify({pubkey: session.pubkey, action: 'subscribe', plan: subscribePlan}),
   });
   const sats = stickyOrderPrice(order, stickySubscriptionPrice(subscribePlan, {offPercent: actionInfo.offPercent}));
-  savePending({...notePending, subscribeOrderId: order.id, subscribePlan, subscribeSats: sats, status: 'waiting_subscription'});
+  savePending({...notePending, subscribeOrderId: order.id, subscribePlan, subscribeSats: sats,
+    paidBadge: order.paidBadge || '', status: 'waiting_subscription'});
   // A free plan (a three-character name) has nothing to pay, so there is no
   // invoice and no dialog to pay in: the desk has already put the time on the key.
   // Go straight to the poll that finishes whatever the reader was doing.
@@ -2960,7 +2980,7 @@ async function startPayment() {
       if (miningRequested && !powBits) throw new Error('The payment service did not confirm the mining difficulty. No note was published.');
       if (miningRequested) showPowOffer(null);
       savePending({...notePending, orderId: order.id, sats, status: 'paid', publishToken: order.publishToken,
-        ...(powBits ? {powBits} : {})});
+        paidBadge: order.paidBadge || '', ...(powBits ? {powBits} : {})});
       if (elements.composer.open) elements.composer.close();
       status(elements.boardStatus, powBits
         ? 'Place the note on the board — it will be mined when you pin it.'
@@ -3042,7 +3062,8 @@ async function pollPayment() {
     if (order.paid && order.publishToken) {
       stopInvoiceMessages();
       if (elements.paymentDialog.open) elements.paymentDialog.close();
-      savePending({...pending, status: 'paid', publishToken: order.publishToken});
+      savePending({...pending, status: 'paid', publishToken: order.publishToken,
+        paidBadge: order.paidBadge || pending.paidBadge || ''});
       if (elements.composer.open) elements.composer.close();
       beginPlacement();
       return;
@@ -3393,7 +3414,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // client show the picture instead of an empty note, and the desk checks it against the print it
     // stored for this order. A written note's content stays its words.
     const pictureAddress = pending.image ? stickyImageUrl(pending.image) : '';
-    const template = makeStickyTemplate({...pending, ...placement, content: pictureAddress || pending.content, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous)});
+    const template = makeStickyTemplate({...pending, ...placement, content: pictureAddress || pending.content, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous), paid: pending.paidBadge || ''});
     // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
     // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
     // one this device is known to complete. The navigation to the signer happens inside

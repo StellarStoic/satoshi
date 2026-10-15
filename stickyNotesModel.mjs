@@ -1129,7 +1129,7 @@ export function normaliseStickyHashtags(input) {
     .filter(tag => tag && tag !== STICKY_TOPIC))];
 }
 
-export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], image = '', liveliness = STICKY_DEFAULT_LIVELINESS, createdAt = Math.floor(Date.now() / 1000)}) {
+export function makeStickyTemplate({content, color, font = 'typewriter', x, y, rotation, geohash, geohashes, exactGeohash = false, anonymous = false, mentions = [], hashtags = [], image = '', liveliness = STICKY_DEFAULT_LIVELINESS, paid = '', createdAt = Math.floor(Date.now() / 1000)}) {
   const text = normaliseStickyText(content);
   // Words are what a written note is; a pinned picture is the note itself and needs none.
   // With neither the note would be blank paper, which is what the desk refuses too.
@@ -1165,6 +1165,12 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
   // of them are named too, so the note is findable on the wider boards as well.
   // Parents shallower than the shallowest code are not boards and are not named:
   // below three characters a code is a region, and the desk refuses one outright.
+  // The badge word the desk handed over with the order, checked here where the writer's own
+  // browser notices a mistake, and checked again by the desk in the published event. A word
+  // this board does not draw is refused rather than published: an unreadable badge on a note
+  // is worse than a missing one, because it looks like a payment.
+  const badge = paid ? stickyPaymentBadge(paid) : null;
+  if (paid && !badge) throw new Error(`"${paid}" is not a way this desk sells a note.`);
   const namedCells = exactGeohash
     ? cells
     : [...new Set(cells.flatMap(cell => geohashPrefixes(cell)))]
@@ -1179,6 +1185,7 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     ['k', 'geo'],
     ['geohash', exactGeohash ? 'exact' : 'prefix'],
     ['sticky', STICKY_VERSION, color, clampPlacement(x).toFixed(5), clampPlacement(y).toFixed(5), clampRotation(rotation).toFixed(2), font],
+    ...(badge ? [[STICKY_PAYMENT_TAG, badge.id]] : []),
     ...(picture ? [[STICKY_IMAGE_TAG, picture]] : []),
     ...mentionList.map(key => [MENTION_TAG, key]),
     // NIP-40: the moment our relay stops serving its copy.
@@ -1192,6 +1199,34 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
     content: text,
     tags,
   };
+}
+
+/**
+ * How a note was paid for, as the badge its own foot carries.
+ *
+ * The desk decides this word, not the board: the desk is the only side that knows what an
+ * order actually cost, so it hands the word over with the order and checks the same word in
+ * the event at publish time. This list is therefore the board's half of one vocabulary — an
+ * icon per word, and a sentence saying what the word claims — and `stickyPaymentBadge`
+ * refuses anything outside it, so a foreign client's invented badge draws nothing at all on
+ * this board rather than drawing a payment that was never made.
+ *
+ * `icon` is a Lineicons class the page already loads; the font is shipped, not fetched.
+ */
+export const STICKY_PAYMENT_TAG = 'paid';
+export const STICKY_PAYMENT_BADGES = [
+  { id: 'pow', icon: 'lni-hammer-1', label: 'Mined',
+    title: 'Mined, not bought: this note\u2019s own id carries the work instead of a payment.' },
+  { id: 'bitcoin', icon: 'lni-bitcoin', label: 'Bitcoin',
+    title: 'Paid for with Bitcoin: a subscription covering it, or a per-note post in sats.' },
+  { id: 'cash', icon: 'lni-dollar-circle', label: 'Cash',
+    title: 'Paid for in cash.' },
+];
+
+/** The badge for a word read out of an event, or null when this board does not draw it. */
+export function stickyPaymentBadge(value) {
+  const id = String(value || '').trim().toLowerCase();
+  return STICKY_PAYMENT_BADGES.find(badge => badge.id === id) || null;
 }
 
 export function parseStickyEvent(event) {
@@ -1249,6 +1284,8 @@ export function parseStickyEvent(event) {
     exactGeohash: scope !== 'prefix',
     expiration: Number.isFinite(expires) && expires > 0 ? expires : null,
     anonymous: event.tags.some(tag => tag?.[0] === 'anonymous' && tag[1] === '24h-local-key'),
+    // Null for a note that says nothing, and null for a word this board does not draw.
+    paid: stickyPaymentBadge(event.tags.find(tag => tag?.[0] === STICKY_PAYMENT_TAG)?.[1])?.id || null,
     mentions: mentionPubkeys(event.tags),
     hashtags: [...new Set(event.tags.filter(tag => tag?.[0] === 't')
       .map(tag => String(tag[1] || '').toLowerCase())

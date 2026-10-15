@@ -35,7 +35,8 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   STICKY_IMAGE_MAX_BYTES,
   stickyImageGrade,
   stickyImageIssue,
-  stickyImageUrl,} from '../stickyNotesModel.mjs';
+  stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
+} from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -285,6 +286,55 @@ test('public sticky-note copy has no retired per-note pricing', async () => {
 });
 
 test('anonymous notes carry a signed identity-mode marker', () => {
+test('a note draws a badge only for a payment this board knows how to draw', () => {
+  assert.equal(stickyPaymentBadge('bitcoin').icon, 'lni-bitcoin');
+  assert.equal(stickyPaymentBadge('pow').icon, 'lni-hammer-1');
+  assert.equal(stickyPaymentBadge('cash').icon, 'lni-dollar-circle');
+  assert.deepEqual(STICKY_PAYMENT_BADGES.map(b => b.id), ['pow', 'bitcoin', 'cash']);
+  assert.equal(stickyPaymentBadge(' CASH ').id, 'cash', 'the desk sends lowercase; the board forgives the rest');
+  // A word the desk does not sell under draws nothing at all. A wrong badge is worse than a
+  // missing one: it claims a payment, and the reader has no way to check it.
+  assert.equal(stickyPaymentBadge('gold'), null);
+  assert.equal(stickyPaymentBadge(''), null);
+  assert.equal(stickyPaymentBadge(undefined), null);
+  assert.equal(stickyPaymentBadge(null), null);
+  assert.equal(stickyPaymentBadge({id: 'cash'}), null, 'a value that is not a word is not a badge');
+});
+
+test('the badge word rides in the event, inside the id the signature covers', () => {
+  const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, paid: 'pow'});
+  assert.deepEqual(template.tags.find(t => t[0] === STICKY_PAYMENT_TAG), ['paid', 'pow']);
+
+  // A note with nothing to say about payment carries no tag at all — which is every note
+  // published before the badge existed, and the desk publishes those rather than refusing them.
+  const plain = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH});
+  assert.equal(plain.tags.some(t => t[0] === STICKY_PAYMENT_TAG), false);
+
+  // A word this board cannot draw is refused where the writer's own browser notices, rather
+  // than signed, published and drawn as nothing after they have paid.
+  assert.throws(() => makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, paid: 'gold'}), /not a way this desk sells/);
+});
+
+test('a note reads its own badge back, and a stranger\'s word as nothing', () => {
+  const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH, paid: 'bitcoin'});
+  const signed = {...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)};
+  assert.equal(parseStickyEvent(signed).paid, 'bitcoin');
+
+  const plain = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0,
+    geohash: TEST_GEOHASH});
+  assert.equal(parseStickyEvent({...plain, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)}).paid, null);
+
+  const foreign = {...plain, tags: [...plain.tags, ['paid', 'gold']],
+    id: 'a'.repeat(64), pubkey: 'b'.repeat(64)};
+  assert.equal(parseStickyEvent(foreign).paid, null, 'a word this board does not draw is not a payment');
+  // The note itself still shows: the badge is a decoration, never a condition of being a note.
+  assert.equal(parseStickyEvent(foreign).color, 'yellow');
+});
+
   const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, anonymous: true});
   assert.deepEqual(template.tags.find(tag => tag[0] === 'anonymous'), ['anonymous', '24h-local-key']);
   const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});

@@ -85,7 +85,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' pay for one note with work. The button offers Free with POW, and pinning then finds 25 bits of'
                     + ' work on the note\'s own id — about 34 million hashes, a few minutes on a phone with the page open,'
                     + ' and nothing to pay. The work has to be on the exact note you publish, so the mining happens when'
-                    + ' you press Pin note, after you place it; a note you move afterwards has to be mined again.',
+                    + ' you press Pin note, after you place it; a note you move afterwards has to be mined again.'
+                    + ' Each note then carries a small mark in the corner of its own foot, saying how it was paid'
+                    + ' for: a hammer if it was mined, the Bitcoin mark if it was paid for with Bitcoin, and a coin'
+                    + ' if it was paid for in cash. A note published before the mark existed carries none.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
