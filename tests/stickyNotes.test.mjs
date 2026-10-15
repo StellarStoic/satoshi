@@ -38,7 +38,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
   USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
-  animatedPicture,
+  animatedPicture, isGiftAction,
 } from '../stickyNotesModel.mjs';
 import {readFileSync, existsSync} from 'node:fs';
 
@@ -2511,7 +2511,9 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(script, /beginAmberSigning\(parked\.template, parked\.context, \{copy: true\}\);[\s\S]{0,240}startAmberClipboardPoll\(\);/);
   assert.match(script, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/);
   assert.match(script, /stopAmberClipboardPoll\(\);\s+status\(elements\.amberCopyStatus, ''\);/);
-  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,200}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
+  // The completion the poll reaches is the shared one, so a note's order is checked there - after the
+  // gift route above it, which is what lets a signed reaction or zap be finished at all.
+  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,900}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
 
   // The manual step in front of the reader still exists, and it names where the signature goes.
   assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
@@ -2923,9 +2925,11 @@ test('the hand-over comes down the moment a pin succeeds, in whichever context d
   assert.match(helper, /stopAmberClipboardPoll\(\)/);
   assert.match(helper, /if \(elements\.amberDialog\.open\) elements\.amberDialog\.close\(\)/);
 
-  // Four moments know a pin succeeded, and every one of them retires the hand-over:
+  // Six moments retire it: four ways a pin is known to be done, and both gift routes - the one a live
+  // page takes and the one a reloaded page takes - because each has to take it down before opening the
+  // dialog that carries the reaction or the invoice.
   const calls = script.match(/retireAmberHandOver\(\);/g) || [];
-  assert.equal(calls.length, 4, 'the four callers, one per way a pin is known to be done');
+  assert.equal(calls.length, 6, 'the callers, one per way a pin is known to be done, plus both gift routes');
 
   // (1) the page that published it,
   const publishSignal = script.indexOf("signalStickyFlow('published', {orderId, event,");
@@ -3339,8 +3343,10 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.match(page, /openNoteGiftDialog\(sticky\.id, author\)/);
   assert.match(page, /\.board-plate, \.sticky-note__author'\)/, 'the board ignores a drag begun on the signature');
   assert.match(page, /wireNoteGiftDialog\(\);/, 'its controls are wired');
-  // A signature that comes back from a signer goes to the gift flow, not to the note flow's arm.
-  assert.match(page, /amber\.context\?\.action === 'react' \|\| amber\.context\?\.action === 'zap'/);
+  // A signature that comes back from a signer goes to the gift flow, not to the note flow's arm - named
+  // once in the model, so the boot path and the live page cannot disagree about which actions are gifts.
+  assert.match(page, /amber\.context\?\.action\)\)/, 'the boot arm asks the shared rule');
+  assert.match(page, /if \(isGiftAction\(answer\.context\?\.action\)\)/, 'and so does every path home');
   // A zap waits in storage across the hand-off, because the phone comes back to a reloaded page.
   assert.match(page, /localStorage\.setItem\(GIFT_PARK_KEY/);
   assert.match(page, /Date\.now\(\) - Number\(park\.createdAt/);
@@ -3351,6 +3357,41 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.doesNotMatch(page, /kind: 7,/, 'nor is the reaction');
   assert.match(css, /\.note-gift__reactions button \{/);
   assert.match(css, /\.note-gift__qr/);
+});
+
+test('no signature is mistaken for a note\u2019s when it is a gift\u2019s', () => {
+  assert.equal(isGiftAction('react'), true);
+  assert.equal(isGiftAction('zap'), true);
+  assert.equal(isGiftAction('pin'), false);
+  assert.equal(isGiftAction('login'), false);
+  assert.equal(isGiftAction(undefined), false, 'a note signature carries no action of this kind');
+  assert.equal(isGiftAction(null), false);
+  assert.equal(isGiftAction(''), false);
+  // "zapper" and "reaction" are not the actions: the match is exact, not a prefix.
+  assert.equal(isGiftAction('zapper'), false);
+  assert.equal(isGiftAction('Reaction'), false);
+});
+
+test('a gift signature is finished by its own flow on every path home, not just on a reload', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // Every returning signature passes through completeAmberSignature, so the gift is routed there.
+  assert.match(page, /async function completeAmberSignature\(answer\) \{[\s\S]{0,900}if \(isGiftAction\(answer\.context\?\.action\)\)/);
+  // And above the note guards, which is what used to swallow it. Compared inside the function: the
+  // order check also appears elsewhere in the file, in the flow that publishes a note.
+  const body = page.slice(page.indexOf('async function completeAmberSignature'),
+    page.indexOf('function retireAmberHandOver'));
+  assert.ok(body.indexOf('isGiftAction(answer.context?.action)') < body.indexOf('if (!pending?.orderId)'),
+    'the gift is routed before the checks that assume a note');
+  // The hand-over is retired so the reader sees the gift's own dialog, not two stacked ones.
+  assert.match(page, /retireAmberHandOver\(\);\n    await finishGiftFromSigner\(answer\);/);
+  // The boot path names the same two actions through the same rule, so the two cannot drift apart.
+  assert.match(page, /else if \(amber\?\.action === 'sign' && isGiftAction\(amber\.context\?\.action\)\)/);
+  assert.equal(/amber\.context\?\.action === 'react' \|\|/.test(page), false,
+    'the two actions are named in one place, not spelled out at each site');
+  // A tab Android reloaded has to hear about the note before it can hand over an invoice.
+  assert.match(page, /async function giftNoteRecord\(noteId, timeoutMs = 8000\)/);
+  assert.match(page, /const record = await giftNoteRecord\(noteId\);/);
+  assert.match(page, /await new Promise\(resolve => setTimeout\(resolve, 250\)\)/);
 });
 
 test('a gift is published where the reader reads, not to relays they never chose', async () => {

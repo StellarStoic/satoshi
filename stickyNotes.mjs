@@ -79,7 +79,8 @@ import {
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
-import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture} from './stickyNotesModel.mjs';
+import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
+ isGiftAction} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
@@ -4111,11 +4112,25 @@ async function sendGiftZap(sats) {
   }
 }
 
+/** The note a gift is for, waiting briefly for a board that has only just started to hear about it. */
+async function giftNoteRecord(noteId, timeoutMs = 8000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    const record = noteEvents.get(noteId);
+    if (record) return record;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  return noteEvents.get(noteId) || null;
+}
+
 /** What a signature that came back from a signer is for, and what to do with it. */
 async function finishGiftFromSigner(amber) {
   const context = amber?.context || {};
   const noteId = String(context.noteId || '');
-  const record = noteEvents.get(noteId);
+  // A page that has just loaded - which is what the reader comes back to when Android reloads the tab
+  // rather than resuming it - has to hear about the note from the relay first. Waiting briefly is the
+  // difference between handing over the invoice and claiming the note is gone.
+  const record = await giftNoteRecord(noteId);
   if (!record) {
     status(elements.boardStatus, 'That signature was for a note that is no longer on this board.', true);
     elements.boardStatus.hidden = false;
@@ -5831,10 +5846,13 @@ async function applySignerReturn() {
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
-    } else if (amber?.action === 'sign' && (amber.context?.action === 'react' || amber.context?.action === 'zap')) {
+    } else if (amber?.action === 'sign' && isGiftAction(amber.context?.action)) {
       // A reaction or a zap came back: it is not the note flow's, so it goes to its own handler
       // rather than falling through to the "that was for a different note" arm below.
       applied = true;
+      // The hand-over has nothing left to ask for once a gift is signed, and the gift's own dialog is
+      // what the reader needs: leaving both up stacks two dialogs on a phone.
+      retireAmberHandOver();
       await finishGiftFromSigner(amber);
     } else if (amber?.action === 'sign' && pending?.orderId === amber.context?.orderId) {
       applied = true;
@@ -5871,6 +5889,17 @@ async function completeAmberSignature(answer) {
   if (!answer || answer.action !== 'sign') return false;
   // The round trip is over, whichever path finished it: the background poll has nothing left to watch.
   stopAmberClipboardPoll();
+  // A reaction or a zap is signed through this same hand-over but belongs to its own flow, and it has
+  // to be routed above the note checks below. A gift signature carries no order, so those checks
+  // reported it as a signature for a different note and dropped it: the reader signed a zap, Amber
+  // closed, and the invoice never came because nothing ever asked for one.
+  if (isGiftAction(answer.context?.action)) {
+    // The hand-over has said everything it has to say, and the gift's own dialog is what the reader
+    // needs to see next.
+    retireAmberHandOver();
+    await finishGiftFromSigner(answer);
+    return true;
+  }
   // A note that is already pinned leaves nothing to finish here, and a duplicate of its own signature
   // arriving from a second path must not be announced as a signature for some other note.
   if (!pending?.orderId) {

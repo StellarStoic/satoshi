@@ -1539,6 +1539,16 @@ export const USER_RELAY_LIMIT = 3;
  * a photograph named `.gif` by a confused uploader is not. The board reads it from the path it was
  * given, which is what the note itself carries.
  */
+/**
+ * Whether a signature that came back from a signer was for a reaction or a zap.
+ *
+ * A gift is signed through the same hand-over as a note, and carries no order, so both flows have to
+ * be able to tell them apart before either can claim the answer.
+ */
+export function isGiftAction(action) {
+  return action === 'react' || action === 'zap';
+}
+
 export function animatedPicture(url) {
   return /\.gif(?:[?#]|$)/i.test(String(url || '').trim());
 }
