@@ -1360,7 +1360,9 @@ function renderQuotedPrice() {
     for (const button of elements.planPicker.querySelectorAll('[data-plan]')) {
       const plan = button.dataset.plan === 'year' ? 'year' : 'week';
       const amount = button.querySelector('b');
-      const price = stickySubscriptionPrice(plan, {member: actionInfo.member});
+      const price = stickySubscriptionPrice(plan, {offPercent: actionInfo.offPercent});
+      // A free plan shows its zero honestly here ("Week · 0 sats"); the button
+      // above says "free", which is the sentence a reader acts on.
       if (amount && Number.isInteger(price)) amount.textContent = String(price);
       button.disabled = !plansAvailable;
       button.classList.toggle('is-active', plan === subscribePlan);
@@ -2722,13 +2724,20 @@ async function buySubscriptionThen(session, notePending, statusElement) {
   if (session.method === 'anonymous') {
     throw new Error(`This temporary identity cannot hold a subscription. Post anonymously for ${STICKY_ANONYMOUS_PRICE_SATS} sats a note, or log in with your own key to use one.`);
   }
-  const member = Boolean(actionInfo.member);
   const order = await api('/orders', {
     method: 'POST',
     body: JSON.stringify({pubkey: session.pubkey, action: 'subscribe', plan: subscribePlan}),
   });
-  const sats = stickyOrderPrice(order, stickySubscriptionPrice(subscribePlan, {member}));
+  const sats = stickyOrderPrice(order, stickySubscriptionPrice(subscribePlan, {offPercent: actionInfo.offPercent}));
   savePending({...notePending, subscribeOrderId: order.id, subscribePlan, subscribeSats: sats, status: 'waiting_subscription'});
+  // A free plan (a three-character name) has nothing to pay, so there is no
+  // invoice and no dialog to pay in: the desk has already put the time on the key.
+  // Go straight to the poll that finishes whatever the reader was doing.
+  if (sats === 0 || order.freeTier === true) {
+    if (statusElement) status(statusElement, 'Your name makes this plan free — finishing what you started...');
+    pollPayment();
+    return;
+  }
   showPaymentPreparing(sats);
   const railReady = await renderPayment(order);
   if (!railReady && order.checkoutLink) location.assign(order.checkoutLink);

@@ -15,16 +15,31 @@ export const STICKY_SUB_WEEKS_PER_YEAR = 52;
 export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
 export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
 export const STICKY_ANONYMOUS_PRICE_SATS = 69;
+// D's ladder: how short a satoshi.si name is decides how much of a plan it pays.
+// Three characters post free, four pay half, five or more pay three quarters. This
+// is the board's copy of the desk's table, and `deploy/check-frontend-contract.mjs`
+// compares the two rung by rung. `maxNameLength: null` is the open-ended top tier.
+export const STICKY_MEMBER_TIERS = Object.freeze([
+  Object.freeze({ maxNameLength: 3, offPercent: 100 }),
+  Object.freeze({ maxNameLength: 4, offPercent: 50 }),
+  Object.freeze({ maxNameLength: null, offPercent: 25 }),
+]);
 
 /** All prices this service charges, so nothing else can be displayed as one. */
-export const STICKY_KNOWN_PRICES = Object.freeze([
+export const STICKY_KNOWN_PRICES = Object.freeze([...new Set([
   0,
   STICKY_ANONYMOUS_PRICE_SATS,
   STICKY_SUB_WEEK_SATS,
   STICKY_SUB_YEAR_SATS,
   STICKY_SUB_MEMBER_WEEK_SATS,
   STICKY_SUB_MEMBER_YEAR_SATS,
-]);
+  // Every tier's price for both plans. Leave one out and a member's own order is
+  // read back as the list price: 7 and 308 are as real as 5 and 205.
+  ...STICKY_MEMBER_TIERS.flatMap(tier => [
+    stickyTierPrice('week', tier.offPercent),
+    stickyTierPrice('year', tier.offPercent),
+  ]),
+])]);
 export const STICKY_MAX_CHARACTERS = 501;
 export const STICKY_COLORS = Object.freeze(['yellow', 'pink', 'blue', 'green', 'orange']);
 
@@ -812,11 +827,32 @@ export function placeSearchResults(payload, {limit = MAP_SEARCH_LIMIT} = {}) {
   }));
 }
 
-/** What a plan costs this buyer: NIP-05 members pay half. Null for no such plan. */
-export function stickySubscriptionPrice(plan, { member = false } = {}) {
-  if (plan === 'week') return member ? STICKY_SUB_MEMBER_WEEK_SATS : STICKY_SUB_WEEK_SATS;
-  if (plan === 'year') return member ? STICKY_SUB_MEMBER_YEAR_SATS : STICKY_SUB_YEAR_SATS;
-  return null;
+/** A plan's price at a discount, floored: a tier never rounds up past its own share. */
+export function stickyTierPrice(plan, offPercent) {
+  const base = plan === 'year' ? STICKY_SUB_YEAR_SATS : STICKY_SUB_WEEK_SATS;
+  const off = Number.isFinite(offPercent) ? Math.min(Math.max(offPercent, 0), 100) : 0;
+  return Math.floor(base * (100 - off) / 100);
+}
+
+/** The tier a name of this length is in, or null when there is no name. */
+export function stickyMemberTier(nameLength) {
+  if (!Number.isInteger(nameLength) || nameLength < 1) return null;
+  return STICKY_MEMBER_TIERS.find(t => t.maxNameLength === null || nameLength <= t.maxNameLength)
+    || STICKY_MEMBER_TIERS[STICKY_MEMBER_TIERS.length - 1];
+}
+
+/**
+ * What a plan costs this buyer.
+ *
+ * `offPercent` is the desk's own answer for this pubkey and wins whenever it is
+ * there. `member` alone is the older shape — half price — and is kept so the page
+ * still shows the right number against a desk that has not been updated yet.
+ * Null for a plan that does not exist.
+ */
+export function stickySubscriptionPrice(plan, { member = false, offPercent = null } = {}) {
+  if (plan !== 'week' && plan !== 'year') return null;
+  if (Number.isFinite(offPercent)) return stickyTierPrice(plan, offPercent);
+  return stickyTierPrice(plan, member ? 50 : 0);
 }
 
 export function stickyOrderPrice(value, fallback = STICKY_SUB_WEEK_SATS) {
@@ -832,6 +868,22 @@ export function stickyDay(seconds) {
 }
 
 /**
+ * Why this buyer's price is what it is, in one sentence.
+ *
+ * `offPercent` is the desk's own answer for this key, so the sentence can never
+ * claim a discount the desk will not charge.
+ */
+export function stickyDiscountSentence({ member = false, offPercent = 0 } = {}) {
+  if (!member) {
+    return 'Satoshi.si names pay less: a 3-character name posts free, 4 characters take 50% off, '
+      + '5 or more take 25% off.';
+  }
+  if (offPercent >= 100) return 'Pinstr is free for a 3-character satoshi.si name.';
+  if (offPercent === 50) return 'Your satoshi.si name takes 50% off.';
+  return `Your satoshi.si name takes ${offPercent}% off.`;
+}
+
+/**
  * What the composer's buttons say. Kept as a pure function of the desk's
  * /pinstr/v1/subscription answer so the wording can be tested without a DOM.
  *
@@ -842,13 +894,18 @@ export function stickyDay(seconds) {
 export function describeStickyAction({ anonymous = false, subscription = null, plan = 'week' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
-  const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { member });
-  const year = (Number.isInteger(prices.yearSats) ? prices.yearSats : null) ?? stickySubscriptionPrice('year', { member });
+  // The desk answers with this key's own tier. The board's ladder is only the
+  // fallback, so a name length the desk did not send cannot invent a price.
+  const offPercent = member
+    ? (Number.isFinite(prices.memberOffPercent)
+      ? prices.memberOffPercent
+      : (stickyMemberTier(prices.memberNameLength) || STICKY_MEMBER_TIERS[1]).offPercent)
+    : 0;
+  const week = (Number.isInteger(prices.weekSats) ? prices.weekSats : null) ?? stickySubscriptionPrice('week', { offPercent });
+  const year = (Number.isInteger(prices.yearSats) ? prices.yearSats : null) ?? stickySubscriptionPrice('year', { offPercent });
   const active = Boolean(subscription?.active);
   const until = stickyDay(subscription?.expiresAt);
-  const discount = member
-    ? 'Your satoshi.si NIP-05 discount is applied: 50% off.'
-    : 'Satoshi.si NIP-05 owners get 50% off.';
+  const discount = stickyDiscountSentence({ member, offPercent });
 
   if (anonymous) {
     return {
@@ -858,6 +915,7 @@ export function describeStickyAction({ anonymous = false, subscription = null, p
       price: STICKY_ANONYMOUS_PRICE_SATS,
       active: false,
       member: false,
+      offPercent: 0,
       week,
       year,
     };
@@ -871,19 +929,25 @@ export function describeStickyAction({ anonymous = false, subscription = null, p
       price: 0,
       active: true,
       member,
+      offPercent,
       week,
       year,
     };
   }
 
-  const price = stickySubscriptionPrice(plan, { member });
+  const price = stickySubscriptionPrice(plan, {offPercent});
+  const freeTier = week === 0 && year === 0;
   return {
-    label: `Subscribe & pin · ${price} sats`,
-    state: `Posting needs a subscription: ${week} sats a week or ${year} sats a year. ${discount}`,
+    // "0 sats" reads like a broken price; a free plan is free, and the desk says so.
+    label: price === 0 ? 'Subscribe & pin · free' : `Subscribe & pin · ${price} sats`,
+    state: freeTier
+      ? `${discount} Press the button and the time is yours — nothing to pay.`
+      : `Posting needs a subscription: ${week} sats a week or ${year} sats a year. ${discount}`,
     needsSubscription: true,
     price,
     active: false,
     member,
+    offPercent,
     week,
     year,
   };

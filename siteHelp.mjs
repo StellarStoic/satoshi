@@ -51,7 +51,7 @@ export const PAGE_HELP = Object.freeze({
         title: 'About Pinstr',
         description: 'Pinstr notes are small public messages signed with your Nostr identity and placed on a shared'
             + ' board. Tag people with @, choose how long a note lives, and post with a subscription: 10 sats a'
-            + ' week, or 5 with a satoshi.si name.',
+            + ' week, less with a satoshi.si name — free with a 3-character one.',
         sections: [
             {
                 label: 'In plain words',
@@ -77,8 +77,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' if you need it here for longer — and a year is the longest this board offers.',
                     'Posting is a pass rather than a payment per note: 10 sats for a week, or 411 for a year, which is'
                     + ' about 21% less than paying weekly. While the pass lasts you can pin as many notes as you like.'
-                    + ' If you own a satoshi.si name such as yourname@satoshi.si,'
-                    + ' the same pass costs half: 5 sats a week or 205 a year.',
+                    + ' A satoshi.si name makes the same pass cheaper, and how short the name is decides how much:'
+                    + ' three characters post free, four characters pay half (5 sats a week or 205 a year), and five or'
+                    + ' more pay three quarters (7 sats a week or 308 a year). The name is what was bought, and shorter'
+                    + ' names cost more to begin with — which is why three characters are the tier that pays nothing.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
@@ -156,8 +158,9 @@ export const PAGE_HELP = Object.freeze({
                     + ' board; nothing is sent anywhere and no name ever leaves the device.',
                     'A pass is a subscription record the payment service keeps against your public key: a week or a year,'
                     + ' extended rather than restarted when you renew early, covering any number of pins while'
-                    + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411; with'
-                    + ' a name, 5 × 52 = 260 → 205).',
+                    + ' it is active. The yearly price is the weekly price for 52 weeks less 21% (10 × 52 = 520 → 411),'
+                    + ' and a member price is a share of that list price, floored: half is 5 and 205, three quarters is 7'
+                    + ' and 308, and a three-character name pays nothing at all.',
                     'A pin from a key with no active pass is refused with a subscription-required answer; the board then'
                     + ' buys the pass and repeats the same action, which the second time comes back already settled at zero'
                     + ' sats along with its publish token.',

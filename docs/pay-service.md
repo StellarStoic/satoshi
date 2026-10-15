@@ -48,8 +48,8 @@ releasing the matching frontend. No previous topic marker is accepted or queried
 
 | purchase or action | named Nostr identity | verified satoshi.si NIP-05 | anonymous identity |
 | ------------------ | -------------------- | --------------------------- | ------------------ |
-| one-week subscription | 10 sats          | 5 sats                      | unavailable        |
-| one-year subscription | 411 sats         | 205 sats                    | unavailable        |
+| one-week subscription | 10 sats          | 5 / 7 / 0 sats by name length | unavailable      |
+| one-year subscription | 411 sats         | 205 / 308 / 0 sats by name length | unavailable  |
 | pin                            | included while subscribed | included while subscribed | 69 sats |
 
 The yearly price is 52 weekly periods less 21%, rounded to a whole satoshi. Prices and
@@ -57,6 +57,25 @@ membership eligibility are fixed server-side. The desk checks its authoritative 
 records using the order pubkey; it never trusts a browser claim, a submitted NIP-05 string,
 or a kind-0 profile. Renewing early extends the existing expiry instead of discarding the
 remaining time.
+
+**A name's length is the discount tier.** Holding a satoshi.si NIP-05 name makes a key a
+member, and how short that name is decides how much of the plan it pays — the name is what
+was bought, after all: three characters cost 50,000 sats, four cost 21,000, five or more cost
+5,000, so the deepest discount belongs to the dearest name.
+
+| name length | discount | week | year |
+| ----------- | -------- | ---- | ---- |
+| 3 characters | 100% (free) | 0 sats | 0 sats |
+| 4 characters | 50% | 5 sats | 205 sats |
+| 5 or more | 25% | 7 sats | 308 sats |
+| no name | — | 10 sats | 411 sats |
+
+Every tier price is a fraction of the list price, **floored**, so no tier can round up past
+its own share. A free plan has no invoice and no rail — BTCPay cannot be asked for zero
+sats — so the order is created already `paid` with `freeTier: true` and the desk grants the
+time itself in the orders route, under the same `activatedAt` guard the worker's status route
+uses. The ladder is published as `prices.memberTiers` on `/config` and `/subscription`, and
+`prices.memberOffPercent` is the tier of the key being asked about.
 
 ## GET /pinstr/v1/subscription?pubkey={64-hex-key}
 
@@ -68,10 +87,17 @@ display. A verified satoshi.si NIP-05 owner without an active subscription recei
   "active": false,
   "expiresAt": null,
   "plan": null,
-  "prices": { "weekSats": 5, "yearSats": 205, "member": true } }
+  "prices": { "weekSats": 5, "yearSats": 205, "member": true, "memberNameLength": 4,
+              "memberOffPercent": 50, "free": false,
+              "memberTiers": [ { "maxNameLength": 3, "offPercent": 100, "weekSats": 0, "yearSats": 0 },
+                                { "maxNameLength": 4, "offPercent": 50, "weekSats": 5, "yearSats": 205 },
+                                { "maxNameLength": null, "offPercent": 25, "weekSats": 7, "yearSats": 308 } ] } }
 ```
 
-An ordinary identity receives `weekSats: 10`, `yearSats: 411`, and `member: false`. An
+`memberOffPercent` is this key's own tier and `memberTiers` is the whole ladder, so a client
+can show what a shorter name would be worth. An ordinary identity receives `weekSats: 10`,
+`yearSats: 411`, `member: false` and `memberOffPercent: 0`; a three-character name receives
+zeros, `memberOffPercent: 100` and `free: true`. An
 active response sets `active: true`, supplies its Unix-seconds `expiresAt`, and identifies
 the plan. This lookup is informational; order creation checks the authoritative records
 again. Anonymous identities do not use this endpoint because subscriptions never cover
@@ -166,7 +192,8 @@ weekly or yearly subscription.
 
 The response above is a pin covered by an active subscription. It must return the publish
 token in the creation response because there is nothing to poll or settle. Subscription
-orders use 10, 411, 5, or 205 sats; an anonymous pin uses 69 sats. Those paid orders
+orders use 10, 411, 5, 205, 7 or 308 sats by tier, and a three-character name's plan is 0
+sats with `freeTier: true`; an anonymous pin uses 69 sats. Those paid orders
 keep the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails. A paid
 subscription activates the pass but has no Nostr event and therefore no publish token.
 

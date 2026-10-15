@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto, createHash} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, STICKY_MEMBER_TIERS, stickyMemberTier, stickyTierPrice, stickyDiscountSentence, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyPictureDigest, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
   boardBitmapSize,
   boardPatternScale,
@@ -171,17 +171,35 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(stickySubscriptionPrice('year', {member: true}), 205);
   assert.equal(stickySubscriptionPrice('month'), null, 'no invented plans');
 
+  // D's ladder, read off the board's own table: 3 characters free, 4 half, 5+ a quarter.
+  assert.deepEqual(STICKY_MEMBER_TIERS.map(t => [t.maxNameLength, t.offPercent]),
+    [[3, 100], [4, 50], [null, 25]]);
+  assert.equal(stickySubscriptionPrice('week', {offPercent: 100}), 0);
+  assert.equal(stickySubscriptionPrice('year', {offPercent: 100}), 0);
+  assert.equal(stickySubscriptionPrice('week', {offPercent: 25}), 7, 'floor(10 x 0.75)');
+  assert.equal(stickySubscriptionPrice('year', {offPercent: 25}), 308, 'floor(411 x 0.75)');
+  assert.equal(stickySubscriptionPrice('week', {member: true, offPercent: 25}), 7,
+    'the desk\u2019s own answer wins over the older half-price fallback');
+  assert.equal(stickyMemberTier(3).offPercent, 100);
+  assert.equal(stickyMemberTier(4).offPercent, 50);
+  assert.equal(stickyMemberTier(9).offPercent, 25, 'the top tier is open-ended');
+  assert.equal(stickyMemberTier(0), null, 'no name is not a tier');
+  assert.equal(stickyMemberTier(undefined), null);
+
   // The yearly price is the weekly one with 21% off, not a number typed twice.
   assert.equal(STICKY_SUB_YEAR_SATS,
     Math.round(STICKY_SUB_WEEK_SATS * STICKY_SUB_WEEKS_PER_YEAR * (1 - STICKY_SUB_YEAR_DISCOUNT)));
-  assert.equal(STICKY_SUB_MEMBER_YEAR_SATS,
-    Math.round(STICKY_SUB_MEMBER_WEEK_SATS * STICKY_SUB_WEEKS_PER_YEAR * (1 - STICKY_SUB_YEAR_DISCOUNT)));
+  assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, stickyTierPrice('year', 50));
 
   // Only prices this service actually quotes are displayed; anything else is not
   // a price it issued, so the board falls back rather than showing it.
   assert.equal(stickyOrderPrice({sats: 10}), 10);
   assert.equal(stickyOrderPrice({sats: 411}), 411);
   assert.equal(stickyOrderPrice({sats: 0}), 0, 'a covered note costs nothing');
+  assert.equal(stickyOrderPrice({sats: 5}), 5);
+  assert.equal(stickyOrderPrice({sats: 205}), 205);
+  assert.equal(stickyOrderPrice({sats: 7}), 7, 'the 25% tier\u2019s weekly price is a price we quote');
+  assert.equal(stickyOrderPrice({sats: 308}), 308, 'and so is its yearly one');
   assert.equal(stickyOrderPrice({sats: 69}), 69);
   assert.equal(stickyOrderPrice({sats: 42}), STICKY_SUB_WEEK_SATS, 'a retired removal price is not displayed');
   assert.equal(stickyOrderPrice({sats: 11}), STICKY_SUB_WEEK_SATS, 'the retired per-note price is not shown');
@@ -190,19 +208,40 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
 });
 
 test('the composer says what posting costs, and what a subscription changes', () => {
-  const stranger = {active: false, prices: {weekSats: 10, yearSats: 411, member: false}};
-  const member = {active: false, prices: {weekSats: 5, yearSats: 205, member: true}};
-  const covered = {active: true, expiresAt: 1800000000, plan: 'week', prices: {weekSats: 5, yearSats: 205, member: true}};
+  const stranger = {active: false, prices: {weekSats: 10, yearSats: 411, member: false, memberOffPercent: 0}};
+  const member = {active: false, prices: {weekSats: 5, yearSats: 205, member: true, memberOffPercent: 50, memberNameLength: 4}};
+  const freeName = {active: false, prices: {weekSats: 0, yearSats: 0, member: true, memberOffPercent: 100, memberNameLength: 3}};
+  const quarter = {active: false, prices: {weekSats: 7, yearSats: 308, member: true, memberOffPercent: 25, memberNameLength: 9}};
+  const covered = {active: true, expiresAt: 1800000000, plan: 'week', prices: {weekSats: 5, yearSats: 205, member: true, memberOffPercent: 50}};
 
   const off = describeStickyAction({subscription: stranger});
   assert.equal(off.needsSubscription, true);
   assert.equal(off.label, 'Subscribe & pin · 10 sats');
   assert.match(off.state, /10 sats a week or 411 sats a year/);
-  assert.match(off.state, /NIP-05 owners get 50% off/);
+  assert.match(off.state, /3-character name posts free, 4 characters take 50% off, 5 or more take 25% off/);
 
   const half = describeStickyAction({subscription: member, plan: 'year'});
   assert.equal(half.label, 'Subscribe & pin · 205 sats');
-  assert.match(half.state, /NIP-05 discount is applied: 50% off/);
+  assert.match(half.state, /Your satoshi\.si name takes 50% off/);
+
+  // A three-character name pays nothing, and the board must say so rather than
+  // offering a plan at "0 sats a week or 0 sats a year".
+  const free = describeStickyAction({subscription: freeName});
+  assert.equal(free.label, 'Subscribe & pin · free');
+  assert.equal(free.price, 0);
+  assert.match(free.state, /Pinstr is free for a 3-character satoshi\.si name/);
+  assert.match(free.state, /nothing to pay/);
+  assert.doesNotMatch(free.state, /0 sats a week/);
+
+  const quarterOff = describeStickyAction({subscription: quarter, plan: 'year'});
+  assert.equal(quarterOff.label, 'Subscribe & pin · 308 sats');
+  assert.match(quarterOff.state, /takes 25% off/);
+
+  // The sentence itself: each tier says its own share, and a stranger is told the ladder.
+  assert.equal(stickyDiscountSentence({member: true, offPercent: 100}), 'Pinstr is free for a 3-character satoshi.si name.');
+  assert.equal(stickyDiscountSentence({member: true, offPercent: 50}), 'Your satoshi.si name takes 50% off.');
+  assert.equal(stickyDiscountSentence({member: true, offPercent: 25}), 'Your satoshi.si name takes 25% off.');
+  assert.match(stickyDiscountSentence({member: false}), /3-character name posts free/);
 
   const on = describeStickyAction({subscription: covered});
   assert.equal(on.needsSubscription, false);
