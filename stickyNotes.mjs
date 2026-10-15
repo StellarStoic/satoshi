@@ -237,6 +237,8 @@ const elements = {
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
+  notePaidBadge: document.getElementById('notePaidBadge'), notePaidBadgeIcon: document.getElementById('notePaidBadgeIcon'),
+  notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
   noteMenuStatus: document.getElementById('noteMenuStatus'),
 };
 
@@ -2388,22 +2390,6 @@ function renderNote(sticky, event = null, temporary = false) {
     author.className = 'sticky-note__author';
     labelNoteAuthor(author, sticky);
     note.appendChild(author);
-    // How this note was paid for, in the foot's other corner: the signature on the right is
-    // the writer's, this on the left is the reader's. It is drawn from the note's own tag,
-    // never from anything this browser remembers, and a word the board does not know draws
-    // nothing at all rather than a payment that was never made.
-    const badge = stickyPaymentBadge(sticky.paid);
-    if (badge) {
-      const paid = document.createElement('span');
-      paid.className = `sticky-note__paid sticky-note__paid--${badge.id}`;
-      paid.title = badge.title;
-      paid.setAttribute('aria-label', badge.title);
-      const icon = document.createElement('i');
-      icon.className = `lni ${badge.icon}`;
-      icon.setAttribute('aria-hidden', 'true');
-      paid.appendChild(icon);
-      note.appendChild(paid);
-    }
   }
   noteAtPlacement(note, sticky);
   const nextNewer = [...elements.canvas.querySelectorAll('.sticky-note:not(.sticky-note--placing)')]
@@ -3680,6 +3666,16 @@ function openNoteMenu(eventId, pin) {
   if (!record) return;
   selectedNoteId = eventId;
   elements.noteEventId.textContent = eventId;
+  // How this note was paid for, in the row under its event id. The mark used to be drawn in the
+  // note's own foot, where a glyph was all that fitted; here there is room for the word too. A
+  // note that says nothing — as every note published before the mark existed does — shows no row.
+  const badge = stickyPaymentBadge(record.sticky?.paid);
+  elements.notePaidBadge.hidden = !badge;
+  if (badge) {
+    elements.notePaidBadgeIcon.className = `lni ${badge.icon}`;
+    elements.notePaidBadgeLabel.textContent = badge.label;
+    elements.notePaidBadge.title = badge.title;
+  }
   elements.noteEventJsonDetails.open = false;
   elements.noteEventJson.textContent = JSON.stringify(record.event, null, 2);
   elements.notePostedAt.dateTime = new Date(record.event.created_at * 1000).toISOString();
@@ -3719,6 +3715,35 @@ async function copySelectedNoteId() {
     setTimeout(() => { elements.copyNoteId.querySelector('span').textContent = 'Copy ID'; }, 1800);
   } catch {
     status(elements.noteMenuStatus, 'Could not copy the event ID.', true);
+  }
+}
+
+/**
+ * Copy the note's own event, pretty-printed, exactly as the panel shows it.
+ *
+ * Read back out of the record rather than out of the panel's text node, so what lands on the
+ * clipboard is the event and not whatever a stylesheet or a selection did to the page.
+ */
+async function copySelectedNoteJson() {
+  const record = noteEvents.get(selectedNoteId);
+  if (!record) return;
+  const json = JSON.stringify(record.event, null, 2);
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(json);
+    else {
+      const field = document.createElement('textarea');
+      field.value = json;
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      if (!document.execCommand('copy')) throw new Error('Copy failed');
+      field.remove();
+    }
+    elements.copyNoteJson.querySelector('span').textContent = 'JSON copied';
+    setTimeout(() => { elements.copyNoteJson.querySelector('span').textContent = 'Copy JSON'; }, 1800);
+  } catch {
+    status(elements.noteMenuStatus, 'Could not copy the event JSON.', true);
   }
 }
 
@@ -5084,6 +5109,7 @@ elements.discardCancel.addEventListener('click', () => keepDiscardedNote());
 // Closing with the X or Escape is a no: put the note back where the drag started.
 elements.discardDialog.addEventListener('close', () => { if (discardRestore) keepDiscardedNote(); });
 elements.copyNoteId.addEventListener('click', copySelectedNoteId);
+elements.copyNoteJson.addEventListener('click', copySelectedNoteJson);
 document.getElementById('closeNoteMenu').addEventListener('click', closeNoteMenu);
 elements.noteEventJsonDetails.addEventListener('toggle', () => requestAnimationFrame(keepNoteMenuOnScreen));
 document.addEventListener('pointerdown', event => {

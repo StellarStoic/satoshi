@@ -3288,3 +3288,29 @@ test('the toggle, its layer and its styles are all in the files the board serves
   assert.match(page, /BURIED_PINS_KEY = 'satoshi:sticky:buried-pins:v1'/);
   assert.match(page, /localStorage\.getItem\(BURIED_PINS_KEY\) === '1'/, 'off until it is switched on');
 });
+
+test('the note details say how the note was paid for, and can copy its own JSON', async () => {
+  const [html, css, page] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  // The row sits below the event id, and the id keeps its own copy button directly under it.
+  const id = html.indexOf('id="noteEventId"');
+  const copyId = html.indexOf('id="copyNoteId"');
+  const badge = html.indexOf('id="notePaidBadge"');
+  assert.ok(id >= 0 && copyId > id && badge > copyId, 'the mark is below the event id');
+  assert.match(html, /id="notePaidBadge"[^>]*hidden/, 'a note that says nothing shows no row there');
+  assert.match(html, /id="notePaidBadgeIcon"[^>]*class="lni/);
+  assert.match(html, /id="notePaidBadgeLabel"/);
+  // The copy button is inside the expanded JSON, under the JSON it copies.
+  const details = html.match(/<details id="noteEventJsonDetails"[\s\S]*?<\/details>/)[0];
+  assert.ok(details.indexOf('id="noteEventJson"') < details.indexOf('id="copyNoteJson"'), 'below the JSON');
+  // It copies the record's own event, not the panel's text, and says so the way the id button does.
+  assert.match(page, /elements\.notePaidBadge\.hidden = !badge/);
+  assert.match(page, /await navigator\.clipboard\.writeText\(json\)/, 'it copies the event it built');
+  assert.match(page, /elements\.copyNoteJson\.addEventListener\('click', copySelectedNoteJson\)/);
+  // And the mark has left the note's own paper: no class, no rule.
+  assert.doesNotMatch(css, /sticky-note__paid/);
+  assert.doesNotMatch(page, /sticky-note__paid/);
+});

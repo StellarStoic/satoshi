@@ -126,16 +126,13 @@
 .sticky-note__text { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: hidden; text-align: center; }
 .sticky-note__pin { position: absolute; top: -36px; left: var(--pin-left, 50%); z-index: 3; width: 40px; height: 40px; translate: -50% 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; cursor: pointer; }
 .sticky-note__pin-art { position: absolute; top: 0; left: -4px; width: 48px; max-width: none; height: auto; pointer-events: none; }
-/* The other corner of the note's foot: how it was paid for, facing the writer's own
-   signature. Small and quiet — it is a fact about the note, not a label on it — and it takes
-   the note's ink colour rather than a brand colour, so it sits on the paper instead of on
-   top of it. */
-.sticky-note__paid { position: absolute; left: 10px; bottom: 7px; z-index: 2; display: inline-flex; align-items: center; color: rgba(38,35,30,.5); font-size: .78rem; line-height: 1; }
-.sticky-note__paid i { font-size: .78rem; line-height: 1; }
-.sticky-note__paid--bitcoin { color: rgba(146,86,10,.72); }
-.sticky-note__paid--pow { color: rgba(38,35,30,.58); }
-.sticky-note__paid--cash { color: rgba(28,88,54,.7); }
-.sticky-note--print .sticky-note__paid { bottom: 9px; }
+/* How a note was paid for, in the details panel under its event id — where the mark began, in
+   the note's own foot, it had room for a glyph and none for the word beside it. One row, the
+   icon in the accent and the word in the panel's own ink. */
+.note-menu__paid { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: #ddd; font-size: .78rem; }
+.note-menu__paid[hidden] { display: none; }
+.note-menu__paid i { color: var(--accent, #f2a900); font-size: .95rem; }
+.note-event-json .secondary-action { margin-top: 9px; }
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
 .sticky-note--placing:active { cursor: grabbing; }
@@ -406,8 +403,7 @@
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) { opacity:.16; filter:grayscale(.65); cursor:progress; user-select:none; }
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed)::before,
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__text,
-.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__author,
-.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__paid { opacity:0; }
+.sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__author { opacity:0; }
 .sticky-note.sticky-note--filtered-out:not(.sticky-note--filter-revealed) .sticky-note__pin { display:none; }
 /* The pins of notes other notes have covered. A layer of its own, over every note, because a
    pin inside a transformed note can never be lifted out of it; only the pins in here take the

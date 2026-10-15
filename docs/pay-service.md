@@ -526,10 +526,12 @@ the first write that uses that registration.
 
 ## How a note says it was paid for
 
-Every note's own foot carries a small mark in the corner, across from the writer's signature,
-saying how that note was paid for: a hammer if it was mined, the Bitcoin mark if it was paid
-for with Bitcoin, a coin if it was paid for in cash. A note published before the mark existed
-carries none, and so do notes published by a board that predates it.
+A note's details say how it was paid for, in a row under its event id: a hammer if it was
+mined, the Bitcoin mark if it was paid for with Bitcoin, a coin if it was paid for in cash. A
+note published before the mark existed shows nothing there, and neither does a note published
+by a board that predates it. The mark began in the note's own foot and moved into the panel,
+where there is room for the word beside the glyph; the panel also carries the whole event as
+JSON, with a button under it that copies that event to the clipboard.
 
 The word is the **desk's**, not the board's. The desk is the only side that knows what an
 order actually cost, so it decides the badge in `paymentBadge(order)` in `src/sticky.mjs`,
