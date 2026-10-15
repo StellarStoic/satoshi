@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v292';   // v292: a reader can add up to three relays of their own, with live lamps
+const CACHE = 'satoshi-static-v293';   // v293: moving pictures can be stopped, and the pinstr page wears a pin
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',

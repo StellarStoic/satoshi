@@ -79,7 +79,7 @@ import {
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
-import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay} from './stickyNotesModel.mjs';
+import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
@@ -160,7 +160,7 @@ const elements = {
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
   rememberBoard: document.getElementById('rememberStickyBoard'),
-  buriedPins: document.getElementById('buriedPins'),
+  buriedPins: document.getElementById('buriedPins'), gifPlay: document.getElementById('gifPlay'),
   openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
   closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
   geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
@@ -1976,6 +1976,66 @@ function renderBoardTextures() {
   }
 }
 
+/* -------------------------------------------------------------------- moving pictures ---- */
+
+/**
+ * Whether the animated pictures on the board are playing.
+ *
+ * On unless the reader turned them off, which is why the stored value is the *off* marker: a
+ * preference that defaults to on must be absent when nobody has chosen, or every reader who never
+ * opened the settings would get whatever the default happened to be written as.
+ */
+const GIF_PLAY_KEY = 'satoshi:sticky:gif-play:v1';
+
+let gifPlay = localStorage.getItem(GIF_PLAY_KEY) !== '0';
+
+/**
+ * Freeze one animated picture, holding the frame that was on screen.
+ *
+ * A GIF cannot be paused with a style, so the picture is replaced by a canvas of the frame it was
+ * showing. The address it came from is kept on the canvas, which is what lets the picture be put
+ * back exactly as it was: same class, so the same size and filter, and the same artwork.
+ */
+function freezePicture(image) {
+  if (!image || image.dataset.gifSource || !animatedPicture(image.src)) return;
+  if (!image.complete || !image.naturalWidth) {
+    image.addEventListener('load', () => { if (!gifPlay) freezePicture(image); }, {once: true});
+    return;
+  }
+  const frame = document.createElement('canvas');
+  frame.className = image.className;
+  frame.width = image.naturalWidth;
+  frame.height = image.naturalHeight;
+  frame.dataset.gifSource = image.src;
+  frame.setAttribute('role', 'img');
+  frame.setAttribute('aria-label', image.alt || 'A picture pinned on this board');
+  try { frame.getContext('2d').drawImage(image, 0, 0); } catch { return; }
+  image.replaceWith(frame);
+}
+
+/** Put a frozen picture back, playing again. */
+function releasePicture(frame) {
+  const image = document.createElement('img');
+  image.className = frame.className;
+  image.decoding = 'async';
+  image.src = frame.dataset.gifSource;
+  image.alt = frame.getAttribute('aria-label') || '';
+  frame.replaceWith(image);
+}
+
+/**
+ * Apply the reader's choice to the board - to everything drawn already, and to each note as it is
+ * drawn, so a board that arrives after the switch is still held still.
+ */
+function applyGifPlay(root = elements.canvas) {
+  if (!root) return;
+  if (gifPlay) {
+    root.querySelectorAll('canvas.sticky-note__print-image[data-gif-source]').forEach(releasePicture);
+    return;
+  }
+  root.querySelectorAll('img.sticky-note__print-image').forEach(freezePicture);
+}
+
 /* ------------------------------------------------------------------------- your relays ---- */
 
 /**
@@ -2508,6 +2568,9 @@ function renderNote(sticky, event = null, temporary = false) {
     photo.src = picture;
     print.append(photo);
     note.appendChild(print);
+    // A reader who turned the moving pictures off gets every note held still, including the ones
+    // that arrive after the switch.
+    if (!gifPlay) applyGifPlay(note);
   } else {
     note.appendChild(text);
   }
@@ -5017,6 +5080,7 @@ function refreshNoteSortControls() {
   elements.followsOnlyRow.hidden = !named;
   elements.followsOnly.checked = followsOnlyPreference;
   elements.buriedPins.checked = showBuriedPins;
+  elements.gifPlay.checked = gifPlay;
   if (named && followsOnlyPreference) loadFollowList(named).catch(() => {
     status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
   });
@@ -5045,6 +5109,11 @@ elements.followsOnly.addEventListener('change', () => {
     status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
   });
   applyNoteFilters();
+});
+elements.gifPlay.addEventListener('change', () => {
+  gifPlay = elements.gifPlay.checked;
+  try { localStorage.setItem(GIF_PLAY_KEY, gifPlay ? '1' : '0'); } catch {}
+  applyGifPlay();
 });
 elements.buriedPins.addEventListener('change', () => {
   showBuriedPins = elements.buriedPins.checked;

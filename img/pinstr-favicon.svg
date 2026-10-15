@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Pinstr">
+  <!-- A pushpin: what a note is held up with. Drawn bold and few, because a favicon is read at
+       16 pixels and anything finer than this is a smudge there. -->
+  <g transform="rotate(-32 56 40)">
+    <ellipse cx="56" cy="40" rx="23" ry="15.5" fill="#e23b2e"/>
+    <ellipse cx="56" cy="36.5" rx="20" ry="11" fill="#f2564a"/>
+    <ellipse cx="49" cy="33" rx="7" ry="4" fill="#ff8f85" opacity=".85"/>
+    <ellipse cx="56" cy="40" rx="23" ry="15.5" fill="none" stroke="#8f1f16" stroke-width="2.5"/>
+  </g>
+  <g transform="rotate(-32 56 40)">
+    <rect x="51" y="50" width="10" height="9" rx="3" fill="#8a8f92"/>
+  </g>
+  <path d="M53 57 L24 86 L21 90 L25 87 L54 58 Z" fill="#6d7275"/>
+  <path d="M52 58 L25 88" stroke="#4a4f52" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#101112">
   <meta name="description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.">
   <title>Pinstr | Satoshi.si</title>
-  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="icon" href="/img/pinstr-favicon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/pinstr-favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/pinstr-favicon-180.png">
   <link rel="manifest" href="/site.webmanifest">
   <link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
@@ -71,6 +73,11 @@
       <label id="followsOnlyRow" class="note-filter-toggle" for="followsOnly">
         <span><strong>Notes from my follows</strong><small>Always show notes only from people you follow.</small></span>
         <input id="followsOnly" type="checkbox" role="switch">
+        <span class="note-filter-toggle__track" aria-hidden="true"></span>
+      </label>
+      <label class="note-filter-toggle" for="gifPlay">
+        <span><strong>Play GIFs</strong><small>Animated pictures loop while this is on. Turned off, each one holds the frame it was on when you switched — a board of moving pictures is hard on a phone's battery.</small></span>
+        <input id="gifPlay" type="checkbox" role="switch">
         <span class="note-filter-toggle__track" aria-hidden="true"></span>
       </label>
       <label class="note-filter-toggle" for="buriedPins">

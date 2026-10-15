@@ -1533,6 +1533,17 @@ export const PINSTR_SHARE_ORIGIN = 'https://pinstr.si';
 export const USER_RELAY_LIMIT = 3;
 
 /**
+ * Whether a picture is one that moves.
+ *
+ * Only the address knows: a GIF served as `image/jpeg` or behind a query string is still a GIF, and
+ * a photograph named `.gif` by a confused uploader is not. The board reads it from the path it was
+ * given, which is what the note itself carries.
+ */
+export function animatedPicture(url) {
+  return /\.gif(?:[?#]|$)/i.test(String(url || '').trim());
+}
+
+/**
  * The lamps a relay's answer is read as, from quickest to slowest.
  *
  * A relay has no ping of its own, so what is measured is how long the socket took to open. That is

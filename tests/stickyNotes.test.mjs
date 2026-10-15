@@ -38,7 +38,9 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
   USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
+  animatedPicture,
 } from '../stickyNotesModel.mjs';
+import {readFileSync, existsSync} from 'node:fs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
 
@@ -3399,6 +3401,79 @@ test('the lamp says how the relay answered, and says so when it did not', () => 
   assert.equal(relayHostLabel('wss://relay.example.com/path'), 'relay.example.com');
   assert.deepEqual(removeUserRelay(['wss://a.com', 'wss://b.com'], 'wss://a.com'), ['wss://b.com']);
   assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
+});
+
+test('only a picture that moves is treated as one', () => {
+  assert.equal(animatedPicture('https://satoshi.si/i/abc.gif'), true);
+  assert.equal(animatedPicture('https://satoshi.si/i/abc.GIF'), true, 'the case of the address is not the reader\u2019s business');
+  assert.equal(animatedPicture('/i/abc.gif?grade=sepia'), true);
+  assert.equal(animatedPicture('/i/abc.gif#top'), true);
+  assert.equal(animatedPicture('  /i/abc.gif  '), true);
+  assert.equal(animatedPicture('/i/abc.gifx'), false, 'a name that merely contains gif is not a GIF');
+  assert.equal(animatedPicture('/i/abc.png'), false);
+  assert.equal(animatedPicture('/i/abc'), false);
+  assert.equal(animatedPicture(''), false);
+  assert.equal(animatedPicture(null), false);
+  assert.equal(animatedPicture(undefined), false);
+});
+
+test('the board plays moving pictures unless the reader stops them', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // On by default: the stored value is the off marker, so never having chosen means playing.
+  assert.match(page, /localStorage\.getItem\(GIF_PLAY_KEY\) !== '0'/);
+  assert.equal(/localStorage\.getItem\(GIF_PLAY_KEY\) === '1'/.test(page), false,
+    'a default of on must not be stored as the default');
+  // The switch shows that state when the board opens.
+  assert.match(page, /elements\.gifPlay\.checked = gifPlay;/);
+  assert.match(page, /gifPlay: document\.getElementById\('gifPlay'\)/);
+  // A GIF cannot be paused by a style, so a stopped one is a canvas holding its frame.
+  assert.match(page, /function freezePicture\(image\)/);
+  assert.match(page, /document\.createElement\('canvas'\)/);
+  assert.match(page, /frame\.dataset\.gifSource = image\.src/);
+  assert.match(page, /getContext\('2d'\)\.drawImage\(image, 0, 0\)/);
+  assert.match(page, /function releasePicture\(frame\)/);
+  assert.match(page, /image\.src = frame\.dataset\.gifSource/);
+  // Only moving pictures are touched, and a picture not yet loaded waits rather than freezing blank.
+  assert.match(page, /frozen\.\w*|animatedPicture\(image\.src\)/);
+  assert.match(page, /if \(!image\.complete \|\| !image\.naturalWidth\)/);
+  // Switching it off holds the board still at once, and switching it on lets it move again.
+  assert.match(page, /elements\.gifPlay\.addEventListener\('change', \(\) => \{/);
+  assert.match(page, /localStorage\.setItem\(GIF_PLAY_KEY, gifPlay \? '1' : '0'\)/);
+  assert.match(page, /applyGifPlay\(\);/);
+  // A note drawn after the switch is held still too.
+  assert.match(page, /if \(!gifPlay\) applyGifPlay\(note\);/);
+});
+
+test('a note\u2019s picture and the pin it is held by survive being frozen', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  // The frozen picture keeps the class, so it keeps the size and the grade filter it had.
+  assert.match(page, /frame\.className = image\.className;/);
+  assert.match(page, /image\.className = frame\.className;/);
+  // The pin, the signature and the note itself are untouched: only the image element is swapped.
+  assert.match(page, /image\.replaceWith\(frame\);/);
+  assert.match(page, /frame\.replaceWith\(image\);/);
+  assert.match(css, /\.sticky-note__print-image\b/, 'the class the freeze relies on still exists');
+});
+
+test('the pinstr page wears a pin instead of the site\u2019s own mark', async () => {
+  const html = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  // The page carries its own icons, ahead of anything the site sets, so the pin wins.
+  assert.match(html, /<link rel="icon" href="\/img\/pinstr-favicon\.svg" type="image\/svg\+xml">/);
+  assert.match(html, /<link rel="icon" type="image\/png" sizes="32x32" href="\/img\/pinstr-favicon-32\.png">/);
+  assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/img\/pinstr-favicon-180\.png">/);
+  assert.equal(html.includes('<link rel="icon" href="/favicon-32x32.png">'), false,
+    'the site\u2019s own mark is no longer what this page offers');
+  // And the files are real, not references to things nobody drew.
+  const svg = readFileSync(new URL('../img/pinstr-favicon.svg', import.meta.url), 'utf8');
+  assert.match(svg, /<svg[\s\S]*viewBox="0 0 100 100"/);
+  for (const size of [32, 180]) {
+    const file = new URL(`../img/pinstr-favicon-${size}.png`, import.meta.url);
+    assert.ok(existsSync(file), `${size}px icon exists`);
+    const bytes = readFileSync(file);
+    assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${size}px is a PNG`);
+    assert.equal(bytes.readUInt32BE(16), size, `${size}px is actually ${size} pixels wide`);
+  }
 });
 
 test('the settings let a reader add three relays, and show them as lamps with milliseconds', async () => {
