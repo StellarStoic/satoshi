@@ -1202,6 +1202,47 @@ export function makeStickyTemplate({content, color, font = 'typewriter', x, y, r
 }
 
 /**
+ * The pins that are buried under other notes.
+ *
+ * A board piles notes up, so a note can end up with its paper behind a later one and its pin —
+ * the only way into it — behind that pin too. This decides which notes are in that state from
+ * geometry alone, so it can be checked without a browser: each note is passed its own box in
+ * board coordinates and the order the board draws them in, and a note counts as covered when
+ * the notes drawn after it (so, on top) hide at least `share` of it.
+ *
+ * The overlaps are summed pairwise and so may count one spot twice when two notes share it.
+ * That is deliberate: a spot under two notes is more covered, not less, and this answers
+ * whether a way in is needed rather than measuring paper. The boxes the page passes are the
+ * notes' unrotated footprints — a rotation is not worth trigonometry here, because the answer
+ * only decides which pins get a stand-in.
+ */
+export const PIN_COVERED_SHARE = 0.2;
+
+/** How long one note stays in front after its pin is used, in milliseconds. */
+export const PIN_RAISE_MS = 21000;
+
+/** The ids of the notes hidden enough by the notes above them to need a reachable pin. */
+export function coveredPinNotes(notes, {share = PIN_COVERED_SHARE} = {}) {
+  const boxes = (notes || []).map((note, index) => ({id: note?.id || '', index, box: note?.box}))
+    .filter(entry => entry.id && entry.box
+      && ['left', 'top', 'width', 'height'].every(key => Number.isFinite(entry.box[key]))
+      && entry.box.width > 0 && entry.box.height > 0);
+  return boxes.filter(note => {
+    const area = note.box.width * note.box.height;
+    const hidden = boxes.reduce((sum, other) => (other.index > note.index
+      ? sum + overlapArea(note.box, other.box) : sum), 0);
+    return hidden >= area * share;
+  }).map(note => note.id);
+}
+
+/** The area two boxes share, or zero when they do not meet. */
+function overlapArea(a, b) {
+  const width = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
+  const height = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
+/**
  * How a note was paid for, as the badge its own foot carries.
  *
  * The desk decides this word, not the board: the desk is the only side that knows what an

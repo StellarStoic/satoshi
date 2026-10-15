@@ -79,7 +79,7 @@ import {
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
-import {stickyPaymentBadge} from './stickyNotesModel.mjs';
+import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS} from './stickyNotesModel.mjs';
 import {
   beginAmberLogin,
   adoptAmberClipboard,
@@ -121,6 +121,9 @@ const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 const BOARD_CELLS_KEY = 'satoshi:sticky:geohash-cells:v1';
 const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
 const BOARD_REMEMBER_KEY = 'satoshi:sticky:remember-geohash:v1';
+// Off by default: the board looks as it always has until the reader asks for the pins of notes
+// that other notes have covered.
+const BURIED_PINS_KEY = 'satoshi:sticky:buried-pins:v1';
 // A place the reader keeps: one cell, opened on every visit, until they unlock it.
 const LOCKED_PLACE_KEY = 'satoshi:sticky:locked-place:v1';
 // Places the reader named themselves: a name and the cells it stands for, in this browser.
@@ -151,6 +154,7 @@ const elements = {
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
   rememberBoard: document.getElementById('rememberStickyBoard'),
+  buriedPins: document.getElementById('buriedPins'),
   openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
   closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
   geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
@@ -371,6 +375,7 @@ if (cardMode) {
 }
 let lockedCells = geohashCellsFrom(localStorage.getItem(LOCKED_PLACE_KEY));
 let rememberBoard = localStorage.getItem(BOARD_REMEMBER_KEY) !== 'false';
+let showBuriedPins = localStorage.getItem(BURIED_PINS_KEY) === '1';
 // A link somebody was sent wins, then the place they locked, then the board they last
 // had open: the lock is their own habit and a link is somebody else pointing.
 let activeGeohashes = linkedCells.length
@@ -2176,6 +2181,140 @@ function installFilteredNoteLongPress(note, id) {
   note.addEventListener('pointercancel', cancel);
 }
 
+// ---- pins for the notes that other notes have covered
+let buriedPinLayerElement = null;
+let buriedPinFrame = 0;
+let raisedNoteId = '';
+let raisedNoteTimer = null;
+let raisedNoteLayer = 460;
+
+/**
+ * One layer for every pin that cannot be reached, laid over the whole canvas.
+ *
+ * A note's pin lives inside the note, and a note is transformed — which makes it a stacking
+ * context — so no pin can be raised out of the note that covers it from the inside. The buried
+ * notes' pins are therefore drawn again in a layer of their own, above every note, each one a
+ * stand-in for its note: the same box, the same transform, the same pin, and nothing else.
+ */
+function buriedPinLayer() {
+  if (!buriedPinLayerElement || !buriedPinLayerElement.isConnected) {
+    buriedPinLayerElement = document.createElement('div');
+    buriedPinLayerElement.className = 'board-pin-layer';
+    elements.canvas.appendChild(buriedPinLayerElement);
+  }
+  return buriedPinLayerElement;
+}
+
+/** The notes the board is drawing, in the order it draws them: later ones lie on top. */
+function drawnNotes() {
+  return [...elements.canvas.querySelectorAll('.sticky-note')]
+    .filter(element => !element.classList.contains('sticky-note--placing')
+      && !element.classList.contains('draft-note'));
+}
+
+function drawBuriedPins() {
+  buriedPinFrame = 0;
+  const layer = buriedPinLayer();
+  layer.replaceChildren();
+  if (!showBuriedPins) return;
+  const ids = new Map();
+  noteEvents.forEach((record, id) => { if (record.element) ids.set(record.element, id); });
+  const notes = drawnNotes().map(element => ({
+    id: ids.get(element),
+    box: {left: element.offsetLeft, top: element.offsetTop,
+      width: element.offsetWidth, height: element.offsetHeight},
+  }));
+  for (const id of coveredPinNotes(notes)) {
+    // The note already in front needs no way in: its own pin is reachable where it stands. A
+    // note the filter is hiding is skipped too — it has no pin to reach at all.
+    if (id === raisedNoteId) continue;
+    const record = noteEvents.get(id);
+    if (record?.element?.classList.contains('sticky-note--filtered-out')) continue;
+    if (record?.element?.isConnected) layer.appendChild(buriedPinProxy(record));
+  }
+}
+
+/**
+ * Coalesce the redraws. One board pass renders many notes, and each rendered note would
+ * otherwise walk every other note; a frame's wait costs nothing and a reader cannot see it.
+ */
+function scheduleBuriedPins() {
+  if (!showBuriedPins) {
+    if (buriedPinFrame) { cancelAnimationFrame(buriedPinFrame); buriedPinFrame = 0; }
+    buriedPinLayerElement?.replaceChildren();
+    return;
+  }
+  if (buriedPinFrame) return;
+  buriedPinFrame = requestAnimationFrame(drawBuriedPins);
+}
+
+function buriedPinProxy(record) {
+  const note = record.element;
+  const style = getComputedStyle(note);
+  const proxy = document.createElement('div');
+  proxy.className = 'board-pin-layer__note';
+  proxy.style.left = `${note.offsetLeft}px`;
+  proxy.style.top = `${note.offsetTop}px`;
+  proxy.style.width = `${note.offsetWidth}px`;
+  proxy.style.height = `${note.offsetHeight}px`;
+  // The note's own resolved transform and origin, so the stand-in stands exactly where the
+  // note stands: the same tilt about the same centre, which is what puts the pin where the
+  // reader can see the note's pin poking out from under the pile.
+  proxy.style.transform = style.transform;
+  proxy.style.transformOrigin = style.transformOrigin;
+  const ownPin = note.querySelector('.sticky-note__pin');
+  const ownArt = note.querySelector('.sticky-note__pin-art');
+  const pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = 'sticky-note__pin';
+  pin.setAttribute('aria-label', 'Open this note\u2019s details and bring it to the front');
+  pin.style.setProperty('--pin-left', ownPin?.style.getPropertyValue('--pin-left') || '50%');
+  if (ownArt) {
+    const art = document.createElement('img');
+    art.className = 'sticky-note__pin-art';
+    art.alt = '';
+    art.decoding = 'async';
+    art.src = ownArt.getAttribute('src');
+    pin.appendChild(art);
+  }
+  // The details open exactly as a pin has always opened them, and the note comes up over the
+  // pile behind them: details of a note the reader still cannot read are of no use.
+  pin.addEventListener('click', click => {
+    click.stopPropagation();
+    openNoteMenu(record.sticky.id, pin);
+    raiseNote(record.sticky.id);
+  });
+  proxy.appendChild(pin);
+  return proxy;
+}
+
+/**
+ * Lift one note over the others for `PIN_RAISE_MS`, then put it back where it belongs.
+ *
+ * The lift is an inline z-index, which the board otherwise never sets — notes are laid out in
+ * the order they were written and the browser stacks them in that order. The value climbs with
+ * each lift so a second note comes up over the first, and stays clear of the two layers the
+ * board does use: a revealed filtered note (490) and one being placed (500).
+ */
+function raiseNote(id) {
+  clearTimeout(raisedNoteTimer);
+  const previous = raisedNoteId && raisedNoteId !== id ? noteEvents.get(raisedNoteId)?.element : null;
+  if (previous) { previous.classList.remove('sticky-note--raised'); previous.style.zIndex = ''; }
+  const element = noteEvents.get(id)?.element;
+  if (!element) { raisedNoteId = ''; return; }
+  raisedNoteLayer = raisedNoteLayer >= 480 ? 460 : raisedNoteLayer + 2;
+  element.style.zIndex = String(raisedNoteLayer);
+  element.classList.add('sticky-note--raised');
+  raisedNoteId = id;
+  scheduleBuriedPins();
+  raisedNoteTimer = setTimeout(() => {
+    element.classList.remove('sticky-note--raised');
+    element.style.zIndex = '';
+    raisedNoteId = '';
+    scheduleBuriedPins();
+  }, PIN_RAISE_MS);
+}
+
 function renderNote(sticky, event = null, temporary = false) {
   // An expired note is never drawn, whatever path asked for it: the relay should not send
   // one, but a stored flow or a note that crossed its moment between the send and this line
@@ -2281,6 +2420,7 @@ function renderNote(sticky, event = null, temporary = false) {
   if (!temporary && event) noteEvents.set(sticky.id, {event, sticky, element: note});
   // Limits such as "last 5" must be recalculated whenever a newer note arrives.
   if (!temporary) applyNoteFilters();
+  if (!temporary) scheduleBuriedPins();
   return note;
 }
 
@@ -4328,6 +4468,7 @@ function applyNoteFilters() {
     {view: noteView, pubkey: session?.pubkey, followsOnly: followsActive, follows: followedPubkeys},
   ));
   noteEvents.forEach((record, id) => record.element.classList.toggle('sticky-note--filtered-out', !visible.has(id)));
+  scheduleBuriedPins();
   const filtered = noteView !== 'all' || Boolean(followsOnlyPreference && named);
   elements.noteSort.classList.toggle('has-active-filter', filtered);
   elements.noteSort.setAttribute('aria-pressed', String(filtered));
@@ -4351,6 +4492,7 @@ function refreshNoteSortControls() {
   });
   elements.followsOnlyRow.hidden = !named;
   elements.followsOnly.checked = followsOnlyPreference;
+  elements.buriedPins.checked = showBuriedPins;
   if (named && followsOnlyPreference) loadFollowList(named).catch(() => {
     status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
   });
@@ -4378,6 +4520,11 @@ elements.followsOnly.addEventListener('change', () => {
   if (followsOnlyPreference) loadFollowList().catch(() => {
     status(elements.noteSortStatus, 'Your Nostr follow list could not be loaded.', true);
   });
+  applyNoteFilters();
+});
+elements.buriedPins.addEventListener('change', () => {
+  showBuriedPins = elements.buriedPins.checked;
+  localStorage.setItem(BURIED_PINS_KEY, showBuriedPins ? '1' : '0');
   applyNoteFilters();
 });
 elements.editor.addEventListener('keydown', handleMentionKeys);

@@ -36,6 +36,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageGrade,
   stickyImageIssue,
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
+  coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
 } from '../stickyNotesModel.mjs';
 
 const TEST_GEOHASH = 'u0qj7z0y1';
@@ -286,6 +287,12 @@ test('public sticky-note copy has no retired per-note pricing', async () => {
 });
 
 test('anonymous notes carry a signed identity-mode marker', () => {
+  const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, anonymous: true});
+  assert.deepEqual(template.tags.find(tag => tag[0] === 'anonymous'), ['anonymous', '24h-local-key']);
+  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
+  assert.equal(parsed.anonymous, true);
+});
+
 test('a note draws a badge only for a payment this board knows how to draw', () => {
   assert.equal(stickyPaymentBadge('bitcoin').icon, 'lni-bitcoin');
   assert.equal(stickyPaymentBadge('pow').icon, 'lni-hammer-1');
@@ -333,12 +340,6 @@ test('a note reads its own badge back, and a stranger\'s word as nothing', () =>
   assert.equal(parseStickyEvent(foreign).paid, null, 'a word this board does not draw is not a payment');
   // The note itself still shows: the badge is a decoration, never a condition of being a note.
   assert.equal(parseStickyEvent(foreign).color, 'yellow');
-});
-
-  const template = makeStickyTemplate({content: 'hello', color: 'yellow', x: .5, y: .5, rotation: 0, geohash: TEST_GEOHASH, anonymous: true});
-  assert.deepEqual(template.tags.find(tag => tag[0] === 'anonymous'), ['anonymous', '24h-local-key']);
-  const parsed = parseStickyEvent({...template, id: 'a'.repeat(64), pubkey: 'b'.repeat(64)});
-  assert.equal(parsed.anonymous, true);
 });
 
 test('sticky event round-trips its visual placement', () => {
@@ -3234,4 +3235,56 @@ test('what the reader is told about mining', () => {
   const starting = stickyPowProgress({});
   assert.match(starting, /starting/);
   assert.doesNotMatch(starting, /left/);
+});
+
+// ---- pins for the notes that other notes have covered
+
+test('a note buried under other notes is the one whose pin needs a way in', () => {
+  const box = (left, top, width = 220, height = 220) => ({left, top, width, height});
+  // Side by side: nothing lies over anything.
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0)}, {id: 'b', box: box(400, 0)}]), []);
+  // A later note lying right over this one.
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0)}, {id: 'b', box: box(0, 0)}]), ['a']);
+  // The order is the board's draw order, so the big note underneath does not bury the small one
+  // laid on top of it, whatever the small one covers.
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0, 600, 600)}, {id: 'b', box: box(0, 0)}]), []);
+  // A sliver along one edge is not being buried; a corner's worth is.
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0)}, {id: 'b', box: box(0, 200)}]), []);
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0)}, {id: 'b', box: box(0, 160)}]), ['a']);
+  // Two notes sharing the edge cover more between them than either does alone, which is the
+  // reason the overlaps are summed: a spot under two notes is more covered, not less. Each of
+  // these hides 11% of the note below, and a note counts as buried at 20%.
+  assert.deepEqual(coveredPinNotes([
+    {id: 'a', box: box(0, 0)},
+    {id: 'b', box: box(0, 150, 110, 50)},
+    {id: 'c', box: box(110, 150, 110, 50)},
+  ]), ['a']);
+  // The share is the caller's to move, and a note with no box of its own is not judged at all.
+  assert.deepEqual(coveredPinNotes([{id: 'a', box: box(0, 0)}, {id: 'b', box: box(0, 200)}],
+    {share: 0.05}), ['a']);
+  assert.deepEqual(coveredPinNotes([{id: 'a'}, {id: '', box: box(0, 0)},
+    {id: 'c', box: box(0, 0, 0, 0)}]), []);
+  assert.deepEqual(coveredPinNotes([]), []);
+  assert.deepEqual(coveredPinNotes(null), []);
+});
+
+test('a lifted note comes back down on the number everybody quotes', () => {
+  // Twenty-one seconds, and it is said in three places: the markup, the help, and here.
+  assert.equal(PIN_RAISE_MS, 21000);
+  assert.ok(PIN_COVERED_SHARE > 0 && PIN_COVERED_SHARE < 1);
+});
+
+test('the toggle, its layer and its styles are all in the files the board serves', async () => {
+  const [html, css, page] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(html, /id="buriedPins"[^>]*type="checkbox"/, 'the toggle lives in the board settings');
+  assert.match(html, /Show pins of covered notes/);
+  assert.match(css, /\.board-pin-layer \{[^}]*pointer-events: none/);
+  assert.match(css, /\.board-pin-layer__pin \{[^}]*pointer-events: auto/, 'only the pin takes the pointer');
+  assert.match(css, /\.sticky-note--raised \{[^}]*box-shadow/);
+  assert.match(page, /BURIED_PINS_KEY = 'satoshi:sticky:buried-pins:v1'/);
+  assert.match(page, /localStorage\.getItem\(BURIED_PINS_KEY\) === '1'/, 'off until it is switched on');
 });

@@ -69,7 +69,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' week, or notes that mention you. Signed-in Nostr users can also keep on “Notes from my follows”'
                     + ' to limit any of those views to people they follow. That choice stays in this browser. A green'
                     + ' outline around the sort button means a filter is active. Filtered notes become faint blank paper'
-                    + ' with no pin: hold the paper for four seconds to reveal one note for a minute.',
+                    + ' with no pin: hold the paper for four seconds to reveal one note for a minute. A note can also'
+                    + ' end up buried under other notes on a busy board. Switch on “Show pins of covered notes” in the'
+                    + ' same panel and a buried note keeps its pin above the pile, so you can reach it; using that pin'
+                    + ' opens the note\'s details and brings the note to the front for twenty-one seconds.',
                     'You choose how long a note stays on this board: a day, a week, a month, six months or a year.'
                     + ' Satoshi.si stops showing it at the chosen time and deletes its relay copy. Nostr is public,'
                     + ' so another relay, app, archive, screenshot or person may keep a copy. The timer is not a promise'
