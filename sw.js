@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v297';   // v297: a note shows what it collected, and a paid zap closes its own dialog
+const CACHE = 'satoshi-static-v298';   // v298: reactions and zaps are read from the reader's own relays too
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',

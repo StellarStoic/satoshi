@@ -1988,6 +1988,9 @@ function renderBoardTextures() {
  */
 const giftEvents = [];
 const giftEventIds = new Set();
+// The subscription every gift read answers to, set when the board connects. One id is enough however
+// many relays are asked: a subscription belongs to a connection, not to a page.
+let giftSubscription = '';
 
 /** What the reader is waiting to have confirmed, and the invoice they are waiting on. */
 let pendingZapInvoice = null;
@@ -2001,12 +2004,68 @@ function boardNoteIds(limit = 300) {
   return [...noteEvents.keys()].slice(0, limit);
 }
 
-/** Ask the relay what these notes have collected: reactions, and zaps paid to them. */
+/**
+ * The sockets opened to the relays the reader added, one each, kept open while the board is.
+ *
+ * The board's own relay is asked on the socket it already has; these are for the same read on the
+ * relays a reader chose in the settings, because a reaction sent from another client went to the
+ * relays that client reads. A tally that only counted one relay would show a number that does not
+ * match what the note actually collected.
+ */
+const giftRelaySockets = new Map();
+// The ids the last request named, so a relay that connects late - or reconnects - is asked the same
+// question as the ones that were already open.
+let giftRequestIds = [];
+
+/** Ask one relay what these notes have collected: reactions, and the zaps paid to them. */
+function sendGiftRequest(socket) {
+  if (!socket || socket.readyState !== WebSocket.OPEN || !giftRequestIds.length) return;
+  socket.send(JSON.stringify(['REQ', giftSubscription, {kinds: [7, 9735], '#e': giftRequestIds, limit: 1000}]));
+}
+
+/** A reaction or a receipt, whatever relay it arrived from, judged and counted the same way. */
+function readGiftPayload(url, payload) {
+  let data = null;
+  try { data = JSON.parse(payload); } catch { return; }
+  if (!Array.isArray(data) || data[0] !== 'EVENT' || data[1] !== giftSubscription) return;
+  // Verified before it is counted, exactly as on the board's own socket: a relay is not trusted with
+  // what goes on the paper.
+  if (window.NostrTools.verifyEvent(data[2])) noteGiftArrived(data[2]);
+}
+
+/** Open, or reuse, the read socket for one relay the reader added. */
+function openGiftRelay(url) {
+  const existing = giftRelaySockets.get(url);
+  if (existing && existing.readyState <= WebSocket.OPEN) {
+    sendGiftRequest(existing);
+    return existing;
+  }
+  let socket = null;
+  try { socket = new WebSocket(url); } catch { return null; }
+  giftRelaySockets.set(url, socket);
+  socket.addEventListener('open', () => sendGiftRequest(socket));
+  socket.addEventListener('message', message => readGiftPayload(url, message.data));
+  // A relay that refuses to connect, or drops halfway, is left at that: the tally is a number written
+  // on a paper, and a reconnect loop watching a board nobody is looking at is not worth the battery.
+  return socket;
+}
+
+/** The reader's list changed: open what they added, and let go of what they removed. */
+function followUserRelays() {
+  for (const url of userRelays) openGiftRelay(url);
+  for (const [url, socket] of [...giftRelaySockets]) {
+    if (userRelays.includes(url)) continue;
+    try { socket.close(); } catch { /* already gone */ }
+    giftRelaySockets.delete(url);
+  }
+}
+
+/** Ask what these notes have collected: on the board's socket, and on each relay the reader added. */
 function requestGiftTallies(socket) {
-  if (!socket || socket.readyState !== WebSocket.OPEN) return;
-  const ids = boardNoteIds();
-  if (!ids.length) return;
-  socket.send(JSON.stringify(['REQ', giftSubscription, {kinds: [7, 9735], '#e': ids, limit: 1000}]));
+  giftRequestIds = boardNoteIds();
+  if (!giftRequestIds.length) return;
+  sendGiftRequest(socket);
+  followUserRelays();
 }
 
 /** Draw what one note has collected. Nothing collected means nothing is written on the paper. */
@@ -2209,6 +2268,9 @@ function renderUserRelays() {
       saveUserRelays();
       renderUserRelays();
       sayUserRelays('Removed. Every note still goes to the board\u2019s own relay.');
+      // What the board reads for reactions and zaps follows the same list: a relay removed here stops
+      // being read, rather than being read until the page is reloaded.
+      followUserRelays();
     });
     row.append(dot, host, ms, remove);
     return row;
@@ -2231,6 +2293,8 @@ async function addRelayFromField() {
   renderUserRelays();
   userRelayPings.set(added, await pingRelay(added));
   renderUserRelays();
+  // A relay added now is read for reactions and zaps from now on, not from the next reload.
+  followUserRelays();
 }
 
 /**
@@ -2751,7 +2815,7 @@ function connectBoard(version = boardConnectionVersion) {
   const subscription = `sticky-${Date.now()}`;
   // A second subscription on the same socket, for what the notes have collected. Asked for once the
   // board is whole, because the filter names the notes and the notes arrive as they are read.
-  const giftSubscription = `${subscription}-gifts`;
+  giftSubscription = `${subscription}-gifts`;
   const socket = new WebSocket(RELAY);
   boardSocket = socket;
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);

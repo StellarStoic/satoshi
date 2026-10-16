@@ -3436,10 +3436,14 @@ test('a note shows what it collected, on the paper\u2019s free corner', async ()
 
 test('the board asks the relay what its notes collected, on the same socket', async () => {
   const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
-  assert.match(page, /const giftSubscription = `\$\{subscription\}-gifts`;/);
+  // Set on the board's own connection and answering every socket, because more than one relay is read.
+  assert.match(page, /let giftSubscription = '';/);
+  assert.match(page, /giftSubscription = `\$\{subscription\}-gifts`;/);
   // Asked for when the board is whole, because the filter names the notes.
   assert.match(page, /applyNoteFilters\(\);\n        requestGiftTallies\(socket\);/);
-  assert.match(page, /socket\.send\(JSON\.stringify\(\['REQ', giftSubscription, \{kinds: \[7, 9735\], '#e': ids, limit: 1000\}\]\)\);/);
+  // The filter names the notes the board just loaded, kept so a relay that answers late is asked the
+  // same question as the ones already open.
+  assert.match(page, /socket\.send\(JSON\.stringify\(\['REQ', giftSubscription, \{kinds: \[7, 9735\], '#e': giftRequestIds, limit: 1000\}\]\)\);/);
   // And taken before the guard that drops anything not on the board's own subscription.
   const taken = page.indexOf("data[1] === giftSubscription");
   const guard = page.indexOf("data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])");
@@ -3447,6 +3451,36 @@ test('the board asks the relay what its notes collected, on the same socket', as
   assert.match(page, /if \(window\.NostrTools\.verifyEvent\(data\[2\]\)\) noteGiftArrived\(data\[2\]\);/,
     'every reaction and receipt is verified before it is counted');
   assert.match(page, /for \(const noteId of boardNoteIds\(\)\) \{/);
+});
+
+test('the reactions and zaps are read from the reader\u2019s own relays too', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The board's own relay is asked on the socket it already has; the reader's relays get one each.
+  assert.match(page, /const giftRelaySockets = new Map\(\);/);
+  assert.match(page, /function openGiftRelay\(url\) \{/);
+  assert.match(page, /function sendGiftRequest\(socket\) \{/);
+  assert.match(page, /sendGiftRequest\(socket\);/);
+  assert.match(page, /followUserRelays\(\);/);
+  assert.match(page, /socket\.send\(JSON\.stringify\(\['REQ', giftSubscription, \{kinds: \[7, 9735\], '#e': giftRequestIds, limit: 1000\}\]\)\);/);
+  // A socket already open for a relay is reused rather than opened again on every request.
+  assert.match(page, /if \(existing && existing\.readyState <= WebSocket\.OPEN\) \{/);
+  // A relay that will not connect is not a broken board, and one that drops is not chased.
+  assert.match(page, /try \{ socket = new WebSocket\(url\); \} catch \{ return null; \}/);
+  assert.equal(/addEventListener\('close', \(\) => openGiftRelay/.test(page), false, 'no reconnect loop');
+  // Whatever relay it came from, the same judging and the same counting: verified, then handed to the
+  // one place that dedupes by id, so the same reaction from two relays stays one reaction.
+  assert.match(page, /socket\.addEventListener\('message', message => readGiftPayload\(url, message\.data\)\);/);
+  assert.match(page, /if \(window\.NostrTools\.verifyEvent\(data\[2\]\)\) noteGiftArrived\(data\[2\]\);/);
+  // The subscription id is set once by the board's own connection and answers every socket.
+  assert.match(page, /let giftSubscription = '';/);
+  assert.match(page, /giftSubscription = `\$\{subscription\}-gifts`;/);
+  // Adding or removing a relay in the settings takes effect at once, not on the next reload.
+  const remove = page.indexOf('userRelays = removeUserRelay(userRelays, url);');
+  assert.ok(remove > -1 && page.slice(remove, remove + 800).includes('followUserRelays();'),
+    'a removed relay stops being read');
+  const add = page.indexOf('userRelayPings.set(added, await pingRelay(added));');
+  assert.ok(add > -1 && page.slice(add, add + 400).includes('followUserRelays();'),
+    'an added relay is read');
 });
 
 test('a paid zap takes its own dialog down and says so', async () => {
