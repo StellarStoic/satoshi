@@ -2496,7 +2496,7 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(poll, /stopAmberClipboardPoll\(\)/);
   // An abandoned page stops on its own and hands the reader the button that always works.
   assert.match(poll, /if \(Date\.now\(\) > amberClipboardDeadline\) \{/);
-  assert.match(poll, /'Amber never handed a signature back\. Tap Pin again, or use the paste button\.'/);
+  assert.match(poll, /`Amber never handed a signature back\. Ask for the \$\{amberActionWords\(\)\} again, or use the paste button\.`/);
   // The interval and the timeout stay what the shipped clients use.
   assert.match(script, /AMBER_CLIPBOARD_POLL_MS = 500;/);
 
@@ -2581,10 +2581,9 @@ test('the hand-over dialog is one line and one button, and every message rides t
     /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
     /sayAmberRoundTrip\('Signature verified - pinning your note'\)/,
     /The browser would not let the page read the clipboard\./,
-    /Nothing valid on the clipboard yet\./,
     /That signature did not match your note\./,
     /The server refused the pin: \$\{outcome\.message\}/,
-    /Amber never handed a signature back\. Tap Pin again, or use the paste button\./,
+    /Amber never handed a signature back\. Ask for the \$\{amberActionWords\(\)\} again, or use the paste button\./,
   ]) assert.match(script, message);
 
   // A refusal is still named in that one line - the read the browser turned down, and any error the
@@ -2672,8 +2671,8 @@ test('the hand-over control is in front of the reader the moment a copy request 
   // without waiting for an event this device never fires.
   const start = script.slice(script.indexOf('function startAmberClipboardPoll'),
     script.indexOf('const signerReturn = await applySignerReturn();'));
-  assert.match(start, /if \(!elements\.amberDialog\.open\) \{\s+showAmberHandOver\(/,
-    'the poll puts the button in front of a reader who is not already looking at it');
+  assert.match(start, /if \(!isGiftAction\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{\s+showAmberHandOver\(/,
+    'the poll puts the button in front of a reader who is not already looking at it - and never over a gift, whose own dialog already says what to do');
 
   // The button reads inside the reader's own tap, and a tap that did not finish leaves the wait
   // running rather than stopping the clock on a request that is still parked.
@@ -2705,7 +2704,11 @@ test('the clipboard round trip says on the page where it got to', async () => {
     'a read the browser refused');
   assert.match(script, /This page cannot read the clipboard while it is in the background\. Tap the button below to read what Amber copied\./,
     'a read refused while the page does not claim focus');
-  assert.match(script, /Nothing valid on the clipboard yet\. Approve the note in Amber, then come back and tap the button below\./);
+  // A clipboard that is empty, or still holding what an earlier trip left there, is the middle of a
+  // round trip rather than a step that failed: the signer's write lands after this page is told it is
+  // back. Saying so in red is what made a working signature look broken.
+  assert.match(script, /if \(code === 'empty' \|\| code === 'invalid'\) \{[\s\S]{0,800}?return '';/);
+  assert.equal(/Nothing valid on the clipboard yet/.test(script), false, 'the false alarm is gone');
   assert.match(complete, /That signature did not match your note\. Your note is still here - pin it again\./,
     'a signature that belongs to another note');
   assert.match(complete, /The server refused the pin: \$\{outcome\.message\}/,
@@ -3392,6 +3395,36 @@ test('a gift signature is finished by its own flow on every path home, not just 
   assert.match(page, /async function giftNoteRecord\(noteId, timeoutMs = 8000\)/);
   assert.match(page, /const record = await giftNoteRecord\(noteId\);/);
   assert.match(page, /await new Promise\(resolve => setTimeout\(resolve, 250\)\)/);
+});
+
+test('a round trip in flight is not a failure, and a tap brings the signature home', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // A refusal is still said: only the reader can act on that one.
+  assert.match(script, /The browser would not let the page read the clipboard\. Tap the button below/);
+  // The one moment the reader must act is the timeout, and it names what is being signed rather than
+  // telling a reader who is reacting that Amber did not hand "the note" back.
+  assert.match(script, /function amberActionWords\(\) \{/);
+  assert.match(script, /if \(action === 'react'\) return 'reaction';/);
+  assert.match(script, /if \(action === 'zap'\) return 'zap';/);
+  assert.match(script, /return 'note';/);
+  // A tap carries the activation a clipboard read needs, so it tries to collect the signature - and
+  // never from inside the hand-over, whose own button reads the clipboard and would race for the
+  // single parked request the two reads both spend.
+  const tap = script.slice(script.indexOf("document.addEventListener('pointerdown'"));
+  assert.match(tap, /if \(!amberSignaturePending\(\) \|\| amberAdoptRunning\) return;/);
+  assert.match(tap, /if \(elements\.amberDialog\.contains\(event\.target\)\) return;/);
+  assert.match(tap, /adoptParkedSignature\(\)\.then\(answer => \{/);
+  assert.match(tap, /if \(answer\?\.action === 'sign'\) return completeAmberSignature\(answer\);/);
+});
+
+test('a gift is not handed a second dialog on top of the one it is signed from', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The gift dialog is already open and already says what to do, so the hand-over is not raised over
+  // it: a modal on top of a modal is how a finished action looks like a stuck one.
+  assert.match(script, /if \(!isGiftAction\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{/);
+  // A note still gets it, and the waiting sentence is unchanged for that case.
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 4,
+    'the waiting-state call sites are all still there');
 });
 
 test('a gift is published where the reader reads, not to relays they never chose', async () => {

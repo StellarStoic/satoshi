@@ -6008,6 +6008,19 @@ function sayAmberOutcome(message, error = false) {
  * The reader's sentence for whatever the last clipboard read reported, so a round trip that stops
  * says which step it stopped at. Each failure point gets its own wording.
  */
+/**
+ * What the reader is having signed, in one word, for the sentences that must name it.
+ *
+ * A reaction and a zap are signed through the same hand-over as a note. Telling a reader who is
+ * reacting that Amber did not hand "the note" back is how a clear message becomes a wrong one.
+ */
+function amberActionWords() {
+  const action = pendingAmberRequest()?.context?.action;
+  if (action === 'react') return 'reaction';
+  if (action === 'zap') return 'zap';
+  return 'note';
+}
+
 function amberReadFailure(code, focused) {
   if (code === 'refused' || code === 'no-api') {
     // document.hasFocus() is a hint here and nowhere else: it only picks which of two true sentences
@@ -6019,7 +6032,12 @@ function amberReadFailure(code, focused) {
       : 'This page cannot read the clipboard while it is in the background. Tap the button below to read what Amber copied.';
   }
   if (code === 'empty' || code === 'invalid') {
-    return 'Nothing valid on the clipboard yet. Approve the note in Amber, then come back and tap the button below.';
+    // Neither is a failure, so neither is said. The signer is another app: what it copies lands after
+    // this page has already been told it is back, and what was on the clipboard before this trip can
+    // still be sitting there for a tick or two. Reporting that as a fault put a red line in front of a
+    // reader whose signature was on its way, which is how a round trip that works came to look like one
+    // that is stuck. The poll keeps trying, and the timeout is the only moment the reader must act.
+    return '';
   }
   // 'waiting' is not a failure: this page's own marker is still on the clipboard and the hand-over
   // wording already says what to do, so it is not overwritten with a failure line.
@@ -6063,7 +6081,7 @@ async function pollAmberClipboard() {
     stopAmberClipboardPoll();
     // Handing the reader the paste button is the whole point of the timeout: nothing arrived within
     // the window the shipped clients use, so the route that always works is put in front of them.
-    showAmberHandOver('Amber never handed a signature back. Tap Pin again, or use the paste button.');
+    showAmberHandOver(`Amber never handed a signature back. Ask for the ${amberActionWords()} again, or use the paste button.`);
     return;
   }
   // The read is attempted on every tick. document.hasFocus() never decides whether it happens — an
@@ -6090,7 +6108,10 @@ function startAmberClipboardPoll() {
   // why the pin path shows this same dialog in the tap that sends the request, exactly as the sign-in
   // path does. The poll still watches the clipboard in the background: the reader may never come back
   // to the dialog, and an answer Amber has already copied must not be left unread.
-  if (!elements.amberDialog.open) {
+  // A gift is asked for from a dialog that is already open and already says what to do, so the
+  // hand-over step is not put on top of it: two modals over one another is what makes a finished action
+  // look like a stuck one. A note has no such dialog and gets the hand-over exactly as before.
+  if (!isGiftAction(pendingAmberRequest()?.context?.action) && !elements.amberDialog.open) {
     showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
   }
   amberClipboardDeadline = Date.now() + AMBER_CLIPBOARD_POLL_TIMEOUT_MS;
@@ -6196,6 +6217,19 @@ async function resumeExternalFlow() {
 window.addEventListener('hashchange', () => { resumeExternalFlow().catch(() => {}); });
 window.addEventListener('pageshow', () => { resumeExternalFlow().catch(() => {}); });
 window.addEventListener('focus', () => { resumeExternalFlow().catch(() => {}); });
+// A tap is the one thing that always carries the activation a clipboard read needs, so while a
+// signature is still out with the signer a tap anywhere on the page tries to take it home. The reader
+// should not have to find a button to collect something they have already signed.
+document.addEventListener('pointerdown', event => {
+  if (!amberSignaturePending() || amberAdoptRunning) return;
+  // Never from inside the hand-over: that dialog's own button reads the clipboard, and two reads of one
+  // signature would race for the single parked request they both spend.
+  if (elements.amberDialog.contains(event.target)) return;
+  adoptParkedSignature().then(answer => {
+    if (answer?.action === 'sign') return completeAmberSignature(answer);
+    return undefined;
+  }).catch(() => {});
+}, true);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) resumeExternalFlow().catch(() => {});
 });
