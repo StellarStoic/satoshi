@@ -80,7 +80,7 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
- isGiftAction} from './stickyNotesModel.mjs';
+ isGiftAction, noteStackOrder} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
@@ -2090,6 +2090,8 @@ function noteGiftArrived(event) {
   }
   // The receipt for the invoice the reader was just shown is the payment landing: that is the answer
   // they are waiting for, not a number on a note.
+  // A tally that moved is a note that may have earned its way forward.
+  scheduleBoardOrder();
   if (Number(event.kind) === 9735 && pendingZapInvoice
       && Date.now() - pendingZapInvoice.startedAt < ZAP_WATCH_MS
       && receiptMatchesInvoice(event, pendingZapInvoice.invoice)) {
@@ -2108,6 +2110,41 @@ function settleZap() {
   if (noteId) renderNoteGifts(noteId);
   if (elements.noteGift.open) elements.noteGift.close();
   notice(`Zapped successfully \u26A1${paid ? ` ${paid} sats` : ''}`);
+}
+
+/* ------------------------------------------------------------- what sits on top of what ---- */
+
+/** When the order is next worked out. A board that re-stacked on every arriving reaction would do it
+ *  dozens of times while a relay catches up, so the work waits for a quiet moment. */
+let boardOrderTimer = 0;
+const BOARD_ORDER_DELAY_MS = 400;
+
+function scheduleBoardOrder() {
+  if (boardOrderTimer) return;
+  boardOrderTimer = setTimeout(() => { boardOrderTimer = 0; applyBoardOrder(); }, BOARD_ORDER_DELAY_MS);
+}
+
+/**
+ * Lay the notes down again in the order their tallies earn.
+ *
+ * A note at rest carries no z-index: what covers what is simply the order the elements sit in, which
+ * is why this moves them rather than numbering them. The burial layer is not touched - it stands at
+ * its own z-index above the whole board, so the pins of buried notes stay reachable whatever the notes
+ * underneath are doing - but the burial geometry is worked out again, because which notes lie under
+ * others is exactly what this changed.
+ */
+function applyBoardOrder() {
+  if (!noteEvents.size) return;
+  const notes = [...noteEvents.entries()].map(([id, record]) => ({
+    id,
+    createdAt: Number(record.sticky?.createdAt) || 0,
+    ...giftTally(id, giftEvents),
+  }));
+  for (const id of noteStackOrder(notes)) {
+    const element = noteEvents.get(id)?.element;
+    if (element) elements.canvas.append(element);
+  }
+  scheduleBuriedPins();
 }
 
 /* -------------------------------------------------------------------- moving pictures ---- */
@@ -2783,6 +2820,8 @@ function renderNote(sticky, event = null, temporary = false) {
     });
   }
   if (!temporary && event) noteEvents.set(sticky.id, {event, sticky, element: note});
+  // A note drawn is a note that may belong somewhere else in the pile.
+  if (!temporary) scheduleBoardOrder();
   // Limits such as "last 5" must be recalculated whenever a newer note arrives.
   if (!temporary) applyNoteFilters();
   if (!temporary) scheduleBuriedPins();
@@ -5240,6 +5279,10 @@ function applyNoteFilters() {
   ));
   noteEvents.forEach((record, id) => record.element.classList.toggle('sticky-note--filtered-out', !visible.has(id)));
   scheduleBuriedPins();
+  // Applied here and now rather than scheduled: this is the pass that runs when the board is whole,
+  // and the share picture is taken on the frame right after it. A board still deciding where its notes
+  // go would be photographed in the wrong order.
+  applyBoardOrder();
   const filtered = noteView !== 'all' || Boolean(followsOnlyPreference && named);
   elements.noteSort.classList.toggle('has-active-filter', filtered);
   elements.noteSort.setAttribute('aria-pressed', String(filtered));

@@ -38,7 +38,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
   USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
-  animatedPicture, isGiftAction,
+  animatedPicture, isGiftAction, noteStackOrder,
 } from '../stickyNotesModel.mjs';
 import {readFileSync, existsSync} from 'node:fs';
 
@@ -3417,6 +3417,30 @@ test('a round trip in flight is not a failure, and a tap brings the signature ho
   assert.match(tap, /if \(answer\?\.action === 'sign'\) return completeAmberSignature\(answer\);/);
 });
 
+test('the board is laid down again in the order the tallies earn', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The order is applied by moving the elements, because a note at rest carries no z-index.
+  assert.match(page, /function applyBoardOrder\(\) \{/);
+  assert.match(page, /const notes = \[\.\.\.noteEvents\.entries\(\)\]\.map\(\(\[id, record\]\) => \(\{/);
+  assert.match(page, /\.\.\.giftTally\(id, giftEvents\),/, 'each note goes in with the tally it has earned');
+  assert.match(page, /for \(const id of noteStackOrder\(notes\)\) \{/);
+  assert.match(page, /elements\.canvas\.append\(element\);/);
+  // And the burial geometry is worked out again: which notes lie under others is what changed.
+  const applied = page.slice(page.indexOf('function applyBoardOrder()'), page.indexOf('* -------------------------------------------------------------------- moving pictures'));
+  assert.match(applied, /scheduleBuriedPins\(\);/);
+  // The burial layer is deliberately not moved: it stands above the whole board at its own z-index.
+  assert.equal(/canvas\.append\(buriedPinLayerElement\)/.test(applied), false);
+  // Debounced, so a relay catching up does not re-stack dozens of times.
+  assert.match(page, /const BOARD_ORDER_DELAY_MS = 400;/);
+  assert.match(page, /function scheduleBoardOrder\(\) \{\n  if \(boardOrderTimer\) return;/);
+  assert.match(page, /boardOrderTimer = setTimeout\(\(\) => \{ boardOrderTimer = 0; applyBoardOrder\(\); \}, BOARD_ORDER_DELAY_MS\);/);
+  // Every moment the pile could have changed: the board being whole, a tally arriving, a note drawn.
+  assert.match(page, /scheduleBuriedPins\(\);\n  \/\/ Applied here and now rather than scheduled[\s\S]{0,300}applyBoardOrder\(\);/,
+    'the pass that runs when the board is whole applies it at once, because the share picture follows');
+  assert.match(page, /A tally that moved is a note that may have earned its way forward\.\n  scheduleBoardOrder\(\);/);
+  assert.match(page, /if \(!temporary\) scheduleBoardOrder\(\);/);
+});
+
 test('a note shows what it collected, on the paper\u2019s free corner', async () => {
   const [page, css] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
@@ -3576,6 +3600,42 @@ test('the lamp says how the relay answered, and says so when it did not', () => 
   assert.equal(relayHostLabel('wss://relay.example.com/path'), 'relay.example.com');
   assert.deepEqual(removeUserRelay(['wss://a.com', 'wss://b.com'], 'wss://a.com'), ['wss://b.com']);
   assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
+});
+
+test('the board stacks by reactions over sats, and by nothing else when there is nothing', () => {
+  const note = (id, createdAt, reactions, sats) => ({id, createdAt, reactions, sats});
+
+  // Nothing collected: the order it always had, oldest at the back and newest on top.
+  assert.deepEqual(noteStackOrder([note('a', 100, 0, 0), note('b', 300, 0, 0), note('c', 200, 0, 0)]),
+    ['a', 'c', 'b']);
+
+  // Money: the smaller the ratio the further forward, so the last one is on top.
+  assert.deepEqual(noteStackOrder([
+    note('small', 10, 6, 2345),   // 0.0026 - the least paid per reaction, so the most forward
+    note('big', 20, 1, 12),       // 0.0833
+    note('mid', 30, 1, 100),      // 0.01
+  ]), ['big', 'mid', 'small']);
+
+  // Reactions without sats cannot be divided: behind every paid note, and ranked by the reactions.
+  assert.deepEqual(noteStackOrder([
+    note('paid', 10, 1, 1000),
+    note('one', 20, 1, 0),
+    note('five', 30, 5, 0),
+    note('nothing', 40, 0, 0),
+  ]), ['nothing', 'one', 'five', 'paid']);
+
+  // Ties keep the creation order, so a board only ever moves when a tally says it should.
+  assert.deepEqual(noteStackOrder([note('old', 1, 2, 100), note('new', 2, 2, 100)]), ['old', 'new']);
+  assert.deepEqual(noteStackOrder([note('a', 1, 0, 0), note('b', 1, 0, 0)]), ['a', 'b']);
+
+  // Nothing to go on is not a crash.
+  assert.deepEqual(noteStackOrder([]), []);
+  assert.deepEqual(noteStackOrder(null), []);
+  assert.deepEqual(noteStackOrder([{id: 'x'}]), ['x']);
+  assert.deepEqual(noteStackOrder([{id: 'x', createdAt: 'nonsense', reactions: 'nonsense', sats: -5}]), ['x']);
+  // A receipt whose amount could not be read is a zero, not a division by nothing.
+  assert.deepEqual(noteStackOrder([{id: 'y', createdAt: 1, reactions: 3, sats: null}, {id: 'z', createdAt: 2, reactions: 0, sats: 0}]),
+    ['z', 'y']);
 });
 
 test('only a picture that moves is treated as one', () => {

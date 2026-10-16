@@ -1549,6 +1549,40 @@ export function isGiftAction(action) {
   return action === 'react' || action === 'zap';
 }
 
+/** A number from anything, with anything unreadable read as zero rather than as NaN. */
+function tallyNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+/**
+ * The board's stacking order: what a note has collected decides what covers what.
+ *
+ * The rule the board was asked for is reactions divided by the sats zapped, and the smaller the result
+ * the further forward the note sits - which is the same as saying that the more each reaction was
+ * worth, the further forward it sits. A note nobody has touched keeps the order it always had, newest
+ * over oldest. A note with reactions but no sats cannot be divided at all, so it is ranked among its
+ * own kind by how many reactions it has, and behind everything that was actually paid for, because a
+ * nought underneath is the largest figure on this scale rather than the smallest.
+ *
+ * Ties fall back to the creation order, so the board only ever moves when a tally says it should.
+ * Returned back to front: the caller lays the elements down in this order, and the last one is on top.
+ */
+export function noteStackOrder(notes) {
+  const keyed = (notes || []).map((note, index) => {
+    const createdAt = Number(note?.createdAt) || 0;
+    const reactions = tallyNumber(note?.reactions);
+    const sats = tallyNumber(note?.sats);
+    const tier = sats > 0 ? 2 : (reactions > 0 ? 1 : 0);
+    // Ascending, smallest first, because the first element laid down is the one at the back.
+    const rank = tier === 2 ? -(reactions / sats) : (tier === 1 ? reactions : createdAt);
+    return {id: note?.id, tier, rank, createdAt, index};
+  });
+  keyed.sort((left, right) => (left.tier - right.tier) || (left.rank - right.rank)
+    || (left.createdAt - right.createdAt) || (left.index - right.index));
+  return keyed.map(entry => entry.id);
+}
+
 export function animatedPicture(url) {
   return /\.gif(?:[?#]|$)/i.test(String(url || '').trim());
 }
