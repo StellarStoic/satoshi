@@ -1549,6 +1549,18 @@ export function isGiftAction(action) {
   return action === 'react' || action === 'zap';
 }
 
+/**
+ * What one reaction is worth, in sats, when a note's score is worked out.
+ *
+ * One sat counted as one reaction made money speak far too loudly: the smallest zap the board offers is
+ * twenty-one sats, so a single one of those outweighed twenty likes. A like is counted as though it
+ * were a zap of this size instead. It sits at the middle of the board's own zap buttons - 21, 100,
+ * 1,000, 5,000 - so a like stands level with the hundred-sat zap, six likes beat a twenty-one-sat zap
+ * twenty-eight times over, and a five-thousand-sat zap is worth fifty likes. Raise it if a click should
+ * count for more, lower it if money should lead harder; this is the whole of that judgement.
+ */
+export const REACTION_SATS = 100;
+
 /** A number from anything, with anything unreadable read as zero rather than as NaN. */
 function tallyNumber(value) {
   const number = Number(value);
@@ -1564,18 +1576,17 @@ function tallyNumber(value) {
  * to beat its ratio. A sum only ever moves a note forward: every reaction and every sat counts as one
  * point, and a reader can see the reason on the paper, since the tally printed there is the score.
  *
- * A note nobody has touched scores nothing and keeps the order it always had, newest over oldest.
- * Sats are counted one for one against reactions, so money leads in practice - one thousand sats
- * outweighs a thousand reactions - and what weighs a reaction against a sat is the single number to
- * change if that judgement ever looks wrong. Ties fall back to the creation order, so the board only
- * ever moves when a tally says it should.
+ * A note nobody has touched scores nothing and keeps the order it always had, newest over oldest. A
+ * reaction is worth REACTION_SATS sats rather than one, without which a twenty-one-sat zap - the
+ * smallest the board offers - would outweigh twenty likes between them. Ties fall back to the creation
+ * order, so the board only ever moves when a tally says it should.
  *
  * Returned back to front: the caller lays the elements down in this order, and the last one is on top.
  */
 export function noteStackOrder(notes) {
   const keyed = (notes || []).map((note, index) => {
     const createdAt = Number(note?.createdAt) || 0;
-    const score = tallyNumber(note?.reactions) + tallyNumber(note?.sats);
+    const score = tallyNumber(note?.reactions) * REACTION_SATS + tallyNumber(note?.sats);
     // Ascending, because the first element laid down is the one at the back.
     return {id: note?.id, score, createdAt, index};
   });

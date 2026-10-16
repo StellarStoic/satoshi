@@ -38,7 +38,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
   USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
-  animatedPicture, isGiftAction, noteStackOrder,
+  animatedPicture, isGiftAction, noteStackOrder, REACTION_SATS,
 } from '../stickyNotesModel.mjs';
 import {readFileSync, existsSync} from 'node:fs';
 
@@ -3602,7 +3602,7 @@ test('the lamp says how the relay answered, and says so when it did not', () => 
   assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
 });
 
-test('the board stacks by what a note collected, added up, and nothing else when there is nothing', () => {
+test('the board stacks by what a note collected, a like weighed against sats', () => {
   const note = (id, createdAt, reactions, sats) => ({id, createdAt, reactions, sats});
 
   // Nothing collected: the order it always had, oldest at the back and newest on top.
@@ -3611,19 +3611,32 @@ test('the board stacks by what a note collected, added up, and nothing else when
 
   // Reactions and sats are one score, and the highest score ends up on top.
   assert.deepEqual(noteStackOrder([
-    note('six', 10, 6, 2345),   // 2,351
-    note('one-twelve', 20, 1, 12),   // 13
-    note('one-hundred', 30, 1, 100), // 101
+    note('six', 10, 6, 2345),        // 600 + 2,345 = 2,945
+    note('one-twelve', 20, 1, 12),   // 100 + 12 = 112
+    note('one-hundred', 30, 1, 100), // 100 + 100 = 200
   ]), ['one-twelve', 'one-hundred', 'six']);
 
-  // A reaction is worth a point, so reactions alone lift a note above one nobody has touched - and a
-  // single small zap outweighs any realistic number of them.
+  // The whole point: the smallest zap the board offers does not outweigh six likes.
   assert.deepEqual(noteStackOrder([
-    note('nothing', 10, 0, 0),        // 0
-    note('one', 20, 1, 0),            // 1
-    note('twenty', 30, 20, 0),        // 20
-    note('zapped', 40, 0, 21),        // 21, one small zap
-  ]), ['nothing', 'one', 'twenty', 'zapped']);
+    note('liked', 10, 6, 0),          // 600
+    note('tipped', 20, 0, 21),        // 21
+  ]), ['tipped', 'liked'], 'six likes beat a twenty-one-sat zap');
+
+  // A like stands level with the board's hundred-sat zap; money leads from there up.
+  assert.deepEqual(noteStackOrder([
+    note('nothing', 10, 0, 0),
+    note('tipped', 20, 0, 21),
+    note('one-like', 30, 1, 0),       // 100
+    note('hundred', 40, 0, 100),      // 100, the same standing
+    note('ten-likes', 50, 10, 0),     // 1,000
+    note('thousand', 60, 0, 1000),    // 1,000, the same standing
+  ]), ['nothing', 'tipped', 'one-like', 'hundred', 'ten-likes', 'thousand']);
+
+  // The rate is published rather than buried in the sum, so a test can hold it to its promise.
+  assert.equal(REACTION_SATS, 100);
+  assert.ok(6 * REACTION_SATS > 21, 'six likes must beat the smallest zap the board offers');
+  assert.ok(REACTION_SATS > 21, 'one like outweighs the smallest zap the board offers');
+  assert.ok(REACTION_SATS <= 1000, 'but a like does not run away with the board either');
 
   // More of either never moves a note back, which is what dividing did.
   const before = noteStackOrder([note('x', 10, 2, 500), note('y', 20, 0, 0)]);
