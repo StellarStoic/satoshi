@@ -3602,27 +3602,34 @@ test('the lamp says how the relay answered, and says so when it did not', () => 
   assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
 });
 
-test('the board stacks by reactions over sats, and by nothing else when there is nothing', () => {
+test('the board stacks by what a note collected, added up, and nothing else when there is nothing', () => {
   const note = (id, createdAt, reactions, sats) => ({id, createdAt, reactions, sats});
 
   // Nothing collected: the order it always had, oldest at the back and newest on top.
   assert.deepEqual(noteStackOrder([note('a', 100, 0, 0), note('b', 300, 0, 0), note('c', 200, 0, 0)]),
     ['a', 'c', 'b']);
 
-  // Money: the smaller the ratio the further forward, so the last one is on top.
+  // Reactions and sats are one score, and the highest score ends up on top.
   assert.deepEqual(noteStackOrder([
-    note('small', 10, 6, 2345),   // 0.0026 - the least paid per reaction, so the most forward
-    note('big', 20, 1, 12),       // 0.0833
-    note('mid', 30, 1, 100),      // 0.01
-  ]), ['big', 'mid', 'small']);
+    note('six', 10, 6, 2345),   // 2,351
+    note('one-twelve', 20, 1, 12),   // 13
+    note('one-hundred', 30, 1, 100), // 101
+  ]), ['one-twelve', 'one-hundred', 'six']);
 
-  // Reactions without sats cannot be divided: behind every paid note, and ranked by the reactions.
+  // A reaction is worth a point, so reactions alone lift a note above one nobody has touched - and a
+  // single small zap outweighs any realistic number of them.
   assert.deepEqual(noteStackOrder([
-    note('paid', 10, 1, 1000),
-    note('one', 20, 1, 0),
-    note('five', 30, 5, 0),
-    note('nothing', 40, 0, 0),
-  ]), ['nothing', 'one', 'five', 'paid']);
+    note('nothing', 10, 0, 0),        // 0
+    note('one', 20, 1, 0),            // 1
+    note('twenty', 30, 20, 0),        // 20
+    note('zapped', 40, 0, 21),        // 21, one small zap
+  ]), ['nothing', 'one', 'twenty', 'zapped']);
+
+  // More of either never moves a note back, which is what dividing did.
+  const before = noteStackOrder([note('x', 10, 2, 500), note('y', 20, 0, 0)]);
+  const afterGain = noteStackOrder([note('x', 10, 5, 500), note('y', 20, 0, 0)]);
+  assert.deepEqual(before, afterGain, 'a note that gains reactions keeps its place or gains one');
+  assert.equal(afterGain[afterGain.length - 1], 'x');
 
   // Ties keep the creation order, so a board only ever moves when a tally says it should.
   assert.deepEqual(noteStackOrder([note('old', 1, 2, 100), note('new', 2, 2, 100)]), ['old', 'new']);
@@ -3633,7 +3640,7 @@ test('the board stacks by reactions over sats, and by nothing else when there is
   assert.deepEqual(noteStackOrder(null), []);
   assert.deepEqual(noteStackOrder([{id: 'x'}]), ['x']);
   assert.deepEqual(noteStackOrder([{id: 'x', createdAt: 'nonsense', reactions: 'nonsense', sats: -5}]), ['x']);
-  // A receipt whose amount could not be read is a zero, not a division by nothing.
+  // A receipt whose amount could not be read counts for nothing, rather than counting as a fault.
   assert.deepEqual(noteStackOrder([{id: 'y', createdAt: 1, reactions: 3, sats: null}, {id: 'z', createdAt: 2, reactions: 0, sats: 0}]),
     ['z', 'y']);
 });

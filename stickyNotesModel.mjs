@@ -1558,27 +1558,28 @@ function tallyNumber(value) {
 /**
  * The board's stacking order: what a note has collected decides what covers what.
  *
- * The rule the board was asked for is reactions divided by the sats zapped, and the smaller the result
- * the further forward the note sits - which is the same as saying that the more each reaction was
- * worth, the further forward it sits. A note nobody has touched keeps the order it always had, newest
- * over oldest. A note with reactions but no sats cannot be divided at all, so it is ranked among its
- * own kind by how many reactions it has, and behind everything that was actually paid for, because a
- * nought underneath is the largest figure on this scale rather than the smallest.
+ * Reactions and sats are added, not divided. Dividing looks tidy on two numbers and behaves badly on a
+ * board: it makes reactions a penalty, because adding a reaction to a note raises its decimal and
+ * pushes the note back, and it lets one large zap hold the top for good, because anything would have
+ * to beat its ratio. A sum only ever moves a note forward: every reaction and every sat counts as one
+ * point, and a reader can see the reason on the paper, since the tally printed there is the score.
  *
- * Ties fall back to the creation order, so the board only ever moves when a tally says it should.
+ * A note nobody has touched scores nothing and keeps the order it always had, newest over oldest.
+ * Sats are counted one for one against reactions, so money leads in practice - one thousand sats
+ * outweighs a thousand reactions - and what weighs a reaction against a sat is the single number to
+ * change if that judgement ever looks wrong. Ties fall back to the creation order, so the board only
+ * ever moves when a tally says it should.
+ *
  * Returned back to front: the caller lays the elements down in this order, and the last one is on top.
  */
 export function noteStackOrder(notes) {
   const keyed = (notes || []).map((note, index) => {
     const createdAt = Number(note?.createdAt) || 0;
-    const reactions = tallyNumber(note?.reactions);
-    const sats = tallyNumber(note?.sats);
-    const tier = sats > 0 ? 2 : (reactions > 0 ? 1 : 0);
-    // Ascending, smallest first, because the first element laid down is the one at the back.
-    const rank = tier === 2 ? -(reactions / sats) : (tier === 1 ? reactions : createdAt);
-    return {id: note?.id, tier, rank, createdAt, index};
+    const score = tallyNumber(note?.reactions) + tallyNumber(note?.sats);
+    // Ascending, because the first element laid down is the one at the back.
+    return {id: note?.id, score, createdAt, index};
   });
-  keyed.sort((left, right) => (left.tier - right.tier) || (left.rank - right.rank)
+  keyed.sort((left, right) => (left.score - right.score)
     || (left.createdAt - right.createdAt) || (left.index - right.index));
   return keyed.map(entry => entry.id);
 }
