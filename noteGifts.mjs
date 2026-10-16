@@ -337,27 +337,33 @@ export function isReceiptForNote(event, noteId) {
 }
 
 /**
- * What a note has collected: how many reactions, and how many sats it was zapped.
+ * What a note has collected: how many readers reacted to it, and how many sats it was zapped.
  *
- * Counted per event, not per person: a reader who sends two reactions sent two, and the same event
- * arriving twice - from a second relay, or twice from one - is counted once by its id.
+ * One reader is one reaction, however many they send: six emoji from one key is one person behind the
+ * note, not six, and the number printed on the paper says so. The same event arriving twice - from a
+ * second relay, or twice from one - is one event, counted by its id.
+ *
+ * Sats are money and add up regardless of who sent them, so two zaps of a hundred sats are two hundred
+ * whether they came from two readers or one.
  */
 export function giftTally(noteId, events) {
   const seen = new Set();
-  let reactions = 0;
+  const reactors = new Set();
   let sats = 0;
   for (const event of events || []) {
     if (!event?.id || seen.has(event.id)) continue;
     if (isReactionForNote(event, noteId)) {
       seen.add(event.id);
-      reactions += 1;
+      // A reaction with no key on it is nobody rather than a nameless reader. The board verifies every
+      // event it counts, so this only ever drops an event that could not have come from a key at all.
+      if (event.pubkey) reactors.add(event.pubkey);
     } else if (isReceiptForNote(event, noteId)) {
       seen.add(event.id);
       const paid = zapReceiptSats(event);
       if (paid) sats += paid;
     }
   }
-  return {reactions, sats};
+  return {reactions: reactors.size, sats};
 }
 
 /** Whether a receipt is the one for an invoice the reader was shown. */

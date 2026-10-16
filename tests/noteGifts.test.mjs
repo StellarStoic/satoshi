@@ -38,24 +38,34 @@ test('a receipt says what was paid, and the request it carries is readable', () 
   assert.equal(zapReceiptRequest({kind: 9735, tags: []}), null);
 });
 
-test('a note\u2019s tally counts reactions and adds up the sats zapped to it', () => {
-  const reaction = id => ({id, kind: 7, tags: [['e', 'note-1']], content: '\u{1F9E1}'});
-  const other = {id: 'r3', kind: 7, tags: [['e', 'note-2']], content: '+'};
+test('a note\u2019s tally counts readers who reacted and adds up the sats zapped to it', () => {
+  const reaction = (id, pubkey) => ({id, kind: 7, tags: [['e', 'note-1']], content: '\u{1F9E1}', pubkey});
+  const other = {id: 'r3', kind: 7, tags: [['e', 'note-2']], content: '+', pubkey: 'carol'};
   const receipt = (id, msats) => ({id, kind: 9735, tags: [['e', 'note-1'], ['description', JSON.stringify({tags: [['amount', String(msats)]]})]]});
-  const events = [reaction('r1'), reaction('r2'), other, receipt('z1', 21000), receipt('z2', 1000000)];
+  const events = [reaction('r1', 'alice'), reaction('r2', 'bob'), other, receipt('z1', 21000), receipt('z2', 1000000)];
   assert.deepEqual(giftTally('note-1', events), {reactions: 2, sats: 1021});
+  // One reader is one reaction, however many they send: six emoji from one key is one person.
+  assert.deepEqual(giftTally('note-1', ['a', 'b', 'c', 'd', 'e', 'f'].map(id => reaction(id, 'alice'))),
+    {reactions: 1, sats: 0});
+  assert.deepEqual(giftTally('note-1', [reaction('r1', 'alice'), reaction('r4', 'alice'), reaction('r5', 'bob')]),
+    {reactions: 2, sats: 0}, 'a reader who reacts twice is still one reader');
   // The same event from a second relay is the same event.
-  assert.deepEqual(giftTally('note-1', [...events, reaction('r1'), receipt('z1', 21000)]), {reactions: 2, sats: 1021});
+  assert.deepEqual(giftTally('note-1', [...events, reaction('r1', 'alice'), receipt('z1', 21000)]), {reactions: 2, sats: 1021});
   // A note nobody has touched shows nothing rather than zeroes.
   assert.deepEqual(giftTally('note-1', [other]), {reactions: 0, sats: 0});
   assert.deepEqual(giftTally('note-1', []), {reactions: 0, sats: 0});
   assert.deepEqual(giftTally('note-1', null), {reactions: 0, sats: 0});
+  // A reaction with no key on it is nobody, not a nameless reader.
+  assert.deepEqual(giftTally('note-1', [{id: 'r9', kind: 7, tags: [['e', 'note-1']], content: '+'}]),
+    {reactions: 0, sats: 0});
+  // Sats are money: they add up whoever sent them, so two zaps are two zaps.
+  assert.deepEqual(giftTally('note-1', [receipt('z1', 100000), receipt('z2', 100000)]), {reactions: 0, sats: 200});
   // A receipt whose amount cannot be read adds a zap, not a wrong number.
   assert.deepEqual(giftTally('note-1', [{id: 'z3', kind: 9735, tags: [['e', 'note-1']]}]), {reactions: 0, sats: 0});
-  assert.equal(isReactionForNote(reaction('r1'), 'note-1'), true);
-  assert.equal(isReactionForNote(reaction('r1'), 'note-2'), false);
+  assert.equal(isReactionForNote(reaction('r1', 'alice'), 'note-1'), true);
+  assert.equal(isReactionForNote(reaction('r1', 'alice'), 'note-2'), false);
   assert.equal(isReceiptForNote(receipt('z1', 21000), 'note-1'), true);
-  assert.equal(isReceiptForNote(reaction('r1'), 'note-1'), false, 'a reaction is not a receipt');
+  assert.equal(isReceiptForNote(reaction('r1', 'alice'), 'note-1'), false, 'a reaction is not a receipt');
 });
 
 test('the receipt for the invoice the reader was shown is recognised, and no other is', () => {

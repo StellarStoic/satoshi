@@ -71,7 +71,7 @@ export const PAGE_HELP = Object.freeze({
                     + ' outline around the sort button means a filter is active. Filtered notes become faint blank paper'
                     + ' with no pin: hold the paper for four seconds to reveal one note for a minute. A note can also'
                     + ' end up buried under other notes on a busy board: the pile stands in the order notes have'
-                    + ' earned, one reaction counting as a hundred sats weighed against a zap\'s sats, so a note'
+                    + ' earned, one reaction per reader counting as a hundred sats weighed against a zap\'s sats, so a note'
                     + ' with six reactions stands ahead of one that took a single twenty-one-sat zap. Notes nobody'
                     + ' has touched yet keep the order they were written in. Then switch on “Show pins of covered notes” in the'
                     + ' same panel and a buried note keeps its pin above the pile, so you can reach it; using that pin'
