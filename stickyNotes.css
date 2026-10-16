@@ -183,6 +183,11 @@
 .user-relays__remove:hover { color: #d0503f; }
 .user-relays__count { margin: 8px 0 0; color: #989b99; font-size: .72rem; }
 .note-event-json .secondary-action { margin-top: 9px; }
+/* What a note has collected: reactions, then the sats zapped to it, on the paper's bottom left - the
+   corner the signature (bottom right) and the pin do not use. Same ink as the signature, because it is
+   part of the note rather than a control: nothing here is clickable. */
+.sticky-note__gifts { position: absolute; left: 10px; bottom: 7px; z-index: 2; max-width: 46%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.sticky-note--print .sticky-note__gifts { bottom: 9px; }
 .sticky-note__author { position: absolute; right: 10px; bottom: 7px; z-index: 2; max-width: 76%; overflow: hidden; color: rgba(38,35,30,.62); font-family: var(--site-font, monospace); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .sticky-note--placing { z-index: 500; width: 240px; cursor: grab; outline: 2px dashed rgba(255,255,255,.8); box-shadow: 5px 12px 24px rgba(0,0,0,.42); user-select: none; touch-action: none; }
 .sticky-note--placing:active { cursor: grabbing; }

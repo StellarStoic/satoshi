@@ -3417,6 +3417,59 @@ test('a round trip in flight is not a failure, and a tap brings the signature ho
   assert.match(tap, /if \(answer\?\.action === 'sign'\) return completeAmberSignature\(answer\);/);
 });
 
+test('a note shows what it collected, on the paper\u2019s free corner', async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+  // Bottom left: the signature owns the bottom right and the pin sits where the reader put it.
+  assert.match(css, /\.sticky-note__gifts \{ position: absolute; left: 10px; bottom: 7px;/);
+  assert.match(css, /\.sticky-note--print \.sticky-note__gifts \{ bottom: 9px; \}/, 'the print band is deeper');
+  // The element exists on every note the board draws, and says nothing until there is something.
+  assert.match(page, /gifts\.className = 'sticky-note__gifts';/);
+  assert.match(page, /gifts\.hidden = true;/);
+  assert.match(page, /element\.hidden = tally\.reactions === 0 && tally\.sats === 0;/);
+  // The words are reactions then sats, which is the order the reader asked for.
+  assert.match(page, /element\.textContent = `\$\{tally\.reactions\}\/\$\{tally\.sats\}`;/);
+  assert.match(page, /element\.title = `\$\{tally\.reactions\} \$\{tally\.reactions === 1 \? 'reaction' : 'reactions'\}, \$\{tally\.sats\} sats zapped`;/);
+});
+
+test('the board asks the relay what its notes collected, on the same socket', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(page, /const giftSubscription = `\$\{subscription\}-gifts`;/);
+  // Asked for when the board is whole, because the filter names the notes.
+  assert.match(page, /applyNoteFilters\(\);\n        requestGiftTallies\(socket\);/);
+  assert.match(page, /socket\.send\(JSON\.stringify\(\['REQ', giftSubscription, \{kinds: \[7, 9735\], '#e': ids, limit: 1000\}\]\)\);/);
+  // And taken before the guard that drops anything not on the board's own subscription.
+  const taken = page.indexOf("data[1] === giftSubscription");
+  const guard = page.indexOf("data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])");
+  assert.ok(taken > -1 && guard > -1 && taken < guard, 'a reaction is not dropped as "not on this board"');
+  assert.match(page, /if \(window\.NostrTools\.verifyEvent\(data\[2\]\)\) noteGiftArrived\(data\[2\]\);/,
+    'every reaction and receipt is verified before it is counted');
+  assert.match(page, /for \(const noteId of boardNoteIds\(\)\) \{/);
+});
+
+test('a paid zap takes its own dialog down and says so', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // The watch is armed only where a receipt can exist: an address that publishes none has none.
+  assert.match(page, /pendingZapInvoice = parked\.allowsNostr\n    \? \{noteId: parked\.noteId, invoice: invoice\.invoice, sats: parked\.sats, startedAt: Date\.now\(\)\}/);
+  // The invoice shown is the one the receipt must be for, and the watch does not outlive the reader's
+  // attention by more than an hour.
+  assert.match(page, /const ZAP_WATCH_MS = 60 \* 60 \* 1000;/);
+  assert.match(page, /Date\.now\(\) - pendingZapInvoice\.startedAt < ZAP_WATCH_MS/);
+  assert.match(page, /receiptMatchesInvoice\(event, pendingZapInvoice\.invoice\)/);
+  assert.match(page, /settleZap\(\);/);
+  // The dialog comes down and the reader is told once, in the board's own words.
+  assert.match(page, /if \(elements\.noteGift\.open\) elements\.noteGift\.close\(\);/);
+  // The message itself, in pieces: a nested template literal cannot be written as one pattern, and the
+  // bolt is written as an escape in the page\u2019s template literal, so the pattern matches that text.
+  assert.match(page, /notice\(`Zapped successfully \\u26A1/);
+  assert.match(page, /\$\{paid \? ` \$\{paid\} sats` : ''\}`\);/, 'and it says how much was paid');
+  // And the note it was for is drawn again, so the number on the paper moves with the payment.
+  const settle = page.slice(page.indexOf('function settleZap()'), page.indexOf('* -------------------------------------------------------------------- moving pictures'));
+  assert.match(settle, /if \(noteId\) renderNoteGifts\(noteId\);/);
+});
+
 test('a gift is not handed a second dialog on top of the one it is signed from', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // The gift dialog is already open and already says what to do, so the hand-over is not raised over

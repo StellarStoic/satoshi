@@ -266,6 +266,108 @@ export function zapCallbackUrl({callback, amountSats, event, lnurl}) {
 }
 
 /** The invoice the callback answers with, or the reason it refused. */
+/** The first value of a tag, or an empty string. */
+function tagValue(event, name) {
+  const tag = (event?.tags || []).find(entry => Array.isArray(entry) && entry[0] === name);
+  return tag && tag.length > 1 ? String(tag[1] ?? '') : '';
+}
+
+/** Every value of a tag. A receipt names the note in one `e` and the zapper in another, and a
+ *  reaction can name more than one event, so this reads all of them rather than the first. */
+function tagValues(event, name) {
+  return (event?.tags || []).filter(entry => Array.isArray(entry) && entry[0] === name)
+    .map(entry => String(entry[1] ?? ''));
+}
+
+/**
+ * What a bolt11 invoice asks for, in sats, or null when the invoice carries no amount.
+ *
+ * The amount lives in the human-readable prefix: `lnbc` then the digits then a multiplier, where m is
+ * milli-bitcoin, u micro, n nano and p pico, and no multiplier means whole bitcoin. An amountless
+ * invoice is `lnbc1…` - the `1` separator with nothing before it - and it cannot be read here, so it
+ * is null rather than zero.
+ */
+export function invoiceAmountSats(invoice) {
+  const text = String(invoice || '').trim().toLowerCase().replace(/^lightning:/, '');
+  const match = text.match(/^lnbc([0-9]+)([munp]?)1/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+  const perBitcoin = {m: 1e-3, u: 1e-6, n: 1e-9, p: 1e-12}[match[2]];
+  const bitcoin = match[2] ? amount * perBitcoin : amount;
+  const sats = bitcoin * 1e8;
+  return Number.isFinite(sats) && sats > 0 ? Math.round(sats) : null;
+}
+
+/**
+ * What a zap receipt says was paid, in sats.
+ *
+ * The request the sender signed is carried in the receipt's `description` tag and its `amount` is in
+ * millisats, which is the figure the invoice was made for. The bolt11 tag is the fallback, for a
+ * receipt whose description cannot be read.
+ */
+export function zapReceiptSats(receipt) {
+  const description = tagValue(receipt, 'description');
+  if (description) {
+    try {
+      const request = JSON.parse(description);
+      const msats = Number(tagValue(request, 'amount'));
+      if (Number.isFinite(msats) && msats > 0) return Math.round(msats / 1000);
+    } catch { /* not readable: the invoice knows too */ }
+  }
+  return invoiceAmountSats(tagValue(receipt, 'bolt11'));
+}
+
+/** The signed request a receipt carries, or null when it does not carry a readable one. */
+export function zapReceiptRequest(receipt) {
+  try {
+    const request = JSON.parse(tagValue(receipt, 'description'));
+    return request && typeof request === 'object' ? request : null;
+  } catch { return null; }
+}
+
+/** Whether an event is a reaction to this note. NIP-25 puts the note it is about in an `e` tag. */
+export function isReactionForNote(event, noteId) {
+  return Number(event?.kind) === 7 && Boolean(noteId) && tagValues(event, 'e').includes(noteId);
+}
+
+/** Whether an event is a zap receipt for this note. NIP-57 puts the zapped note in an `e` tag. */
+export function isReceiptForNote(event, noteId) {
+  return Number(event?.kind) === 9735 && Boolean(noteId) && tagValues(event, 'e').includes(noteId);
+}
+
+/**
+ * What a note has collected: how many reactions, and how many sats it was zapped.
+ *
+ * Counted per event, not per person: a reader who sends two reactions sent two, and the same event
+ * arriving twice - from a second relay, or twice from one - is counted once by its id.
+ */
+export function giftTally(noteId, events) {
+  const seen = new Set();
+  let reactions = 0;
+  let sats = 0;
+  for (const event of events || []) {
+    if (!event?.id || seen.has(event.id)) continue;
+    if (isReactionForNote(event, noteId)) {
+      seen.add(event.id);
+      reactions += 1;
+    } else if (isReceiptForNote(event, noteId)) {
+      seen.add(event.id);
+      const paid = zapReceiptSats(event);
+      if (paid) sats += paid;
+    }
+  }
+  return {reactions, sats};
+}
+
+/** Whether a receipt is the one for an invoice the reader was shown. */
+export function receiptMatchesInvoice(receipt, invoice) {
+  const wanted = String(invoice || '').trim().toLowerCase().replace(/^lightning:/, '');
+  if (!wanted) return false;
+  return tagValues(receipt, 'bolt11')
+    .some(value => value.trim().toLowerCase().replace(/^lightning:/, '') === wanted);
+}
+
 export function parseInvoice(payload) {
   const data = payload || {};
   if (typeof data.pr === 'string' && /^ln(bc|tb|bcrt)[0-9a-z]+$/i.test(data.pr.trim())) {

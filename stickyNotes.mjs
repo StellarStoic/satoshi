@@ -86,6 +86,7 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
 import {
   REACTION_SET, ZAP_AMOUNTS, reactionTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
+  giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice,
 } from './noteGifts.mjs';
 import {
   beginAmberLogin,
@@ -1977,6 +1978,79 @@ function renderBoardTextures() {
   }
 }
 
+/* ----------------------------------------------------------------- what a note collected ---- */
+
+/**
+ * Every reaction and every zap receipt the board has heard about, and the notes they are about.
+ *
+ * Kept flat and deduped by id: the same reaction can arrive from a second relay, and a tally is
+ * cheap to recompute, so nothing is counted twice and nothing is stored per note.
+ */
+const giftEvents = [];
+const giftEventIds = new Set();
+
+/** What the reader is waiting to have confirmed, and the invoice they are waiting on. */
+let pendingZapInvoice = null;
+// A receipt arrives when the payment settles, which can be long after the dialog was opened - and
+// long after the reader gave up on it. Past this the message would be about a payment nobody is
+// looking at any more, so the watch is dropped rather than left for a surprise hours later.
+const ZAP_WATCH_MS = 60 * 60 * 1000;
+
+/** The note ids the board knows about, for a filter that asks about all of them at once. */
+function boardNoteIds(limit = 300) {
+  return [...noteEvents.keys()].slice(0, limit);
+}
+
+/** Ask the relay what these notes have collected: reactions, and zaps paid to them. */
+function requestGiftTallies(socket) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  const ids = boardNoteIds();
+  if (!ids.length) return;
+  socket.send(JSON.stringify(['REQ', giftSubscription, {kinds: [7, 9735], '#e': ids, limit: 1000}]));
+}
+
+/** Draw what one note has collected. Nothing collected means nothing is written on the paper. */
+function renderNoteGifts(noteId) {
+  const record = noteEvents.get(noteId);
+  const element = record?.element?.querySelector('.sticky-note__gifts');
+  if (!element) return;
+  const tally = giftTally(noteId, giftEvents);
+  element.hidden = tally.reactions === 0 && tally.sats === 0;
+  element.textContent = `${tally.reactions}/${tally.sats}`;
+  element.title = `${tally.reactions} ${tally.reactions === 1 ? 'reaction' : 'reactions'}, ${tally.sats} sats zapped`;
+  element.setAttribute('aria-label', element.title);
+}
+
+/** A reaction or a receipt arrived: it belongs to one note, so that note is drawn again. */
+function noteGiftArrived(event) {
+  if (!event?.id || giftEventIds.has(event.id)) return;
+  giftEventIds.add(event.id);
+  giftEvents.push(event);
+  for (const noteId of boardNoteIds()) {
+    if (isReactionForNote(event, noteId) || isReceiptForNote(event, noteId)) renderNoteGifts(noteId);
+  }
+  // The receipt for the invoice the reader was just shown is the payment landing: that is the answer
+  // they are waiting for, not a number on a note.
+  if (Number(event.kind) === 9735 && pendingZapInvoice
+      && Date.now() - pendingZapInvoice.startedAt < ZAP_WATCH_MS
+      && receiptMatchesInvoice(event, pendingZapInvoice.invoice)) {
+    settleZap();
+  }
+}
+
+/**
+ * The payment landed: the invoice is answered, so the dialog that was asking for it comes down and
+ * the reader is told once, in the plainest words the board has.
+ */
+function settleZap() {
+  const paid = pendingZapInvoice?.sats || 0;
+  const noteId = pendingZapInvoice?.noteId || '';
+  pendingZapInvoice = null;
+  if (noteId) renderNoteGifts(noteId);
+  if (elements.noteGift.open) elements.noteGift.close();
+  notice(`Zapped successfully \u26A1${paid ? ` ${paid} sats` : ''}`);
+}
+
 /* -------------------------------------------------------------------- moving pictures ---- */
 
 /**
@@ -2602,6 +2676,13 @@ function renderNote(sticky, event = null, temporary = false) {
       if (key.key === 'Enter' || key.key === ' ') { key.preventDefault(); openNoteMenu(sticky.id, pin); }
     });
     note.appendChild(pin);
+    // What the note has collected, written on the paper's bottom left: the signature owns the bottom
+    // right and the pin sits where the reader put it, so this corner is the one that is free. Hidden
+    // until there is something to say, because "0/0" on every note is noise, not news.
+    const gifts = document.createElement('span');
+    gifts.className = 'sticky-note__gifts';
+    gifts.hidden = true;
+    note.appendChild(gifts);
     const author = document.createElement('span');
     author.className = 'sticky-note__author';
     labelNoteAuthor(author, sticky);
@@ -2668,6 +2749,9 @@ function connectBoard(version = boardConnectionVersion) {
     return;
   }
   const subscription = `sticky-${Date.now()}`;
+  // A second subscription on the same socket, for what the notes have collected. Asked for once the
+  // board is whole, because the filter names the notes and the notes arrive as they are read.
+  const giftSubscription = `${subscription}-gifts`;
   const socket = new WebSocket(RELAY);
   boardSocket = socket;
   const timeout = setTimeout(() => status(elements.boardStatus, 'The board is taking longer than usual to open.'), 6000);
@@ -2684,10 +2768,17 @@ function connectBoard(version = boardConnectionVersion) {
         clearTimeout(timeout);
         elements.boardStatus.hidden = true;
         applyNoteFilters();
+        requestGiftTallies(socket);
         // The relay has sent everything it stores for this board and the notes are drawn: this is
         // the moment a picture of the board is whole. Rendered on the next frame, so nothing is
         // captured with the layout still settling.
         if (cardMode) requestAnimationFrame(() => { document.documentElement.dataset.pinstrCard = 'ready'; });
+        return;
+      }
+      // Reactions and receipts come home on their own subscription: they are about notes, not on the
+      // board, so they must be taken before the guard below drops anything not on this one.
+      if (data[0] === 'EVENT' && data[1] === giftSubscription) {
+        if (window.NostrTools.verifyEvent(data[2])) noteGiftArrived(data[2]);
         return;
       }
       if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools.verifyEvent(data[2])) return;
@@ -4055,6 +4146,11 @@ async function finishZap(signed, parked) {
   const invoice = parseInvoice(payload);
   if (!invoice.ok) { setGiftStatus(invoice.error, true); return; }
   showGiftInvoice(invoice.invoice, parked, parked.address || '');
+  // Watch for this invoice being paid, so the dialog can come down by itself and say so. An address
+  // that does not publish receipts has none to watch for, and the hint above has already said so.
+  pendingZapInvoice = parked.allowsNostr
+    ? {noteId: parked.noteId, invoice: invoice.invoice, sats: parked.sats, startedAt: Date.now()}
+    : null;
   setGiftStatus(`Zapping ${parked.sats} sats.`);
   if (parked.clamped) setGiftStatus(`Zapping ${parked.sats} sats \u2014 the amount their address accepts.`);
 }

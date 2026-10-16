@@ -6,6 +6,68 @@ import {
   bech32Encode, bech32Decode, lnurlEncode, lnurlDecode, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapRequestTemplate, zapCallbackUrl, parseInvoice,
 } from '../noteGifts.mjs';
+// The names this file's first import list predates, taken the same way rather than rewritten.
+import {
+  invoiceAmountSats, zapReceiptSats, zapReceiptRequest, giftTally,
+  isReactionForNote, isReceiptForNote, receiptMatchesInvoice,
+} from '../noteGifts.mjs';
+
+test('an invoice says what it asks for, in sats', () => {
+  assert.equal(invoiceAmountSats('lnbc210n1pabcdef'), 21, 'nano-bitcoin: 210 n is 21 sats');
+  assert.equal(invoiceAmountSats('lnbc21u1pabcdef'), 2100, 'micro: 21 u is 2,100 sats');
+  assert.equal(invoiceAmountSats('lnbc1m1pabcdef'), 100000, 'milli: 1 m is a thousandth of a bitcoin, so 100,000 sats');
+  assert.equal(invoiceAmountSats('lnbc2m1pabcdef'), 200000);
+  assert.equal(invoiceAmountSats('lnbc10p1pabcdef'), 0, 'a tenth of a sat is not a sat');
+  assert.equal(invoiceAmountSats('lightning:lnbc210n1pabcdef'), 21, 'a lightning: prefix is not the invoice');
+  assert.equal(invoiceAmountSats('  LNBC210N1PABCDEF  '), 21, 'case and space are the reader\u2019s, not the invoice\u2019s');
+  assert.equal(invoiceAmountSats('lnbc1pabcdef'), null, 'an amountless invoice cannot be read here');
+  assert.equal(invoiceAmountSats('lnurl1dp68gurn8ghj7'), null, 'not a bolt11 invoice at all');
+  assert.equal(invoiceAmountSats(''), null);
+  assert.equal(invoiceAmountSats(null), null);
+});
+
+test('a receipt says what was paid, and the request it carries is readable', () => {
+  const request = {kind: 9734, tags: [['e', 'note-1'], ['amount', '21000']], pubkey: 'abc'};
+  const receipt = {kind: 9735, tags: [['e', 'note-1'], ['p', 'abc'], ['description', JSON.stringify(request)], ['bolt11', 'lnbc1000n1pabcdef']]};
+  assert.equal(zapReceiptSats(receipt), 21, 'millisats in the request are what was asked for');
+  assert.deepEqual(zapReceiptRequest(receipt), request);
+  // Without a readable description the invoice still knows what it asks for.
+  const terse = {kind: 9735, tags: [['e', 'note-1'], ['description', 'not json'], ['bolt11', 'lnbc1000n1pabcdef']]};
+  assert.equal(zapReceiptSats(terse), 100);
+  assert.equal(zapReceiptSats({kind: 9735, tags: [['e', 'note-1']]}), null, 'nothing to read');
+  assert.equal(zapReceiptRequest({kind: 9735, tags: []}), null);
+});
+
+test('a note\u2019s tally counts reactions and adds up the sats zapped to it', () => {
+  const reaction = id => ({id, kind: 7, tags: [['e', 'note-1']], content: '\u{1F9E1}'});
+  const other = {id: 'r3', kind: 7, tags: [['e', 'note-2']], content: '+'};
+  const receipt = (id, msats) => ({id, kind: 9735, tags: [['e', 'note-1'], ['description', JSON.stringify({tags: [['amount', String(msats)]]})]]});
+  const events = [reaction('r1'), reaction('r2'), other, receipt('z1', 21000), receipt('z2', 1000000)];
+  assert.deepEqual(giftTally('note-1', events), {reactions: 2, sats: 1021});
+  // The same event from a second relay is the same event.
+  assert.deepEqual(giftTally('note-1', [...events, reaction('r1'), receipt('z1', 21000)]), {reactions: 2, sats: 1021});
+  // A note nobody has touched shows nothing rather than zeroes.
+  assert.deepEqual(giftTally('note-1', [other]), {reactions: 0, sats: 0});
+  assert.deepEqual(giftTally('note-1', []), {reactions: 0, sats: 0});
+  assert.deepEqual(giftTally('note-1', null), {reactions: 0, sats: 0});
+  // A receipt whose amount cannot be read adds a zap, not a wrong number.
+  assert.deepEqual(giftTally('note-1', [{id: 'z3', kind: 9735, tags: [['e', 'note-1']]}]), {reactions: 0, sats: 0});
+  assert.equal(isReactionForNote(reaction('r1'), 'note-1'), true);
+  assert.equal(isReactionForNote(reaction('r1'), 'note-2'), false);
+  assert.equal(isReceiptForNote(receipt('z1', 21000), 'note-1'), true);
+  assert.equal(isReceiptForNote(reaction('r1'), 'note-1'), false, 'a reaction is not a receipt');
+});
+
+test('the receipt for the invoice the reader was shown is recognised, and no other is', () => {
+  const receipt = {kind: 9735, tags: [['bolt11', 'lnbc210n1pabcdef']]};
+  assert.equal(receiptMatchesInvoice(receipt, 'lnbc210n1pabcdef'), true);
+  assert.equal(receiptMatchesInvoice(receipt, '  LNBC210N1PABCDEF '), true);
+  assert.equal(receiptMatchesInvoice(receipt, 'lightning:lnbc210n1pabcdef'), true);
+  assert.equal(receiptMatchesInvoice(receipt, 'lnbc500n1pabcdef'), false, 'a different invoice is a different payment');
+  assert.equal(receiptMatchesInvoice(receipt, ''), false);
+  assert.equal(receiptMatchesInvoice(receipt, null), false);
+  assert.equal(receiptMatchesInvoice({kind: 9735, tags: []}, 'lnbc210n1pabcdef'), false);
+});
 
 const NOTE = 'a'.repeat(64);
 const AUTHOR = 'b'.repeat(64);
