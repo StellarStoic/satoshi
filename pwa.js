@@ -40,7 +40,8 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
 }
 
 const SATOSHI_CHAT_SETTING = 'satoshiChatEnabled';
-const SENSITIVE_INPUT_PAGE = ['/wallet.html', '/nostrKeys.html'].includes(location.pathname);
+const ANALYTICS_DISABLED_PAGE = ['/wallet.html', '/nostrKeys.html'].some(page => location.pathname.endsWith(page));
+const CHAT_DISABLED_PAGE = location.pathname.endsWith('/wallet.html');
 const RUNNING_AS_APP = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 let deferredInstallPrompt = null;
@@ -52,13 +53,13 @@ window.addEventListener('beforeinstallprompt', event => {
     window.dispatchEvent(new CustomEvent('satoshi-pwa-install-state'));
 });
 
-if (!SENSITIVE_INPUT_PAGE && !document.querySelector('link[href="/analytics.css"]')) {
+if (!ANALYTICS_DISABLED_PAGE && !document.querySelector('link[href="/analytics.css"]')) {
     const analyticsStyles = document.createElement('link');
     analyticsStyles.rel = 'stylesheet';
     analyticsStyles.href = '/analytics.css';
     document.head.append(analyticsStyles);
 }
-if (!SENSITIVE_INPUT_PAGE) {
+if (!ANALYTICS_DISABLED_PAGE) {
     import('/analytics.mjs').catch(error => console.warn('Analytics consent could not be loaded:', error));
 }
 import('/seo.mjs').catch(error => console.warn('SEO metadata could not be loaded:', error));
@@ -232,7 +233,7 @@ if (document.querySelector('.footer')) {
 let chatEnabled = true;
 try { chatEnabled = localStorage.getItem(SATOSHI_CHAT_SETTING) !== 'false'; } catch { /* Use the default. */ }
 const animatedHome = ['/', '/index.html'].includes(location.pathname);
-if (chatEnabled && !animatedHome && !SENSITIVE_INPUT_PAGE) {
+if (chatEnabled && !animatedHome && !CHAT_DISABLED_PAGE) {
     if (!document.querySelector('link[href="/satoshiChat.css"]')) {
         const chatStyles = document.createElement('link');
         chatStyles.rel = 'stylesheet';

@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v307';   // v307: accessible themes, Nostr keys and expanded Pinstr board patterns
+const CACHE = 'satoshi-static-v322';   // v322: explain password and Nostr recipient protection
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',
@@ -21,7 +21,7 @@ const CORE = [
     '/isBip39.html', '/isBip39.css', '/isBip39.js', '/bip39Lookup.mjs', '/vendor/bip39.mjs',
     '/entropy.html', '/entropy.css', '/entropy.mjs', '/entropyModel.mjs',
     '/21fm.html', '/lofi.css', '/lofi.mjs', '/lofiModel.mjs', '/lofiInstruments.mjs', '/lofiRealSounds.mjs', '/vendor/tone/Tone.js', '/vendor/tone/Tone.js.map',
-    '/stego.html', '/stego.css', '/stego/emojiConfetti.css', '/stego/foundSecrets.css',
+    '/stego.html', '/stego.css', '/stego/h1.js', '/stego/emojiConfetti.css', '/stego/foundSecrets.css',
     '/stego/emojiDecoder.js', '/stego/emojiConfetti.js', '/stego/foundSecrets.js', '/stego/threeZeroWidthCharactersDecoder.js',
     '/stego/textTransformer.js', '/stego/decipher.js', '/stego/text-stego.js', '/stego/file-stego.js', '/stego/truncate.js',
     '/stego/nostrStegoFetch.js', '/stego/nostr-recipient.js', '/stego/loader.js', '/stego/clickToCopy.js', '/stego/vendor/bech32.js', '/stego/vendor/crypto-js.min.js',

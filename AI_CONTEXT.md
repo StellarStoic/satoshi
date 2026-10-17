@@ -102,6 +102,32 @@ Use the selected page section to answer questions such as "What does this button
     - **PWA version (`#pwaVersion`)**: Shows the installed Progressive Web App version.
     - **[Ignore unless specifically asked for]**: Footer content.
 
+### Page: [Nostr Keys]
+- **URL**: /nostrKeys.html
+- **Purpose**: A browser-only Nostr key utility with three views: convert an existing key between NIP-19 and hexadecimal forms, generate a new random identity, or mine a memorable public `npub` pattern.
+- **In simple terms**:
+    - An `npub` is the public identity people may safely know and share.
+    - An `nsec` is the secret that controls that identity. Anyone who obtains it can sign events as that user. Never ask the user to paste an `nsec`, secret hex, or other private key into chat.
+    - Hex is another representation of the same raw key bytes; converting representation does not encrypt or rotate a key.
+- **Converter (`#convertView`)**:
+    - Accepts `npub`, `nsec`, or exactly 64 hexadecimal characters and converts locally in the browser.
+    - A bare 64-character hex value does not identify whether it is public or secret. The page therefore shows both interpretations when mathematically possible; the user must know which kind of key they started with.
+    - NIP-19 Bech32 checksums detect typing errors but provide no encryption or secrecy.
+- **Generator (`#generateView`)**:
+    - Uses `crypto.getRandomValues` to create a valid 32-byte secp256k1 secret scalar, then derives its x-only public key and the corresponding `nsec` and `npub`.
+    - For an identity that matters, advise downloading and inspecting the HTML, disconnecting the device, generating offline, and keeping verified backups of the secret.
+- **Miner (`#mineView`)**:
+    - Repeatedly generates fresh valid keypairs until the public key matches the requested public pattern. This is vanity generation, not recovery and not an attempt to find another person's secret.
+    - Prefixes match after `npub1`; suffixes match before the six-character Bech32 checksum; leading-zero rules apply to public-key hex. Comma-separated values are alternatives. When several rule types are set, all rule types must match.
+    - CPU mode uses Web Workers. GPU mode uses WebGPU only after a known-key self-test; unsupported or failed GPU operation falls back to CPU.
+    - One additional specified Bech32 character multiplies average work by about 32; one public-hex zero multiplies it by about 16. The displayed time is a probability-based average, never a deadline or guarantee.
+- **Privacy boundary for Synthetic Satoshi**:
+    - The widget may receive the active tool, public vanity-pattern settings, CPU/GPU choice, worker count, displayed difficulty, measured speed, estimate, and non-secret status text.
+    - The widget never receives the converter input, converted values, generated keys, mined keys, or result fields through page context. It cannot inspect or validate those omitted values.
+    - If a user manually sends a secret in chat, tell them to treat it as exposed and replace the identity. Do not repeat or transform the secret.
+- **Local behavior**: The page does not save keys. Result fields are cleared when the page is left. Analytics remains disabled on this page; Synthetic Satoshi is optional through site settings.
+- **[Ignore unless specifically asked for]**: Footer content.
+
 ### Page: [Lottery]
 - **URL**: /lottery.html
 - **Purpose**: Play a Bitcoin Lightning lottery powered by The Daily Thunder (`playtdt.com`). Draws are provably fair, using Bitcoin block hashes every 100 blocks.

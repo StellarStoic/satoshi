@@ -4,12 +4,13 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 
 const root = new URL('../', import.meta.url);
-const [html, pwa, sitemap, seo, serviceWorker] = await Promise.all([
+const [html, pwa, sitemap, seo, serviceWorker, chat] = await Promise.all([
   readFile(new URL('nostrKeys.html', root), 'utf8'),
   readFile(new URL('pwa.js', root), 'utf8'),
   readFile(new URL('sitemap.xml', root), 'utf8'),
   readFile(new URL('seo.mjs', root), 'utf8'),
   readFile(new URL('sw.js', root), 'utf8'),
+  readFile(new URL('satoshiChat.mjs', root), 'utf8'),
 ]);
 
 const core = html.match(/<script id="nostr-keys-core">([\s\S]*?)<\/script>/)?.[1];
@@ -80,10 +81,16 @@ test('page is downloadable, inspectable and explicit about secret-key safety', (
   assert.doesNotMatch(core, /localStorage|sessionStorage|fetch\(|XMLHttpRequest/);
 });
 
-test('route is discoverable, cached, and excluded from analytics and AI chat', () => {
+test('route is discoverable, cached, private from analytics, and available to safe AI help', () => {
   assert.match(pwa, /Nostr keys/);
-  assert.match(pwa, /\['\/wallet\.html', '\/nostrKeys\.html'\]/);
+  assert.match(pwa, /const ANALYTICS_DISABLED_PAGE = \['\/wallet\.html', '\/nostrKeys\.html'\]\.some/);
+  assert.match(pwa, /const CHAT_DISABLED_PAGE = location\.pathname\.endsWith\('\/wallet\.html'\)/);
+  assert.match(pwa, /chatEnabled && !animatedHome && !CHAT_DISABLED_PAGE/);
   assert.match(sitemap, /nostrKeys\.html/);
   assert.match(seo, /'\/nostrKeys\.html': \[/);
   assert.match(serviceWorker, /'\/nostrKeys\.html'/);
+  assert.match(chat, /location\.pathname\.endsWith\('\/nostrKeys\.html'\)/);
+  assert.match(chat, /key inputs, converted values, generated keys, mined keys, and result fields are intentionally omitted/);
+  assert.doesNotMatch(chat.match(/if \(location\.pathname\.endsWith\('\/nostrKeys\.html'\)\) \{([\s\S]*?)\n  \}/)?.[1] || '', /convertInput|convertResults|generateResults|mineResults/);
+  assert.match(html, /Synthetic Satoshi can explain the tool, but key inputs and results are deliberately hidden/);
 });

@@ -4,7 +4,7 @@
     right: 25px; /* 25px from the left of the nearest positioned ancestor */
     font-size: 24px;
     z-index: 100000;
-    color: #888; /* Icon color */
+    color: var(--text-muted); /* Icon color */
     cursor: pointer;
     pointer-events: auto !important; /* Force clickability */
 }
@@ -29,15 +29,15 @@
 }
 
 .red {
-    color: red;
+    color: var(--danger);
 }
 
 .green {
-    color: rgb(58, 184, 58);
+    color: var(--success);
 }
 
 .yellow {
-    color: yellow;
+    color: var(--focus);
 }
 
 /* Main content container for desktop spacing */
@@ -87,7 +87,7 @@
 }
 
 .stat-card h3 {
-    color: #c5ba9e;
+    color: var(--text-muted);
     font-size: 0.9em;
     margin-bottom: 10px;
     text-transform: uppercase;
@@ -140,7 +140,7 @@
 .left-arrow.disabled, .right-arrow.disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    color: #888;
+    color: var(--text-muted);
 }
 
 .left-arrow i, .right-arrow i {
@@ -206,20 +206,20 @@
 }
 
 .meta-label {
-    color: #c5ba9e;
+    color: var(--text-muted);
     font-size: 0.9em;
     margin-bottom: 5px;
 }
 
 #draw-number {
-    color: #00f200;
+    color: var(--success);
     font-weight: bold;
     font-size: 2.5rem;
     text-align: center;
 }
 
 .meta-value {
-    color: #fff;
+    color: var(--text);
     font-size: 1.2em;
     font-family: "Roboto Mono", monospace;
     text-align: center;
@@ -227,7 +227,7 @@
 
 #block-label {
     font-size: 0.9em;
-    color: #c5ba9e;
+    color: var(--text-muted);
     margin-bottom: 5px;
 }
 
@@ -238,7 +238,7 @@
 
 /* Style for block hash with winning numbers */
 .block-hash-link {
-    color: #fff;
+    color: var(--text);
     text-decoration: none;
     font-family: "Roboto Mono", monospace;
     font-size: 0.85em;
@@ -251,13 +251,13 @@
 }
 
 .winning-numbers {
-    color: rgb(58, 184, 58); /* Using your existing green color [1] */
+    color: var(--success);
     font-weight: bold;
 }
 
 .last-updated {
     font-size: 0.85em;
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     width: 100%;
 }
@@ -309,7 +309,7 @@
 
 .winners-table td {
     padding: 12px 15px;
-    color: #c5ba9e;
+    color: var(--text-muted);
     white-space: nowrap;
     border-bottom: 1px solid #444;
 }
@@ -340,7 +340,7 @@
 }
 
 .progress-bar-container h3 {
-    color: #c5ba9e;
+    color: var(--text-muted);
     font-size: 0.9em;
     margin-bottom: 15px;
     text-transform: uppercase;
@@ -379,7 +379,7 @@
     display: flex;
     justify-content: space-between;
     font-size: 0.8em;
-    color: #c5ba9e;
+    color: var(--text-muted);
 }
 
 .progress-labels span {
@@ -421,8 +421,8 @@
 .provider-status {
     text-align: center;
     margin-top: 5px;
-    font-size: 0.7em;
-    color: #888;
+    font-size: .75rem;
+    color: var(--text-muted);
 }
 
 #current-provider {
@@ -437,7 +437,7 @@
 
 @keyframes highlight {
     0% { color: var(--accent); }
-    50% { color: #ffd700; }
+    50% { color: var(--focus); }
     100% { color: var(--accent); }
 }
 
@@ -456,7 +456,7 @@
 }
 
 .sat-logo {
-    color: #fff;
+    color: var(--text);
     width: 40px;
     height: 40px;
     vertical-align: middle;

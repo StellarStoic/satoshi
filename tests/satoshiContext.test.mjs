@@ -13,11 +13,19 @@ test('AI context has no unresolved runtime placeholder', () => {
 test('AI context maps every documented page to one URL', () => {
   assert.ok(parsed.introduction.includes('Synthetic Satoshi'));
   assert.ok(parsed.rules.includes('Protect secrets'));
-  assert.equal(parsed.pages.size, 31);
+  assert.equal(parsed.pages.size, 32);
   assert.equal(parsed.pages.get('/converter.html')?.name, 'Converter');
   assert.equal(parsed.pages.get('/nip05store.html')?.name, 'NIP-05 name store');
   assert.equal(parsed.pages.get('/bitcoinTxCost.html')?.name, 'Bitcoin and Ark Transaction Cost');
   assert.equal(parsed.pages.get('/stickyNotes.html')?.name, 'Pinstr');
+  assert.equal(parsed.pages.get('/nostrKeys.html')?.name, 'Nostr Keys');
+});
+
+test('Nostr Keys context explains the tool without inviting secret disclosure', () => {
+  const selected = selectAiContext(parsed, '/nostrKeys.html');
+  assert.match(selected, /browser-only Nostr key utility/);
+  assert.match(selected, /never receives the converter input, converted values, generated keys, mined keys/);
+  assert.match(selected, /Never ask the user to paste an `nsec`/);
 });
 
 test('every documented page exists in the site root', async () => {

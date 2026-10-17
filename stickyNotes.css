@@ -583,6 +583,105 @@
 .share-board-link input { width: 100%; }
 .share-board-preview { display: block; width: 100%; margin: 14px 0 0; border: 1px solid rgba(255, 246, 214, .18); border-radius: 6px; background: #241608; aspect-ratio: 1; object-fit: cover; }
 
+/* Dialog chrome follows the selected site theme; the cork and paper remain physical colors. */
+.sticky-dialog,
+.geohash-map-dialog { border-color: var(--border); color: var(--text); background: var(--surface); color-scheme: light dark; }
+.dialog-inner > p,
+.nostr-connect-help,
+.nostr-connect-uri,
+.board-chooser label,
+.board-depth-help p,
+.note-view-options legend,
+.note-filter-toggle small,
+.geohash-map-header p,
+.geohash-map-selection,
+.area-scale span,
+.login-note,
+.private-key-login,
+.inline-status,
+.account-card code,
+.anonymous-expiry,
+.composer-count,
+.pow-offer,
+.note-image__lead,
+.note-image__pick > span,
+.note-image__pick small,
+.note-image__grades-label,
+.note-image__grade span,
+.note-image__grades-hint,
+.font-choice,
+.hashtag-field,
+.hashtag-field small,
+.hashtag-status,
+.liveliness__head,
+.liveliness__ticks,
+.liveliness__hint,
+.note-scope-toggle,
+.sticky-payment p,
+.sticky-payment code { color: var(--text-muted); }
+.board-chooser input,
+.board-chooser select,
+.login-field input,
+.note-gift__custom input,
+.user-relays__field input,
+.note-font-select,
+.note-font-select option,
+.hashtag-field input,
+.note-image__pick input,
+.nostr-connect-uri code {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+.login-methods button,
+.amber-pair,
+.anonymous-login,
+.rail-tab,
+.note-kind,
+.note-kind__button,
+.note-view-options label,
+.area-scale,
+.board-depth-help p,
+.geohash-map-search,
+.geohash-map-search__result,
+.note-gift__reactions button,
+.note-gift__amounts button,
+.user-relays__list li,
+.sticky-payment { color: var(--text); background: var(--surface-raised); border-color: var(--border); }
+.dialog-close,
+.note-menu__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  font-size: 22px;
+  cursor: pointer;
+}
+.dialog-close:is(:hover, :focus-visible),
+.note-menu__close:is(:hover, :focus-visible) { color: var(--accent); background: var(--surface); border-color: var(--accent); }
+.note-menu { color: var(--text); background: color-mix(in srgb, var(--surface) 97%, transparent); border-color: var(--border); }
+.note-menu > span,
+.note-menu code,
+.note-menu time,
+.note-event-json summary,
+.note-event-json pre code { color: var(--text-muted); }
+.note-event-json,
+.note-event-json pre { border-color: var(--border); }
+.note-event-json pre { background: var(--surface-raised); }
+.primary-action,
+.pay-button { color: var(--accent-contrast); }
+.private-key-login .private-key-warning,
+.private-key-warning strong,
+.inline-status.is-error,
+.hashtag-status.is-error { color: var(--danger); }
+.liveliness__ticks,
+.note-event-json pre code { font-size: .75rem; }
+
 /* Card mode: the page wearing nothing but the board, so the desk can screenshot the board itself
    into the picture a shared link unfurls with. Everything the reader needs while browsing is gone -
    the title, the controls, the help and menu affordances, the site's live footer, the status line,

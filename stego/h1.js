@@ -28,7 +28,8 @@
     charMap[charArray[i]] = i;
   }
   
-  const scale    = 25;      // font size (and horizontal step)
+  const defaultScale = 25; // Downloadable page keeps its original title size.
+  let scale = defaultScale;
   const breaks   = 0.03;   // deceleration per frame
   const endSpeed = 0.03;   // minimal speed when finishing
   const firstLetter = 80;  // base parameter before a letter stops
@@ -51,6 +52,13 @@
   function resizeCanvas(){
     canvas.width  = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
+    const requestedScale = Number(canvas.dataset.titleScale);
+    if (Number.isFinite(requestedScale) && requestedScale > 0) {
+      const availableScale = (canvas.width - 24) / (maxLen - 1);
+      scale = Math.min(requestedScale, Math.max(20, availableScale));
+    } else {
+      scale = defaultScale;
+    }
   }
   window.onresize = resizeCanvas;
   resizeCanvas();

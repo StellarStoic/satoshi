@@ -659,3 +659,33 @@ option:checked {
         transform: translateY(0);
     }
 }
+
+/* Keep chart controls, event dialogs and supporting copy readable in every theme. */
+.chart-container :is(select, input) { border-color: var(--border); }
+.chart-container button:not(.snapshot-btn) { color: var(--accent-contrast); }
+optgroup { color: var(--text); background: var(--surface-raised); }
+optgroup option { color: var(--text); background: var(--surface); }
+.modal-content { color: var(--text); border-color: var(--border); }
+.modal-content .close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    color: var(--text);
+    background: var(--surface-raised);
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    line-height: 1;
+}
+.modal-content .close:is(:hover, :focus-visible) { color: var(--accent); border-color: var(--accent); }
+.event-meta,
+.quote-context,
+.export-option-btn small,
+.v4v-message p,
+.v4v-message p:last-child { color: var(--text-muted); }
+.event-link a,
+.quote-source,
+#exportModalTitle,
+.export-option-btn { color: var(--text); }
+.event-card,
+.export-option-btn { background: var(--surface-raised); border-color: var(--border); }

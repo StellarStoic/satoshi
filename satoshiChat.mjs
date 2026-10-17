@@ -345,6 +345,34 @@ function extractError(payload, status) {
 
 function buildPageContext(userText = '') {
   const context = [`Page: ${document.title}`, `Path: ${location.pathname}`];
+  if (location.pathname.endsWith('/nostrKeys.html')) {
+    const activeTab = document.querySelector('.tab[aria-selected="true"]')?.textContent?.trim() || 'Unknown';
+    const statusFor = {
+      Convert: document.getElementById('convertStatus'),
+      Generate: document.getElementById('generateStatus'),
+      Mine: document.getElementById('mineStatus'),
+    };
+    context.push(`Active Nostr Keys tool: ${activeTab}`);
+    const status = statusFor[activeTab]?.textContent?.trim();
+    if (status) context.push(`Tool status: ${status}`);
+    if (activeTab === 'Mine') {
+      const safeMiningState = [
+        ['Requested prefixes', document.getElementById('prefixes')?.value],
+        ['Requested suffixes', document.getElementById('suffixes')?.value],
+        ['Leading public-hex zeros', document.getElementById('zeros')?.value],
+        ['Device', document.getElementById('device')?.selectedOptions?.[0]?.textContent],
+        ['CPU workers', document.getElementById('coreCount')?.value],
+        ['Estimated difficulty', document.getElementById('difficulty')?.textContent],
+        ['Measured speed', document.getElementById('speed')?.textContent],
+        ['Average-time estimate', document.getElementById('estimate')?.textContent],
+      ]
+        .filter(([, value]) => String(value ?? '').trim())
+        .map(([label, value]) => `${label}: ${String(value).trim()}`);
+      if (safeMiningState.length) context.push(`Current non-secret mining settings:\n${safeMiningState.join('\n')}`);
+    }
+    context.push('Privacy boundary: key inputs, converted values, generated keys, mined keys, and result fields are intentionally omitted. Never ask the user to paste an nsec or secret hex into chat.');
+    return context.join('\n').slice(0, 7000);
+  }
   if (SENSITIVE_CONTEXT_PAGES.has(location.pathname)) {
     context.push('Page details are intentionally omitted because this page may contain wallet secrets or private files.');
     return context.join('\n');

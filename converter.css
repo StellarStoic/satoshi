@@ -223,7 +223,7 @@ body > #menu,
     padding: 0;
     border: 0;
     background-color: #5c735100;
-    color: #888;
+    color: var(--text-muted);
     cursor: pointer;
     font-size: 24px;
     line-height: 1;
@@ -233,7 +233,7 @@ body > #menu,
 .add-currency-icon .lni { display: block; font-size: 24px; line-height: 1; pointer-events: none; }
 
 .add-currency-icon:hover {
-    color: #fefffe;
+    color: var(--text);
 }
 
 /* Placeholder text color */
@@ -261,7 +261,7 @@ body > #menu,
 
 .currency-item:not(:has(input:disabled)):hover {
     background-color: var(--accent); /* Highlight background color on hover */
-    color: #000; /* Text color on hover for better visibility */
+    color: var(--accent-contrast); /* Text color on hover for better visibility */
 }
 
 .currency-item:has(input:checked) {
@@ -343,7 +343,7 @@ body > #menu,
 }
 
 .description-modal a {
-    color: #c5ba9e; /* Brighter color for better visibility */
+    color: var(--accent);
     text-decoration: underline; /* Optional: Underline to indicate a link */
 }
 
@@ -448,7 +448,7 @@ body > #menu,
   }
   
   .live-data-text {
-    color: #88888856;
+    color: var(--text-muted);
     font-size: 12px;
     line-height: 1;
     margin-top: 70px;
@@ -460,7 +460,7 @@ body > #menu,
   
   .live-data-text.active {
     visibility: visible;
-    color: #ffffff7e;
+    color: var(--text);
   }
   
   #active-text {

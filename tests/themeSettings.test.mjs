@@ -87,3 +87,29 @@ test('Moscow Time sync state and fetched value retain the original display face'
   assert.match(css, /#satoshisValue\s*\{[^}]*font-family:\s*'East Sea Dokdo', cursive !important;/s);
   assert.match(theme, /:not\(#satoshisValue\)/);
 });
+
+test('shared network modals and close controls use theme contrast tokens', async () => {
+  const css = await read('theme.css');
+
+  assert.match(css, /\.footer-modal \.footer-modal-content[^}]*color:\s*var\(--text\)[^}]*background:\s*var\(--surface\)/s);
+  assert.match(css, /\.footer-modal h2[^}]*color:\s*var\(--text\)/s);
+  assert.match(css, /\.mempool-metric[^}]*background:\s*var\(--surface-raised\)[^}]*border:\s*1px solid var\(--border\)/s);
+  assert.match(css, /\.mempool-metric strong[^}]*color:\s*var\(--text\)/s);
+  assert.match(css, /\.footer-modal \.close-icon[^}]*color:\s*var\(--text\)[^}]*background:\s*var\(--surface-raised\)[^}]*border:\s*2px solid var\(--border\)/s);
+});
+
+test('pages with custom panels map their text and surfaces to the active theme', async () => {
+  const [custody, lottery, converter, chart, offers, pinstr, game, terms] = await Promise.all([
+    read('selfCustody.css'), read('lotteryStats.css'), read('converter.css'), read('chart.css'),
+    read('offers.css'), read('stickyNotes.css'), read('game39.css'), read('lotteryTOS.html'),
+  ]);
+
+  assert.match(custody, /--ink:\s*var\(--text\)/);
+  assert.match(lottery, /\.stat-card h3\s*\{[^}]*color:\s*var\(--text-muted\)/s);
+  assert.match(converter, /\.add-currency-icon[^}]*color:\s*var\(--text-muted\)/s);
+  assert.match(chart, /\.event-meta,[\s\S]*color:\s*var\(--text-muted\)/);
+  assert.match(offers, /--book-muted:\s*var\(--text-muted\)/);
+  assert.match(pinstr, /\.dialog-close,[\s\S]*background:\s*var\(--surface-raised\)[\s\S]*border:\s*2px solid var\(--border\)/);
+  assert.match(game, /#joinStatus\s*\{[^}]*color:\s*var\(--text\)/s);
+  assert.match(terms, /\.warning \{ color: var\(--text\); background: color-mix/);
+});

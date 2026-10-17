@@ -1,4 +1,5 @@
 /tools/*
+!/tools/build-stego-local.mjs
 !/tools/bip39/
 !/tools/history/
 !/tools/news/

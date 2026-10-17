@@ -8,6 +8,8 @@
   <link rel="canonical" href="https://satoshi.si/stego.html">
   <link rel="icon" href="/favicon-32x32.png">
   <link rel="manifest" href="/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.bunny.net">
+  <link href="https://fonts.bunny.net/css?family=major-mono-display:400" rel="stylesheet">
   <title>Steganography and Cipher Tools | Satoshi.si</title>
   <link rel="stylesheet" href="/stego/emojiConfetti.css">
   <link rel="stylesheet" href="/stego/foundSecrets.css">
@@ -468,63 +470,6 @@
         color: #ffa726;
     }
 
-    .qr-code-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center; /* Center content */
-      align-items: center;
-      gap: 30px; /* Space between items */
-      padding: 15px;
-    }
-
-    .qr-code-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      width: 200px; /* Ensures equal width */
-    }
-
-    .qr-code {
-      max-width: 150px;
-      height: auto;
-      border: 1px solid #888;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: transform 0.2s ease-in-out;
-    }
-
-    .qr-code:hover {
-      transform: scale(1.1);
-    }
-
-    .qr-code-text {
-      font-family: monospace;
-      font-size: 0.75em;
-      word-break: break-word;
-      margin-top: 5px;
-      color: #aaa;
-      text-align: center;
-    }
-
-    /* Center the Alby link */
-    .alby-link-container {
-      display: flex;
-      justify-content: center;
-      margin-top: 15px;
-    }
-
-    .alby-link-container a {
-      text-decoration: none;
-      color: #ff9800;
-      font-weight: bold;
-      transition: color 0.2s ease-in-out;
-    }
-
-    .alby-link-container a:hover {
-      color: #ffa726;
-    }
-
     .close {
       color: #aaa;
       float: right;
@@ -668,11 +613,29 @@
       The versioned decoder also reads messages made with the earlier 32-bit format. Hidden files are encoded into Base64 and appended to carrier files using a unique marker.
     </p>
     <p>
-      <strong>Encryption:</strong><br>
-      When you provide an encryption key, the tool encrypts the hidden content using AES encryption. 
-      The same key is required to decrypt and extract the hidden data. It is advised to protect any 
-      private information or digital payment invoices with a password, as bots can easily be programmed 
-      to immediately claim these invoices.
+      <strong>Protecting a hidden message or file:</strong><br>
+      Steganography hides that a secret exists; encryption protects the secret if somebody finds it.
+      The optional protection field supports two different methods:
+    </p>
+    <ul>
+      <li>
+        <strong>Password:</strong> enter an ordinary password to encrypt the hidden text or file. The recipient
+        must enter the same password to unlock it. Share the password separately from the carrier, and keep it
+        safe because a forgotten password cannot be recovered.
+      </li>
+      <li>
+        <strong>Recipient npub:</strong> enter the recipient's public Nostr key beginning with <code>npub</code>.
+        The secret is encrypted for that Nostr identity, so only the owner of the matching private key can unlock it.
+        An <code>npub</code> is public and safe to share; it cannot decrypt the secret by itself.
+      </li>
+    </ul>
+    <p>
+      To unlock an <code>npub</code>-protected secret, the recipient can choose <strong>Sign with Nostr</strong>
+      with a NIP-07 browser signer or Amber on Android, or choose <strong>Use bunker</strong> for a NIP-46 remote
+      signer. The signer authorizes NIP-44 decryption while keeping the private key inside the signer. Manually
+      entering an <code>nsec</code> or hexadecimal private key is available only as a discouraged fallback; it is
+      processed in this browser, cleared from the field after use, and is not saved. For hidden files, the file is
+      encrypted locally with a random key and only that key is locked to the recipient's <code>npub</code>.
     </p>
     <p>
       <strong>Steganography Methods:</strong><br>
@@ -784,32 +747,6 @@
       If you have any special visual effects requests, please reach out to me.
     </p>
 
-    <!-- Zap the Developer Section with QR Codes -->
-    <div class="zap-dev-section">
-      <h3>Zap the Developer ⚡️</h3>
-      <p>If you find this website valuable, consider contributing a sat or two. Thank you.</p>
-
-      <div class="qr-code-container">
-        <div class="qr-code-wrapper">
-          <!-- Lightning QR Code -->
-          <img src="/stego/img/images/qrLND.svg" alt="Lightning QR Code" class="qr-code" id="lightningQRCode" 
-              title="LNURL1DP68GURN8GHJ7EM9W3SKCCNE9E3K7MF0WQHHXAR9D3KXZUNNW3HKJCEWDFEK7MSS3L3TN"><br>
-          <span class="qr-code-text"><small>letterswiss19@walletofsatoshi.com</small></span>
-        </div>
-
-        <div class="qr-code-wrapper">
-          <!-- Onchain QR Code -->
-          <img src="/stego/img/images/qrOC.svg" alt="Onchain QR Code" class="qr-code" id="onchainQRCode" 
-              title="bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e"><br>
-          <span class="qr-code-text" id="onchainAddress"><small>bc1q2ytw4gwrkw5jg6ekutcwrgw8x5nlkahyk54l5e</small></span>
-        </div>
-      </div>
-
-      <div class="alby-link-container">
-        <p>
-          <a href="https://getalby.com/p/stellarstoic" target="_blank">My Alby page</a>
-      </p>
-    </div>
   </template>
 
 <!-- Modal for Obfuscation Explanation -->
@@ -826,8 +763,17 @@
 </div>
 
   <header class="stego-hero">
-    <p>Local privacy workshop</p>
-    <h1 id="mainTitle">Steganography Playground</h1>
+    <h1 id="mainTitle" aria-label="Awesome Steganography Playground">
+      <canvas width="460" height="170" data-title-scale="34" aria-hidden="true"></canvas>
+    </h1>
+    <div class="stego-definition" aria-label="Dictionary definition of steganography">
+      <div class="stego-definition__heading">
+        <strong>steganography</strong>
+        <span><em>noun</em> [ U ]</span>
+      </div>
+      <div class="stego-definition__pronunciation"><strong>uk</strong> /steɡ.əˈnɒɡ.rə.fi/</div>
+      <div class="stego-definition__meaning">~the practice of writing hidden messages in ordinary text, pictures, etc.</div>
+    </div>
     <span>Hide a message in plain sight, recover concealed data, inspect Nostr events, or build a reversible cipher sequence. Processing stays in this browser.</span>
   </header>
 
@@ -850,7 +796,7 @@
     <label for="hiddenMessage">Hidden Message</label>
     <textarea id="hiddenMessage" placeholder="Enter the hidden message"></textarea>
     
-    <label for="encryptionKey">Optional Password or Recipient npub</label>
+    <label for="encryptionKey">Optional Password or <span style="color: var(--stego-purple);">Recipient npub</span></label>
     <input type="password" id="encryptionKey" placeholder="Password or npub1..." autocomplete="new-password" spellcheck="false">
     <div id="nostrRecipientPreview" class="nostr-recipient-preview" role="status" aria-live="polite" hidden></div>
   </div>
@@ -918,7 +864,7 @@
     <label for="hiddenText">Or Enter Hidden Text</label>
     <textarea id="hiddenText" placeholder="Enter text to hide instead of a file"></textarea>
   
-    <label for="fileEncryptionKey">Optional Password or Recipient npub</label>
+    <label for="fileEncryptionKey">Optional Password or <span style="color: var(--stego-purple);">Recipient npub</span></label>
     <input type="password" id="fileEncryptionKey" placeholder="Password or npub1..." autocomplete="new-password" spellcheck="false">
     <div id="fileNostrRecipientPreview" class="nostr-recipient-preview" role="status" aria-live="polite" hidden></div>
   </div>
@@ -1129,6 +1075,9 @@
   <button id="removeAllMethodsBtn" class="delete-button" style="display:none; background-color:rgb(220, 110, 110)">Remove all</button>
 </div>
 
+<p class="stego-source-note">
+  <a href="/stego-local.html" download="stego-local.html">Download Stego for local use</a>. <a href="https://github.com/StellarStoic/satoshi/blob/main/stego-local.html" target="_blank" rel="noopener noreferrer">View this file's source on GitHub</a>.
+</p>
 
 <div class="legal-disclaimer" style="font-size: 0.85rem; color: red; margin-top: 30px; padding: 10px; max-width: 500px; text-align: center; border-top: 1px solid #444;">
   <strong>Legal Disclaimer:</strong> The creator of this website cannot be held responsible in case of misuse of this website for activities not permitted by law in the user's country.
@@ -1249,6 +1198,7 @@ function copyToClipboard(elementId) {
     <script src="/stego/nostrStegoFetch.js"></script>
     <script src="/stego/loader.js"></script>
     <script src="/stego/clickToCopy.js"></script>
+    <script src="/stego/h1.js"></script>
     <script src="/burgerMenu.js"></script>
 </body>
 </html>

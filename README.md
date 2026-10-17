@@ -97,6 +97,8 @@ Open **http://127.0.0.1:8080**. A VSCodium static-server extension can serve the
 
 Use HTTPS in production or localhost for service-worker development. Root-relative asset paths and the manifest assume hosting at the domain root; subdirectory hosting requires path changes.
 
+`stego-local.html` is the generated single-file edition of the live Stego tool. Rebuild it after Stego UI, style, script, or asset changes with `node tools/build-stego-local.mjs`; `node tools/build-stego-local.mjs --check` verifies that the download still mirrors the live page. The generated edition intentionally excludes the PWA/AI loader, burger navigation, and live footer.
+
 ## Development
 
 Keep contributions approachable: plain HTML, CSS, and JavaScript, with page-specific styles and shared theme variables in `theme.css`. Navigation effects live in `siteEffects.css` and `siteEffects.js`. The PWA entry points are `site.webmanifest`, `pwa.js`, and `sw.js`.

@@ -121,10 +121,14 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="theme.css">
     <style>
+        body { color: var(--text); background-color: var(--page-bg); }
         .container { background: transparent; border-radius: 0; box-shadow: none; }
+        header, h2, footer { border-color: var(--border); }
         h1, h2, strong { color: var(--text); }
-        .warning { background: #332b15; }
-        .disclaimer { background: #351d20; }
+        h3, a { color: var(--accent); }
+        .last-updated, footer { color: var(--text-muted); }
+        .warning { color: var(--text); background: color-mix(in srgb, var(--focus) 12%, var(--surface)); border-color: color-mix(in srgb, var(--focus) 55%, var(--border)); }
+        .disclaimer { color: var(--text); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
     </style>
     <script src="pwa.js" defer></script>
     <link rel="stylesheet" href="siteEffects.css">

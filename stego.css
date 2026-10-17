@@ -37,29 +37,69 @@
   border-bottom: 1px solid var(--border);
 }
 
-.stego-hero p {
-  margin: 0 0 9px;
+.stego-definition {
+  width: min(100%, 630px);
+  margin: 2px auto 8px;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.stego-definition__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 12px;
+}
+
+.stego-definition__heading > strong {
   color: var(--stego-orange);
+  font-size: 1.05rem;
+}
+
+.stego-definition__heading span,
+.stego-definition__pronunciation {
+  color: var(--text-muted);
   font-size: .75rem;
-  font-weight: 700;
+}
+
+.stego-definition__pronunciation {
+  margin-top: 2px;
+}
+
+.stego-definition__pronunciation strong {
+  color: var(--text);
   text-transform: uppercase;
 }
 
+.stego-definition__meaning {
+  margin-top: 4px;
+  font-size: .78rem;
+}
+
 .stego-hero h1 {
-  margin: 0;
+  width: min(100%, 460px);
+  height: 170px;
+  margin: 0 auto;
   color: var(--text);
   font-size: clamp(2rem, 7vw, 4.4rem);
   font-weight: 400;
   line-height: 1.02;
 }
 
+.stego-hero #mainTitle canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .stego-hero > span {
   display: block;
   max-width: 630px;
-  margin-top: 18px;
+  margin: 18px auto 0;
   color: var(--text-muted);
   font-size: .86rem;
   line-height: 1.75;
+  text-align: center;
 }
 
 #helpIcon {
@@ -617,6 +657,29 @@
   font-size: .7rem !important;
   line-height: 1.6;
   text-align: left !important;
+}
+
+.stego-source-note {
+  max-width: 500px;
+  margin: 30px auto 0;
+  color: var(--text-muted);
+  font-size: .7rem;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.stego-source-note a {
+  color: var(--stego-green);
+  text-underline-offset: 3px;
+}
+
+.stego-source-note a:hover,
+.stego-source-note a:focus-visible {
+  color: var(--stego-orange);
+}
+
+.stego-source-note + .legal-disclaimer {
+  margin-top: 10px !important;
 }
 
 @media (max-width: 600px) {

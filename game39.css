@@ -27,6 +27,8 @@
     border-radius: 8px;
     box-shadow: 0 1px 5px rgba(0,0,0,0.1);
     font-family: "Roboto Mono", monospace;
+    background: var(--surface);
+    color: var(--text);
   }
 
   .round-input {
@@ -38,7 +40,7 @@
 
   #roundText {
     font-size: 1.5rem;
-    color: #888;
+    color: var(--text-muted);
     font-family: "Roboto Mono", monospace;
   }
   
@@ -49,6 +51,8 @@
     border: 1px solid #ccc;
     border-radius: 8px;
     font-family: "Roboto Mono", monospace;
+    background: var(--surface);
+    color: var(--text);
   }
   
   /* BUTTON STYLING */
@@ -62,7 +66,7 @@
     border: none;
     border-radius: 8px;
     background-color: #f7931a;
-    color: white;
+    color: var(--accent-contrast);
     cursor: pointer;
     transition: background-color 0.2s;
   }
@@ -76,7 +80,7 @@
     top: 35px; /* 25px from the top of the nearest positioned ancestor */
     right: 25px; /* 25px from the left of the nearest positioned ancestor */
     font-size: 24px;
-    color: #888; /* Icon color */
+    color: var(--text-muted); /* Icon color */
     cursor: pointer;
 }
 
@@ -88,7 +92,7 @@
   /* PEER ID DISPLAY */
   #yourId {
     font-size: 0.95rem;
-    color: #444;
+    color: var(--text-muted);
     word-break: break-word;
     max-width: 80%;
   }
@@ -97,11 +101,11 @@
 
   #joinStatus {
     font-size: 1rem;
-    color: #333;
+    color: var(--text);
   }
   
   #joinStatus.error {
-    color: red;
+    color: var(--danger);
   }
 
 /* Makes entire container use full viewport */
@@ -178,7 +182,7 @@
   left: 0;
   width: 100%;
   background-color: var(--surface-raised);
-  color: #fff;
+  color: var(--text);
   font-family: "Roboto Mono", monospace;
   padding: 1rem;
   text-align: center;
@@ -202,7 +206,7 @@
   font-weight: bold;
   font-family: 'East Sea Dokdo', cursive;
   background-color: var(--surface-raised);
-  color: #c47710;
+  color: var(--accent);
   text-align: center;
   padding: 0 1rem;
   word-break: break-word;
