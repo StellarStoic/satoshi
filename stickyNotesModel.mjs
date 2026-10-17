@@ -1718,6 +1718,22 @@ export const AMBER_HANDED_OVER_LINE = 'This signature was already handed over - 
  * recent thing that happened to this note, and "nothing left to pin" underneath it reads as a
  * second, quieter failure.
  */
+/**
+ * The headers for a call to the payment desk.
+ *
+ * A GET carries no body, and a `content-type` on one turns it into a request the browser must preflight
+ * first. The desk answers OPTIONS for its GET routes with `access-control-allow-methods` but no
+ * `access-control-allow-headers`, so every price quote was refused by CORS and the composer never got
+ * the number it needed - the note then went to the desk with no valid amount and came back 402.
+ */
+export function apiHeaders(options = {}) {
+  const headers = {...(options.headers || {})};
+  const body = options.body;
+  if (body !== undefined && body !== null) headers['content-type'] = 'application/json';
+  return headers;
+}
+
+
 export function spentAmberHandOver({parked = null, handed = null} = {}) {
   if (parked || handed?.action !== 'sign') return null;
   return {

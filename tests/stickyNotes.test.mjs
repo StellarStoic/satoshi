@@ -7,6 +7,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
  stickyPowOffer, stickyPowSentence, stickyPowProgress, stickyPowDifficulty,
   boardBitmapSize,
   boardPatternScale,
+  apiHeaders,
   BOARD_TILE_PX,
   BOARD_IMAGE_PX,
   BOARD_BITMAP_MAX,
@@ -3765,4 +3766,21 @@ test('the settings let a reader add three relays, and show them as lamps with mi
   assert.match(page, /publishToRelays\(event, userRelays\)\.catch\(\(\) => \{\}\)/);
   // The panel draws and measures itself when it opens.
   assert.match(page, /renderUserRelays\(\);\n  checkUserRelays\(\);/);
+});
+
+test('a quote request carries no content-type, so the browser never preflights it', async () => {
+  // The desk answers OPTIONS for its GET routes with access-control-allow-methods but no
+  // access-control-allow-headers, so announcing a JSON body on a GET that has none made every price
+  // quote fail in the browser: the composer then had no amount and the note came back 402.
+  assert.deepEqual(apiHeaders({}), {});
+  assert.deepEqual(apiHeaders({method: 'GET'}), {});
+  assert.deepEqual(apiHeaders({body: JSON.stringify({a: 1})}), {'content-type': 'application/json'});
+  assert.deepEqual(apiHeaders({headers: {'x-test': '1'}}), {'x-test': '1'});
+  assert.deepEqual(apiHeaders({body: 'x', headers: {'x-test': '1'}}),
+                   {'x-test': '1', 'content-type': 'application/json'});
+
+  // And the call site uses it, rather than setting the header itself.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(page, /headers: apiHeaders\(options\)/);
+  assert.doesNotMatch(page, /headers: \{'content-type': 'application\/json', \.\.\.\(options\.headers/);
 });

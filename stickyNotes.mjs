@@ -1,4 +1,5 @@
 import {
+  apiHeaders,
   STICKY_COLORS,
   STICKY_FONTS,
   STICKY_ANONYMOUS_PRICE_SATS,
@@ -1470,7 +1471,7 @@ async function refreshSubscription() {
 async function api(path, options = {}) {
   const response = await fetch(API + path, {
     ...options,
-    headers: {'content-type': 'application/json', ...(options.headers || {})},
+    headers: apiHeaders(options),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
