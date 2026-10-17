@@ -65,7 +65,7 @@ const elements = Object.fromEntries([
   'walletFeeSlow', 'walletFeeRegular', 'walletFeeFast', 'walletArkFeePolicy', 'walletArkFeeQuote', 'walletFeesUpdated',
   'lockWallet', 'receiveView', 'sendView', 'activityView', 'activityDialog', 'openWalletActivity', 'arkReceivePanel', 'lightningReceivePanel', 'newArkAddress',
   'openWalletSettings', 'onchainBalance', 'onchainPending', 'moveView', 'onchainReceivePanel', 'newOnchainAddress',
-  'invoiceAmount', 'invoiceDescription', 'sendForm', 'onchainSendForm', 'onchainSendDestination', 'onchainSendAmount',
+  'invoiceAmount', 'invoiceDescription', 'sendForm', 'onchainSendForm', 'onchainSendDestination', 'onchainSendAmount', 'openBoardFromSend',
   'onchainFeeRate', 'onchainFeeHint', 'useSuggestedOnchainFee', 'arkSendMaxOption', 'arkSendMax',
   'boardForm', 'boardAmount', 'offboardForm', 'offboardAmount', 'offboardAll',
   'sendDestination', 'sendAmount', 'destinationHint', 'walletHistory', 'confirmPaymentDialog',
@@ -2225,13 +2225,29 @@ elements.onchainFeeRate.addEventListener('input', () => {
     : 'Enter a fee rate or use the current normal estimate.';
 });
 
+function openBoardMoveFromSend() {
+  const amount = Number(elements.onchainSendAmount.value);
+  if (Number.isSafeInteger(amount) && amount > 0) elements.boardAmount.value = String(amount);
+  showWalletView('move');
+  elements.boardAmount.focus();
+}
+
+elements.openBoardFromSend.addEventListener('click', openBoardMoveFromSend);
+
 elements.onchainSendForm.addEventListener('submit', async event => {
   event.preventDefault();
   if (!onchain || operationRunning) return;
   const destination = elements.onchainSendDestination.value.trim();
   const amount = Number(elements.onchainSendAmount.value);
+  let arkDestination = false;
+  try { arkDestination = validateArkAddress(destination); } catch { /* Not a complete Ark address. */ }
+  if (arkDestination) {
+    openBoardMoveFromSend();
+    setNotice('Ark addresses cannot be paid directly from an on-chain balance. Review the move into this wallet\'s Ark balance below.', 'error');
+    return;
+  }
   if (!bitcoinAddressMatchesNetwork(destination, activeNetwork.id)) {
-    setNotice(`Enter a valid-looking ${activeNetwork.shortLabel} Bitcoin address.`, 'error');
+    setNotice(`Enter a valid-looking ${activeNetwork.shortLabel} Bitcoin address, or choose “Move to Ark” for this wallet's Ark balance.`, 'error');
     return;
   }
   if (!Number.isSafeInteger(amount) || amount <= 0) {

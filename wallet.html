@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#101112">
   <meta name="description" content="An experimental self-custodial Bitcoin wallet using the Ark Layer 2 protocol, built with Second's Bark Web SDK for Signet and mainnet.">
+  <link rel="canonical" href="https://satoshi.si/wallet.html">
   <title>Ark Bitcoin Wallet | Satoshi.si</title>
   <link rel="icon" href="/favicon-32x32.png">
   <link rel="manifest" href="/site.webmanifest">
@@ -121,6 +122,10 @@
           <button type="submit" class="wallet-primary"><i data-lucide="scan-search"></i>Review payment</button>
         </form>
         <form id="onchainSendForm" class="send-form" data-send-panel="onchain" hidden>
+          <div class="wallet-balance-route">
+            <div><strong>Moving to this wallet's Ark balance?</strong><span>No address is needed. The wallet creates the boarding transaction for you.</span></div>
+            <button type="button" class="wallet-secondary" id="openBoardFromSend"><i data-lucide="arrow-left-right"></i>Move to Ark</button>
+          </div>
           <div class="send-destination-heading"><label for="onchainSendDestination">Bitcoin address</label><button type="button" class="wallet-quiet wallet-scan-qr" data-scan-target="onchain"><i data-lucide="scan-line"></i>Scan QR</button></div>
           <textarea id="onchainSendDestination" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Bitcoin address" required></textarea>
           <label class="send-amount" for="onchainSendAmount">Amount<input id="onchainSendAmount" type="number" min="1" step="1" inputmode="numeric" required><span>sats</span></label>

@@ -132,6 +132,15 @@ test('balance moves explain costs and distinguish a cooperative withdrawal from 
   assert.match(walletSource, /\['Bitcoin mining fee', 'Calculated by the on-chain wallet when submitted'\]/);
 });
 
+test('on-chain send routes Ark destinations to the internal boarding flow', () => {
+  assert.match(walletHtml, /id="openBoardFromSend"/);
+  assert.match(walletHtml, /Moving to this wallet's Ark balance/);
+  assert.match(walletSource, /arkDestination = validateArkAddress\(destination\)/);
+  assert.match(walletSource, /function openBoardMoveFromSend\(\)/);
+  assert.match(walletSource, /showWalletView\('move'\)/);
+  assert.match(walletSource, /Ark addresses cannot be paid directly from an on-chain balance/);
+});
+
 test('unlocked wallet home keeps only primary actions and moves history into a bottom sheet', () => {
   assert.match(walletHtml, /class="wallet-actions"[\s\S]*data-wallet-view="send"[\s\S]*data-wallet-view="receive"/);
   assert.doesNotMatch(walletHtml, /data-wallet-view="(?:move|activity)"/);

@@ -551,6 +551,28 @@ button:disabled {
   max-width: 720px;
 }
 
+.wallet-balance-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--wallet-line);
+  border-radius: 8px;
+  background: var(--wallet-panel-strong);
+}
+
+.wallet-balance-route > div { display: grid; gap: 4px; }
+.wallet-balance-route strong { color: var(--text, #f5f5f2); }
+.wallet-balance-route span { color: var(--wallet-muted); font-size: .82rem; line-height: 1.4; }
+.wallet-balance-route button { flex: 0 0 auto; margin: 0; white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .wallet-balance-route { align-items: stretch; flex-direction: column; }
+  .wallet-balance-route button { width: 100%; }
+}
+
 .send-form select,
 .wallet-setting-row select,
 .reveal-seed-dialog input {
