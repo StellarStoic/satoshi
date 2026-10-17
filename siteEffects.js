@@ -36,7 +36,9 @@
 
     if (consumeEntry() && !reducedMotion.matches) {
         showEffect('enter');
-        cleanupTimer = setTimeout(clearEffect, 220);
+        // Keep the completed transparent layer until the next navigation.
+        // Removing a full-viewport composited layer can flash for one frame in
+        // Chromium, even when its final computed opacity is already zero.
     }
 
     // A restored history entry must never retain the departing screen's overlay.
@@ -76,6 +78,6 @@
                 clearEffect();
                 navigating = false;
             }, 1500);
-        }, internal ? 240 : 380);
+        }, internal ? 500 : 380);
     });
 })();

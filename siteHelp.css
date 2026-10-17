@@ -15,7 +15,7 @@
     border-radius: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: #888 !important;
+    color: var(--text-muted) !important;
     font: inherit !important;
     font-size: 24px !important;
     line-height: 1 !important;
@@ -51,7 +51,7 @@
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
-    color: #888 !important;
+    color: var(--text-muted) !important;
     font-size: 24px !important;
     line-height: 1 !important;
 }
@@ -84,8 +84,12 @@
 .site-help-trigger:hover,
 .site-help-trigger:focus-visible {
     color: var(--accent) !important;
-    outline: none !important;
     transform: scale(1.06);
+}
+.site-help-trigger:focus-visible,
+.site-help-companion.site-help-companion--icon:focus-visible {
+    outline: 3px solid var(--focus) !important;
+    outline-offset: 3px !important;
 }
 
 .site-help-trigger .lni {
@@ -101,10 +105,10 @@
     margin: auto;
     padding: 0;
     overflow: hidden;
-    border: 1px solid #4a4d4f;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: #17191a;
-    color: #f3f3f1;
+    background: var(--surface);
+    color: var(--text);
     box-shadow: 0 24px 70px rgba(0, 0, 0, .56);
 }
 
@@ -134,7 +138,7 @@
 
 .site-help-dialog p {
     margin: 0;
-    color: #d1d3d1;
+    color: var(--text-muted);
     font-size: 1rem;
     line-height: 1.65;
 }
@@ -154,7 +158,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: #aeb1af;
+    color: var(--text-muted);
     font-size: 28px;
     line-height: 1;
     cursor: pointer;
@@ -163,8 +167,8 @@
 .site-help-dialog__close:hover,
 .site-help-dialog__close:focus-visible {
     color: var(--accent);
-    outline: 1px solid var(--accent);
-    outline-offset: 2px;
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
 }
 
 @media (max-width: 600px) {
@@ -198,7 +202,7 @@
     margin: 16px 0 14px;
     padding: 4px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, .06);
+    background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
 }
 
 .site-help-dialog__tab {
@@ -207,7 +211,7 @@
     border: 0;
     border-radius: 7px;
     background: transparent;
-    color: #d1d3d1;
+    color: var(--text-muted);
     font: inherit;
     font-size: .85rem;
     font-weight: 600;
@@ -221,10 +225,10 @@
 }
 
 .site-help-dialog__tab[aria-selected="true"] {
-    background: #24282a;
+    background: var(--surface-raised);
     color: var(--accent);
     opacity: 1;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+    box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .site-help-dialog__panel[hidden] {

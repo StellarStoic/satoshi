@@ -5,21 +5,16 @@
     pointer-events: none;
     overflow: hidden;
 }
-.site-tv-static, .site-tv-roll { position: absolute; inset: -256px; }
+.site-tv-static, .site-tv-roll { position: absolute; }
 .site-tv-static {
-    background-color: #101112;
-    background-image: var(--page-texture), var(--page-texture), var(--page-texture);
-    background-position: 0 0, 43px 71px, 109px 21px;
-    background-size: 127px 127px, 193px 193px, 256px 256px;
-    animation: site-tv-static 80ms steps(1, end) infinite;
+    inset: -8%;
+    background: radial-gradient(circle at center, #0b0c0d 0%, #08090a 58%, #030404 100%);
 }
 .site-tv-roll {
-    inset: -100% 0;
-    background: repeating-linear-gradient(to bottom, transparent 0 3px, rgba(0, 0, 0, .2) 3px 4px), linear-gradient(to bottom, transparent 40%, rgba(140, 150, 140, .16) 48%, #030404 51%, transparent 60%);
-    animation: site-tv-roll 240ms linear both;
+    display: none;
 }
-.site-tv-leave { animation: site-tv-cover 100ms ease-out both; }
-.site-tv-enter { animation: site-tv-reveal 200ms ease-out both; }
+.site-tv-leave .site-tv-static { animation: site-center-fade-out 500ms cubic-bezier(.4, 0, .2, 1) both; }
+.site-tv-enter .site-tv-static { animation: site-center-fade-in 500ms cubic-bezier(.4, 0, .2, 1) both; }
 .site-tv-top, .site-tv-bottom, .site-tv-line { display: none; }
 .site-tv-off .site-tv-static, .site-tv-off .site-tv-roll { display: none; }
 .site-tv-off .site-tv-top, .site-tv-off .site-tv-bottom {
@@ -44,15 +39,14 @@
     box-shadow: 0 0 12px 2px rgba(210, 225, 215, .4);
     animation: site-tv-power-line 370ms ease-out both;
 }
-@keyframes site-tv-static {
-    0%, 100% { transform: translate(0, 0); }
-    25% { transform: translate(-53px, 91px); }
-    50% { transform: translate(127px, -83px); }
-    75% { transform: translate(-151px, -127px); }
+@keyframes site-center-fade-out {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
-@keyframes site-tv-roll { from { transform: translateY(-30%); } to { transform: translateY(30%); } }
-@keyframes site-tv-cover { from { opacity: 0; } to { opacity: 1; } }
-@keyframes site-tv-reveal { from { opacity: 1; } to { opacity: 0; } }
+@keyframes site-center-fade-in {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
 @keyframes site-tv-collapse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes site-tv-power-line {
     0%, 35% { opacity: 0; transform: scaleX(1); }

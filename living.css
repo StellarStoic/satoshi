@@ -31,7 +31,7 @@
 .living-main .increase { color: #ffa985; }
 .living-note, .living-sources { font-size: 12px; line-height: 1.7; }
 .living-note { margin: 18px 0; }
-.living-sources a { color: #b9c4c9; }
+.living-sources a { color: var(--text-muted); }
 #living-error { padding: 20px 0; color: #ffa985; }
 @media (max-width: 600px) {
     .living-main { padding: 38px 16px 24px; }

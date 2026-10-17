@@ -315,7 +315,7 @@
 .spectator-message {
   text-align: center;
   font-size: 1.1rem;
-  color: #bababa;
+  color: var(--text-muted);
   margin-top: 2rem;
   padding: 1rem;
   background-color: #00000092;

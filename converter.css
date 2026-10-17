@@ -285,7 +285,7 @@ body > #menu,
 .currency-protected-note {
     margin: 10px 2px 0;
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.35;
     text-align: center;
 }
@@ -307,7 +307,7 @@ body > #menu,
     border: 1px solid var(--border);
     border-radius: 5px;
     outline: none;
-    background: #111315;
+    background: var(--page-bg);
     color: var(--text);
     font: 500 16px/1 "Roboto Mono", monospace;
     letter-spacing: 0;
@@ -449,7 +449,7 @@ body > #menu,
   
   .live-data-text {
     color: #88888856;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1;
     margin-top: 70px;
     margin: 0;
@@ -464,7 +464,7 @@ body > #menu,
   }
   
   #active-text {
-    font-size: 10px;
+    font-size: 12px;
     margin-top: 13px;
     margin-left: -50px;
   }

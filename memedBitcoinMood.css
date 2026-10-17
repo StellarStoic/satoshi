@@ -290,7 +290,7 @@ h1 {
 
 .fallback-content {
     text-align: center;
-    color: #6c757d;
+    color: var(--text-muted);
 }
 
 .fallback-emoji {
@@ -314,7 +314,7 @@ h1 {
 .image-loading {
     display: none;
     text-align: center;
-    color: #6c757d;
+    color: var(--text-muted);
     font-style: italic;
 }
 

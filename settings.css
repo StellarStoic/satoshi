@@ -12,16 +12,16 @@
 }
 .setting-row label { display: grid; gap: 3px; cursor: pointer; }
 .setting-row strong { color: var(--text); font-size: 14px; }
-.setting-row span { color: var(--text-muted); font-size: 11px; }
+.setting-row span { color: var(--text-muted); font-size: 12px; }
 .setting-row input { width: 42px; height: 22px; accent-color: var(--accent); cursor: pointer; }
 .setting-row input:disabled { opacity: .45; cursor: wait; }
-.setting-row select { min-width: 104px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); font: 600 11px/1.2 "Roboto Mono", monospace; }
+.setting-row select { min-width: 104px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); font: 600 12px/1.2 "Roboto Mono", monospace; }
 .setting-copy { display: grid; gap: 3px; }
 .setting-copy strong { color: var(--text); font-size: 14px; }
-.setting-copy span { color: var(--text-muted); font-size: 11px; }
-.setting-action { min-width: 82px; padding: 9px 12px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: 6px; font: 700 11px/1.2 "Roboto Mono", monospace; cursor: pointer; }
+.setting-copy span { color: var(--text-muted); font-size: 12px; }
+.setting-action { min-width: 82px; padding: 9px 12px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: 6px; font: 700 12px/1.2 "Roboto Mono", monospace; cursor: pointer; }
 .setting-action:disabled { color: var(--text-muted); background: var(--surface-raised); cursor: default; }
-.pwa-version { margin: 28px 0 0; color: var(--text-muted); font-size: 10px; text-align: center; opacity: .72; }
+.pwa-version { margin: 28px 0 0; color: var(--text-muted); font-size: 12px; text-align: center; opacity: .72; }
 .pwa-version strong { color: var(--text-muted); font-weight: 500; }
 
 @media (max-width: 440px) {

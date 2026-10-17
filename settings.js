@@ -1,7 +1,7 @@
 (() => {
   const select = document.getElementById('siteTheme');
   const key = 'satoshiSiteTheme';
-  const validThemes = ['legacy', 'coffee', 'forest', 'ocean', 'space', 'electric', 'ice'];
+  const validThemes = ['legacy', 'coffee', 'forest', 'ocean', 'space', 'electric', 'ice', 'marshmellow', 'amsterdam'];
 
   function currentTheme() {
     if (window.satoshiTheme) return window.satoshiTheme.get();

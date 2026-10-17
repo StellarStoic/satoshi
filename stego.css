@@ -5,8 +5,8 @@
   --stego-cyan: #63dfe4;
   --stego-panel: rgba(24, 26, 28, .88);
   --stego-field: #121415;
-  --background-color: #101112;
-  --background-reverse-color: #f0f0f0;
+  --background-color: var(--page-bg);
+  --background-reverse-color: var(--text);
   --text-color: var(--stego-green);
   --text-border: var(--stego-green);
   --file-color: var(--stego-orange);
@@ -15,7 +15,7 @@
   --nostr-border: var(--stego-purple);
   --cipher-color: var(--stego-cyan);
   --cipher-border: var(--stego-cyan);
-  color: #e6e7e4;
+  color: var(--text);
   font-family: "Roboto Mono", monospace;
 }
 
@@ -34,20 +34,20 @@
 .stego-hero {
   margin-bottom: 44px;
   padding: 0 0 34px;
-  border-bottom: 1px solid #3b3e40;
+  border-bottom: 1px solid var(--border);
 }
 
 .stego-hero p {
   margin: 0 0 9px;
   color: var(--stego-orange);
-  font-size: .68rem;
+  font-size: .75rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .stego-hero h1 {
   margin: 0;
-  color: #f1f2ee;
+  color: var(--text);
   font-size: clamp(2rem, 7vw, 4.4rem);
   font-weight: 400;
   line-height: 1.02;
@@ -57,7 +57,7 @@
   display: block;
   max-width: 630px;
   margin-top: 18px;
-  color: #a9adae;
+  color: var(--text-muted);
   font-size: .86rem;
   line-height: 1.75;
 }
@@ -76,7 +76,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #777d82;
+  color: var(--text-muted);
   font: 400 1.25rem/1 "Roboto Mono", monospace;
   cursor: pointer;
 }
@@ -114,7 +114,7 @@
 
 .stego-app h3 {
   margin: 30px 0 14px;
-  color: #e6e7e4;
+  color: var(--text);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -122,8 +122,8 @@
 .stego-app h5,
 .stego-app h6 {
   margin: 22px 0 8px;
-  color: #9da1a2;
-  font-size: .72rem;
+  color: var(--text-muted);
+  font-size: .75rem;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -143,10 +143,10 @@
   width: 100%;
   min-height: 46px;
   padding: 11px 13px;
-  border: 1px solid #45494b;
+  border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--stego-field);
-  color: #eceeea;
+  color: var(--text);
   font: inherit;
   font-size: .84rem;
   transition: border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, background 160ms ease;
@@ -160,17 +160,17 @@
 
 .stego-app input[type="file"] {
   padding: 8px;
-  color: #aeb2b3;
+  color: var(--text-muted);
 }
 
 .stego-app input[type="file"]::file-selector-button {
   min-height: 30px;
   margin-right: 10px;
   padding: 5px 10px;
-  border: 1px solid #4a4e50;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #242729;
-  color: #d8dad8;
+  background: var(--surface-raised);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -215,10 +215,10 @@
   align-items: center;
   margin-top: 9px;
   padding: 9px;
-  border: 1px solid color-mix(in srgb, var(--stego-purple) 55%, #45494b);
+  border: 1px solid color-mix(in srgb, var(--stego-purple) 55%, var(--border));
   border-radius: 6px;
   background: rgba(148, 87, 176, .08);
-  color: #dfe2dd;
+  color: var(--text);
   font-size: .76rem;
   line-height: 1.35;
 }
@@ -237,10 +237,10 @@
 .nostr-recipient-avatar {
   width: 42px;
   height: 42px;
-  border: 1px solid #555b5d;
+  border: 1px solid var(--border);
   border-radius: 50%;
   object-fit: cover;
-  background: #222628;
+  background: var(--surface-raised);
 }
 
 .nostr-recipient-name {
@@ -256,8 +256,8 @@
   display: block;
   overflow: hidden;
   margin-bottom: 2px;
-  color: #aeb2b3;
-  font-size: .68rem;
+  color: var(--text-muted);
+  font-size: .75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -291,7 +291,7 @@
 .bunker-controls {
   margin-top: 10px;
   padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--stego-purple) 45%, #45494b);
+  border: 1px solid color-mix(in srgb, var(--stego-purple) 45%, var(--border));
   border-radius: 6px;
   background: rgba(10, 11, 12, .48);
 }
@@ -324,7 +324,7 @@
   border: 1px dashed var(--section-color, var(--stego-green));
   border-radius: 5px;
   background: rgba(10, 11, 12, .55);
-  color: #dfe2dd;
+  color: var(--text);
   font-family: system-ui, sans-serif;
   font-size: .86rem;
   line-height: 1.55;
@@ -350,7 +350,7 @@
   height: 1px;
   margin: 30px 0;
   border: 0;
-  background: #343739;
+  background: var(--surface-raised);
 }
 
 .multi-section-hr {
@@ -380,9 +380,9 @@
   padding: 6px 0;
 }
 
-.file-section { --section-color: var(--stego-orange); color: #d5d7d4; }
-.nostr-section { --section-color: var(--stego-purple); color: #d5d7d4; }
-.cipher-section { --section-color: var(--stego-cyan); color: #d5d7d4; opacity: 1; }
+.file-section { --section-color: var(--stego-orange); color: var(--text); }
+.nostr-section { --section-color: var(--stego-purple); color: var(--text); }
+.cipher-section { --section-color: var(--stego-cyan); color: var(--text); opacity: 1; }
 
 .file-section .sectionTitle,
 .nostr-section .sectionTitle,
@@ -412,14 +412,14 @@
 
 #textTransformationMethod {
   appearance: auto;
-  color: #e6e7e4;
-  background: #121415;
+  color: var(--text);
+  background: var(--page-bg);
 }
 
 #textTransformationMethod option,
 #textTransformationMethod optgroup {
-  color: #e6e7e4;
-  background: #17191a;
+  color: var(--text);
+  background: var(--surface);
 }
 
 .method-sequence {
@@ -434,7 +434,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   color: #101112;
-  font-size: .72rem;
+  font-size: .75rem;
 }
 
 .method-controls {
@@ -473,7 +473,7 @@
   min-height: 0;
   border-style: solid;
   border-color: color-mix(in srgb, var(--stego-orange) 48%, #45494b);
-  color: #cfd2ce;
+  color: var(--text);
 }
 
 .file-section #stegoDownloadLink {
@@ -496,9 +496,9 @@
   z-index: 5000;
   padding: 12px 18px;
   transform: translate(-50%, -50%);
-  border: 1px solid #4b4f51;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #121415;
+  background: var(--page-bg);
   color: #f2a900;
   box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
 }
@@ -512,10 +512,10 @@
   max-width: min(520px, calc(100% - 32px));
   padding: 11px 16px;
   transform: translateX(-50%);
-  border: 1px solid #4b4f51;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: #17191a;
-  color: #eceeea;
+  background: var(--surface);
+  color: var(--text);
   font-size: .78rem;
   text-align: center;
   opacity: 0;
@@ -551,11 +551,11 @@
   margin: auto !important;
   padding: 26px !important;
   overflow-y: auto;
-  border: 1px solid #44484a !important;
+  border: 1px solid var(--border) !important;
   border-top: 2px solid var(--stego-orange) !important;
   border-radius: 7px;
-  background: #151718 !important;
-  color: #c8cbc8;
+  background: var(--surface) !important;
+  color: var(--text);
   box-shadow: 0 24px 80px rgba(0, 0, 0, .66);
   font-size: .8rem;
   line-height: 1.7;
@@ -565,17 +565,17 @@
 .modal-content h2,
 .modal-content h3,
 .modal-content h4 {
-  color: #f2f3ef;
+  color: var(--text);
 }
 
 .modal-content a { color: var(--stego-orange); }
-.modal-content code { color: #d6d8d5; }
+.modal-content code { color: var(--text); }
 .modal-content .close,
 .modal-content .close-button {
   position: sticky !important;
   top: 0 !important;
   float: right;
-  color: #c6c9c7;
+  color: var(--text-muted);
   font-size: 1.7rem;
   cursor: pointer;
 }
@@ -589,12 +589,12 @@
 .qr-code-wrapper {
   min-width: 0;
   padding: 12px;
-  border: 1px solid #373a3c;
+  border: 1px solid var(--border);
   text-align: center;
 }
 
 .qr-code { width: min(150px, 100%); padding: 4px; background: #fff; }
-.qr-code-text { display: block; color: #999d9e; font-size: .65rem; word-break: break-all; }
+.qr-code-text { display: block; color: var(--text-muted); font-size: .75rem; word-break: break-all; }
 
 .mini-modal {
   position: fixed;
@@ -603,8 +603,8 @@
   padding: 12px;
   border: 1px solid var(--stego-cyan);
   border-radius: 6px;
-  background: #151718;
-  color: #dfe2df;
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 14px 45px rgba(0, 0, 0, .6);
 }
 

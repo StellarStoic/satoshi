@@ -17,7 +17,7 @@ test('shared menu follows theme contrast and fills mobile screens', async () => 
   const theme = await readFile(new URL('../theme.css', import.meta.url), 'utf8');
 
   assert.match(styles, /#menu li a\s*\{[^}]*color:\s*#fff/s);
-  assert.match(theme, /html\[data-theme="ice"\] #menu a[\s\S]*?color:\s*#111820/);
+  assert.match(theme, /html\[data-theme="ice"\][\s\S]*?#menu a[\s\S]*?color:\s*var\(--text\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?#menu\s*\{[^}]*width:\s*calc\(100vw - 24px\)/s);
   assert.match(styles, /#menu > ul > li > a,[\s\S]*?min-height:\s*52px/s);
 });

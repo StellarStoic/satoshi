@@ -70,7 +70,7 @@
 .lab-details { padding: 16px 0; border-block: 1px solid var(--border); }
 .lab-details summary { cursor: pointer; min-height: 32px; font-weight: 600; }
 .lab-bit-grid { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; margin: 18px 0; }
-#bip39-page .lab-bit { min-height: 36px; min-width: 0; padding: 4px 0; border-color: #35685f; background: #152c28; color: var(--lab-entropy); font: 14px monospace; border-radius: 3px; }
+#bip39-page .lab-bit { min-height: 36px; min-width: 0; padding: 4px 0; border-color: #35685f; background: var(--surface-raised); color: var(--lab-entropy); font: 14px monospace; border-radius: 3px; }
 #bip39-page .lab-bit[aria-pressed="true"] { background: var(--lab-entropy); color: #101112; }
 .lab-hex-line { display: grid; gap: 6px; font-size: 14px; }
 .lab-hex-line code { overflow-wrap: anywhere; }
@@ -142,7 +142,7 @@ html:has(#lab-glossary[open]) { overflow: hidden; }
     .lab-word-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     #bip39-page .lab-word { padding: 10px; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; }
     .lab-word-name { font-size: 15px; }
-    .lab-word-bits { font-size: 11px; }
+    .lab-word-bits { font-size: 12px; }
     .lab-equation { gap: 10px; justify-content: space-between; }
     .lab-equation strong { font-size: 26px; }
     .lab-equation span { font-size: 12px; }

@@ -28,7 +28,7 @@
 }
 
 .control-group label {
-    color: #f0f0f0;
+    color: var(--text);
     font-size: 14px;
     font-weight: 500;
 }
@@ -38,7 +38,7 @@ select, input, button {
     border: 1px solid #333;
     border-radius: 6px;
     background: var(--surface-raised);
-    color: #f0f0f0;
+    color: var(--text);
     font-size: 14px;
     min-width: 120px;
 }
@@ -72,7 +72,7 @@ button:disabled {
 .chart-wrapper {
     position: relative;
     height: 500px;
-    background: #0a0a0a;
+    background: var(--page-bg);
     border-radius: 8px;
     overflow: hidden;
     margin-bottom: 20px;
@@ -88,7 +88,7 @@ button:disabled {
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #f0f0f0;
+    color: var(--text);
     font-size: 18px;
 }
 
@@ -139,7 +139,7 @@ button:disabled {
 optgroup {
     font-weight: bold;
     font-style: normal;
-    color: #a0a0a0;
+    color: var(--text-muted);
     background-color: #00000087;
     padding: 5px 0;
 }
@@ -176,7 +176,7 @@ option:checked {
     color: #ff4444;
     text-align: center;
     padding: 20px;
-    background: #2a1a1a;
+    background: var(--surface);
     border-radius: 6px;
     margin: 10px 0;
 }
@@ -280,7 +280,7 @@ option:checked {
 }
 
 .event-card {
-    background: #1a1a1a;
+    background: var(--surface);
     padding: 15px;
     border-radius: 6px;
     border-left: 4px solid var(--accent);
@@ -294,7 +294,7 @@ option:checked {
 }
 
 .event-title {
-    color: #f0f0f0;
+    color: var(--text);
     font-weight: bold;
     margin-bottom: 5px;
 }
@@ -324,7 +324,7 @@ option:checked {
 }
 
 .modal-content {
-    background-color: #1a1a1a;
+    background-color: var(--surface);
     margin: 5% auto;
     padding: 20px;
     border: 1px solid #333;
@@ -491,7 +491,7 @@ option:checked {
     color: white;
     padding: 2px 8px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 12px;
     position: absolute;
     transform: translateX(-50%);
     white-space: nowrap;
