@@ -100,8 +100,13 @@
         <input id="boardTextureUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2048" placeholder="https://example.com/pattern.png">
       </label>
       <p class="board-texture-note">A linked image is fetched by your browser from that address, so that site sees your visit. Patterns you add yourself stay yours.</p>
+      <label class="board-texture-field" for="boardPatternCss"><span>Or paste a pattern as CSS</span>
+        <textarea id="boardPatternCss" rows="4" spellcheck="false" autocomplete="off" autocapitalize="none" maxlength="2000" placeholder="background-image: repeating-linear-gradient(45deg, #444cf7 0 25%, transparent 0 50%, #444cf7 0 75%, transparent 0);"></textarea>
+      </label>
+      <p class="board-texture-note">Copy one from <a href="https://css-pattern.com" target="_blank" rel="noopener noreferrer">css-pattern.com</a> and paste it here. It is painted by this browser and kept only in it. Gradients only — a pattern that would fetch a file is refused, because it would tell that site when you opened your board.</p>
       <div class="board-chooser__actions">
         <button type="button" id="resetBoardTexture" class="secondary-action"><span>Use the default</span></button>
+        <button type="button" id="usePastedPattern" class="secondary-action"><span>Use the CSS above</span></button>
         <button type="submit" class="primary-action">Use it</button>
       </div>
       <div id="boardStyleStatus" class="inline-status" role="status" aria-live="polite"></div>

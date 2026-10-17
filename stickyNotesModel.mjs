@@ -1433,6 +1433,26 @@ export const BOARD_TEXTURES = Object.freeze([
   Object.freeze({id: 'christmas', label: 'Christmas', url: '/img/board-christmas.png'}),
   Object.freeze({id: 'dot-grid', label: 'Dot grid', url: '/img/board-dot-grid.jpg'}),
   Object.freeze({id: 'natural-black', label: 'Natural black', url: '/img/board-natural-black.png'}),
+  // Fifteen more from the same collection. A tile names the board pixels one repeat covers, chosen
+  // near twice each file's own width and fenced at the 96 the carbon fibre already uses and at the
+  // usual 600: a 42px weave blown up to 600 reads as cloth rather than weave, while a 400px photo at
+  // 600 is the scale the collection is meant to be seen at. Entries keeping the usual tile name
+  // none. img/board-textures.LICENSE.txt carries the credit each of these has to keep.
+  Object.freeze({id: 'fancy-cushion', label: 'Fancy cushion', url: '/img/board-fancy-cushion.png'}),
+  Object.freeze({id: 'wheat', label: 'Wheat', url: '/img/board-wheat.png'}),
+  Object.freeze({id: 'folk-pattern-black', label: 'Folk black', url: '/img/board-folk-pattern-black.png'}),
+  Object.freeze({id: 'folk-pattern', label: 'Folk', url: '/img/board-folk-pattern.png'}),
+  Object.freeze({id: 'bananas', label: 'Bananas', url: '/img/board-bananas.png'}),
+  Object.freeze({id: 'dark-grey-terrazzo', label: 'Dark terrazzo', url: '/img/board-dark-grey-terrazzo.png'}),
+  Object.freeze({id: 'darkness', label: 'Darkness', url: '/img/board-darkness.png'}),
+  Object.freeze({id: 'grey-washed-wall', label: 'Washed wall', url: '/img/board-grey-washed-wall.png'}),
+  Object.freeze({id: 'gray-floral', label: 'Grey floral', url: '/img/board-gray-floral.png', tile: 300}),
+  Object.freeze({id: 'tex2res4', label: 'Tex2res4', url: '/img/board-tex2res4.png'}),
+  Object.freeze({id: 'perforated-white-leather', label: 'Perforated leather', url: '/img/board-perforated-white-leather.png'}),
+  Object.freeze({id: 'graphy', label: 'Graphy', url: '/img/board-graphy.png', tile: 160}),
+  Object.freeze({id: 'woven', label: 'Woven', url: '/img/board-woven.png', tile: 96}),
+  Object.freeze({id: 'pool-table', label: 'Pool table', url: '/img/board-pool-table.png', tile: 512}),
+  Object.freeze({id: 'green-dust-scratches', label: 'Green dust scratches', url: '/img/board-green-dust-scratches.png', tile: 592}),
 ]);
 
 export const DEFAULT_BOARD_TEXTURE_URL = BOARD_TEXTURES[0].url;
@@ -1453,6 +1473,93 @@ export function boardTextureTile(texture) {
 
 /** Long enough for a real image address, short enough that a paste of a file cannot get in. */
 export const BOARD_TEXTURE_URL_MAX = 2048;
+
+/**
+ * A pattern the reader pasted as CSS — the shape css-pattern.com hands out — instead of a file.
+ *
+ * The pattern is painted by the reader's own browser on this page and nowhere else, so the job here
+ * is not to decide what looks good but to refuse the three things a style rule can do that a pattern
+ * has no business doing: name a property that is not a background, pull something in from a third
+ * party, or be long enough to be a file. Everything else is passed through as written, because a
+ * pattern with its numbers rounded to something the code approves of is not the pattern they chose.
+ */
+export const BOARD_PATTERN_CSS_MAX = 2000;
+export const BOARD_PATTERN_CSS_VALUE_MAX = 400;
+/** The declarations that paint, plus opacity - which dims the paint layer only, never the notes. */
+export const BOARD_PATTERN_CSS_PROPERTIES = Object.freeze([
+  'background', 'background-color', 'background-image', 'background-position',
+  'background-repeat', 'background-size', 'background-blend-mode', 'opacity',
+]);
+/**
+ * Anything that would make the pattern fetch, import or execute. `url(` is the one that matters: a
+ * pattern is meant to be gradients, and a URL in one turns every reader's board into a beacon that
+ * tells a stranger when and where it was opened.
+ */
+const BOARD_PATTERN_CSS_FORBIDDEN = Object.freeze([
+  'url(', 'image-set(', 'src(', '@', '<', '>', 'expression(', 'javascript:',
+  'behavior:', '\\', '/*', '*/',
+]);
+
+function clipped(text, limit = 40) {
+  const value = String(text || '');
+  return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
+/**
+ * Validate a pasted pattern. Returns {ok: true, css, properties} with one canonical
+ * `name:value;` spelling, or {ok: false, error} whose message names what was refused.
+ */
+export function boardPatternCss(text) {
+  const raw = String(text ?? '').replace(/\/\*[\s\S]*?\*\//gu, ' ');
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return {ok: false, error: 'Paste a pattern first — the CSS you copied from css-pattern.com.'};
+  }
+  if (trimmed.length > BOARD_PATTERN_CSS_MAX) {
+    return {ok: false, error: `A pasted pattern may be at most ${BOARD_PATTERN_CSS_MAX} characters.`};
+  }
+  const declarations = [];
+  for (const chunk of trimmed.split(';')) {
+    const piece = chunk.trim();
+    if (!piece) continue;
+    const colon = piece.indexOf(':');
+    if (colon <= 0) {
+      return {ok: false, error: `“${clipped(piece)}” is not a declaration — each one reads like background-color: #eee.`};
+    }
+    const property = piece.slice(0, colon).trim().toLowerCase();
+    const value = piece.slice(colon + 1).trim();
+    const custom = property.startsWith('--');
+    if (custom && !/^--[a-z0-9_-]+$/u.test(property)) {
+      return {ok: false, error: `“${clipped(property)}” is not a usable variable name.`};
+    }
+    if (!custom && !BOARD_PATTERN_CSS_PROPERTIES.includes(property)) {
+      return {
+        ok: false,
+        error: `${property} is not a board pattern — a pattern may set background declarations, `
+          + 'opacity, and its own --variables.',
+      };
+    }
+    if (!value) return {ok: false, error: `${property} has no value.`};
+    if (value.length > BOARD_PATTERN_CSS_VALUE_MAX) {
+      return {ok: false, error: `${property} is longer than ${BOARD_PATTERN_CSS_VALUE_MAX} characters.`};
+    }
+    const lower = value.toLowerCase();
+    for (const bad of BOARD_PATTERN_CSS_FORBIDDEN) {
+      if (lower.includes(bad)) {
+        return {
+          ok: false,
+          error: `${property} contains “${bad}” — a pattern is painted by this page, so it may not `
+            + 'fetch, import or embed anything.',
+        };
+      }
+    }
+    declarations.push(`${property}:${value}`);
+  }
+  if (!declarations.some(entry => entry.startsWith('background-image:') || entry.startsWith('background:'))) {
+    return {ok: false, error: 'A pattern needs a background-image or a background shorthand; without one there is nothing to paint.'};
+  }
+  return {ok: true, css: `${declarations.join(';')};`, properties: declarations};
+}
 
 /**
  * A pattern address a reader typed, or '' when it is not one this page will paint with. Only

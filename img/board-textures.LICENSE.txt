@@ -21,9 +21,29 @@ where a reader can find it.
   board-dot-grid.jpg          Dot Grid                Darius Garza
   board-natural-black.png     Ep Natural Black        Carl
 
+  board-fancy-cushion.png         Fancy Cushion           Zikii Zhou
+  board-wheat.png                 Wheat                   Icons8 Team
+  board-folk-pattern-black.png    Folk Pattern Black      Askar Assanbekov
+  board-folk-pattern.png          Folk Pattern            Askar Assanbekov
+  board-bananas.png               Bananas                 Marie Van den Broeck
+  board-dark-grey-terrazzo.png    Dark Grey Terrazzo      Ringococo
+  board-darkness.png              Darkness                Isabelle Schniermanni
+  board-grey-washed-wall.png      Grey Washed Wall        Sagive SEO
+  board-gray-floral.png           Gray Floral             Lauren
+  board-tex2res4.png              Tex2Res4                Janos Koos
+  board-perforated-white-leather.png  Perforated White Leather  Dmitry
+  board-graphy.png                Graphy                  We Are Pixel8
+  board-woven.png                 Woven                   Max Rudberg
+  board-pool-table.png            Pool Table              Caveman
+  board-green-dust-scratches.png  Green Dust Scratches    Atle Mo
+
 Pattern pages (the designer and the pattern's own page):
   cork-board-pattern  cartographer  carbon-fibre-2  christmas-dark
   christmas  dot-grid-pattern  ep-natural-black
+  fancy-cushion-pattern  wheat-pattern  folk-pattern-black  folk-pattern
+  bananas  dark-grey-terrazzo  darkness  grey-washed-wall  gray-floral
+  tex2res4  perforated-white-leather  graphy  woven  pool-table
+  green-dust-scratches
   e.g. https://www.toptal.com/designers/subtlepatterns/cork-board-pattern/
 
 Files fetched from
@@ -34,3 +54,10 @@ Two notes for whoever touches these next:
     a .jpg and named as one.
   - carbon fibre is a 24x22 tile. At the board's usual 600px tile it would repeat
     twenty-five times inside one cork tile, so its catalogue entry names a 96px tile.
+  - five of the fifteen added later are served under a file name that is not their page
+    slug (grey_wash_wall, greyfloral, perforated_white_leather, pool_table,
+    green_dust_scratch). The slug is what the catalogue's id keeps; the file keeps the
+    bytes the collection served.
+  - the small tiles - gray-floral 300, graphy 160, woven 96, pool-table 512,
+    green-dust-scratches 592 - are board pixels per repeat, chosen near twice each
+    file's own width, so a 42px weave does not read as cloth at board scale.

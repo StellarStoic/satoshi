@@ -60,6 +60,7 @@ import {
   BOARD_TEXTURES,
   DEFAULT_BOARD_TEXTURE_URL,
   boardTextureUrl,
+  boardPatternCss,
   boardTextureLabel,
   boardTextureTile,
   boardPlateFontSize,
@@ -142,6 +143,9 @@ const SAVED_PLACES_MAX = 24;
 const SAVED_PLACE_NAME_MAX = 40;
 // The pattern the reader picked for their board: this browser only, like the board itself.
 const BOARD_TEXTURE_KEY = 'satoshi:sticky:board-texture:v1';
+// A pattern pasted as CSS instead of linked as a file. One key for each kind of pattern, and choosing
+// one clears the other: two patterns at once is not a setting a reader can mean.
+const BOARD_PATTERN_CSS_KEY = 'satoshi:sticky:board-pattern-css:v1';
 const elements = {
   board: document.getElementById('stickyBoard'), canvas: document.getElementById('stickyCanvas'), boardStatus: document.getElementById('boardStatus'),
   loginConfirmation: document.getElementById('loginConfirmation'),
@@ -152,6 +156,8 @@ const elements = {
   boardStyleForm: document.getElementById('boardStyleForm'),
   boardTextureOptions: document.getElementById('boardTextureOptions'),
   boardTextureUrl: document.getElementById('boardTextureUrl'),
+  boardPatternCss: document.getElementById('boardPatternCss'),
+  usePastedPattern: document.getElementById('usePastedPattern'),
   resetBoardTexture: document.getElementById('resetBoardTexture'),
   boardStyleStatus: document.getElementById('boardStyleStatus'),
   account: document.getElementById('nostrAccount'), newSticky: document.getElementById('newSticky'),
@@ -1945,6 +1951,45 @@ function scheduleBoardTransform(rect) {
  * catalogue's own when they have not picked one.
  */
 let boardTextureChoice = boardTextureUrl(localStorage.getItem(BOARD_TEXTURE_KEY) || '');
+
+/**
+ * A pattern pasted as CSS. Kept as the canonical spelling the validator returned, so what is stored is
+ * exactly what was accepted — and a stored value that no longer passes (an older rule, a hand-edited
+ * key) is dropped rather than painted.
+ */
+function storedPastedCss() {
+  const parsed = boardPatternCss(localStorage.getItem(BOARD_PATTERN_CSS_KEY) || '');
+  return parsed.ok ? parsed.css : '';
+}
+let boardPatternCssChoice = storedPastedCss();
+
+/** Whether the board is painted from pasted CSS rather than from a file. */
+function boardPatternIsCss() {
+  return Boolean(boardPatternCssChoice);
+}
+
+/**
+ * Paint the pasted pattern.
+ *
+ * The bitmap is emptied and the pattern goes on the canvas element itself, which is already the
+ * board-sized layer the transform moves — so a CSS pattern pans and zooms with the notes for free,
+ * and a gradient costs nothing to rasterise where the bitmap cost a device-sized texture. `opacity`
+ * in a pasted pattern therefore dims the paint layer only, never the notes on it.
+ */
+function paintPastedPattern() {
+  const canvas = elements.boardPaint;
+  if (!canvas) return;
+  canvas.removeAttribute('style');
+  canvas.width = 1;                 // setting either size also clears the bitmap
+  canvas.height = 1;
+  boardTexture.ready = false;
+  const parsed = boardPatternCss(boardPatternCssChoice);
+  if (!parsed.ok) return;
+  for (const declaration of parsed.properties) {
+    const colon = declaration.indexOf(':');
+    canvas.style.setProperty(declaration.slice(0, colon), declaration.slice(colon + 1));
+  }
+}
 // Set while the reader's own pattern is failing to load, so the catalogue's pattern is painted
 // without forgetting the address they typed.
 let boardTextureFallback = false;
@@ -1963,7 +2008,8 @@ function renderBoardTextures() {
   const group = elements.boardTextureOptions;
   if (!group) return;
   group.replaceChildren();
-  const current = boardTextureSource();
+  // Nothing in the catalogue is the current pattern while a pasted one is painting.
+  const current = boardPatternIsCss() ? '' : boardTextureSource();
   for (const texture of BOARD_TEXTURES) {
     const selected = texture.url === current;
     const button = document.createElement('button');
@@ -2356,6 +2402,7 @@ function publishToUserRelays(event) {
 function openBoardStyle() {
   renderBoardTextures();
   elements.boardTextureUrl.value = boardTextureChoice;
+  if (elements.boardPatternCss) elements.boardPatternCss.value = boardPatternCssChoice;
   sayBoardStyle('');
   showDialog(elements.boardStyleDialog);
   renderUserRelays();
@@ -2368,6 +2415,10 @@ function applyBoardTexture(url) {
   boardTextureChoice = url;
   if (url) localStorage.setItem(BOARD_TEXTURE_KEY, url);
   else localStorage.removeItem(BOARD_TEXTURE_KEY);
+  // Choosing a file forgets a pasted pattern: one pattern paints the board.
+  boardPatternCssChoice = '';
+  localStorage.removeItem(BOARD_PATTERN_CSS_KEY);
+  if (elements.boardPatternCss) elements.boardPatternCss.value = '';
   // The canvas repaints when its size changes or its flag is cleared, and a new pattern does not
   // change the size: clearing the flag is what tells it the picture is new.
   boardTexture.ready = false;
@@ -2381,9 +2432,43 @@ function applyBoardTexture(url) {
   setTimeout(() => { elements.boardStatus.hidden = true; }, 3000);
 }
 
+/**
+ * Paint the board with the CSS the reader pasted, and remember it here.
+ *
+ * A refusal changes nothing and says why in the dialog: a pattern that half applied is worse than one
+ * that did not, because the reader would have no way to tell which half took.
+ */
+function applyPastedPattern(text) {
+  const parsed = boardPatternCss(text);
+  if (!parsed.ok) {
+    sayBoardStyle(parsed.error, true);
+    return false;
+  }
+  boardPatternCssChoice = parsed.css;
+  localStorage.setItem(BOARD_PATTERN_CSS_KEY, parsed.css);
+  // The paste is the pattern now: a linked file would paint over it.
+  boardTextureChoice = '';
+  boardTextureFallback = false;
+  localStorage.removeItem(BOARD_TEXTURE_KEY);
+  elements.boardTextureUrl.value = '';
+  loadBoardImage();
+  renderBoardTextures();
+  elements.boardStyleDialog.close();
+  status(elements.boardStatus, 'Board pattern: the CSS you pasted.');
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 3000);
+  return true;
+}
+
 const boardTexture = {image: null, ready: false, timer: 0};
 
 function loadBoardImage() {
+  // A pasted pattern has no file to fetch, and asking for one would paint over it.
+  if (boardPatternIsCss()) {
+    paintPastedPattern();
+    return;
+  }
+  elements.boardPaint.removeAttribute('style');
   const source = boardTextureSource();
   const image = new Image();
   image.decoding = 'async';
@@ -5459,6 +5544,7 @@ elements.userRelayInput.addEventListener('keydown', key => {
   if (key.key === 'Enter') { key.preventDefault(); addRelayFromField(); }
 });
 elements.resetBoardTexture.addEventListener('click', () => applyBoardTexture(''));
+elements.usePastedPattern?.addEventListener('click', () => { applyPastedPattern(elements.boardPatternCss.value); });
 elements.boardStyleForm.addEventListener('submit', event => {
   event.preventDefault();
   const typed = elements.boardTextureUrl.value;

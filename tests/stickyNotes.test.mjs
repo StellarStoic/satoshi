@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {webcrypto, createHash} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
-import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, STICKY_MEMBER_TIERS, stickyMemberTier, stickyTierPrice, stickyDiscountSentence, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
+import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, STICKY_MEMBER_TIERS, stickyMemberTier, stickyTierPrice, stickyDiscountSentence, boardPatternCss, BOARD_TEXTURES, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyPictureDigest, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
  stickyPowOffer, stickyPowSentence, stickyPowProgress, stickyPowDifficulty,
   boardBitmapSize,
@@ -3804,4 +3804,83 @@ test('the stranger wording does not claim the reader is anonymous', () => {
   assert.match(stranger.state, /no satoshi\.si name/);
   assert.match(anonymous.label, /anonymously/, 'the board-minted key keeps its own wording');
   assert.equal(stranger.price, anonymous.price, 'both pay the same flat price');
+});
+
+
+/* ----------------------------------------------------------------- pasted board patterns ---- */
+
+test('a pattern pasted from css-pattern.com is accepted as written', () => {
+  const pasted = `background-color: #e5e5f7;
+opacity: 0.8;
+background-image: repeating-linear-gradient(45deg, #444cf7 25%, transparent 25%, transparent 75%, #444cf7 75%, #444cf7);
+background-position: 0 0, 10px 10px;
+background-size: 20px 20px;`;
+  const parsed = boardPatternCss(pasted);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.match(parsed.css, /^background-color:#e5e5f7;opacity:0\.8;background-image:repeating-linear-gradient/);
+  assert.match(parsed.css, /background-size:20px 20px;$/);
+  assert.equal(parsed.properties.length, 5, 'every declaration survives the round trip');
+});
+
+test('a pattern may not fetch anything, or set anything that is not a background', () => {
+  const remote = boardPatternCss('background-image: url(https://tracker.example/p.gif);');
+  assert.equal(remote.ok, false);
+  assert.match(remote.error, /url\(/, 'the refusal names what it refused');
+  assert.equal(boardPatternCss('@import "https://elsewhere/site.css";').ok, false);
+  const positional = boardPatternCss('position: fixed; background-image: linear-gradient(red, blue);');
+  assert.equal(positional.ok, false);
+  assert.match(positional.error, /position is not a board pattern/);
+});
+
+test('a pattern needs something to paint', () => {
+  const colourOnly = boardPatternCss('background-color: #123456;');
+  assert.equal(colourOnly.ok, false);
+  assert.match(colourOnly.error, /background-image/);
+  assert.equal(boardPatternCss('').ok, false);
+  assert.equal(boardPatternCss('   ').ok, false);
+});
+
+test('a pattern may carry its own variables and comments', () => {
+  const parsed = boardPatternCss('/* from css-pattern.com */ --s: 40px; background-size: var(--s); background-image: linear-gradient(var(--s), red, blue);');
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.match(parsed.css, /^--s:40px;/);
+  assert.doesNotMatch(parsed.css, /\*\//, 'comments do not survive the round trip');
+  const shouty = boardPatternCss('Background-Image: linear-gradient(90deg, red, blue)');
+  assert.equal(shouty.ok, true);
+  assert.match(shouty.css, /^background-image:/, 'property names are stored lowercase');
+});
+
+test('every pattern in the catalogue has a picture this page can serve', async () => {
+  const ids = BOARD_TEXTURES.map(texture => texture.id);
+  const urls = BOARD_TEXTURES.map(texture => texture.url);
+  assert.equal(new Set(ids).size, ids.length, 'ids are unique');
+  assert.equal(new Set(urls).size, urls.length, 'urls are unique');
+  assert.equal(BOARD_TEXTURES.length, 22, 'the seven originals and the fifteen added later');
+  for (const texture of BOARD_TEXTURES) {
+    assert.match(texture.url, /^\/img\/board-[a-z0-9-]+\.(png|jpg)$/u, texture.id);
+    assert.ok(texture.label.length > 1, `${texture.id} has a label a reader can read`);
+    if (texture.tile !== undefined) {
+      assert.ok(texture.tile >= 96 && texture.tile <= 600, `${texture.id} paints inside the board's own range`);
+    }
+    // A catalogue entry naming a file nobody fetched passes every grep and 404s for the reader.
+    const bytes = await readFile(new URL(`..${texture.url}`, import.meta.url));
+    const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
+    assert.ok(png || jpeg, `${texture.id} is a real image, not a promise of one`);
+  }
+});
+
+test('the pasted pattern lives in the board style dialog and is wired to the model', async () => {
+  const page = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const start = page.indexOf('id="boardStyleDialog"');
+  assert.ok(start > 0, 'the dialog exists');
+  const dialog = page.slice(start, page.indexOf('</dialog>', start));
+  assert.match(dialog, /id="boardPatternCss"/u, 'the field sits in the board style dialog');
+  assert.match(dialog, /<button type="button" id="usePastedPattern"/u,
+    'a bare button inside the form would submit it and close the panel');
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(script, /const BOARD_PATTERN_CSS_KEY = 'satoshi:sticky:board-pattern-css:v1';/u);
+  assert.match(script, /applyPastedPattern\(elements\.boardPatternCss\.value\)/u, 'the button calls the model rule');
+  assert.match(script, /if \(boardPatternIsCss\(\)\) \{\n    paintPastedPattern\(\);/u,
+    'a pasted pattern must not be painted over by a file');
 });

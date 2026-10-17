@@ -567,7 +567,12 @@
 .board-texture__label { font-size: 11px; }
 .board-texture.is-selected { border-color: var(--accent, #f7931a); box-shadow: 0 0 0 1px var(--accent, #f7931a); }
 .board-texture-field { display: flex; flex-direction: column; gap: 4px; }
-.board-texture-field input { width: 100%; }
+.board-texture-field input, .board-texture-field textarea { width: 100%; }
+.board-texture-field textarea {
+  min-height: 74px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.45; padding: 8px 9px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.28); color: inherit;
+}
 .board-texture-note { margin: 0; font-size: 12px; opacity: .75; }
 
 /* The clipboard route back from Amber: a full-width action under the login methods. */
