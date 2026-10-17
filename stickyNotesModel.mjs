@@ -903,7 +903,21 @@ export function stickyDiscountSentence({ member = false, offPercent = 0 } = {}) 
  * on — a buyer with no subscription is offered "subscribe and post" as one action
  * rather than a detour they have to repeat.
  */
-export function describeStickyAction({ anonymous = false, subscription = null, plan = 'week' } = {}) {
+/**
+ * Is this key priced as a throwaway?
+ *
+ * The desk decides: a key with no satoshi.si name and no profile on the big relays
+ * comes back marked `anonymous`, because the board can mint such a key in a second
+ * and the cheapest week would otherwise be the cheapest way to post forever. The
+ * board's own anonymous mode counts too, and is the same thing to the pricing code.
+ */
+export function anonymousForQuote(session, subscription) {
+  if (!session) return false;
+  if (session.method === 'anonymous') return true;
+  return Boolean(subscription && subscription.anonymous === true);
+}
+
+export function describeStickyAction({ anonymous = false, stranger = false, subscription = null, plan = 'week' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
   // The desk answers with this key's own tier. The board's ladder is only the
@@ -920,9 +934,16 @@ export function describeStickyAction({ anonymous = false, subscription = null, p
   const discount = stickyDiscountSentence({ member, offPercent });
 
   if (anonymous) {
+    // A key the desk does not recognise is priced like a throwaway, but calling it
+    // "post anonymously" would be a lie: the reader is signed in with their own key,
+    // the desk has simply never seen it anywhere else.
     return {
-      label: `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
-      state: `Anonymous post: ${STICKY_ANONYMOUS_PRICE_SATS} sats. One key can post one note and cannot buy a weekly or yearly subscription.`,
+      label: stranger
+        ? `One note · ${STICKY_ANONYMOUS_PRICE_SATS} sats`
+        : `Post anonymously · ${STICKY_ANONYMOUS_PRICE_SATS} sats`,
+      state: stranger
+        ? `This key is new here: no satoshi.si name and no profile on the big relays. It can pin one note for ${STICKY_ANONYMOUS_PRICE_SATS} sats, and a subscription is not for sale to it.`
+        : `Anonymous post: ${STICKY_ANONYMOUS_PRICE_SATS} sats. One key can post one note and cannot buy a weekly or yearly subscription.`,
       needsSubscription: false,
       price: STICKY_ANONYMOUS_PRICE_SATS,
       active: false,

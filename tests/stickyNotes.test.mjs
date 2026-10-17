@@ -8,6 +8,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   boardBitmapSize,
   boardPatternScale,
   apiHeaders,
+  anonymousForQuote,
   BOARD_TILE_PX,
   BOARD_IMAGE_PX,
   BOARD_BITMAP_MAX,
@@ -3783,4 +3784,24 @@ test('a quote request carries no content-type, so the browser never preflights i
   const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   assert.match(page, /headers: apiHeaders\(options\)/);
   assert.doesNotMatch(page, /headers: \{'content-type': 'application\/json', \.\.\.\(options\.headers/);
+});
+
+
+test('a key the relays do not know is priced as a throwaway and offered no plan', () => {
+  const session = {method: 'nip07', pubkey: 'a'.repeat(64)};
+  assert.equal(anonymousForQuote(session, {anonymous: true}), true, 'the desk verdict counts');
+  assert.equal(anonymousForQuote(session, {anonymous: false}), false);
+  assert.equal(anonymousForQuote({method: 'anonymous'}, null), true, 'the board mode still counts');
+  assert.equal(anonymousForQuote(null, {anonymous: true}), false, 'nobody signed in is nobody');
+});
+
+test('the stranger wording does not claim the reader is anonymous', () => {
+  const quote = {anonymous: true, prices: {weekSats: 10, yearSats: 411}};
+  const stranger = describeStickyAction({anonymous: true, stranger: true, subscription: quote});
+  const anonymous = describeStickyAction({anonymous: true, subscription: quote});
+  assert.match(stranger.label, /One note/);
+  assert.doesNotMatch(stranger.label, /anonymously/);
+  assert.match(stranger.state, /no satoshi\.si name/);
+  assert.match(anonymous.label, /anonymously/, 'the board-minted key keeps its own wording');
+  assert.equal(stranger.price, anonymous.price, 'both pay the same flat price');
 });

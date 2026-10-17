@@ -13,6 +13,7 @@ import {
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
   describeStickyAction,
+  anonymousForQuote,
   stickySubscriptionPrice,
   STICKY_TOPIC,
   normaliseStickyHashtags,
@@ -1390,9 +1391,14 @@ function updateAccount() {
 
 function renderQuotedPrice() {
   const session = getNostrSession();
-  const anonymous = session?.method === 'anonymous';
-  const checkingSubscription = Boolean(session && !anonymous && !subscriptionResolved);
-  actionInfo = describeStickyAction({anonymous, subscription, plan: subscribePlan});
+  // Two ways to be a throwaway: the board's own anonymous mode, or a key the desk
+  // looked for on the big relays and could not find. Both price the same way, and
+  // neither may be offered a plan — the desk refuses those orders by name.
+  const anonymousMode = session?.method === 'anonymous';
+  const stranger = !anonymousMode && Boolean(subscription && subscription.anonymous === true);
+  const anonymous = anonymousMode || stranger;
+  const checkingSubscription = Boolean(session && !anonymousMode && !subscriptionResolved);
+  actionInfo = describeStickyAction({anonymous, stranger, subscription, plan: subscribePlan});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
   quotedPrice = session && !checkingSubscription ? actionInfo.price : 0;
@@ -3480,7 +3486,10 @@ async function startPayment() {
           geohash: activeGeohash, geohashes: [...activeGeohashes],
           ...(pictureHash ? {pictureHash} : {}),
           ...(miningRequested ? {pow: true, powName: String(session.profile?.nip05 || '').trim()} : {}),
-          geohashMode: exactGeohash ? 'exact' : 'prefix', ...(session.method === 'anonymous' ? {anonymous: true} : {})}),
+          geohashMode: exactGeohash ? 'exact' : 'prefix',
+          // Say it rather than let the desk infer it: the two sides agree on what this
+          // key is, so the order that comes back is priced the way the composer showed.
+          ...(anonymousForQuote(session, subscription) ? {anonymous: true} : {})}),
       });
     } catch (error) {
       // 402 is the desk saying "this key is registered but has no subscription".
@@ -3507,10 +3516,11 @@ async function startPayment() {
       await buySubscriptionThen(session, notePending, elements.paymentStatus);
       return;
     }
-    if (session.method === 'anonymous' && Number(order?.sats) !== STICKY_ANONYMOUS_PRICE_SATS) {
+    const anonymousOrder = anonymousForQuote(session, subscription);
+    if (anonymousOrder && Number(order?.sats) !== STICKY_ANONYMOUS_PRICE_SATS) {
       throw new Error(`Anonymous posting is waiting for the ${STICKY_ANONYMOUS_PRICE_SATS}-sat price update on the payment service. No invoice was shown.`);
     }
-    const sats = stickyOrderPrice(order, session.method === 'anonymous' ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_SUB_WEEK_SATS);
+    const sats = stickyOrderPrice(order, anonymousOrder ? STICKY_ANONYMOUS_PRICE_SATS : STICKY_SUB_WEEK_SATS);
     // The picture goes to the site before anything is placed: the note carries the address the
     // desk hands back, so that address has to exist first. It is the same order as the note —
     // one note, one order — and the guard runs again here, measured on the file itself. A
