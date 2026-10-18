@@ -273,6 +273,26 @@ class Worker:
         return handled
 
 
+def pick_key() -> str:
+    """The first BTCPay key that the server still accepts.
+
+    The opreturn key may be revoked, or the environment may still hold a dead one, so the
+    candidates are tried in order against the cheap identity endpoint. The donate key is
+    last: it carries invoice permissions only, which is exactly what this worker needs.
+    """
+    candidates = [
+        secret(CONF / "wallet-key", env_name="BTCPAY_OP_RETURN_API"),
+        secret(CONF / "wallet-key"),
+        secret(CONF / "api-key"),
+    ]
+    for candidate in dict.fromkeys(c for c in candidates if c):
+        status, _ = http("GET", f"{BTCPAY_BASE}/api/v1/api-keys/current", key=candidate)
+        if status == 200:
+            return candidate
+        print(f"key ending ...{candidate[-4:]} refused ({status}), trying the next")
+    return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish paid OP_RETURN messages via BTCPay.")
     parser.add_argument("--once", action="store_true", help="one pass, then exit")
@@ -280,7 +300,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="explain the wiring and exit")
     args = parser.parse_args()
 
-    note_key = secret(CONF / "wallet-key", env_name="BTCPAY_OP_RETURN_API")
+    note_key = pick_key()
     token = secret(TOKEN_FILE)
     worker = Worker(note_key, token, dry_run=args.dry_run)
 
