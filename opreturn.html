@@ -60,7 +60,7 @@
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
   .board-list { display:flex; flex-direction:column; gap:12px; }
-  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:var(--surface-raised); background-size:auto; background-repeat:repeat; }
+  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:var(--surface-raised); background-size:auto; background-repeat:repeat; cursor:pointer; }
   .note.branded { border:2px solid var(--accent); }
   .note.branded .banner p { color:var(--accent); }
   .note.chain { border:1px solid var(--line); border-left:6px solid #7d848f; }
@@ -68,13 +68,15 @@
   .board-more { display:inline-flex; align-items:center; gap:8px; margin-top:16px; color:var(--accent); font-weight:600; text-decoration:none; }
   .board-more .lni { font-size:1.15rem; }
   .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; padding:16px; z-index:60; overflow:auto; }
-  .cardclose { position:fixed; top:14px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:1.4rem; line-height:1; cursor:pointer; z-index:70; }
+  button.cardclose { position:fixed; top:14px; right:16px; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; border-radius:0; background:transparent; color:var(--text-muted); font-size:22px; line-height:1; cursor:pointer; z-index:70; }
+  button.cardclose:is(:hover,:focus-visible) { color:var(--accent); }
   .sharecard { width:min(92vw, 640px); aspect-ratio:1/1; max-height:72vh; border:2px solid #7d848f; border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); display:flex; flex-direction:column; justify-content:space-between; padding:26px; background-size:cover; position:relative; }
   .sharecard.branded { border-color:var(--accent); box-shadow:0 0 20px color-mix(in srgb, var(--accent) 28%, transparent), 0 14px 44px rgba(0,0,0,.65); }
   .sharecard.branded .sharetext { color:var(--accent); }
   .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
   .sharecard > * { position:relative; }
-  .sharecard .share-logo { position:absolute; right:18px; bottom:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
+  .sharecard > .share-brandmark { position:absolute; right:14px; bottom:14px; display:flex; flex-direction:column; align-items:center; gap:2px; color:#e8eaed; font-size:.58rem; font-weight:700; line-height:1; }
+  .share-brandmark .share-logo { width:38px; height:38px; border-radius:50%; opacity:.88; }
   .sharetext { color:#f4f6f8; font-size:clamp(.95rem, 3.4vw, 1.9rem); font-weight:600; line-height:1.25; white-space:pre-wrap; overflow-wrap:anywhere; }
   .sharetext.is-long { font-size:clamp(.82rem, 2.8vw, 1.45rem); }
   .sharefoot { display:flex; flex-direction:column; gap:4px; padding-right:52px; font-size:.75rem; color:#c9ced6; }
@@ -139,7 +141,7 @@
 
   <section id="boardSection">
     <h2>The board</h2>
-    <p class="hint">The five newest readable messages. Optional satoshi.si branding uses the current theme accent; unbranded messages stay grey.</p>
+    <p class="hint">The five newest readable messages. Tap one to see it whole.</p>
     <div id="board" class="board-list"><p class="hint">Loading…</p></div>
     <a class="board-more" href="/opreturnBoard.html"><span>Read more</span><i class="lni lni-message-3-text" aria-hidden="true"></i></a>
   </section>
@@ -162,6 +164,7 @@
 <script src="qrCodeGenerator_1_4_4.js"></script>
 <script type="module">
 import { validateMessage, priceSats, OP_RETURN, orderView, isOrderTerminal, sharePattern, recentBoardNotes } from './opreturnModel.mjs';
+import { downloadOpReturnCard, shareOpReturnCard } from './opreturnCard.mjs';
 
 const API = 'https://pay.satoshi.si/opreturn/v1';
 const el = (id) => document.getElementById(id);
@@ -277,9 +280,9 @@ function openReader(note) {
   const overlay = document.createElement('div');
   overlay.className = 'cardwrap';
   overlay.innerHTML = `
-    <button class="cardclose" aria-label="Close">&times;</button>
+    <button class="cardclose" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
     <div class="sharecard${note.viaSatoshi ? ' branded' : ''}" style="background-image:${pattern.css}">
-      <img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">
+      <span class="share-brandmark"><img class="share-logo" src="/android-chrome-192x192.png" alt=""><span>satoshi.si</span></span>
       <div class="sharetext${new TextEncoder().encode(note.text || '').length > 56 ? ' is-long' : ''}">${(note.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
       <div class="sharefoot">
         ${note.viaSatoshi ? '<span class="brand">satoshi.si/opreturn</span>' : ''}
@@ -288,14 +291,25 @@ function openReader(note) {
         <span class="when">Date and time: ${note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable'}</span>
       </div>
     </div>
-    <div class="bar"><button id="dl">Download PNG</button><button class="ghost" id="closeCard">Close</button></div>`;
+    <div class="bar"><button id="dl"><i class="lni lni-download-1" aria-hidden="true"></i> Download</button><button id="share"><i class="lni lni-share-1" aria-hidden="true"></i> Share</button></div>`;
   document.body.appendChild(overlay);
   openOverlay = overlay;
   fitShareText(overlay.querySelector('.sharecard'));
   overlay.querySelector('.cardclose').onclick = () => overlay.remove();
-  overlay.querySelector('#closeCard').onclick = () => overlay.remove();
   overlay.onclick = (event) => { if (event.target === overlay) overlay.remove(); };
-  overlay.querySelector('#dl').onclick = () => downloadCard(note, pattern);
+  overlay.querySelector('#dl').onclick = () => downloadOpReturnCard(note, pattern);
+  overlay.querySelector('#share').onclick = async (event) => {
+    const button = event.currentTarget;
+    try {
+      const result = await shareOpReturnCard(note, pattern);
+      if (result === 'copied') {
+        button.textContent = 'Link copied';
+        setTimeout(() => { button.innerHTML = '<i class="lni lni-share-1" aria-hidden="true"></i> Share'; }, 1800);
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') console.warn('card share failed:', error);
+    }
+  };
 }
 
 function fitShareText(card) {
@@ -310,124 +324,6 @@ function fitShareText(card) {
       text.style.fontSize = `${size}px`;
     }
   });
-}
-
-function downloadCard(note, pattern) {
-  const computed = getComputedStyle(document.documentElement);
-  const accent = computed.getPropertyValue('--accent').trim() || '#f2a900';
-  const face = computed.getPropertyValue('--site-font').trim() || 'monospace';
-  const size = 1080;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0b0d11';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = `hsl(${(pattern.hue + 40) % 360} 62% 20%)`;
-  ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = pattern.ink;
-  ctx.fillStyle = pattern.ink;
-  if (pattern.shape === 0) {
-    ctx.lineWidth = 3;
-    for (let offset = -size; offset < size * 2; offset += pattern.size) {
-      ctx.beginPath();
-      ctx.moveTo(offset, 0);
-      ctx.lineTo(offset - size, size);
-      ctx.stroke();
-    }
-  } else if (pattern.shape === 1) {
-    for (let y = 0; y < size; y += pattern.size) {
-      for (let x = 0; x < size; x += pattern.size) {
-        ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  } else if (pattern.shape === 2) {
-    ctx.lineWidth = 4;
-    const step = pattern.size * 2;
-    for (let offset = -size; offset < size * 2; offset += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, offset);
-      ctx.lineTo(size, offset + size * Math.tan((pattern.angle * Math.PI) / 180));
-      ctx.stroke();
-    }
-  } else {
-    const step = pattern.size * 2;
-    for (let x = 0; x < size; x += step) {
-      for (let y = 0; y < size; y += step) {
-        ctx.beginPath();
-        ctx.arc(x, y, step * 0.4, 0, Math.PI * 0.35);
-        ctx.stroke();
-      }
-    }
-  }
-  ctx.fillStyle = 'rgba(10,12,16,0.82)';
-  ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = note.viaSatoshi ? accent : '#7d848f';
-  ctx.lineWidth = 14;
-  ctx.strokeRect(28, 28, size - 56, size - 56);
-  let fontSize = 66;
-  let lines = [];
-  do {
-    ctx.font = `600 ${fontSize}px ${face}`;
-    lines = wrapCanvasText(ctx, String(note.text || ''), size - 190);
-    if (lines.length * fontSize * 1.25 <= 610) break;
-    fontSize -= 2;
-  } while (fontSize > 10);
-  ctx.fillStyle = note.viaSatoshi ? accent : '#ffffff';
-  const startY = 475 - (lines.length * fontSize * 1.25) / 2;
-  lines.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
-  if (note.viaSatoshi) {
-    ctx.fillStyle = accent;
-    ctx.font = `600 30px ${face}`;
-    ctx.fillText('satoshi.si/opreturn', 95, 900);
-  }
-  ctx.fillStyle = '#e8eaed';
-  ctx.font = '400 25px system-ui, sans-serif';
-  if (note.viaSatoshi) ctx.fillText('written through satoshi.si', 95, 900);
-  ctx.fillText(`Date and time: ${note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable'}`, 95, 936);
-  ctx.fillStyle = '#9aa3af';
-  ctx.font = '400 22px ui-monospace, Menlo, monospace';
-  ctx.fillText('Transaction ID:', 95, 972);
-  const txid = String(note.txid || 'unavailable');
-  ctx.fillText(txid.slice(0, 32), 95, 1002);
-  if (txid.length > 32) ctx.fillText(txid.slice(32), 95, 1032);
-  const finish = () => canvas.toBlob((blob) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `opreturn-${(note.txid || 'message').slice(0, 12)}.png`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-  }, 'image/png');
-  const logo = new Image();
-  logo.onload = () => {
-    ctx.drawImage(logo, size - 145, size - 145, 72, 72);
-    finish();
-  };
-  logo.onerror = finish;
-  logo.src = '/android-chrome-192x192.png';
-}
-
-function wrapCanvasText(ctx, text, maxWidth) {
-  const lines = [];
-  let line = '';
-  for (const character of Array.from(text)) {
-    if (character === '\n') {
-      lines.push(line);
-      line = '';
-      continue;
-    }
-    const candidate = line + character;
-    if (line && ctx.measureText(candidate).width > maxWidth) {
-      lines.push(line.trimEnd());
-      line = character.trimStart();
-    } else {
-      line = candidate;
-    }
-  }
-  if (line || !lines.length) lines.push(line);
-  return lines;
 }
 
 function noteCard(note) {
@@ -446,13 +342,6 @@ function noteCard(note) {
   const who = note.viaSatoshi ? 'via satoshi.si' : 'public message';
   meta.appendChild(Object.assign(document.createElement('span'), { textContent: who }));
   if (when) meta.appendChild(Object.assign(document.createElement('span'), { textContent: when }));
-  const cardBtn = document.createElement('button');
-  cardBtn.className = 'ghost';
-  cardBtn.style.padding = '2px 10px';
-  cardBtn.style.fontSize = '.75rem';
-  cardBtn.textContent = 'Card';
-  cardBtn.onclick = () => openReader(note);
-  meta.appendChild(cardBtn);
   if (note.txid) {
     const link = document.createElement('a');
     link.href = `https://mempool.space/tx/${note.txid}`;
@@ -462,6 +351,19 @@ function noteCard(note) {
     meta.appendChild(link);
   }
   card.appendChild(meta);
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', 'Open message card');
+  card.onclick = (event) => {
+    if (event.target.closest('a')) return;
+    openReader(note);
+  };
+  card.onkeydown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openReader(note);
+    }
+  };
   return card;
 }
 
