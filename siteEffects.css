@@ -1,35 +1,46 @@
-.site-tv-transition {
+.site-page-fade,
+.site-power-off {
     position: fixed;
     inset: 0;
     z-index: 2147483647;
     pointer-events: none;
     overflow: hidden;
+    contain: strict;
 }
-.site-tv-static, .site-tv-roll { position: absolute; }
-.site-tv-static {
-    inset: -8%;
+
+/* Internal navigation uses one quiet surface. The tiny final opacity keeps the
+   compositor layer alive, avoiding Chromium's one-frame layer teardown flash. */
+.site-page-fade {
     background: radial-gradient(circle at center, #0b0c0d 0%, #08090a 58%, #030404 100%);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: opacity;
 }
-.site-tv-roll {
-    display: none;
+.site-page-fade--leave {
+    opacity: 0;
+    transition: opacity 520ms cubic-bezier(.33, 1, .68, 1);
 }
-.site-tv-leave .site-tv-static { animation: site-center-fade-out 500ms cubic-bezier(.4, 0, .2, 1) both; }
-.site-tv-enter .site-tv-static { animation: site-center-fade-in 500ms cubic-bezier(.4, 0, .2, 1) both; }
-.site-tv-top, .site-tv-bottom, .site-tv-line { display: none; }
-.site-tv-off .site-tv-static, .site-tv-off .site-tv-roll { display: none; }
-.site-tv-off .site-tv-top, .site-tv-off .site-tv-bottom {
-    display: block;
+.site-page-fade--leave.is-active { opacity: 1; }
+.site-page-fade--enter {
+    opacity: 1;
+    transition: opacity 620ms cubic-bezier(.22, 1, .36, 1);
+}
+.site-page-fade--enter.is-active { opacity: .001; }
+
+/* External links retain the deliberate power-off gesture. These elements are
+   never created for navigation between satoshi.si pages. */
+.site-power-off__top,
+.site-power-off__bottom {
     position: absolute;
     left: 0;
     right: 0;
     height: 50%;
     background: #000;
-    animation: site-tv-collapse 180ms ease-in both;
+    animation: site-power-collapse 180ms ease-in both;
 }
-.site-tv-top { top: 0; transform-origin: top; }
-.site-tv-bottom { bottom: 0; transform-origin: bottom; }
-.site-tv-off .site-tv-line {
-    display: block;
+.site-power-off__top { top: 0; transform-origin: top; }
+.site-power-off__bottom { bottom: 0; transform-origin: bottom; }
+.site-power-off__line {
     position: absolute;
     top: calc(50% - 1px);
     left: 0;
@@ -37,24 +48,18 @@
     height: 2px;
     background: #d6e0da;
     box-shadow: 0 0 12px 2px rgba(210, 225, 215, .4);
-    animation: site-tv-power-line 370ms ease-out both;
+    animation: site-power-line 370ms ease-out both;
 }
-@keyframes site-center-fade-out {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-@keyframes site-center-fade-in {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-@keyframes site-tv-collapse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-@keyframes site-tv-power-line {
+@keyframes site-power-collapse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes site-power-line {
     0%, 35% { opacity: 0; transform: scaleX(1); }
     50% { opacity: .8; transform: scaleX(1); }
     85% { opacity: .6; transform: scaleX(.015); }
     100% { opacity: 0; transform: scaleX(0); }
 }
+
 @media (prefers-reduced-motion: reduce) {
     body::before { animation: none; }
-    .site-tv-transition { display: none; }
+    .site-page-fade,
+    .site-power-off { display: none; }
 }

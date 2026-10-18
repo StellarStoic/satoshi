@@ -37,21 +37,29 @@ function toggleClass(elem, className) {
     }
 }
 
+function closeSubmenus() {
+    document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
+        removeClass(activeItem, 'active');
+        activeItem.querySelector(':scope > a')?.setAttribute('aria-expanded', 'false');
+    });
+    if (theMenu) removeClass(theMenu, 'submenu-view');
+}
+
 function closeBurgerMenu() {
     if (theToggle) {
         removeClass(theToggle, 'on');
         theToggle.setAttribute('aria-expanded', 'false');
     }
-    document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
-        removeClass(activeItem, 'active');
-    });
+    closeSubmenus();
 }
 
 if (theToggle) {
     theToggle.setAttribute('aria-expanded', hasClass(theToggle, 'on') ? 'true' : 'false');
     theToggle.onclick = function() {
         toggleClass(this, 'on');
-        this.setAttribute('aria-expanded', hasClass(this, 'on') ? 'true' : 'false');
+        var isOpen = hasClass(this, 'on');
+        this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (!isOpen) closeSubmenus();
         return false;
     };
 }
@@ -75,6 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add click event to each submenu trigger
     submenuItems.forEach(function(menuItem) {
+        menuItem.setAttribute('aria-expanded', 'false');
         menuItem.addEventListener('click', function(e) {
             // Prevent the link from navigating if it's just '#'
             if (this.getAttribute('href') === '#') {
@@ -82,16 +91,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             var parentLi = this.parentElement;
+            var wasActive = hasClass(parentLi, 'active');
             
             // Close other open submenus
             document.querySelectorAll('.has-submenu.active').forEach(function(activeItem) {
-                if (activeItem !== parentLi) {
-                    removeClass(activeItem, 'active');
-                }
+                removeClass(activeItem, 'active');
+                activeItem.querySelector(':scope > a')?.setAttribute('aria-expanded', 'false');
             });
             
-            // Toggle current submenu
-            toggleClass(parentLi, 'active');
+            // The selected category becomes a focused submenu view. Selecting its
+            // heading again returns to the complete main menu.
+            if (wasActive) {
+                removeClass(theMenu, 'submenu-view');
+                this.setAttribute('aria-expanded', 'false');
+            } else {
+                addClass(parentLi, 'active');
+                addClass(theMenu, 'submenu-view');
+                this.setAttribute('aria-expanded', 'true');
+            }
         });
     });
     

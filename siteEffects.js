@@ -1,24 +1,53 @@
 (() => {
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    const storageKey = 'satoshi-channel-entry';
+    const storageKey = 'satoshi-soft-fade-entry-v1';
+    const retiredStorageKey = 'satoshi-channel-entry';
     let overlay;
     let navigating = false;
     let cleanupTimer;
+    let activationFrame;
+    let paintFrame;
+
+    function cancelPendingWork() {
+        clearTimeout(cleanupTimer);
+        cancelAnimationFrame(activationFrame);
+        cancelAnimationFrame(paintFrame);
+    }
 
     function clearEffect() {
-        clearTimeout(cleanupTimer);
+        cancelPendingWork();
         overlay?.remove();
         overlay = null;
     }
 
-    function showEffect(kind) {
+    function activateFade() {
+        activationFrame = requestAnimationFrame(() => {
+            paintFrame = requestAnimationFrame(() => overlay?.classList.add('is-active'));
+        });
+    }
+
+    function showFade(kind) {
+        cancelPendingWork();
+        if (!overlay?.classList.contains('site-page-fade')) {
+            overlay?.remove();
+            overlay = document.createElement('div');
+            overlay.setAttribute('aria-hidden', 'true');
+            document.body.append(overlay);
+        }
+        // Reuse the same compositor surface when a visitor continues navigating.
+        // Internal transitions never create any of the old TV/static child layers.
+        overlay.className = `site-page-fade site-page-fade--${kind}`;
+        activateFade();
+    }
+
+    function showPowerOff() {
         clearEffect();
         overlay = document.createElement('div');
-        overlay.className = `site-tv-transition site-tv-${kind}`;
+        overlay.className = 'site-power-off';
         overlay.setAttribute('aria-hidden', 'true');
-        for (const name of ['static', 'roll', 'top', 'bottom', 'line']) {
+        for (const name of ['top', 'bottom', 'line']) {
             const part = document.createElement('div');
-            part.className = `site-tv-${name}`;
+            part.className = `site-power-off__${name}`;
             overlay.append(part);
         }
         document.body.append(overlay);
@@ -28,6 +57,7 @@
         try {
             const pending = JSON.parse(sessionStorage.getItem(storageKey));
             sessionStorage.removeItem(storageKey);
+            sessionStorage.removeItem(retiredStorageKey);
             return pending && pending.url === location.href && Date.now() - pending.time < 15000;
         } catch {
             return false;
@@ -35,13 +65,10 @@
     }
 
     if (consumeEntry() && !reducedMotion.matches) {
-        showEffect('enter');
-        // Keep the completed transparent layer until the next navigation.
-        // Removing a full-viewport composited layer can flash for one frame in
-        // Chromium, even when its final computed opacity is already zero.
+        showFade('enter');
+        // The almost-transparent surface remains reusable for the next navigation.
     }
 
-    // A restored history entry must never retain the departing screen's overlay.
     addEventListener('pageshow', event => {
         if (event.persisted) clearEffect();
         navigating = false;
@@ -64,13 +91,15 @@
         if (navigating) return;
         navigating = true;
         const internal = url.origin === location.origin || ['satoshi.si', 'www.satoshi.si'].includes(url.hostname);
-        showEffect(internal ? 'leave' : 'off');
         if (internal) {
+            showFade('leave');
             try {
-                sessionStorage.setItem(storageKey, JSON.stringify({ url: url.href, time: Date.now() }));
+                sessionStorage.setItem(storageKey, JSON.stringify({url: url.href, time: Date.now()}));
             } catch {
                 // Navigation still works when browser storage is unavailable.
             }
+        } else {
+            showPowerOff();
         }
         setTimeout(() => {
             location.assign(url.href);
@@ -78,6 +107,6 @@
                 clearEffect();
                 navigating = false;
             }, 1500);
-        }, internal ? 500 : 380);
+        }, internal ? 570 : 380);
     });
 })();

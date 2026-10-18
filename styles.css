@@ -110,6 +110,9 @@ body {
 #toggle.on ~ #menu {
 	opacity: 1;
 	visibility: visible;
+	transform: translateY(0) scale(1);
+	pointer-events: auto;
+	transition-delay: 0s;
 	}
 
 	/* menu appearance*/
@@ -132,7 +135,10 @@ body {
 	/* just for this demo */
 	opacity: 0;
 	visibility: hidden;
-	transition: opacity .4s;
+	transform: translateY(-8px) scale(.985);
+	transform-origin: top left;
+	pointer-events: none;
+	transition: opacity 260ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 320ms;
 	z-index: 2000; /* Increase z-index to be on top of all content */
 	}
 #menu:after {
@@ -199,8 +205,11 @@ ul, li, li a {
     left: 0;
     min-width: 200px; /* Minimum width to prevent too narrow menus */
     max-height: 0; /* Start collapsed */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-7px);
     overflow: hidden; /* Hide overflow when collapsed */
-    transition: max-height 0.3s ease; /* Smooth expand/collapse */
+    transition: max-height 360ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 360ms;
     background: var(--surface-raised); /* Slightly different background */
     margin: 0;
     border-radius: 3px;
@@ -211,9 +220,38 @@ ul, li, li a {
 /* When submenu is active */
 .has-submenu.active .submenu {
     max-height: 500px; /* Adjust based on your content height */
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
     overflow-y: auto; /* Add scroll if content is too long */
     width: 300px;
+    transition-delay: 0s;
 
+}
+
+/* Focus the open category instead of leaving the entire main menu behind it. */
+#menu > ul > li {
+    max-height: 64px;
+    opacity: 1;
+    transform: translateX(0);
+    transition: max-height 320ms cubic-bezier(.22, 1, .36, 1), opacity 180ms ease, transform 300ms cubic-bezier(.22, 1, .36, 1);
+}
+#menu.submenu-view > ul > li {
+    max-height: 0;
+    opacity: 0;
+    transform: translateX(-8px);
+    overflow: hidden;
+    pointer-events: none;
+}
+#menu.submenu-view > ul > li.has-submenu.active {
+    max-height: calc(45dvh + 64px);
+    opacity: 1;
+    transform: translateX(0);
+    overflow: visible;
+    pointer-events: auto;
+}
+#menu.submenu-view > ul > li.has-submenu.active > a {
+    border-bottom: 1px solid var(--border);
 }
 
 /* Submenu items */

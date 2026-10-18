@@ -10,6 +10,24 @@ test('burger menu closes fully on outside click and Escape', async () => {
   assert.match(script, /!theMenu\?\.contains\(e\.target\) && !theToggle\?\.contains\(e\.target\)/);
   assert.match(script, /e\.key === 'Escape'/);
   assert.match(script, /aria-expanded/);
+  assert.match(script, /function closeSubmenus\(\)/);
+  assert.match(script, /removeClass\(theMenu, 'submenu-view'\)/);
+});
+
+test('opening a submenu hides the main choices and its heading acts as back', async () => {
+  const [script, styles] = await Promise.all([
+    readFile(new URL('../burgerMenu.js', import.meta.url), 'utf8'),
+    readFile(new URL('../styles.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(script, /var wasActive = hasClass\(parentLi, 'active'\)/);
+  assert.match(script, /addClass\(theMenu, 'submenu-view'\)/);
+  assert.match(script, /if \(wasActive\)[\s\S]*removeClass\(theMenu, 'submenu-view'\)/);
+  assert.match(styles, /#menu\.submenu-view > ul > li\s*\{[\s\S]*?max-height:\s*0;[\s\S]*?opacity:\s*0/);
+  assert.match(styles, /#menu\.submenu-view > ul > li\.has-submenu\.active\s*\{[\s\S]*?opacity:\s*1/);
+  assert.doesNotMatch(styles, /#menu\.submenu-view > ul > li\s*\{\s*display:\s*none/);
+  assert.match(styles, /\.submenu\s*\{[\s\S]*?transition:\s*max-height 360ms[\s\S]*?opacity 220ms/);
+  assert.match(styles, /#menu\s*\{[\s\S]*?transition:\s*opacity 260ms[\s\S]*?transform 320ms/);
 });
 
 test('shared menu follows theme contrast and fills mobile screens', async () => {
