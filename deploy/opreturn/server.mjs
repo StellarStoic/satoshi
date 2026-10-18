@@ -11,7 +11,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { OP_RETURN, validateMessage, priceSats, latestFromBlocks, boardNote } from './opreturnModel.mjs';
+import { OP_RETURN, validateMessage, priceSats, latestFromBlocks, boardNote, looksLikeLanguage } from './opreturnModel.mjs';
 
 const PORT = Number(process.env.OPRETURN_PORT || 8791);
 const DATA_DIR = process.env.OPRETURN_DATA || path.resolve('./data');
@@ -313,7 +313,10 @@ const server = http.createServer(async (req, res) => {
           publishedAt: new Date(o.createdAtMs).toISOString(),
           source: 'tool',
         }));
+      // The index was built before the filter earned its keep, and a restart should not
+      // resurrect what it threw out: judge every stored entry again on the way out.
       const fromChain = chain.messages
+        .filter(m => looksLikeLanguage(m.text))
         .slice(0, OP_RETURN.latestCount)
         .map(m => boardNote({
           text: m.text,

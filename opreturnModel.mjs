@@ -153,8 +153,12 @@ export function looksLikeLanguage(value) {
   if (/\bto:(usdt|usdc|eth|btc|trx)\b/i.test(text)) {
     return false; // bridge receipts
   }
-  const words = text.split(/\s+/).filter(word => /\p{L}{3,}/u.test(word));
-  if (!words.length && text.length > 20) {
+  const tokens = text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (tokens.some(token => token.length >= 26)) {
+    return false; // an address or a hash wore a message's clothes
+  }
+  const words = tokens.filter(token => /\p{L}{3,}/u.test(token));
+  if (text.length > 20 && words.length < 2) {
     return false; // one long blob is not a sentence
   }
   const shouting = (text.match(/[A-Z]/g) || []).length / Math.max(letters, 1);
