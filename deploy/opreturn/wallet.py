@@ -279,6 +279,42 @@ def build_and_sign(message: str, utxos, address_program: bytes, key_path: pathli
     return raw.hex(), summary
 
 
+# ------------------------------------------------------------------- key export ----
+
+BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def base58check(payload: bytes) -> str:
+    data = payload + sha256d(payload)[:4]
+    number = int.from_bytes(data, "big")
+    out = ""
+    while number:
+        number, remainder = divmod(number, 58)
+        out = BASE58[remainder] + out
+    padding = len(data) - len(data.lstrip(b"\x00"))
+    return "1" * padding + out
+
+
+def private_scalar(path: pathlib.Path) -> bytes:
+    """The 32-byte private key out of the PEM, so it can be carried to another wallet."""
+    der = subprocess.run(["openssl", "ec", "-in", str(path), "-outform", "DER"],
+                         check=True, capture_output=True).stdout
+    marker = der.find(b"\x04\x20")
+    if marker < 0:
+        raise ValueError("no 32-byte private key in this PEM")
+    return der[marker + 2:marker + 34]
+
+
+def key_as_wif(path: pathlib.Path, testnet: bool = False) -> str:
+    """WIF for import into Electrum, Sparrow or any wallet that takes one.
+
+    This is the recovery path if the machine that holds the PEM is gone: the WIF plus a
+    wallet that accepts it reaches the same coins. Treat the output as the money itself.
+    """
+    version = b"\xef" if testnet else b"\x80"
+    return base58check(version + private_scalar(path) + b"\x01")
+
+
 # --------------------------------------------------------------- plain payments ----
 
 def decode_segwit(address: str):
@@ -385,6 +421,9 @@ if __name__ == "__main__":
             generate_key(key_path)
             print("generated", key_path)
         print(pool_address(key_path))
+    elif command == "wif":
+        print(key_as_wif(key_path))
+        print("this is the money itself: do not paste it into a chat or a web page", file=sys.stderr)
     elif command == "balance":
         utxos = fetch_utxos(pool_address(key_path))
         print(sum(int(u["value"]) for u in utxos), "sats in", len(utxos), "coins")

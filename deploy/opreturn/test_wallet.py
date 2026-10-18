@@ -103,6 +103,30 @@ class Withdrawal(unittest.TestCase):
                                      destination, key, pubkey, feerate=2.0)
 
 
+class KeyExport(unittest.TestCase):
+    def test_the_wif_carries_the_same_key_as_the_pem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = pathlib.Path(tmp) / "k.pem"
+            wallet.generate_key(key)
+            wif = wallet.key_as_wif(key)
+            self.assertEqual(wif[0], "K", "compressed mainnet WIF")
+            self.assertEqual(len(wif), 52)
+            number = 0
+            for char in wif:
+                number = number * 58 + wallet.BASE58.index(char)
+            raw = number.to_bytes(39, "big")
+            self.assertEqual(raw[0], 0x80)
+            self.assertEqual(raw[1:33], wallet.private_scalar(key))
+            self.assertEqual(raw[33], 0x01, "compressed flag")
+
+    def test_the_address_matches_the_key_it_exports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = pathlib.Path(tmp) / "k.pem"
+            pubkey = wallet.generate_key(key)
+            self.assertEqual(wallet.pool_address(key),
+                             wallet.segwit_address("bc", 0, wallet.hash160(pubkey)))
+
+
 class Bip143Vector(unittest.TestCase):
     """If the digest matches BIP143's own number, the signer is correct."""
 

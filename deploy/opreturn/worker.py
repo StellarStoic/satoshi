@@ -52,7 +52,9 @@ MAX_PUBLISH_ATTEMPTS = 120
 MAX_MESSAGE_BYTES = 80
 
 
-def secret(path: pathlib.Path) -> str:
+def secret(path: pathlib.Path, env_name: str = "") -> str:
+    if env_name and os.environ.get(env_name, "").strip():
+        return os.environ[env_name].strip()
     if not path.exists():
         return ""
     return path.read_text().strip()
@@ -278,7 +280,7 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="explain the wiring and exit")
     args = parser.parse_args()
 
-    note_key = secret(CONF / "wallet-key")
+    note_key = secret(CONF / "wallet-key", env_name="BTCPAY_OP_RETURN_API")
     token = secret(TOKEN_FILE)
     worker = Worker(note_key, token, dry_run=args.dry_run)
 
@@ -289,9 +291,17 @@ def main() -> int:
         print("service:", SERVICE_BASE)
         status, body = worker.service("GET", "/health")
         print("service health:", status, json.dumps(body)[:200] if isinstance(body, dict) else str(body)[:200])
-        onchain = http("GET", f"{BTCPAY_BASE}/api/v1/stores/{worker.store}/payment-methods/{ONCHAIN_METHOD}/wallet",
-                       key=note_key)
-        print("on-chain wallet:", onchain[0], json.dumps(onchain[1])[:160] if isinstance(onchain[1], dict) else "")
+        # Deliberately no wallet call: the key is being narrowed to invoices alone, and a
+        # check that needs wallet permission would look like a fault after that.
+        address = wallet.pool_address(POOL_KEY)
+        print("pool address:", address)
+        print("pool balance:", worker.pool_balance(), "sats")
+        scopes = http("GET", f"{BTCPAY_BASE}/api/v1/api-keys/current", key=note_key)
+        if scopes[0] == 200 and isinstance(scopes[1], dict):
+            granted = sorted(scopes[1].get("permissions") or [])
+            print("key permissions:", len(granted))
+            for name in granted:
+                print("   ", name)
         return 0
 
     if not note_key or not worker.store or not token:
