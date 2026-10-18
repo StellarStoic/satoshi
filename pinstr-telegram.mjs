@@ -84,6 +84,85 @@ function injectLoginStyles() {
   document.head.appendChild(style);
 }
 
+// The key lives sealed on the server, so the only way a Telegram user can take it with
+// them is to ask for it. This is that button, and the one that deletes our copy after
+// they have imported it somewhere they trust.
+function mountKeyTools(detail) {
+  if (typeof document === 'undefined' || !detail || !detail.session) return;
+  const host = document.querySelector('#loginDialog .dialog-inner');
+  if (!host || host.querySelector('.pinstr-key-tools')) return;
+
+  const box = document.createElement('div');
+  box.className = 'pinstr-key-tools';
+  box.style.cssText = 'margin:18px 0 0;padding-top:14px;border-top:1px solid var(--border);';
+
+  const heading = document.createElement('p');
+  heading.textContent = 'Your key';
+  heading.style.cssText = 'margin:0 0 6px;font-size:.85rem;color:var(--text);';
+  const explain = document.createElement('p');
+  explain.textContent = 'This account was created for you, so the key is held here for now. Export it into your own signer to keep it.';
+  explain.style.cssText = 'margin:0 0 10px;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
+
+  const exportButton = document.createElement('button');
+  exportButton.type = 'button';
+  exportButton.textContent = 'Export my key';
+  exportButton.style.cssText = 'padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.82rem;cursor:pointer;margin:0 8px 8px 0;';
+
+  const forgetButton = document.createElement('button');
+  forgetButton.type = 'button';
+  forgetButton.textContent = 'Remove our copy';
+  forgetButton.hidden = true;
+  forgetButton.style.cssText = 'padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font:inherit;font-size:.82rem;cursor:pointer;';
+
+  const field = document.createElement('textarea');
+  field.readOnly = true;
+  field.hidden = true;
+  field.spellcheck = false;
+  field.style.cssText = 'width:100%;margin:10px 0 8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--page-bg);color:var(--text);font:inherit;font-size:.8rem;word-break:break-all;';
+  const warning = document.createElement('p');
+  warning.hidden = true;
+  warning.textContent = 'Anyone holding this is you. Import it into Amber or another signer, then remove our copy.';
+  warning.style.cssText = 'margin:0 0 8px;font-size:.78rem;line-height:1.5;color:#e05353;';
+
+  exportButton.addEventListener('click', async () => {
+    exportButton.disabled = true;
+    try {
+      const res = await post('/export', {}, detail.session);
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      field.value = res.data.nsec;
+      field.hidden = false;
+      warning.hidden = false;
+      forgetButton.hidden = false;
+      field.focus();
+      field.select();
+    } catch (err) {
+      setStatus('Could not export the key: ' + String(err.message || err), 'bad');
+    } finally {
+      exportButton.disabled = false;
+    }
+  });
+
+  forgetButton.addEventListener('click', async () => {
+    if (!detail.pubkey) return;
+    const res = await fetch(`${API}/key`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + detail.session },
+      body: JSON.stringify({ confirm: detail.pubkey }),
+    });
+    if (res.ok) {
+      field.hidden = true;
+      warning.hidden = true;
+      forgetButton.hidden = true;
+      setStatus('Our copy of the key is deleted. It now exists only where you imported it.', 'ok');
+    } else {
+      setStatus('Could not remove the stored key.', 'bad');
+    }
+  });
+
+  box.append(heading, explain, exportButton, forgetButton, field, warning);
+  host.appendChild(box);
+}
+
 function makeTelegramButton({ wide = false } = {}) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -235,6 +314,7 @@ function announce(detail) {
   try {
     if (detail && detail.active && detail.signedIn) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
+      mountKeyTools(detail);
     } else if (detail && detail.active) {
       setStatus(`Telegram sign-in failed: ${detail.reason || 'unknown reason'}`, 'bad');
     }

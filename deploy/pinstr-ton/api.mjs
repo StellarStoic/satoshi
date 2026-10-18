@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { verifyInitData, verifyLoginWidget } from './telegramAuth.mjs';
-import { sealSecret, checkKind0, publishToAll } from './profile.mjs';
+import { sealSecret, openSecret, checkKind0, publishToAll } from './profile.mjs';
 
 const PORT = Number(process.env.PINSTR_TG_PORT || 8851);
 const TOKEN = process.env.PINSTR_TG_BOT_TOKEN || '';
@@ -169,8 +169,48 @@ export function createServer(env = {}) {
         send(res, 200, {
           user: session.user,
           expiresAt: new Date(session.exp * 1000).toISOString(),
-          profile: record ? { pubkey: record.pubkey, published: Boolean(record.published) } : null,
+          profile: record ? { pubkey: record.pubkey, published: Boolean(record.published), hasKey: Boolean(record.sealed) } : null,
         });
+        return;
+      }
+      if (url.pathname === '/tg/export' && req.method === 'POST') {
+        // The one endpoint that returns a secret. Session-only, rate limited, never logged.
+        if (!secret) return send(res, 503, { error: 'session secret not configured' });
+        const auth = req.headers.authorization || '';
+        const session = readSession(auth.startsWith('Bearer ') ? auth.slice(7) : '', secret);
+        if (!session) return send(res, 401, { error: 'no valid session' });
+        const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+        if (rateLimited(`export:${ip}:${session.tg}`, Date.now())) return send(res, 429, { error: 'too many attempts' });
+        const record = readProfile(profileDir, session.user.id);
+        if (!record || !record.sealed) return send(res, 404, { error: 'no key stored for this account' });
+        let nsec;
+        try {
+          nsec = openSecret(record.sealed, secret);
+        } catch (err) {
+          return send(res, 500, { error: 'the stored key cannot be opened: ' + String(err.message || err) });
+        }
+        record.lastExportAt = new Date().toISOString();
+        writeProfile(profileDir, session.user.id, record);
+        send(res, 200, { nsec, pubkey: record.pubkey, warning: 'Anyone with this key is you. Import it into your own signer, then remove it here.' });
+        return;
+      }
+      if (url.pathname === '/tg/key' && req.method === 'DELETE') {
+        if (!secret) return send(res, 503, { error: 'session secret not configured' });
+        const auth = req.headers.authorization || '';
+        const session = readSession(auth.startsWith('Bearer ') ? auth.slice(7) : '', secret);
+        if (!session) return send(res, 401, { error: 'no valid session' });
+        const body = await readJson(req);
+        const record = readProfile(profileDir, session.user.id);
+        if (!record) return send(res, 404, { error: 'no key stored for this account' });
+        if (body.confirm !== record.pubkey) return send(res, 400, { error: 'confirm must be the pubkey of the key being removed' });
+        writeProfile(profileDir, session.user.id, {
+          tgId: session.user.id,
+          pubkey: record.pubkey,
+          deleted: true,
+          sealed: null,
+          deletedAt: new Date().toISOString(),
+        });
+        send(res, 200, { deleted: true, pubkey: record.pubkey });
         return;
       }
       if (url.pathname === '/tg/profile' && req.method === 'POST') {
@@ -183,7 +223,7 @@ export function createServer(env = {}) {
         const nsec = typeof body.nsec === 'string' ? body.nsec.trim() : '';
         if (!event || !event.pubkey) return send(res, 400, { error: 'event required' });
         const existing = readProfile(profileDir, session.user.id);
-        if (existing && existing.pubkey !== event.pubkey) {
+        if (existing && !existing.deleted && existing.pubkey !== event.pubkey) {
           // First write wins: a Telegram id keeps the key it was given.
           return send(res, 409, { error: 'a different key is already bound to this account', pubkey: existing.pubkey });
         }
