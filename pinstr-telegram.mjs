@@ -34,34 +34,75 @@ async function getJson(path, session) {
   return { status: res.status, ok: res.ok, data };
 }
 
-function showStatus(detail) {
-  if (typeof document === 'undefined') return;
+function setStatus(text, tone) {
+  const line = document.querySelector('.pinstr-tg-status');
+  if (!line) return;
+  line.textContent = text;
+  line.style.color = tone === 'ok' ? 'var(--accent)' : tone === 'bad' ? '#e05353' : 'var(--text-muted)';
+}
+
+// The board builds its login block after the module may have loaded, so the Telegram
+// option is mounted whenever that block appears rather than once at boot.
+function mountTelegramOption() {
+  if (typeof document === 'undefined') return false;
   const block = document.querySelector('.anonymous-login-block');
-  if (!block) return;
-  let line = block.querySelector('.pinstr-tg-status');
-  if (!line) {
-    line = document.createElement('p');
-    line.className = 'pinstr-tg-status';
-    line.style.cssText = 'margin:6px 0 0;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
-    block.appendChild(line);
-  }
-  if (!detail || !detail.active) {
-    line.textContent = 'Opened in a browser: Telegram sign-in is only available inside Telegram.';
-    return;
-  }
-  if (detail.signedIn) {
-    line.textContent = `Telegram ${detail.user.id} · npub ${detail.npub || detail.pubkey}${detail.created ? ' · key just created' : ''}`;
-    line.style.color = 'var(--accent)';
-  } else {
-    line.textContent = `Telegram sign-in failed: ${detail.reason || 'unknown reason'}`;
-    line.style.color = '#e05353';
+  if (!block || block.querySelector('.pinstr-tg-row')) return Boolean(block);
+
+  const row = document.createElement('div');
+  row.className = 'pinstr-tg-row';
+  row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'pinstr-tg-btn';
+  button.style.cssText = 'display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:24px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.86rem;cursor:pointer;';
+  button.innerHTML = '<i class="lni lni-telegram" aria-hidden="true"></i><span>Sign in with Telegram</span>';
+
+  const note = document.createElement('p');
+  note.className = 'pinstr-tg-status';
+  note.style.cssText = 'margin:0;font-size:.8rem;line-height:1.5;color:var(--text-muted);flex:1 1 100%;';
+
+  const inTelegram = Boolean(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData);
+  note.textContent = inTelegram ? 'Checking your Telegram session…' : 'Inside Telegram this signs you in with one tap, with no key to save.';
+
+  button.addEventListener('click', () => {
+    if (!inTelegram) {
+      setStatus('Open @pinstrsibot in Telegram and choose Open Pinstr.', 'bad');
+      return;
+    }
+    button.disabled = true;
+    button.style.opacity = '.6';
+    bootTelegram().finally(() => {
+      button.disabled = false;
+      button.style.opacity = '1';
+    });
+  });
+
+  row.append(button, note);
+  block.appendChild(row);
+  return true;
+}
+
+function watchForLoginBlock() {
+  if (typeof document === 'undefined' || typeof MutationObserver !== 'function') return;
+  const tryMount = () => {
+    if (mountTelegramOption()) observer.disconnect();
+  };
+  const observer = new MutationObserver(tryMount);
+  tryMount();
+  if (!document.querySelector('.pinstr-tg-row')) {
+    observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 }
 
 function announce(detail) {
   globalThis.PinstrTelegram = detail;
   try {
-    showStatus(detail);
+    if (detail && detail.active && detail.signedIn) {
+      setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
+    } else if (detail && detail.active) {
+      setStatus(`Telegram sign-in failed: ${detail.reason || 'unknown reason'}`, 'bad');
+    }
   } catch {}
   try {
     globalThis.dispatchEvent(new CustomEvent(EVENT, { detail }));
@@ -134,6 +175,10 @@ export async function ensureBooted() {
 }
 
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensureBooted(); });
-  else ensureBooted();
+  const start = () => {
+    watchForLoginBlock();
+    ensureBooted();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 }
