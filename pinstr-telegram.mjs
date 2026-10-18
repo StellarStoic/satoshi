@@ -44,6 +44,46 @@ function setStatus(text, tone) {
   line.style.color = tone === 'ok' ? 'var(--accent)' : tone === 'bad' ? '#e05353' : 'var(--text-muted)';
 }
 
+// All three ways in should look like the same kind of choice, so the board's own
+// anonymous button is the reference: its computed style is copied onto the Telegram
+// button and the Nostr summary instead of me inventing a third look.
+function copyLoginLook(target, ref, { stretch = false } = {}) {
+  if (!target || !ref) return;
+  let cs;
+  try {
+    cs = getComputedStyle(ref);
+  } catch {
+    return;
+  }
+  const props = ['background', 'background-color', 'color', 'border', 'border-radius', 'padding', 'font-family', 'font-size', 'font-weight', 'letter-spacing', 'text-transform', 'box-sizing', 'min-height'];
+  for (const prop of props) {
+    const value = cs.getPropertyValue(prop);
+    if (value) target.style.setProperty(prop, value);
+  }
+  target.style.display = 'flex';
+  target.style.alignItems = 'center';
+  target.style.gap = '10px';
+  target.style.justifyContent = stretch ? 'space-between' : 'center';
+  target.style.cursor = 'pointer';
+  target.style.width = '100%';
+  target.style.margin = '0 0 10px';
+}
+
+function injectLoginStyles() {
+  if (typeof document === 'undefined' || document.getElementById('pinstr-tg-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'pinstr-tg-styles';
+  style.textContent = `
+    .pinstr-nostr { margin: 0 0 10px; }
+    .pinstr-nostr > summary { list-style: none; }
+    .pinstr-nostr > summary::-webkit-details-marker { display: none; }
+    .pinstr-nostr > summary::after { content: '\\25BE'; margin-left: auto; font-size: .9em; opacity: .7; }
+    .pinstr-nostr[open] > summary::after { transform: rotate(180deg); }
+    .pinstr-nostr[open] > summary { margin-bottom: 10px; }
+  `;
+  document.head.appendChild(style);
+}
+
 function makeTelegramButton({ wide = false } = {}) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -118,6 +158,7 @@ function restructureLoginDialog() {
       if (node) details.appendChild(node);
     }
 
+    injectLoginStyles();
     const button = makeTelegramButton({ wide: true });
     const note = document.createElement('p');
     note.className = 'pinstr-tg-status';
@@ -125,6 +166,11 @@ function restructureLoginDialog() {
     wireTelegramButton(button, note);
     details.parentNode.insertBefore(button, details);
     details.parentNode.insertBefore(note, details);
+
+    const reference = dialog.querySelector('.anonymous-login');
+    copyLoginLook(button, reference);
+    copyLoginLook(summary, reference, { stretch: true });
+    summary.textContent = 'Sign in with Nostr';
   }
   return true;
 }
