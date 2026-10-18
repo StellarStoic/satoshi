@@ -131,9 +131,42 @@ export function scriptToText(scriptHex) {
 }
 
 // One entry from the chain, as the latest-21 feed hands it to the board.
+// Most OP_RETURN traffic is not a message: colour protocols, bridge receipts, address
+// tags. Showing those on a board would bury the handful of people who meant to be read,
+// so a string has to look like language before it counts.
+export function looksLikeLanguage(value) {
+  const text = String(value ?? '').trim();
+  if (text.length < 2) {
+    return false;
+  }
+  const letters = (text.match(/\p{L}/gu) || []).length;
+  if (letters < 2) {
+    return false;
+  }
+  const hexShare = (text.match(/[0-9A-Fa-f]/g) || []).length / text.length;
+  if (text.length > 16 && hexShare > 0.5) {
+    return false; // OUT:AAEC891A54B5EDE77A72A8BA...
+  }
+  if (/0x[0-9A-Fa-f]{16,}/.test(text)) {
+    return false; // a wallet address wore a message's clothes
+  }
+  if (/\bto:(usdt|usdc|eth|btc|trx)\b/i.test(text)) {
+    return false; // bridge receipts
+  }
+  const words = text.split(/\s+/).filter(word => /\p{L}{3,}/u.test(word));
+  if (!words.length && text.length > 20) {
+    return false; // one long blob is not a sentence
+  }
+  const shouting = (text.match(/[A-Z]/g) || []).length / Math.max(letters, 1);
+  if (text.length > 24 && shouting > 0.8) {
+    return false; // a hash, not a message
+  }
+  return true;
+}
+
 export function chainMessage({ txid, scriptHex, blockHeight = null, blockTime = null } = {}) {
   const text = scriptToText(scriptHex);
-  if (!txid || !text) {
+  if (!txid || !text || !looksLikeLanguage(text)) {
     return null;
   }
   return { txid, text, blockHeight, blockTime };
