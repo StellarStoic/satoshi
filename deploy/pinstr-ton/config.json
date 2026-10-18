@@ -1,0 +1,42 @@
+{
+  "wallet": {
+    "friendly": "UQBabpCfz6dDmTfDIw1TDOdt13pRAEMD35V3hgHFI_7ETxRf",
+    "raw": "0:5a6e909fcfa7439937c3230d530ce76dd77a51004303df95778601c523fec44f",
+    "workchain": 0,
+    "bounceable": true,
+    "testnet": false,
+    "note": "Merchant wallet for the Pinstr Telegram door. Public receiving address only; no key here, nothing to sweep."
+  },
+  "rails": {
+    "telegramSessions": [
+      "TON",
+      "BTC-LN"
+    ],
+    "otherSessions": [
+      "BARK",
+      "BTC-LN"
+    ],
+    "tonVisibleOutsideTelegram": false
+  },
+  "scope": {
+    "surfaces": [
+      "pinstr.si"
+    ],
+    "neverOn": [
+      "satoshi.si"
+    ],
+    "telegramPinsVisibleOnSatoshiSi": true
+  },
+  "quote": {
+    "ttlSeconds": 300,
+    "toleranceBps": 200,
+    "commentCarriesOrderId": true
+  },
+  "price": {
+    "anonymousSats": 69,
+    "weekSats": 10,
+    "yearSats": 411,
+    "memberWeekSats": 5,
+    "memberYearSats": 205
+  }
+}
