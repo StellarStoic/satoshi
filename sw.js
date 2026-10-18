@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v323';   // v323: the OP_RETURN message tool and its board
+const CACHE = 'satoshi-static-v324';   // v324: OP_RETURN in the Tools menu
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',

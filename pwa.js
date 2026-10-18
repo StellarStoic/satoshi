@@ -124,6 +124,8 @@ const MENU_ITEMS = [
         {label: 'Entropy Lab', href: '/entropy.html'},
         {label: '21FM', href: '/21fm.html'},
         {label: 'Steganography & Ciphers', href: '/stego.html'},
+        {label: 'OP_RETURN messages', href: '/opreturn.html'},
+        {label: 'OP_RETURN board', href: '/opreturnBoard.html'},
         {label: 'GhostQR', href: '/ghostQR.html'},
     ]},
     {label: 'News', href: '/news.html'},
