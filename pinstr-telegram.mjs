@@ -34,8 +34,35 @@ async function getJson(path, session) {
   return { status: res.status, ok: res.ok, data };
 }
 
+function showStatus(detail) {
+  if (typeof document === 'undefined') return;
+  const block = document.querySelector('.anonymous-login-block');
+  if (!block) return;
+  let line = block.querySelector('.pinstr-tg-status');
+  if (!line) {
+    line = document.createElement('p');
+    line.className = 'pinstr-tg-status';
+    line.style.cssText = 'margin:6px 0 0;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
+    block.appendChild(line);
+  }
+  if (!detail || !detail.active) {
+    line.textContent = 'Opened in a browser: Telegram sign-in is only available inside Telegram.';
+    return;
+  }
+  if (detail.signedIn) {
+    line.textContent = `Telegram ${detail.user.id} · npub ${detail.npub || detail.pubkey}${detail.created ? ' · key just created' : ''}`;
+    line.style.color = 'var(--accent)';
+  } else {
+    line.textContent = `Telegram sign-in failed: ${detail.reason || 'unknown reason'}`;
+    line.style.color = '#e05353';
+  }
+}
+
 function announce(detail) {
   globalThis.PinstrTelegram = detail;
+  try {
+    showStatus(detail);
+  } catch {}
   try {
     globalThis.dispatchEvent(new CustomEvent(EVENT, { detail }));
   } catch {}
