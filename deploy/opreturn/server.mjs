@@ -75,7 +75,6 @@ function publicOrder(order) {
     sats: order.sats,
     message: order.message,
     isPublic: order.isPublic,
-    theme: order.theme,
     rails: order.rails || {},
     invoiceId: order.invoiceId || null,
     opReturnTxid: order.opReturnTxid || null,
@@ -375,17 +374,17 @@ const server = http.createServer(async (req, res) => {
         send(res, 400, { error: check.error, code: 'invalid_message' });
         return;
       }
-      const theme = typeof payload.theme === 'string' ? payload.theme.slice(0, 40) : null;
       const order = {
         id: newId(),
         state: 'new',
         message: check.value,
         bytes: check.bytes,
         sats: priceSats(),
-        isPublic: Boolean(payload.isPublic),
-        // The buyer may choose to be seen as a satoshi.si user; the note says so.
+        // OP_RETURN is public by design. This flag remains in stored orders so older
+        // opt-outs stay excluded, while every new order is eligible for the board.
+        isPublic: true,
+        // Branding is optional and does not identify or authenticate the writer.
         viaSatoshi: Boolean(payload.viaSatoshi),
-        theme: payload.isPublic ? theme : null,
         createdAtMs: Date.now(),
         rails: {},
       };
@@ -416,7 +415,6 @@ const server = http.createServer(async (req, res) => {
           text: o.message,
           txid: o.opReturnTxid,
           mine: true,
-          theme: o.theme,
           viaSatoshi: Boolean(o.viaSatoshi),
           publishedAt: new Date(o.createdAtMs).toISOString(),
           source: 'tool',

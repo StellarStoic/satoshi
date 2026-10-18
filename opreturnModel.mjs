@@ -61,6 +61,30 @@ export function priceSats({ serviceSats = OP_RETURN.serviceSats, networkSats = O
   return Math.round(Math.max(0, serviceSats) + Math.max(0, networkSats));
 }
 
+// A share card gets its visual identity from the transaction id alone. Keeping this in
+// the shared model makes the write page, read page and downloaded image agree.
+export function sharePattern(txid) {
+  let hash = 2166136261;
+  for (const character of String(txid || '')) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const value = hash >>> 0;
+  const hue = value % 360;
+  const shape = Math.floor(value / 256) % 4;
+  const angle = Math.floor(value / 65536) % 180;
+  const size = 14 + (Math.floor(value / 1048576) % 22);
+  const ink = `hsl(${hue} 72% 58%)`;
+  const base = `linear-gradient(160deg, hsl(${(hue + 40) % 360} 62% 20%), #0b0d11)`;
+  const shapes = [
+    `repeating-linear-gradient(${angle}deg, ${ink} 0 3px, transparent 3px ${size}px)`,
+    `radial-gradient(${ink} 2px, transparent 2.5px)`,
+    `linear-gradient(${angle}deg, transparent 47%, ${ink} 49%, ${ink} 51%, transparent 53%)`,
+    `repeating-conic-gradient(from ${angle}deg at 50% 50%, ${ink} 0 7deg, transparent 7deg ${size * 2}deg)`,
+  ];
+  return {hue, shape, angle, size, ink, css: `${shapes[shape]}, ${base}`};
+}
+
 // A bitcoin script is a byte string, so the message is hex from here on.
 function toHex(bytes) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -211,25 +235,36 @@ export function latestFromBlocks(blocks, limit = OP_RETURN.latestCount) {
   return found.slice(0, limit);
 }
 
-// How a message becomes a note on the board. A message someone paid to show keeps the
-// border of the theme they chose; the chain's own latest 21 are grey, so a reader can tell
-// a paid message from a found one at a glance.
-export const BORDER_PAID = 'theme';
+// The accent is optional satoshi.si branding, not a claim about who wrote a message.
+// Share-card patterns are derived separately from each transaction id.
+export const BORDER_PAID = 'paid';
 export const BORDER_CHAIN = 'grey';
 
-export function boardNote({ text, txid = null, mine = false, theme = null, publishedAt = null, source = 'chain', viaSatoshi = false } = {}) {
+export function boardNote({ text, txid = null, mine = false, publishedAt = null, source = 'chain', viaSatoshi = false } = {}) {
   return {
     kind: 'opreturn',
     text: String(text ?? ''),
     txid,
     mine: Boolean(mine),
-    border: mine ? BORDER_PAID : BORDER_CHAIN,
-    theme: mine ? theme : null,
+    border: viaSatoshi ? BORDER_PAID : BORDER_CHAIN,
     publishedAt,
     source,
-    // Only a buyer who ticked the box is shown as a satoshi.si user.
+    // Only a writer who ticked the box gets visible satoshi.si branding.
     viaSatoshi: Boolean(viaSatoshi),
   };
+}
+
+export function recentBoardNotes({ paid = [], chain = [] } = {}, limit = Infinity) {
+  const seen = new Set();
+  return [...paid, ...chain]
+    .sort((a, b) => new Date(b?.publishedAt || 0) - new Date(a?.publishedAt || 0))
+    .filter(note => {
+      const key = note?.txid || `${note?.text || ''}|${note?.publishedAt || ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, Math.max(0, limit));
 }
 
 export const ORDER_STATES = ['new', 'awaiting_payment', 'paid', 'published', 'failed', 'expired'];

@@ -1,11 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import {
   OP_RETURN, TOTAL_SATS, priceSats, validateMessage, bytesLeft, messageBytes,
   opReturnScript, scriptToText, chainMessage, latestFromBlocks, boardNote,
-  BORDER_PAID, BORDER_CHAIN, orderView, isOrderTerminal,
+  BORDER_PAID, BORDER_CHAIN, orderView, isOrderTerminal, sharePattern, recentBoardNotes,
 } from '../opreturnModel.mjs';
+import { helpCopy, helpSections, PAGE_HELP } from '../siteHelp.mjs';
+
+test('OP_RETURN pages use the shared site navigation, controls, and footer', async () => {
+  const pages = await Promise.all([
+    readFile(new URL('../opreturn.html', import.meta.url), 'utf8'),
+    readFile(new URL('../opreturnBoard.html', import.meta.url), 'utf8'),
+  ]);
+  for (const html of pages) {
+    assert.match(html, /<script src="\/pwa\.js" defer><\/script>/);
+    assert.match(html, /<nav id="menu"[^>]*><ul><\/ul><\/nav>/);
+    assert.match(html, /data-live-footer/);
+    assert.match(html, /lni lni-bolt-2/);
+    assert.doesNotMatch(html, /id="helpIcon"/);
+  }
+  assert.match(pages[0], /id="listIcon"[\s\S]*lni-message-3-text/);
+  assert.match(pages[0], /Read more[\s\S]*lni-message-3-text/);
+  assert.equal((pages[0].match(/type="checkbox"/g) || []).length, 1);
+  assert.doesNotMatch(pages[0], /id="isPublic"/);
+  assert.match(pages[1], /id="writeIcon"[\s\S]*lni-pencil-1/);
+});
+
+test('OP_RETURN help separates plain guidance from public technical details', () => {
+  for (const path of ['/opreturn.html', '/opreturnBoard.html']) {
+    const sections = helpSections(PAGE_HELP[path]);
+    assert.deepEqual(sections.map(section => section.label), ['In plain words', 'Technical']);
+    assert.ok(sections[0].paragraphs.length >= 4, `${path} needs a useful plain explanation`);
+    assert.ok(sections[1].paragraphs.length >= 4, `${path} needs useful technical detail`);
+    const copy = helpCopy(PAGE_HELP[path]);
+    assert.match(copy, /public/i);
+    assert.match(copy, /OP_RETURN/i);
+    assert.doesNotMatch(copy, /worker token|API key|key path|private endpoint|server path/i);
+  }
+  const writeHelp = helpCopy(PAGE_HELP['/opreturn.html']);
+  assert.match(writeHelp, /80 basic English letters[\s\S]*20 orange hearts/i);
+  assert.match(writeHelp, /UTF-8[\s\S]*OP_PUSHDATA1/);
+  assert.match(helpCopy(PAGE_HELP['/opreturnBoard.html']), /readability heuristic/i);
+});
 
 test('a message is judged in bytes, and 80 is the wall', () => {
   assert.equal(messageBytes('abc'), 3);
@@ -54,13 +92,44 @@ test('what is not a readable message is not shown as one', () => {
   assert.equal(scriptToText('6a'), null, 'nothing after OP_RETURN');
 });
 
-test('the board keeps a paid message and a found one apart', () => {
-  const paid = boardNote({ text: 'mine', txid: 'aa', mine: true, theme: 'woven' });
-  assert.equal(paid.border, BORDER_PAID);
-  assert.equal(paid.theme, 'woven');
-  const found = boardNote({ text: 'theirs', txid: 'bb' });
-  assert.equal(found.border, BORDER_CHAIN);
-  assert.equal(found.theme, null);
+test('only an explicit branding choice gives a board message the accent border', () => {
+  const unbranded = boardNote({ text: 'mine', txid: 'aa', mine: true });
+  assert.equal(unbranded.border, BORDER_CHAIN);
+  assert.equal('theme' in unbranded, false);
+  const branded = boardNote({ text: 'mine', txid: 'bb', mine: true, viaSatoshi: true });
+  assert.equal(branded.border, BORDER_PAID);
+  assert.equal('theme' in branded, false);
+});
+
+test('the write-page board helper merges, sorts, deduplicates, and keeps five', () => {
+  const paid = Array.from({ length: 4 }, (_, index) => ({
+    txid: `paid-${index}`,
+    text: `paid ${index}`,
+    publishedAt: `2026-10-${String(index + 10).padStart(2, '0')}T00:00:00Z`,
+  }));
+  const chain = Array.from({ length: 4 }, (_, index) => ({
+    txid: `chain-${index}`,
+    text: `chain ${index}`,
+    publishedAt: `2026-10-${String(index + 12).padStart(2, '0')}T00:00:00Z`,
+  }));
+  chain.push({ ...paid[3] });
+  const notes = recentBoardNotes({ paid, chain }, 5);
+  assert.equal(notes.length, 5);
+  assert.equal(new Set(notes.map(note => note.txid)).size, 5);
+  assert.deepEqual(notes.map(note => note.txid), ['chain-3', 'chain-2', 'paid-3', 'chain-1', 'paid-2']);
+});
+
+test('a transaction id deterministically styles only its share card', async () => {
+  const txid = 'ab'.repeat(32);
+  assert.deepEqual(sharePattern(txid), sharePattern(txid));
+  assert.notEqual(sharePattern(txid).css, sharePattern('cd'.repeat(32)).css);
+  assert.match(sharePattern(txid).css, /gradient/);
+
+  const html = await readFile(new URL('../opreturn.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /id="themeRow"|id="theme"|Border of your note/);
+  assert.doesNotMatch(html, /theme:\s*publicEl/);
+  assert.match(html, /share-logo[\s\S]*android-chrome-192x192\.png/);
+  assert.match(html, /note\.viaSatoshi \? accent : '#7d848f'/);
 });
 
 test('the latest feed flattens blocks newest first and drops the noise', () => {

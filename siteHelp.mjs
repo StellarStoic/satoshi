@@ -199,6 +199,57 @@ export const PAGE_HELP = Object.freeze({
         title: 'About the P2P order book',
         description: 'Compare public peer-to-peer Bitcoin buy and sell offers from several markets in one place, then continue on the original platform.'
     },
+    '/opreturn.html': {
+        title: 'About OP_RETURN write',
+        description: 'Write a short public message into a real Bitcoin transaction. Once confirmed, the transaction becomes part of Bitcoin history.',
+        sections: [
+            {
+                label: 'In plain words',
+                paragraphs: [
+                    'OP_RETURN is a small space in a Bitcoin transaction for data instead of money. This page lets you place a short message there. The message carries zero sats and cannot be spent.',
+                    'The limit is 80 bytes, which is not always the same as 80 visible characters. For example, 80 basic English letters use 80 bytes and fit exactly. One orange-heart emoji uses 4 bytes, so 20 orange hearts fill the same space. The counter below the message shows the real size as you type.',
+                    'Write up to 80 bytes, pay the displayed price, and the service prepares and broadcasts the Bitcoin transaction. Confirmation depends on miners and the network, just like any other on-chain transaction.',
+                    'Everything written this way is public. Anyone can read, copy, quote, or archive it, and a confirmed transaction cannot be edited. Never write a password, recovery phrase, private key, personal information, or anything else that should remain secret.',
+                    'Every new message written here is eligible for OP_RETURN read because it is public anyway. The optional checkbox only adds satoshi.si branding: an accent border and small logo. It does not identify or authenticate the writer.'
+                ]
+            },
+            {
+                label: 'Technical',
+                paragraphs: [
+                    'The page encodes the message as UTF-8 and limits the result to 80 bytes. ASCII characters usually use one byte; emoji and accented characters may use several, which is why the byte counter matters more than the number of visible characters.',
+                    'The transaction output script begins with OP_RETURN (0x6a), followed by a data-push opcode and the message bytes. Messages up to 75 bytes use a direct push length; messages from 76 to 80 bytes use OP_PUSHDATA1. The output value is zero, and the script is provably unspendable.',
+                    'Creating an order returns supported Bitcoin payment instructions. After payment is detected, a separate service wallet selects its own coins, creates the zero-value OP_RETURN output and a change output when appropriate, applies an on-chain mining fee, signs the transaction, and broadcasts it. No wallet key or signing secret is sent to this page.',
+                    'The displayed total combines the service charge with a mining-fee estimate. The final transaction fee depends on its actual input count, virtual size, and fee rate. The page follows the order through payment, broadcast, and publication and then exposes the resulting transaction id.',
+                    'A confirmed OP_RETURN is committed by the block and remains verifiable through Bitcoin’s chain of hashes. Archival nodes and indexes may retain its full contents indefinitely, while pruning nodes may discard old block bodies after validation. Either way, publishing should be treated as irreversible and public.'
+                ]
+            }
+        ]
+    },
+    '/opreturnBoard.html': {
+        title: 'About OP_RETURN read',
+        description: 'Browse public text found in OP_RETURN outputs on the Bitcoin blockchain, with the newest readable messages first.',
+        sections: [
+            {
+                label: 'In plain words',
+                paragraphs: [
+                    'OP_RETURN read is a window into short public messages placed inside Bitcoin transactions. Reading is free and does not require an account or wallet.',
+                    'An accent border and small satoshi.si logo mean the writer chose visible satoshi.si branding. Grey entries are unbranded public messages. Neither style proves who wrote a message.',
+                    'Select a message to see a larger share view and its transaction identifier. The board does not own or edit the on-chain message; it only presents public blockchain data.',
+                    'This is a filtered reading view, not every OP_RETURN ever created. Many outputs contain software markers, proofs, hashes, or other machine data rather than sentences. Public content may also be inaccurate or offensive, so treat it as somebody’s message, not as a fact endorsed by satoshi.si.'
+                ]
+            },
+            {
+                label: 'Technical',
+                paragraphs: [
+                    'The reader obtains recent OP_RETURN records from a public blockchain index, requests older pages as you scroll, and merges those records with public messages published through satoshi.si. It sorts the newest results first and removes repeated text within each fetched page.',
+                    'For raw scripts, the decoder accepts scripts beginning with OP_RETURN (0x6a) followed by a direct data push or OP_PUSHDATA1. It decodes the remaining bytes as strict UTF-8 and rejects malformed bytes, empty values, and disallowed control characters.',
+                    'A language filter hides common protocol payloads, address-like strings, long hexadecimal blobs, single-token markers, and other machine-oriented data. This is a readability heuristic: it can hide a genuine message or allow unusual data through, and it is not a complete classification of the blockchain.',
+                    'The optional branding flag controls the accent border, satoshi.si logo, and “via satoshi.si” label. Without it an entry uses the neutral grey border, even when the site helped publish it. Board entries stay simple; only the opened share card gets a CSS pattern, deterministically generated from its transaction id.',
+                    'The transaction id links the displayed text to its source transaction. The board never decrypts private data because OP_RETURN messages shown here are public by design, and no private keys, wallet credentials, or signing material are needed to read them.'
+                ]
+            }
+        ]
+    },
     '/priceScanner.html': {
         title: 'About the price scanner',
         description: 'Point your camera at a printed or handwritten price. On-device recognition finds the amount and overlays its current Bitcoin or sat value without uploading the camera image.'
@@ -278,6 +329,8 @@ function iconMarkup() {
 }
 
 const TOP_RIGHT_COMPANIONS = Object.freeze({
+    '/opreturn.html': {selector: '#listIcon', group: true, icon: true},
+    '/opreturnBoard.html': {selector: '#writeIcon', group: true, icon: true},
     '/quotes.html': {selector: '#next-quote', group: true, icon: true},
     '/converter.html': {selector: '.add-currency-icon', group: true, icon: true},
     '/news.html': {selector: '#openNewsSettings', group: true, icon: true},

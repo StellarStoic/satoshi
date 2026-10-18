@@ -381,6 +381,19 @@ function buildPageContext(userText = '') {
   const contextRoot = document.querySelector('main') || document.getElementById('converter') || document.body;
   const cleanRoot = contextRoot.cloneNode(true);
   cleanRoot.querySelectorAll('nav, footer, dialog, script, style, #menu, #toggle, .footer, .satoshi-chat-panel, .satoshi-chat-launcher').forEach(node => node.remove());
+  if (location.pathname === '/opreturn.html') {
+    cleanRoot.querySelectorAll('#message, #rails').forEach(node => node.remove());
+    const byteCount = document.getElementById('count')?.textContent?.trim();
+    const status = document.getElementById('statusLabel')?.textContent?.trim();
+    const detail = document.getElementById('statusDetail')?.textContent?.trim();
+    const safeState = [
+      byteCount ? `Draft size: ${byteCount}` : '',
+      `Use satoshi.si branding: ${document.getElementById('viaSatoshi')?.checked ? 'yes' : 'no'}`,
+      document.getElementById('orderPanel')?.hidden ? '' : `Order status: ${[status, detail].filter(Boolean).join(' — ')}`,
+    ].filter(Boolean);
+    context.push(`Current non-sensitive OP_RETURN state:\n${safeState.join('\n')}`);
+    context.push('Privacy boundary: the draft message, invoices, payment destinations, QR contents, and payment identifiers are intentionally omitted.');
+  }
   const visibleText = cleanRoot.textContent
     .split('\n')
     .map(line => line.trim())

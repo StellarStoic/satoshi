@@ -2,12 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OP_RETURN board: messages written into bitcoin | Satoshi.si</title>
-<meta name="description" content="Every readable OP_RETURN message found on the Bitcoin blockchain, newest first, paid ones marked in orange.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101112">
+<title>OP_RETURN read: messages written into Bitcoin | Satoshi.si</title>
+<meta name="description" content="A filtered stream of readable OP_RETURN messages found on the Bitcoin blockchain, newest first, with optional satoshi.si branding.">
 <link rel="canonical" href="https://satoshi.si/opreturnBoard.html">
 <link rel="icon" href="/favicon-32x32.png">
+<link rel="manifest" href="/site.webmanifest">
+<link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/siteEffects.css">
+<link rel="stylesheet" href="/siteHelp.css">
+<script src="/pwa.js" defer></script>
+<script src="/siteEffects.js" defer></script>
 <style>
   :root { --bg: var(--page-bg); --panel: var(--surface); --line: var(--border); --ink: var(--text); --dim: var(--text-muted); }
   * { box-sizing:border-box; }
@@ -21,81 +29,62 @@
   .lede { color:var(--dim); margin:0 0 18px; font-size:.92rem; }
   .list { display:flex; flex-direction:column; gap:12px; }
   .note { border:1px solid var(--line); border-left:6px solid #7d848f; border-radius:8px; padding:12px; background:var(--panel); cursor:pointer; }
-  .note.mine { border:2px solid var(--accent); }
+  .note.branded { border:2px solid var(--accent); }
+  .note.branded p { color:var(--accent); }
   .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
   .note .meta { margin-top:8px; font-size:.76rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .note .via { color:var(--accent); font-weight:600; }
   .sentinel { height:2px; }
-  #helpIcon, #writeIcon { position:absolute; top:max(22px, env(safe-area-inset-top)); z-index:2100; display:grid; place-items:center; width:36px; height:36px; min-height:0; margin:0; padding:0; border:0; background:transparent; color:var(--text-muted); font:400 1.25rem/1 var(--site-font); cursor:pointer; text-decoration:none; }
-  #helpIcon { right:22px; }
-  #writeIcon { right:58px; }
-  #helpIcon:hover, #writeIcon:hover { color:var(--accent); }
-  @media (max-width:600px) {
-    #helpIcon, #writeIcon { top:max(14px, env(safe-area-inset-top)); width:34px; height:34px; font-size:1.1rem; }
-    #helpIcon { right:12px; }
-    #writeIcon { right:48px; }
-  }
   .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.84); display:flex; align-items:center; justify-content:center; padding:16px; z-index:60; overflow:auto; }
   .cardclose { position:fixed; top:14px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:1.4rem; cursor:pointer; z-index:70; }
-  .sharecard { width:min(92vw,620px); aspect-ratio:1/1; max-height:72vh; border-radius:14px; padding:24px; display:flex; flex-direction:column; justify-content:space-between; position:relative; box-shadow:0 14px 44px rgba(0,0,0,.6); }
+  .sharecard { width:min(92vw,620px); aspect-ratio:1/1; max-height:72vh; border:2px solid #7d848f; border-radius:14px; padding:24px; display:flex; flex-direction:column; justify-content:space-between; position:relative; box-shadow:0 14px 44px rgba(0,0,0,.6); }
+  .sharecard.branded { border-color:var(--accent); box-shadow:0 0 20px color-mix(in srgb, var(--accent) 28%, transparent), 0 14px 44px rgba(0,0,0,.6); }
+  .sharecard.branded .sharetext { color:var(--accent); }
   .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
   .sharecard > * { position:relative; }
-  .sharetext { font-size:clamp(1.05rem,3.4vw,1.85rem); font-weight:600; }
+  .sharecard .share-logo { position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
+  .sharetext { color:#f4f6f8; font-size:clamp(1.05rem,3.4vw,1.85rem); font-weight:600; }
   .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
   .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
 </style>
 </head>
-<body class="dark-theme opreturn-page">
+<body class="opreturn-page">
   <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
   <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
-  <button type="button" id="helpIcon" aria-label="How to read this board" title="How to read this board">?</button>
-  <a href="/opreturn.html" id="writeIcon" title="Write a message" aria-label="Write a message">&#9998;</a>
+  <a href="/opreturn.html" id="writeIcon" class="site-help-companion site-help-companion--icon site-help-companion--grouped" title="Open OP_RETURN write" aria-label="Open OP_RETURN write"><i class="lni lni-pencil-1" aria-hidden="true"></i></a>
   <div class="opreturn-app">
     <header class="hero">
-      <h1>The OP_RETURN board</h1>
-      <span class="lede">Every readable message written into the Bitcoin blockchain, newest first. Orange is a message someone paid for here; grey was found on the chain. Tap one to see it whole.</span>
+      <h1>OP_RETURN read</h1>
+      <span class="lede">A filtered stream of readable messages found in Bitcoin OP_RETURN outputs, newest first. An accent border and logo mark optional satoshi.si branding; grey remains neutral. Tap one to see it whole.</span>
     </header>
     <div class="list" id="list"><p class="lede">Loading&hellip;</p></div>
   </div>
   <footer class="footer" data-live-footer>
     <a href="mailto:one@satoshi.si">one@satoshi.si</a>
-    <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
-    <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+    <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+    <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
   </footer>
-  <script src="/burgerMenu.js" defer></script>
-  <script type="module" src="/siteFooter.mjs"></script>
+  <script src="/burgerMenu.js"></script>
 <script type="module">
+import { sharePattern, recentBoardNotes } from './opreturnModel.mjs';
+
 const API = 'https://pay.satoshi.si/opreturn/v1';
 const list = document.getElementById('list');
 let cursor = null, busy = false;
-
-function patternOf(txid) {
-  let hash = 2166136261;
-  for (const char of String(txid || '')) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
-  const m = Math.abs(hash);
-  const hue = m % 360, shape = (m >> 8) % 4, angle = (m >> 16) % 180, size = 14 + ((m >> 20) % 22);
-  const ink = 'hsl(' + hue + ' 72% 58%)';
-  const base = 'linear-gradient(160deg, hsl(' + ((hue + 40) % 360) + ' 62% 20%), #0b0d11)';
-  const shapes = [
-    'repeating-linear-gradient(' + angle + 'deg, ' + ink + ' 0 3px, transparent 3px ' + size + 'px)',
-    'radial-gradient(' + ink + ' 2px, transparent 2.5px)',
-    'linear-gradient(' + angle + 'deg, transparent 47%, ' + ink + ' 49%, ' + ink + ' 51%, transparent 53%)',
-    'repeating-conic-gradient(from ' + angle + 'deg at 50% 50%, ' + ink + ' 0 7deg, transparent 7deg ' + (size * 2) + 'deg)'
-  ];
-  return shapes[shape] + ', ' + base;
-}
 
 function openCard(note) {
   const overlay = document.createElement('div');
   overlay.className = 'cardwrap';
   const safe = (note.text || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   overlay.innerHTML = '<button class="cardclose" aria-label="Close">&times;</button>'
-    + '<div class="sharecard" style="background-image:' + patternOf(note.txid) + '">'
+    + '<div class="sharecard' + (note.viaSatoshi ? ' branded' : '') + '" style="background-image:' + sharePattern(note.txid).css + '">'
+    + (note.viaSatoshi ? '<img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">' : '')
     + '<div class="sharetext">' + safe + '</div>'
-    + '<div class="sharefoot"><span class="brand">satoshi.si/opreturn</span>'
-    + (note.viaSatoshi ? '<span>shared by a satoshi.si user</span>' : '')
+    + '<div class="sharefoot">' + (note.viaSatoshi ? '<span class="brand">satoshi.si/opreturn</span>' : '')
+    + (note.viaSatoshi ? '<span>written through satoshi.si</span>' : '')
     + '<span style="font-family:ui-monospace,Menlo,monospace">' + (note.txid ? note.txid.slice(0, 32) + '&hellip;' : '') + '</span>'
-    + '<span>' + (note.mine ? 'paid message' : 'found on chain') + (note.publishedAt ? ' &middot; ' + new Date(note.publishedAt).toUTCString() : '') + '</span></div></div>';
+    + '<span>public OP_RETURN' + (note.publishedAt ? ' &middot; ' + new Date(note.publishedAt).toUTCString() : '') + '</span></div></div>';
   document.body.appendChild(overlay);
   const close = () => overlay.remove();
   overlay.querySelector('.cardclose').onclick = close;
@@ -107,14 +96,13 @@ function openCard(note) {
 
 function noteCard(note) {
   const card = document.createElement('div');
-  card.className = 'note ' + (note.mine ? 'mine' : '');
+  card.className = 'note ' + (note.viaSatoshi ? 'branded' : '');
   const text = document.createElement('p');
   text.textContent = note.text;
   card.appendChild(text);
   const meta = document.createElement('div');
   meta.className = 'meta';
-  meta.appendChild(Object.assign(document.createElement('span'), { textContent: note.mine ? 'paid' : 'found on chain' }));
-  if (note.viaSatoshi) meta.appendChild(Object.assign(document.createElement('span'), { className: 'via', textContent: 'via satoshi.si' }));
+  meta.appendChild(Object.assign(document.createElement('span'), { textContent: note.viaSatoshi ? 'via satoshi.si' : 'public message' }));
   if (note.publishedAt) meta.appendChild(Object.assign(document.createElement('span'), { textContent: new Date(note.publishedAt).toUTCString() }));
   if (note.txid) meta.appendChild(Object.assign(document.createElement('span'), { textContent: note.txid.slice(0, 14) + '\u2026' }));
   card.appendChild(meta);
@@ -133,7 +121,7 @@ async function firstPage() {
   try {
     const response = await fetch(API + '/latest');
     const data = await response.json();
-    const notes = [...(data.paid || []), ...(data.chain || [])];
+    const notes = recentBoardNotes(data);
     list.textContent = '';
     if (!notes.length) { list.innerHTML = '<p class="lede">No messages yet.</p>'; return; }
     notes.forEach(note => list.appendChild(noteCard(note)));

@@ -2,14 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OP_RETURN: write a message on the blockchain | Satoshi.si</title>
-<meta name="description" content="Write a short message into the Bitcoin blockchain in an OP_RETURN output. Pay 1400 sats with Ark, Lightning or on-chain. It stays there as long as Bitcoin does.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101112">
+<title>OP_RETURN write: put a message on Bitcoin | Satoshi.si</title>
+<meta name="description" content="Write a short public message into an OP_RETURN output. After confirmation, its transaction becomes part of Bitcoin history.">
 <link rel="canonical" href="https://satoshi.si/opreturn.html">
+<link rel="icon" href="/favicon-32x32.png">
+<link rel="manifest" href="/site.webmanifest">
+<link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/siteEffects.css">
-<script src="/burgerMenu.js" defer></script>
-<script src="/vendor/lucide/lucide.min.js" defer></script>
+<link rel="stylesheet" href="/siteHelp.css">
+<script src="/pwa.js" defer></script>
+<script src="/siteEffects.js" defer></script>
 <style>
   /* The site's palette and face come from /theme.css; these are only short names. */
   :root { --bg: var(--page-bg); --panel: var(--surface); --line: var(--border); --ink: var(--text); --dim: var(--text-muted); --ok: var(--success); --bad: var(--danger); }
@@ -28,53 +34,48 @@
   details { border-top:1px solid var(--line); padding-top:12px; margin-top:12px; }
   summary { cursor:pointer; color: var(--accent); }
   label { display:block; font-size:.9rem; color: var(--dim); margin: 10px 0 4px; }
-  textarea { width:100%; min-height:88px; background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; resize:vertical; }
-  input[type=text] { width:100%; background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
-  select { background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }
+  textarea { width:100%; min-height:88px; background:var(--surface-raised); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; resize:vertical; }
+  input[type=text] { width:100%; background:var(--surface-raised); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
+  select { background:var(--surface-raised); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
   .count { font-variant-numeric: tabular-nums; color: var(--dim); font-size:.85rem; }
   .count.over { color: var(--bad); }
-  button { background: var(--accent); color:#101318; border:0; border-radius:8px; padding:11px 18px; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:400; }
+  .opreturn-app button, .cardwrap button { background: var(--accent); color:var(--accent-contrast); border:0; border-radius:8px; padding:11px 18px; font:inherit; font-weight:600; cursor:pointer; }
+  .opreturn-app button:disabled { opacity:.5; cursor:not-allowed; }
+  .opreturn-app button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:400; }
   .price { font-variant-numeric: tabular-nums; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.82rem; word-break:break-all; }
   .rail { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px; }
   .rail h3 { margin:0 0 6px; font-size:.9rem; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
   .qr { background:#fff; padding:8px; border-radius:6px; display:inline-block; margin:8px 0; }
   .qr svg, .qr img { display:block; width:180px; height:180px; }
-  .status { margin-top:14px; padding:12px; border-radius:8px; border:1px solid var(--line); background:#101318; }
+  .status { margin-top:14px; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--surface-raised); }
   .status strong { display:block; margin-bottom:4px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
   .hint { color: var(--dim); font-size:.85rem; }
   [hidden] { display:none !important; }
   a { color: var(--accent); }
   #orderPanel { margin-top:18px; }
-  /* Same treatment as the help icon on the site's other pages: no chrome, just a glyph. */
-  #helpIcon, #listIcon { position:absolute; top:max(22px, env(safe-area-inset-top)); z-index:2100; display:grid; place-items:center; width:36px; height:36px; min-height:0; margin:0; padding:0; border:0; background:transparent; color:var(--text-muted); font:400 1.25rem/1 var(--site-font); cursor:pointer; text-decoration:none; }
-  #helpIcon { right:58px; }
-  #listIcon { right:22px; }
-  #helpIcon:hover, #helpIcon:focus-visible, #listIcon:hover, #listIcon:focus-visible { color: var(--accent); outline: none; }
-  @media (max-width:600px) {
-    #helpIcon, #listIcon { top:max(14px, env(safe-area-inset-top)); width:34px; height:34px; font-size:1.1rem; }
-    #helpIcon { right:48px; }
-    #listIcon { right:12px; }
-  }
   .cardwrap canvas { max-width:min(92vw, 760px); max-height:74vh; width:auto; height:auto; }
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
   .board-list { max-height:64vh; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
-  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:#101318; background-size:auto; background-repeat:repeat; }
-  .note.mine { border:2px solid var(--accent); }
+  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:var(--surface-raised); background-size:auto; background-repeat:repeat; }
+  .note.branded { border:2px solid var(--accent); }
+  .note.branded .banner p { color:var(--accent); }
   .note.chain { border:1px solid var(--line); border-left:6px solid #7d848f; }
   .note .via { color:var(--accent); font-weight:600; }
-  .sentinel { height:2px; }
+  .board-more { display:inline-flex; align-items:center; gap:8px; margin-top:16px; color:var(--accent); font-weight:600; text-decoration:none; }
+  .board-more .lni { font-size:1.15rem; }
   .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; padding:16px; z-index:60; overflow:auto; }
   .cardclose { position:fixed; top:14px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:1.4rem; line-height:1; cursor:pointer; z-index:70; }
-  .sharecard { width:min(92vw, 640px); aspect-ratio:1/1; max-height:72vh; border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); display:flex; flex-direction:column; justify-content:space-between; padding:26px; background-size:cover; position:relative; }
+  .sharecard { width:min(92vw, 640px); aspect-ratio:1/1; max-height:72vh; border:2px solid #7d848f; border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); display:flex; flex-direction:column; justify-content:space-between; padding:26px; background-size:cover; position:relative; }
+  .sharecard.branded { border-color:var(--accent); box-shadow:0 0 20px color-mix(in srgb, var(--accent) 28%, transparent), 0 14px 44px rgba(0,0,0,.65); }
+  .sharecard.branded .sharetext { color:var(--accent); }
   .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
   .sharecard > * { position:relative; }
-  .sharetext { font-size:clamp(1.05rem, 3.4vw, 1.9rem); font-weight:600; white-space:pre-wrap; overflow:hidden; }
+  .sharecard .share-logo { position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
+  .sharetext { color:#f4f6f8; font-size:clamp(1.05rem, 3.4vw, 1.9rem); font-weight:600; white-space:pre-wrap; overflow:hidden; }
   .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
   .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
   .sharefoot .badge { color:#e8eaed; }
@@ -87,15 +88,14 @@
   .banner p { color:#fff; }
 </style>
 </head>
-<body class="dark-theme opreturn-page">
+<body class="opreturn-page">
   <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
   <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
-  <button type="button" id="helpIcon" aria-label="What is an OP_RETURN message" title="How this tool works">?</button>
-  <a href="/opreturnBoard.html" id="listIcon" aria-label="Open the full OP_RETURN board" title="Browse every message">&#9776;</a>
+  <a href="/opreturnBoard.html" id="listIcon" class="site-help-companion site-help-companion--icon site-help-companion--grouped" aria-label="Open OP_RETURN read" title="Open OP_RETURN read"><i class="lni lni-message-3-text" aria-hidden="true"></i></a>
 <div class="opreturn-app">
   <header class="hero">
-    <h1>Write a message on the blockchain</h1>
-    <span class="lede">Your words go into an OP_RETURN output, inside a real Bitcoin transaction. Nobody can edit them, and nobody can delete them while Bitcoin exists.</span>
+    <h1>OP_RETURN write</h1>
+    <span class="lede">Your words go into an OP_RETURN output inside a real Bitcoin transaction. After confirmation, they become a public and uneditable part of Bitcoin history.</span>
   </header>
 
   <section>
@@ -103,7 +103,7 @@
     <p>You write up to <strong>80 bytes</strong> — roughly 80 characters, fewer if you use emoji or accented letters. You pay <span class="price" id="price">1999</span> sats. Within a minute of your payment, a transaction carrying your message is signed and broadcast by this site's own wallet. It confirms with the next block, usually ten minutes later.</p>
     <details>
       <summary>Technical: what exactly goes on chain</summary>
-      <p>Your message is encoded as UTF-8 and written into a script of the form <span class="mono">OP_RETURN &lt;push&gt; &lt;your bytes&gt;</span>. 80 bytes is one standard output, which every node relays and every miner includes; anything larger is non-standard, so the tool refuses it rather than build something that might never confirm.</p>
+      <p>Your message is encoded as UTF-8 and written into a script of the form <span class="mono">OP_RETURN &lt;push&gt; &lt;your bytes&gt;</span>. The 80-byte limit follows widely used standard relay policy. Larger data outputs may not be relayed or mined, so this tool refuses them.</p>
       <p>The transaction spends from this service's wallet, pays the miner fee from that wallet, and returns the change to it. The OP_RETURN output itself carries zero value — you pay for the space, not for an amount. Messages are paid for over Ark or Lightning, which settle in seconds; the message transaction itself is always on-chain, because that is the only place an OP_RETURN can live.</p>
       <p>The price is the service fee plus the miner fee at the feerate this site's node reports when you order. There is no account, no login, and no identifier linking the message to you: a different address pays each order, and this site stores only your message and its transaction id.</p>
       <p>The plain truth about permanence: a confirmation makes the message part of the chain, but nothing stops someone from copying it, and nothing on chain is confidential. Do not put secrets in it.</p>
@@ -120,30 +120,9 @@
     </div>
 
     <label class="row" style="margin-top:14px">
-      <span>Show it on the board below</span>
-      <input type="checkbox" id="isPublic">
-    </label>
-    <label class="row" style="margin-top:10px">
-      <span>Let my message show that I used satoshi.si</span>
+      <span>Show this was written through satoshi.si</span>
       <input type="checkbox" id="viaSatoshi">
     </label>
-    <div id="themeRow" class="board" hidden>
-      <div>
-        <label for="theme">Border of your note</label>
-        <select id="theme">
-          <option value="cork">Cork</option>
-          <option value="wheat">Wheat</option>
-          <option value="fancy-cushion">Fancy cushion</option>
-          <option value="woven">Woven</option>
-          <option value="graphy">Graphy</option>
-          <option value="dark-grey-terrazzo">Dark grey terrazzo</option>
-          <option value="folk-pattern">Folk pattern</option>
-          <option value="pool-table">Pool table</option>
-        </select>
-      </div>
-      <p class="hint" style="margin:0">The latest 21 messages found on the chain are shown with a grey border, so a paid one is easy to tell apart.</p>
-    </div>
-
     <div class="row" style="margin-top:16px">
       <button id="pay">Pay <span id="payAmount">1999</span> sats</button>
       <button id="reset" class="ghost" hidden>Write another</button>
@@ -159,27 +138,29 @@
 
   <section id="boardSection">
     <h2>The board</h2>
-    <p class="hint">Messages people paid to leave on the chain. Paid ones here carry the pattern their sender chose; the newest 21 readable messages found anywhere on the chain carry a grey border.</p>
+    <p class="hint">The five newest readable messages. Optional satoshi.si branding uses the current theme accent; unbranded messages stay grey.</p>
     <div id="board" class="board-list"><p class="hint">Loading…</p></div>
+    <a class="board-more" href="/opreturnBoard.html"><span>Read more</span><i class="lni lni-message-3-text" aria-hidden="true"></i></a>
   </section>
 
   <section>
     <h2>Using it from code</h2>
     <p>The same service is a public API, with no key:</p>
-    <p class="mono">POST https://pay.satoshi.si/opreturn/v1/orders<br>{ "message": "hello", "isPublic": false }<br><br>GET https://pay.satoshi.si/opreturn/v1/orders/&lt;id&gt;<br>GET https://pay.satoshi.si/opreturn/v1/config<br>GET https://pay.satoshi.si/opreturn/v1/latest</p>
+    <p class="mono">POST https://pay.satoshi.si/opreturn/v1/orders<br>{ "message": "hello", "viaSatoshi": false }<br><br>GET https://pay.satoshi.si/opreturn/v1/orders/&lt;id&gt;<br>GET https://pay.satoshi.si/opreturn/v1/config<br>GET https://pay.satoshi.si/opreturn/v1/latest</p>
     <p class="hint">The order answers with the rail destinations and the amount. Poll it until <span class="mono">state</span> is <span class="mono">published</span>, then read <span class="mono">opReturnTxid</span>.</p>
   </section>
 </div>
 <footer class="footer" data-live-footer>
   <a href="mailto:one@satoshi.si">one@satoshi.si</a>
-  <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
-  <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+  <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+  <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+  <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
 </footer>
-<script type="module" src="/siteFooter.mjs"></script>
+<script src="/burgerMenu.js"></script>
 
 <script src="qrCodeGenerator_1_4_4.js"></script>
 <script type="module">
-import { validateMessage, priceSats, OP_RETURN, orderView, isOrderTerminal } from './opreturnModel.mjs';
+import { validateMessage, priceSats, OP_RETURN, orderView, isOrderTerminal, sharePattern, recentBoardNotes } from './opreturnModel.mjs';
 
 const API = 'https://pay.satoshi.si/opreturn/v1';
 const el = (id) => document.getElementById(id);
@@ -187,9 +168,6 @@ const messageEl = el('message');
 const countEl = el('count');
 const payBtn = el('pay');
 const resetBtn = el('reset');
-const publicEl = el('isPublic');
-const themeRow = el('themeRow');
-const themeEl = el('theme');
 const orderPanel = el('orderPanel');
 const railsEl = el('rails');
 const statusLabel = el('statusLabel');
@@ -290,155 +268,23 @@ function paintOrder(order) {
   }
 }
 
-const THUMB = (theme) => `img/board-${theme || 'cork'}.png`;
-
-const TEXTURES = ['cork', 'woven', 'wheat', 'graphy', 'fancy-cushion', 'dark-grey-terrazzo',
-  'folk-pattern', 'pool-table', 'bananas', 'darkness', 'tex2res4', 'gray-floral',
-  'christmas', 'carbon-fibre', 'cartographer', 'green-dust-scratches'];
-
-// The same txid always picks the same pattern, so a message keeps its look.
-function textureFor(txid) {
-  let hash = 2166136261;
-  for (const char of String(txid || '')) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return TEXTURES[Math.abs(hash) % TEXTURES.length];
-}
-
-function textureOf(note) {
-  return note.mine ? (note.theme || 'cork') : textureFor(note.txid);
-}
-
-function openCard(note) {
-  const wrap = document.createElement('div');
-  wrap.className = 'cardwrap';
-  const canvas = document.createElement('canvas');
-  canvas.width = 1080;
-  canvas.height = 1080;
-  wrap.appendChild(canvas);
-  const bar = document.createElement('div');
-  bar.className = 'bar';
-  const download = document.createElement('button');
-  download.textContent = 'Download card';
-  download.onclick = () => {
-    canvas.toBlob((blob) => {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `opreturn-${(note.txid || 'message').slice(0, 12)}.png`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-    }, 'image/png');
-  };
-  const close = document.createElement('button');
-  close.className = 'ghost';
-  close.textContent = 'Close';
-  close.onclick = () => wrap.remove();
-  bar.appendChild(download);
-  bar.appendChild(close);
-  wrap.appendChild(bar);
-  wrap.onclick = (event) => { if (event.target === wrap) wrap.remove(); };
-  document.body.appendChild(wrap);
-
-  const draw = (image) => {
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#14161a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (image) {
-      const ratio = Math.max(canvas.width / image.width, canvas.height / image.height);
-      const w = image.width * ratio;
-      const h = image.height * ratio;
-      ctx.drawImage(image, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
-    }
-    ctx.fillStyle = 'rgba(12,14,18,0.80)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = note.mine ? '#f7931a' : '#7d848f';
-    ctx.lineWidth = 14;
-    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
-
-    const text = note.text || '';
-    ctx.fillStyle = '#ffffff';
-    let size = text.length > 220 ? 38 : text.length > 110 ? 48 : 62;
-    ctx.font = `600 ${size}px system-ui, -apple-system, Segoe UI, sans-serif`;
-    const maxWidth = canvas.width - 190;
-    const words = text.split(/\s+/);
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-      const candidate = line ? line + ' ' + word : word;
-      if (ctx.measureText(candidate).width > maxWidth && line) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = candidate;
-      }
-    }
-    if (line) lines.push(line);
-    const visible = lines.slice(0, 12);
-    const startY = 300 - Math.min(visible.length, 12) * (size * 0.6) / 2;
-    visible.forEach((row, index) => {
-      ctx.fillText(index === 11 && lines.length > 12 ? row + ' …' : row, 95, startY + index * size * 1.28);
-    });
-
-    ctx.font = '500 30px system-ui, sans-serif';
-    ctx.fillStyle = '#f7931a';
-    ctx.fillText('satoshi.si/opreturn', 95, 900);
-    if (note.viaSatoshi) {
-      ctx.fillStyle = '#e8eaed';
-      ctx.fillText('shared by a satoshi.si user', 95, 948);
-    }
-    ctx.fillStyle = '#9aa3af';
-    ctx.font = '400 26px ui-monospace, Menlo, monospace';
-    if (note.txid) ctx.fillText(note.txid.slice(0, 40) + (note.txid.length > 40 ? '…' : ''), 95, 996);
-    const when = note.publishedAt ? new Date(note.publishedAt).toUTCString() : '';
-    ctx.fillText(`${note.mine ? 'paid message' : 'found on chain'}${when ? ' · ' + when : ''}`, 95, 1036);
-  };
-
-  const image = new Image();
-  image.onload = () => draw(image);
-  image.onerror = () => draw(null);
-  image.src = THUMB(textureOf(note));
-}
-
-// The opened card is styled from the transaction id: same message, same look, no image
-// files. Four shapes, a hue, an angle and a spacing, all derived from the hash.
-function patternOf(txid) {
-  let hash = 2166136261;
-  for (const char of String(txid || '')) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  const magnitude = Math.abs(hash);
-  const hue = magnitude % 360;
-  const shape = (magnitude >> 8) % 4;
-  const angle = (magnitude >> 16) % 180;
-  const size = 14 + ((magnitude >> 20) % 22);
-  const ink = `hsl(${hue} 72% 58%)`;
-  const base = `linear-gradient(160deg, hsl(${(hue + 40) % 360} 62% 20%), #0b0d11)`;
-  const shapes = [
-    `repeating-linear-gradient(${angle}deg, ${ink} 0 3px, transparent 3px ${size}px)`,
-    `radial-gradient(${ink} 2px, transparent 2.5px)`,
-    `linear-gradient(${angle}deg, transparent 47%, ${ink} 49%, ${ink} 51%, transparent 53%)`,
-    `repeating-conic-gradient(from ${angle}deg at 50% 50%, ${ink} 0 7deg, transparent 7deg ${size * 2}deg)`,
-  ];
-  return { hue, shape, angle, size, ink, css: `${shapes[shape]}, ${base}` };
-}
 let openOverlay = null;
 
 function openReader(note) {
   if (openOverlay) openOverlay.remove();
-  const pattern = patternOf(note.txid);
+  const pattern = sharePattern(note.txid);
   const overlay = document.createElement('div');
   overlay.className = 'cardwrap';
   overlay.innerHTML = `
     <button class="cardclose" aria-label="Close">&times;</button>
-    <div class="sharecard" style="background-image:${pattern.css}">
+    <div class="sharecard${note.viaSatoshi ? ' branded' : ''}" style="background-image:${pattern.css}">
+      ${note.viaSatoshi ? '<img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">' : ''}
       <div class="sharetext">${(note.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
       <div class="sharefoot">
-        <span class="brand">satoshi.si/opreturn</span>
-        ${note.viaSatoshi ? '<span class="badge">shared by a satoshi.si user</span>' : ''}
+        ${note.viaSatoshi ? '<span class="brand">satoshi.si/opreturn</span>' : ''}
+        ${note.viaSatoshi ? '<span class="badge">written through satoshi.si</span>' : ''}
         <span class="tx">${note.txid ? note.txid.slice(0, 32) + '…' : ''}</span>
-        <span class="when">${note.mine ? 'paid message' : 'found on chain'}${note.publishedAt ? ' · ' + new Date(note.publishedAt).toUTCString() : ''}</span>
+        <span class="when">public OP_RETURN${note.publishedAt ? ' · ' + new Date(note.publishedAt).toUTCString() : ''}</span>
       </div>
     </div>
     <div class="bar"><button id="dl">Download PNG</button><button class="ghost" id="closeCard">Close</button></div>`;
@@ -502,12 +348,12 @@ function downloadCard(note, pattern) {
   }
   ctx.fillStyle = 'rgba(10,12,16,0.82)';
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = note.mine ? '#f7931a' : '#7d848f';
+  ctx.strokeStyle = note.viaSatoshi ? accent : '#7d848f';
   ctx.lineWidth = 14;
   ctx.strokeRect(28, 28, size - 56, size - 56);
   const words = String(note.text || '').split(/\s+/);
   let fontSize = words.length > 34 ? 40 : words.length > 18 ? 52 : 66;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = note.viaSatoshi ? accent : '#ffffff';
   ctx.font = `600 ${fontSize}px ${face}`;
   const lines = [];
   let line = '';
@@ -520,27 +366,40 @@ function downloadCard(note, pattern) {
   const shown = lines.slice(0, 11);
   const startY = 520 - (shown.length * fontSize * 1.25) / 2;
   shown.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
-  ctx.fillStyle = accent;
-  ctx.font = `600 30px ${face}`;
-  ctx.fillText('satoshi.si/opreturn', 95, 900);
+  if (note.viaSatoshi) {
+    ctx.fillStyle = accent;
+    ctx.font = `600 30px ${face}`;
+    ctx.fillText('satoshi.si/opreturn', 95, 900);
+  }
   ctx.fillStyle = '#e8eaed';
   ctx.font = '400 26px system-ui, sans-serif';
-  if (note.viaSatoshi) ctx.fillText('shared by a satoshi.si user', 95, 942);
+  if (note.viaSatoshi) ctx.fillText('written through satoshi.si', 95, 942);
   ctx.fillStyle = '#9aa3af';
   ctx.font = '400 24px ui-monospace, Menlo, monospace';
   if (note.txid) ctx.fillText(note.txid.slice(0, 44) + '…', 95, 988);
-  canvas.toBlob((blob) => {
+  const finish = () => canvas.toBlob((blob) => {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `opreturn-${(note.txid || 'message').slice(0, 12)}.png`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 4000);
   }, 'image/png');
+  if (!note.viaSatoshi) {
+    finish();
+    return;
+  }
+  const logo = new Image();
+  logo.onload = () => {
+    ctx.drawImage(logo, size - 155, 70, 80, 80);
+    finish();
+  };
+  logo.onerror = finish;
+  logo.src = '/android-chrome-192x192.png';
 }
 
 function noteCard(note) {
   const card = document.createElement('div');
-  card.className = 'note ' + (note.mine ? 'mine' : 'chain');
+  card.className = 'note ' + (note.viaSatoshi ? 'branded' : 'chain');
   const banner = document.createElement('div');
   banner.className = 'banner';
 
@@ -551,13 +410,9 @@ function noteCard(note) {
   const meta = document.createElement('div');
   meta.className = 'meta';
   const when = note.publishedAt ? new Date(note.publishedAt).toLocaleString() : '';
-  const who = note.mine ? 'paid, pattern ' + (note.theme || 'cork') : 'found on chain';
+  const who = note.viaSatoshi ? 'via satoshi.si' : 'public message';
   meta.appendChild(Object.assign(document.createElement('span'), { textContent: who }));
   if (when) meta.appendChild(Object.assign(document.createElement('span'), { textContent: when }));
-  if (note.viaSatoshi) {
-    meta.appendChild(Object.assign(document.createElement('span'),
-      { className: 'via', textContent: 'via satoshi.si' }));
-  }
   const cardBtn = document.createElement('button');
   cardBtn.className = 'ghost';
   cardBtn.style.padding = '2px 10px';
@@ -577,58 +432,11 @@ function noteCard(note) {
   return card;
 }
 
-let boardCursor = null;
-let boardBusy = false;
-
-function makeSentinel() {
-  const node = document.createElement('div');
-  node.className = 'sentinel';
-  node.id = 'sentinel';
-  return node;
-}
-
-// Deeper history loads as the reader reaches the end, for as long as the index has more.
-async function loadMore() {
-  if (!boardCursor || boardBusy) return;
-  boardBusy = true;
-  const board = el('board');
-  const sentinel = el('sentinel');
-  try {
-    const data = await getJson(`${API}/chain?before=${encodeURIComponent(boardCursor)}&limit=20`);
-    const notes = data.chain || [];
-    boardCursor = data.nextBefore || null;
-    const anchor = sentinel && sentinel.parentNode === board ? sentinel : null;
-    for (const note of notes) {
-      if (anchor) board.insertBefore(noteCard(note), anchor);
-      else board.appendChild(noteCard(note));
-    }
-    if (!boardCursor && anchor) anchor.remove();
-  } catch (error) {
-    console.warn('more history failed:', error.message);
-  } finally {
-    boardBusy = false;
-  }
-}
-
-function watchScroll() {
-  if (!('IntersectionObserver' in window)) return;
-  const observer = new IntersectionObserver((entries) => {
-    if (entries.some(entry => entry.isIntersecting)) loadMore();
-  }, { root: el('board'), rootMargin: '240px' });
-  const attach = () => {
-    const sentinel = el('sentinel');
-    if (sentinel) observer.observe(sentinel);
-  };
-  attach();
-  setInterval(attach, 4000);
-  return observer;
-}
-
 async function loadBoard() {
   const board = el('board');
   try {
     const data = await getJson(`${API}/latest`);
-    const notes = [...(data.paid || []), ...(data.chain || [])];
+    const notes = recentBoardNotes(data, 5);
     if (!notes.length) {
       board.textContent = '';
       board.appendChild(Object.assign(document.createElement('p'),
@@ -637,8 +445,6 @@ async function loadBoard() {
     }
     board.textContent = '';
     for (const note of notes) board.appendChild(noteCard(note));
-    boardCursor = data.nextBefore || null;
-    board.appendChild(makeSentinel());
   } catch (error) {
     board.textContent = '';
     board.appendChild(Object.assign(document.createElement('p'),
@@ -679,8 +485,6 @@ payBtn.addEventListener('click', async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         message: check.value,
-        isPublic: publicEl.checked,
-        theme: publicEl.checked ? themeEl.value : null,
         viaSatoshi: el('viaSatoshi').checked,
       }),
     });
@@ -706,20 +510,11 @@ resetBtn.addEventListener('click', () => {
 });
 
 messageEl.addEventListener('input', paintCount);
-publicEl.addEventListener('change', () => { themeRow.hidden = !publicEl.checked; });
 
-document.getElementById('helpIcon').onclick = () => {
-  const details = document.querySelector('details');
-  if (details) {
-    details.open = true;
-    details.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-};
 paintPrice();
 paintCount();
 loadBoard();
 setInterval(loadBoard, 30000);
-watchScroll();
 </script>
 </body>
 </html>
