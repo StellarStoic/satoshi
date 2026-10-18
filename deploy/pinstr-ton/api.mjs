@@ -12,7 +12,7 @@ const PORT = Number(process.env.PINSTR_TG_PORT || 8851);
 const TOKEN = process.env.PINSTR_TG_BOT_TOKEN || '';
 const SECRET = process.env.PINSTR_TG_SESSION_SECRET || '';
 const SESSION_TTL_S = Number(process.env.PINSTR_TG_SESSION_TTL || 604800);
-const ALLOWED_ORIGINS = (process.env.PINSTR_TG_ORIGINS || 'https://pinstr.si,https://www.pinstr.si').split(',').map((s) => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = (process.env.PINSTR_TG_ORIGINS || 'https://pinstr.si,https://www.pinstr.si,https://satoshi.si,https://www.satoshi.si').split(',').map((s) => s.trim()).filter(Boolean);
 const VERIFY_PER_MIN = Number(process.env.PINSTR_TG_VERIFY_PER_MIN || 12);
 const PROFILE_DIR = process.env.PINSTR_TG_PROFILE_DIR || '/opt/pinstr-tg/profiles';
 const RELAYS = (process.env.PINSTR_TG_RELAYS || 'wss://nostr.satoshi.si').split(',').map((s) => s.trim()).filter(Boolean);

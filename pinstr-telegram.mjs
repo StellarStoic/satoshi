@@ -5,7 +5,10 @@
 // key yet, one is made here — in the page, with the already-shipped nostr-tools — and
 // the kind 0 is signed here too, so the server never needs a schnorr implementation.
 
-const API = '/tg';
+// The service lives on pinstr.si, but the board is served from satoshi.si as well, so
+// the base is absolute wherever the page is not on pinstr.si itself.
+const ON_PINSTR = /(^|\.)pinstr\.si$/i.test(typeof location !== 'undefined' ? location.hostname : '');
+const API = ON_PINSTR ? '/tg' : 'https://pinstr.si/tg';
 const EVENT = 'pinstr-telegram-ready';
 
 function tools() {
@@ -102,7 +105,7 @@ function restructureLoginDialog() {
     details.className = 'pinstr-nostr';
     const summary = document.createElement('summary');
     summary.textContent = 'Sign in with Nostr';
-    summary.style.cssText = 'cursor:pointer;font-size:.9rem;color:var(--text-muted);margin:0 0 10px;';
+    summary.style.cssText = 'cursor:pointer;font-size:1.05rem;color:var(--text);margin:0 0 12px;padding:6px 0;';
     details.appendChild(summary);
     methods.parentNode.insertBefore(details, methods);
     for (const node of [
