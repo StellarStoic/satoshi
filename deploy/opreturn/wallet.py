@@ -17,6 +17,8 @@ import json
 import os
 import pathlib
 import subprocess
+import tempfile
+import subprocess
 
 # ---------------------------------------------------------------- bech32 (BIP173) ----
 
@@ -118,9 +120,18 @@ def public_key(path: pathlib.Path) -> bytes:
 
 
 def sign_hash(path: pathlib.Path, digest: bytes) -> bytes:
-    """DER-encoded ECDSA signature over a 32-byte digest, normalised to low-S."""
-    der = subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(path)],
-                         input=digest, check=True, capture_output=True).stdout
+    """DER-encoded ECDSA signature over a 32-byte digest, normalised to low-S.
+
+    Bitcoin hands the signer an already-computed double SHA256. `openssl dgst -sign`
+    would hash it again, which produces a signature over the wrong number and the network
+    rejects the transaction. pkeyutl signs the digest as given when told which hash it is.
+    """
+    with tempfile.NamedTemporaryFile("wb", suffix=".digest") as handle:
+        handle.write(digest)
+        handle.flush()
+        der = subprocess.run(["openssl", "pkeyutl", "-sign", "-inkey", str(path),
+                              "-in", handle.name, "-pkeyopt", "digest:sha256"],
+                             check=True, capture_output=True).stdout
     r, s = _parse_der(der)
     order = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
     if s > order // 2:

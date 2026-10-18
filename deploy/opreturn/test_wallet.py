@@ -170,12 +170,25 @@ class Signing(unittest.TestCase):
             pub = pathlib.Path(tmp) / "k.pub"
             subprocess.run(["openssl", "ec", "-in", str(key), "-pubout", "-out", str(pub)],
                            check=True, capture_output=True)
+            # Verify the digest itself, the way the network does. `openssl dgst` would hash
+            # the digest again and happily confirm a signature that Bitcoin rejects, which is
+            # exactly how a wrong signer shipped once.
             digest = wallet.sha256(b"a message worth signing")
             sig_file = pathlib.Path(tmp) / "sig.der"
             sig_file.write_bytes(wallet.sign_hash(key, digest))
-            check = subprocess.run(["openssl", "dgst", "-sha256", "-verify", str(pub),
-                                    "-signature", str(sig_file)], input=digest, capture_output=True)
+            digest_file = pathlib.Path(tmp) / "digest.bin"
+            digest_file.write_bytes(digest)
+            check = subprocess.run(["openssl", "pkeyutl", "-verify", "-pubin", "-inkey", str(pub),
+                                    "-in", str(digest_file), "-sigfile", str(sig_file),
+                                    "-pkeyopt", "digest:sha256"], capture_output=True)
             self.assertEqual(check.returncode, 0, (check.stdout + check.stderr).decode(errors="replace"))
+            # and prove the old habit is actually wrong: hashing the digest must not verify
+            double = pathlib.Path(tmp) / "double.bin"
+            double.write_bytes(wallet.sha256(digest))
+            wrong = subprocess.run(["openssl", "pkeyutl", "-verify", "-pubin", "-inkey", str(pub),
+                                    "-in", str(double), "-sigfile", str(sig_file),
+                                    "-pkeyopt", "digest:sha256"], capture_output=True)
+            self.assertNotEqual(wrong.returncode, 0, "a signature over the hash of the digest is invalid")
 
     def test_signatures_are_low_s(self):
         with tempfile.TemporaryDirectory() as tmp:
