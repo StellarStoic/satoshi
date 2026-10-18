@@ -217,7 +217,7 @@ export function latestFromBlocks(blocks, limit = OP_RETURN.latestCount) {
 export const BORDER_PAID = 'theme';
 export const BORDER_CHAIN = 'grey';
 
-export function boardNote({ text, txid = null, mine = false, theme = null, publishedAt = null, source = 'chain' } = {}) {
+export function boardNote({ text, txid = null, mine = false, theme = null, publishedAt = null, source = 'chain', viaSatoshi = false } = {}) {
   return {
     kind: 'opreturn',
     text: String(text ?? ''),
@@ -227,6 +227,8 @@ export function boardNote({ text, txid = null, mine = false, theme = null, publi
     theme: mine ? theme : null,
     publishedAt,
     source,
+    // Only a buyer who ticked the box is shown as a satoshi.si user.
+    viaSatoshi: Boolean(viaSatoshi),
   };
 }
 

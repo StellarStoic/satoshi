@@ -255,7 +255,7 @@ async function refreshFeed() {
       messages.push({ text, txid: row.txid, blockHeight: row.block_height ?? null, blockTime: when });
     }
     chain.messages = messages.slice(0, KEEP_MESSAGES);
-    chain.cursor = { blockId: 'opreturn.xyz', page: 0 };
+    chain.cursor = { blockId: 'opreturn.xyz', page: 0, before: payload.next_before || null };
     saveChain();
     console.log(`feed refreshed: ${messages.length} readable of ${rows.length}`);
   } catch (error) {
@@ -304,6 +304,42 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Deeper pages of the chain feed, for the board's scrolling.
+    if (route === '/opreturn/v1/chain' && req.method === 'GET') {
+      const before = url.searchParams.get('before') || '';
+      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
+      if (!before) {
+        send(res, 200, { chain: [], nextBefore: null });
+        return;
+      }
+      try {
+        const response = await fetch(
+          `https://opreturn.xyz/api/messages?sort=new&limit=${limit}&before=${encodeURIComponent(before)}`,
+          { headers: { accept: 'application/json' } });
+        const payload = await response.json();
+        const rows = Array.isArray(payload) ? payload : payload.messages || [];
+        const seen = new Set();
+        const out = [];
+        for (const row of rows) {
+          const text = String(row.content ?? '').trim();
+          if (!text || !looksLikeLanguage(text)) continue;
+          const key = text.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(boardNote({
+            text,
+            txid: row.txid,
+            publishedAt: row.block_time ? new Date(Number(row.block_time) * 1000).toISOString() : null,
+            source: 'chain',
+          }));
+        }
+        send(res, 200, { chain: out, nextBefore: payload.next_before || null });
+      } catch (error) {
+        send(res, 502, { error: 'the index could not be read', detail: error.message });
+      }
+      return;
+    }
+
     // One message by txid: the receipt a buyer can keep.
     if (route.startsWith('/opreturn/v1/message/') && req.method === 'GET') {
       const txid = route.slice('/opreturn/v1/message/'.length);
@@ -347,6 +383,8 @@ const server = http.createServer(async (req, res) => {
         bytes: check.bytes,
         sats: priceSats(),
         isPublic: Boolean(payload.isPublic),
+        // The buyer may choose to be seen as a satoshi.si user; the note says so.
+        viaSatoshi: Boolean(payload.viaSatoshi),
         theme: payload.isPublic ? theme : null,
         createdAtMs: Date.now(),
         rails: {},
@@ -379,6 +417,7 @@ const server = http.createServer(async (req, res) => {
           txid: o.opReturnTxid,
           mine: true,
           theme: o.theme,
+          viaSatoshi: Boolean(o.viaSatoshi),
           publishedAt: new Date(o.createdAtMs).toISOString(),
           source: 'tool',
         }));
@@ -400,7 +439,7 @@ const server = http.createServer(async (req, res) => {
           publishedAt: m.blockTime ? new Date(m.blockTime * 1000).toISOString() : null,
           source: 'chain',
         }));
-      send(res, 200, { paid, chain: fromChain });
+      send(res, 200, { paid, chain: fromChain, nextBefore: chain.cursor?.before || null });
       return;
     }
 

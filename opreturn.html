@@ -44,8 +44,13 @@
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
   .board-list { max-height:64vh; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
   .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:#101318; background-size:auto; background-repeat:repeat; }
-  .note.mine { border-left-color: var(--accent); }
-  .note.chain { border-left-color:#7d848f; }
+  .note.mine { border:2px solid var(--accent); }
+  .note.chain { border:1px solid var(--line); border-left:6px solid #7d848f; }
+  .note .via { color:var(--accent); font-weight:600; }
+  .sentinel { height:2px; }
+  .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.78); display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; padding:16px; z-index:60; }
+  .cardwrap canvas { max-width:min(92vw, 760px); border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); }
+  .cardwrap .bar { display:flex; gap:10px; }
   .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
   .note .meta { margin-top:8px; font-size:.78rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
   .note .meta a { color:var(--dim); }
@@ -82,6 +87,10 @@
     <label class="row" style="margin-top:14px">
       <span>Show it on the board below</span>
       <input type="checkbox" id="isPublic">
+    </label>
+    <label class="row" style="margin-top:10px">
+      <span>Let my message show that I used satoshi.si</span>
+      <input type="checkbox" id="viaSatoshi">
     </label>
     <div id="themeRow" class="board" hidden>
       <div>
@@ -242,13 +251,121 @@ function paintOrder(order) {
 
 const THUMB = (theme) => `img/board-${theme || 'cork'}.png`;
 
+const TEXTURES = ['cork', 'woven', 'wheat', 'graphy', 'fancy-cushion', 'dark-grey-terrazzo',
+  'folk-pattern', 'pool-table', 'bananas', 'darkness', 'tex2res4', 'gray-floral',
+  'christmas', 'carbon-fibre', 'cartographer', 'green-dust-scratches'];
+
+// The same txid always picks the same pattern, so a message keeps its look.
+function textureFor(txid) {
+  let hash = 2166136261;
+  for (const char of String(txid || '')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return TEXTURES[Math.abs(hash) % TEXTURES.length];
+}
+
+function textureOf(note) {
+  return note.mine ? (note.theme || 'cork') : textureFor(note.txid);
+}
+
+function openCard(note) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cardwrap';
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  wrap.appendChild(canvas);
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  const download = document.createElement('button');
+  download.textContent = 'Download card';
+  download.onclick = () => {
+    canvas.toBlob((blob) => {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `opreturn-${(note.txid || 'message').slice(0, 12)}.png`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+    }, 'image/png');
+  };
+  const close = document.createElement('button');
+  close.className = 'ghost';
+  close.textContent = 'Close';
+  close.onclick = () => wrap.remove();
+  bar.appendChild(download);
+  bar.appendChild(close);
+  wrap.appendChild(bar);
+  wrap.onclick = (event) => { if (event.target === wrap) wrap.remove(); };
+  document.body.appendChild(wrap);
+
+  const draw = (image) => {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#14161a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (image) {
+      const ratio = Math.max(canvas.width / image.width, canvas.height / image.height);
+      const w = image.width * ratio;
+      const h = image.height * ratio;
+      ctx.drawImage(image, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    }
+    ctx.fillStyle = 'rgba(12,14,18,0.80)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = note.mine ? '#f7931a' : '#7d848f';
+    ctx.lineWidth = 14;
+    ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+    const text = note.text || '';
+    ctx.fillStyle = '#ffffff';
+    let size = text.length > 220 ? 38 : text.length > 110 ? 48 : 62;
+    ctx.font = `600 ${size}px system-ui, -apple-system, Segoe UI, sans-serif`;
+    const maxWidth = canvas.width - 190;
+    const words = text.split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? line + ' ' + word : word;
+      if (ctx.measureText(candidate).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(line);
+    const visible = lines.slice(0, 12);
+    const startY = 300 - Math.min(visible.length, 12) * (size * 0.6) / 2;
+    visible.forEach((row, index) => {
+      ctx.fillText(index === 11 && lines.length > 12 ? row + ' …' : row, 95, startY + index * size * 1.28);
+    });
+
+    ctx.font = '500 30px system-ui, sans-serif';
+    ctx.fillStyle = '#f7931a';
+    ctx.fillText('satoshi.si/opreturn', 95, 900);
+    if (note.viaSatoshi) {
+      ctx.fillStyle = '#e8eaed';
+      ctx.fillText('shared by a satoshi.si user', 95, 948);
+    }
+    ctx.fillStyle = '#9aa3af';
+    ctx.font = '400 26px ui-monospace, Menlo, monospace';
+    if (note.txid) ctx.fillText(note.txid.slice(0, 40) + (note.txid.length > 40 ? '…' : ''), 95, 996);
+    const when = note.publishedAt ? new Date(note.publishedAt).toUTCString() : '';
+    ctx.fillText(`${note.mine ? 'paid message' : 'found on chain'}${when ? ' · ' + when : ''}`, 95, 1036);
+  };
+
+  const image = new Image();
+  image.onload = () => draw(image);
+  image.onerror = () => draw(null);
+  image.src = THUMB(textureOf(note));
+}
+
 function noteCard(note) {
   const card = document.createElement('div');
   card.className = 'note ' + (note.mine ? 'mine' : 'chain');
   const banner = document.createElement('div');
   banner.className = 'banner';
   banner.style.backgroundImage =
-    `linear-gradient(rgba(16,19,24,.74), rgba(16,19,24,.74)), url(${THUMB(note.theme)})`;
+    `linear-gradient(rgba(16,19,24,.74), rgba(16,19,24,.74)), url(${THUMB(textureOf(note))})`;
   banner.style.backgroundSize = 'auto, auto';
   const text = document.createElement('p');
   text.textContent = note.text;
@@ -260,6 +377,17 @@ function noteCard(note) {
   const who = note.mine ? 'paid, pattern ' + (note.theme || 'cork') : 'found on chain';
   meta.appendChild(Object.assign(document.createElement('span'), { textContent: who }));
   if (when) meta.appendChild(Object.assign(document.createElement('span'), { textContent: when }));
+  if (note.viaSatoshi) {
+    meta.appendChild(Object.assign(document.createElement('span'),
+      { className: 'via', textContent: 'via satoshi.si' }));
+  }
+  const cardBtn = document.createElement('button');
+  cardBtn.className = 'ghost';
+  cardBtn.style.padding = '2px 10px';
+  cardBtn.style.fontSize = '.75rem';
+  cardBtn.textContent = 'Card';
+  cardBtn.onclick = () => openCard(note);
+  meta.appendChild(cardBtn);
   if (note.txid) {
     const link = document.createElement('a');
     link.href = `https://mempool.space/tx/${note.txid}`;
@@ -270,6 +398,53 @@ function noteCard(note) {
   }
   card.appendChild(meta);
   return card;
+}
+
+let boardCursor = null;
+let boardBusy = false;
+
+function makeSentinel() {
+  const node = document.createElement('div');
+  node.className = 'sentinel';
+  node.id = 'sentinel';
+  return node;
+}
+
+// Deeper history loads as the reader reaches the end, for as long as the index has more.
+async function loadMore() {
+  if (!boardCursor || boardBusy) return;
+  boardBusy = true;
+  const board = el('board');
+  const sentinel = el('sentinel');
+  try {
+    const data = await getJson(`${API}/chain?before=${encodeURIComponent(boardCursor)}&limit=20`);
+    const notes = data.chain || [];
+    boardCursor = data.nextBefore || null;
+    const anchor = sentinel && sentinel.parentNode === board ? sentinel : null;
+    for (const note of notes) {
+      if (anchor) board.insertBefore(noteCard(note), anchor);
+      else board.appendChild(noteCard(note));
+    }
+    if (!boardCursor && anchor) anchor.remove();
+  } catch (error) {
+    console.warn('more history failed:', error.message);
+  } finally {
+    boardBusy = false;
+  }
+}
+
+function watchScroll() {
+  if (!('IntersectionObserver' in window)) return;
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting)) loadMore();
+  }, { root: el('board'), rootMargin: '240px' });
+  const attach = () => {
+    const sentinel = el('sentinel');
+    if (sentinel) observer.observe(sentinel);
+  };
+  attach();
+  setInterval(attach, 4000);
+  return observer;
 }
 
 async function loadBoard() {
@@ -285,6 +460,8 @@ async function loadBoard() {
     }
     board.textContent = '';
     for (const note of notes) board.appendChild(noteCard(note));
+    boardCursor = data.nextBefore || null;
+    board.appendChild(makeSentinel());
   } catch (error) {
     board.textContent = '';
     board.appendChild(Object.assign(document.createElement('p'),
@@ -327,6 +504,7 @@ payBtn.addEventListener('click', async () => {
         message: check.value,
         isPublic: publicEl.checked,
         theme: publicEl.checked ? themeEl.value : null,
+        viaSatoshi: el('viaSatoshi').checked,
       }),
     });
     paintOrder(order);
@@ -357,6 +535,7 @@ paintPrice();
 paintCount();
 loadBoard();
 setInterval(loadBoard, 30000);
+watchScroll();
 </script>
 </body>
 </html>
