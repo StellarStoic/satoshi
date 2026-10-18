@@ -42,7 +42,7 @@ test('a script over the limit is refused rather than built', () => {
 });
 
 test('scripts round-trip back to text, including emoji and accents', () => {
-  for (const text of ['hi', 'gm', 'čas ⚡️', 'x'.repeat(80)]) {
+  for (const text of ['hi there', 'gm', 'čas ⚡️', 'x'.repeat(80)]) {
     assert.equal(scriptToText(opReturnScript(text)), text);
   }
 });
@@ -68,22 +68,22 @@ test('the latest feed flattens blocks newest first and drops the noise', () => {
     { height: 900002, timestamp: 1700000000, txs: [
       { txid: 'tx1', vout: [
         { scriptpubkey: '76a914' + '11'.repeat(20) + '88ac' },
-        { scriptpubkey: opReturnScript('first') },
+        { scriptpubkey: opReturnScript('first message') },
       ] },
     ] },
     { height: 900001, timestamp: 1699999400, txs: [
-      { txid: 'tx2', vout: [{ scriptpubkey: opReturnScript('second') }] },
+      { txid: 'tx2', vout: [{ scriptpubkey: opReturnScript('second message') }] },
     ] },
   ];
   const latest = latestFromBlocks(blocks, 21);
-  assert.deepEqual(latest.map(m => m.text), ['first', 'second']);
+  assert.deepEqual(latest.map(m => m.text), ['first message', 'second message']);
   assert.equal(latest[0].txid, 'tx1');
   assert.equal(latest[1].blockHeight, 900001);
 });
 
 test('the limit holds, and an unreadable entry is skipped not shown', () => {
   const blocks = [{ height: 1, timestamp: 0, txs: [
-    { txid: 'a', vout: [{ scriptpubkey: '6a' }, { scriptpubkey: opReturnScript('ok') }] },
+    { txid: 'a', vout: [{ scriptpubkey: '6a' }, { scriptpubkey: opReturnScript('ok then') }] },
   ] }];
   assert.equal(latestFromBlocks(blocks, 21).length, 1);
   assert.equal(chainMessage({ txid: 'x', scriptHex: '6a' }), null);
