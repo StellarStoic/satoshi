@@ -42,6 +42,15 @@
   #orderPanel { margin-top:18px; }
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
+  .board-list { max-height:64vh; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
+  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:#101318; background-size:auto; background-repeat:repeat; }
+  .note.mine { border-left-color: var(--accent); }
+  .note.chain { border-left-color:#7d848f; }
+  .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
+  .note .meta { margin-top:8px; font-size:.78rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
+  .note .meta a { color:var(--dim); }
+  .banner { background:linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.55)); border-radius:6px; padding:10px 12px; }
+  .banner p { color:#fff; }
 </style>
 </head>
 <body>
@@ -71,7 +80,7 @@
     </div>
 
     <label class="row" style="margin-top:14px">
-      <span>Show it on the board at satoshi.si/pinstr</span>
+      <span>Show it on the board below</span>
       <input type="checkbox" id="isPublic">
     </label>
     <div id="themeRow" class="board" hidden>
@@ -102,6 +111,12 @@
     <div id="statusBox" class="status"><strong id="statusLabel">Preparing the invoice</strong><span id="statusDetail" class="hint"></span></div>
     <div id="rails"></div>
     <p class="hint" style="margin-top:12px">Pay any one rail. The message goes out once the payment is seen; this page follows it through to the transaction.</p>
+  </section>
+
+  <section id="boardSection">
+    <h2>The board</h2>
+    <p class="hint">Messages people paid to leave on the chain. Paid ones here carry the pattern their sender chose; the newest 21 readable messages found anywhere on the chain carry a grey border.</p>
+    <div id="board" class="board-list"><p class="hint">Loading…</p></div>
   </section>
 
   <section>
@@ -225,6 +240,58 @@ function paintOrder(order) {
   }
 }
 
+const THUMB = (theme) => `img/board-${theme || 'cork'}.png`;
+
+function noteCard(note) {
+  const card = document.createElement('div');
+  card.className = 'note ' + (note.mine ? 'mine' : 'chain');
+  const banner = document.createElement('div');
+  banner.className = 'banner';
+  banner.style.backgroundImage =
+    `linear-gradient(rgba(16,19,24,.74), rgba(16,19,24,.74)), url(${THUMB(note.theme)})`;
+  banner.style.backgroundSize = 'auto, auto';
+  const text = document.createElement('p');
+  text.textContent = note.text;
+  banner.appendChild(text);
+  card.appendChild(banner);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const when = note.publishedAt ? new Date(note.publishedAt).toLocaleString() : '';
+  const who = note.mine ? 'paid, pattern ' + (note.theme || 'cork') : 'found on chain';
+  meta.appendChild(Object.assign(document.createElement('span'), { textContent: who }));
+  if (when) meta.appendChild(Object.assign(document.createElement('span'), { textContent: when }));
+  if (note.txid) {
+    const link = document.createElement('a');
+    link.href = `https://mempool.space/tx/${note.txid}`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = note.txid.slice(0, 12) + '…';
+    meta.appendChild(link);
+  }
+  card.appendChild(meta);
+  return card;
+}
+
+async function loadBoard() {
+  const board = el('board');
+  try {
+    const data = await getJson(`${API}/latest`);
+    const notes = [...(data.paid || []), ...(data.chain || [])];
+    if (!notes.length) {
+      board.textContent = '';
+      board.appendChild(Object.assign(document.createElement('p'),
+        { className: 'hint', textContent: 'No messages yet. Yours would be the first.' }));
+      return;
+    }
+    board.textContent = '';
+    for (const note of notes) board.appendChild(noteCard(note));
+  } catch (error) {
+    board.textContent = '';
+    board.appendChild(Object.assign(document.createElement('p'),
+      { className: 'hint', textContent: 'The board could not be loaded: ' + error.message }));
+  }
+}
+
 async function poll(orderId) {
   try {
     const order = await getJson(`${API}/orders/${orderId}`);
@@ -233,6 +300,7 @@ async function poll(orderId) {
       clearInterval(pollTimer);
       pollTimer = null;
       resetBtn.hidden = false;
+      loadBoard();
       return;
     }
   } catch (error) {
@@ -287,6 +355,8 @@ publicEl.addEventListener('change', () => { themeRow.hidden = !publicEl.checked;
 
 paintPrice();
 paintCount();
+loadBoard();
+setInterval(loadBoard, 30000);
 </script>
 </body>
 </html>
