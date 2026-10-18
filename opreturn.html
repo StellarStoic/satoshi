@@ -15,8 +15,12 @@
   :root { --bg: var(--page-bg); --panel: var(--surface); --line: var(--border); --ink: var(--text); --dim: var(--text-muted); --ok: var(--success); --bad: var(--danger); }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page-bg); color: var(--text); font-family: var(--site-font); font-size: 15px; line-height: 1.65; }
-  main { width: min(100% - 24px, 720px); margin: 0 auto; padding: 84px 0 70px; }
-  main > section, main > h1, main > p { margin-left: 0; margin-right: 0; }
+  /* Same column and clearance as the app wrappers on the site's other pages. */
+  .opreturn-app { width: min(720px, calc(100% - 32px)); margin: 0 auto; padding: 96px 0 92px; text-align: left; }
+  .opreturn-app, .opreturn-app * { box-sizing: border-box; }
+  .hero { margin-bottom: 44px; padding: 0 0 34px; border-bottom: 1px solid var(--border); }
+  .hero h1 { margin: 0 0 8px; color: var(--text); font-size: clamp(1.5rem, 4.4vw, 2.1rem); font-weight: 500; line-height: 1.15; }
+  .hero .lede { max-width: 630px; margin: 0; color: var(--text-muted); font-size: .86rem; }
   h1 { font-size: 1.6rem; margin: 0 0 6px; }
   .lede { color: var(--dim); margin: 0 0 22px; }
   h2 { font-size: 1rem; margin: 26px 0 8px; color: var(--accent); letter-spacing: .02em; text-transform: uppercase; }
@@ -83,14 +87,16 @@
   .banner p { color:#fff; }
 </style>
 </head>
-<body class="dark-theme">
+<body class="dark-theme opreturn-page">
   <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
   <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
   <button type="button" id="helpIcon" aria-label="What is an OP_RETURN message" title="How this tool works">?</button>
   <a href="/opreturnBoard.html" id="listIcon" aria-label="Open the full OP_RETURN board" title="Browse every message">&#9776;</a>
-<main>
-  <h1>Write a message on the blockchain</h1>
-  <p class="lede">Your words go into an OP_RETURN output, inside a real Bitcoin transaction. Nobody can edit them, and nobody can delete them while Bitcoin exists.</p>
+<div class="opreturn-app">
+  <header class="hero">
+    <h1>Write a message on the blockchain</h1>
+    <span class="lede">Your words go into an OP_RETURN output, inside a real Bitcoin transaction. Nobody can edit them, and nobody can delete them while Bitcoin exists.</span>
+  </header>
 
   <section>
     <h2>What this is</h2>
@@ -163,7 +169,7 @@
     <p class="mono">POST https://pay.satoshi.si/opreturn/v1/orders<br>{ "message": "hello", "isPublic": false }<br><br>GET https://pay.satoshi.si/opreturn/v1/orders/&lt;id&gt;<br>GET https://pay.satoshi.si/opreturn/v1/config<br>GET https://pay.satoshi.si/opreturn/v1/latest</p>
     <p class="hint">The order answers with the rail destinations and the amount. Poll it until <span class="mono">state</span> is <span class="mono">published</span>, then read <span class="mono">opReturnTxid</span>.</p>
   </section>
-</main>
+</div>
 <footer class="footer" data-live-footer>
   <a href="mailto:one@satoshi.si">one@satoshi.si</a>
   <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
