@@ -25,6 +25,9 @@ test('OP_RETURN pages use the shared site navigation, controls, and footer', asy
   assert.match(pages[0], /Read more[\s\S]*lni-message-3-text/);
   assert.equal((pages[0].match(/type="checkbox"/g) || []).length, 1);
   assert.doesNotMatch(pages[0], /id="isPublic"/);
+  assert.match(pages[0], /recentBoardNotes\(data, 5\)/);
+  assert.doesNotMatch(pages[0], /\.board-list\s*\{[^}]*overflow-y\s*:\s*auto/);
+  assert.doesNotMatch(pages[0], /\.board-list\s*\{[^}]*max-height/);
   assert.match(pages[1], /id="writeIcon"[\s\S]*lni-pencil-1/);
 });
 
