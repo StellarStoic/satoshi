@@ -109,7 +109,7 @@ class KeyExport(unittest.TestCase):
             key = pathlib.Path(tmp) / "k.pem"
             wallet.generate_key(key)
             wif = wallet.key_as_wif(key)
-            self.assertEqual(wif[0], "K", "compressed mainnet WIF")
+            self.assertIn(wif[0], "KL", "compressed mainnet WIF")
             self.assertEqual(len(wif), 52)
             number = 0
             for char in wif:
