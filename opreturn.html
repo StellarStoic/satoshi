@@ -197,7 +197,7 @@ function paintOrder(order) {
   const view = orderView(order);
   statusLabel.textContent = view.label;
   statusLabel.className = view.done ? 'ok' : view.failed ? 'bad' : '';
-  statusDetail.textContent = view.detail || '';
+  statusDetail.textContent = [view.detail, order.id ? `order ${order.id}` : ''].filter(Boolean).join(' · ');
   if (order.rails) {
     railsEl.textContent = '';
     if (order.rails.lightning?.destination) {

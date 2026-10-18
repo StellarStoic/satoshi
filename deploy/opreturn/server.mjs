@@ -87,6 +87,11 @@ function publicOrder(order) {
 
 function send(res, status, body, extraHeaders = {}) {
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
+  // One line per answer, in journald, so a bug report can be traced to the exact request
+  // and the exact thing this service said back.
+  const route = res.req ? `${res.req.method} ${res.req.url}` : 'unknown';
+  const note = status >= 400 ? ` says ${String(payload).slice(0, 200)}` : '';
+  console.log(`${new Date().toISOString()} ${status} ${route}${note}`);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
