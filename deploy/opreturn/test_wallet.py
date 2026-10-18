@@ -114,7 +114,7 @@ class KeyExport(unittest.TestCase):
             number = 0
             for char in wif:
                 number = number * 58 + wallet.BASE58.index(char)
-            raw = number.to_bytes(39, "big")
+            raw = number.to_bytes(38, "big")  # version + scalar + flag + 4 checksum
             self.assertEqual(raw[0], 0x80)
             self.assertEqual(raw[1:33], wallet.private_scalar(key))
             self.assertEqual(raw[33], 0x01, "compressed flag")
