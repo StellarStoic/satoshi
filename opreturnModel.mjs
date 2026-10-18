@@ -17,10 +17,10 @@ export const OP_RETURN = {
   // non-standard, so the tool refuses instead of quietly building something miners drop.
   maxBytes: 80,
   // What we charge, in sats. SatWire takes 3000; we take less and still cover the miner.
-  serviceSats: 1000,
+  serviceSats: 1600,
   // The miner fee we plan for, sats. A one-output-plus-change tx at 2 sat/vB costs about
   // this much; the real number comes from the wallet when the transaction is built.
-  networkSatsEstimate: 400,
+  networkSatsEstimate: 399,
   minFeeRate: 2,
   maxFeeRate: 500,
   // How many of the chain's latest messages the board shows.
