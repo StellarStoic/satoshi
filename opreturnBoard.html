@@ -42,9 +42,11 @@
   .sharecard.branded .sharetext { color:var(--accent); }
   .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
   .sharecard > * { position:relative; }
-  .sharecard .share-logo { position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
-  .sharetext { color:#f4f6f8; font-size:clamp(1.05rem,3.4vw,1.85rem); font-weight:600; }
-  .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
+  .sharecard .share-logo { position:absolute; right:18px; bottom:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
+  .sharetext { color:#f4f6f8; font-size:clamp(.95rem,3.4vw,1.85rem); font-weight:600; line-height:1.25; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .sharetext.is-long { font-size:clamp(.82rem,2.8vw,1.4rem); }
+  .sharefoot { display:flex; flex-direction:column; gap:4px; padding-right:52px; font-size:.75rem; color:#c9ced6; }
+  .sharefoot .tx { font-family:ui-monospace,Menlo,monospace; font-size:.68rem; line-height:1.3; overflow-wrap:anywhere; }
   .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
 </style>
 </head>
@@ -79,18 +81,33 @@ function openCard(note) {
   const safe = (note.text || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   overlay.innerHTML = '<button class="cardclose" aria-label="Close">&times;</button>'
     + '<div class="sharecard' + (note.viaSatoshi ? ' branded' : '') + '" style="background-image:' + sharePattern(note.txid).css + '">'
-    + (note.viaSatoshi ? '<img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">' : '')
-    + '<div class="sharetext">' + safe + '</div>'
+    + '<img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">'
+    + '<div class="sharetext' + (new TextEncoder().encode(note.text || '').length > 56 ? ' is-long' : '') + '">' + safe + '</div>'
     + '<div class="sharefoot">' + (note.viaSatoshi ? '<span class="brand">satoshi.si/opreturn</span>' : '')
     + (note.viaSatoshi ? '<span>written through satoshi.si</span>' : '')
-    + '<span style="font-family:ui-monospace,Menlo,monospace">' + (note.txid ? note.txid.slice(0, 32) + '&hellip;' : '') + '</span>'
-    + '<span>public OP_RETURN' + (note.publishedAt ? ' &middot; ' + new Date(note.publishedAt).toUTCString() : '') + '</span></div></div>';
+    + '<span class="tx">Transaction ID: ' + (note.txid || 'unavailable') + '</span>'
+    + '<span>Date and time: ' + (note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable') + '</span></div></div>';
   document.body.appendChild(overlay);
+  fitShareText(overlay.querySelector('.sharecard'));
   const close = () => overlay.remove();
   overlay.querySelector('.cardclose').onclick = close;
   overlay.onclick = (event) => { if (event.target === overlay) close(); };
   document.addEventListener('keydown', function esc(event) {
     if (event.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+  });
+}
+
+function fitShareText(card) {
+  const text = card?.querySelector('.sharetext');
+  const foot = card?.querySelector('.sharefoot');
+  if (!text || !foot) return;
+  requestAnimationFrame(() => {
+    let size = Number.parseFloat(getComputedStyle(text).fontSize) || 16;
+    const available = Math.max(70, card.clientHeight - foot.offsetHeight - 76);
+    while (text.scrollHeight > available && size > 8) {
+      size -= 1;
+      text.style.fontSize = `${size}px`;
+    }
   });
 }
 

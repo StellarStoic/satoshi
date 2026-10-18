@@ -129,10 +129,22 @@ test('a transaction id deterministically styles only its share card', async () =
   assert.match(sharePattern(txid).css, /gradient/);
 
   const html = await readFile(new URL('../opreturn.html', import.meta.url), 'utf8');
+  const boardHtml = await readFile(new URL('../opreturnBoard.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /id="themeRow"|id="theme"|Border of your note/);
   assert.doesNotMatch(html, /theme:\s*publicEl/);
   assert.match(html, /share-logo[\s\S]*android-chrome-192x192\.png/);
   assert.match(html, /note\.viaSatoshi \? accent : '#7d848f'/);
+  for (const page of [html, boardHtml]) {
+    assert.match(page, /Transaction ID:[\s\S]*note\.txid \|\| 'unavailable'/);
+    assert.match(page, /Date and time:/);
+    assert.match(page, /\.share-logo\s*\{[^}]*bottom:18px/);
+    assert.match(page, /function fitShareText\(/);
+    assert.doesNotMatch(page, /note\.txid\.slice\(0, 32\) \+ ['"](?:…|&hellip;)/);
+  }
+  assert.match(html, /function wrapCanvasText\(/);
+  assert.match(html, /txid\.slice\(0, 32\)[\s\S]*txid\.slice\(32\)/);
+  assert.match(helpCopy(PAGE_HELP['/opreturn.html']), /same transaction[\s\S]*same colors and shapes/i);
+  assert.match(helpCopy(PAGE_HELP['/opreturnBoard.html']), /four CSS pattern families/i);
 });
 
 test('the latest feed flattens blocks newest first and drops the noise', () => {

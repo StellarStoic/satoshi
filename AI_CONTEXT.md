@@ -331,13 +331,13 @@ Use the selected page section to answer questions such as "What does this button
     - Every new message written here is eligible for OP_RETURN read because the Bitcoin message is public anyway. There is no visibility checkbox.
 - **Writing and payment**:
     - **Message (`#message`)**: Validates non-empty readable text by encoded byte length, not JavaScript character count. Newlines are allowed; an invisible control-character-only message is refused.
-    - **Branding (`#viaSatoshi`)**: Optionally adds the current theme accent border, a small satoshi.si logo, and a “via satoshi.si” label to the board/share card. It is branding, not an author identity or cryptographic signature.
+    - **Branding (`#viaSatoshi`)**: Optionally colors the border and message with the current theme accent and adds a “via satoshi.si” label. The generated card always carries a small satoshi.si logo as the image source. Branding is not an author identity or cryptographic signature.
     - **Payment (`#pay`, `#orderPanel`)**: The total combines the service charge and an estimated on-chain mining cost. Available Bitcoin payment rails are shown by the generated order. After payment is detected, the service constructs, signs and broadcasts the on-chain message transaction, and the page follows its status to the resulting transaction id.
     - **Board preview (`#board`)**: Shows only the five newest merged public messages. **Card** opens the share view; **Read more** opens the full OP_RETURN read page.
 - **Technical details**:
     - UTF-8 bytes are written as `OP_RETURN <push> <message bytes>`. Lengths up to 75 bytes use a direct data-push opcode; 76–80 bytes use OP_PUSHDATA1. The 80-byte cap follows widely used standard relay policy rather than a Bitcoin consensus maximum.
     - The service transaction uses its own inputs, a zero-value OP_RETURN output, and a change output when appropriate. The real mining fee depends on inputs, virtual size, and the fee rate at construction time. Never claim that the estimate guarantees the final fee or confirmation time.
-    - Share-card appearance is not chosen by the writer. `sharePattern` deterministically derives its CSS pattern, hue, shape, angle, and spacing from the public transaction id. The same transaction id therefore reproduces the same card on OP_RETURN write and OP_RETURN read.
+    - Share-card appearance is not chosen by the writer. `sharePattern` hashes the public transaction ID and deterministically derives its hue, one of four CSS pattern families, angle, and spacing. The same transaction ID therefore reproduces the same background on OP_RETURN write and OP_RETURN read. The card keeps the complete message, transaction ID, date, time, and logo visible.
     - Confirmation commits the transaction through Bitcoin's chain of hashes. Archival nodes and public indexes may keep the full data indefinitely; pruning nodes may discard old block bodies after validation. Publishing must still be treated as public and irreversible.
 - **Synthetic Satoshi privacy boundary**:
     - The widget may receive the current byte count, the optional branding choice, and plain order-status labels.
@@ -348,8 +348,8 @@ Use the selected page section to answer questions such as "What does this button
 - **URL**: /opreturnBoard.html
 - **Purpose**: Presents a filtered, newest-first stream of public text found in Bitcoin OP_RETURN outputs.
 - **Key elements**:
-    - **Entries (`#list .note`)**: An accent border and logo mean the writer selected satoshi.si branding. Grey means unbranded. Styling does not establish truth, safety, authorship, source, or confirmation quality.
-    - **Share view (`.sharecard`)**: Opens when an entry is selected and shows the message, transaction identifier, time when available, and source label. Its CSS pattern is deterministically generated from the transaction id by the same `sharePattern` function used on OP_RETURN write.
+    - **Entries (`#list .note`)**: An accent-colored border and message plus the “via satoshi.si” label mean the writer selected satoshi.si branding. Grey means unbranded. The logo appears on every opened share card. Styling does not establish truth, safety, authorship, source, or confirmation quality.
+    - **Share view (`.sharecard`)**: Opens when an entry is selected and shows the complete message, complete transaction ID, date and time when available, and the small satoshi.si logo. Its CSS pattern is deterministically generated from the transaction ID by the same `sharePattern` function used on OP_RETURN write.
     - **Write shortcut (`#writeIcon`)**: Opens `/opreturn.html` to create a message.
     - **Scrolling**: The first request loads recent entries; older indexed pages are requested as the reader approaches the bottom. Reading is free and does not require an account or wallet.
 - **What the board includes**:

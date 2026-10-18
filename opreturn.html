@@ -74,12 +74,13 @@
   .sharecard.branded .sharetext { color:var(--accent); }
   .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
   .sharecard > * { position:relative; }
-  .sharecard .share-logo { position:absolute; top:18px; right:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
-  .sharetext { color:#f4f6f8; font-size:clamp(1.05rem, 3.4vw, 1.9rem); font-weight:600; white-space:pre-wrap; overflow:hidden; }
-  .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
+  .sharecard .share-logo { position:absolute; right:18px; bottom:18px; width:38px; height:38px; border-radius:50%; opacity:.88; }
+  .sharetext { color:#f4f6f8; font-size:clamp(.95rem, 3.4vw, 1.9rem); font-weight:600; line-height:1.25; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .sharetext.is-long { font-size:clamp(.82rem, 2.8vw, 1.45rem); }
+  .sharefoot { display:flex; flex-direction:column; gap:4px; padding-right:52px; font-size:.75rem; color:#c9ced6; }
   .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
   .sharefoot .badge { color:#e8eaed; }
-  .sharefoot .tx { font-family:ui-monospace, Menlo, monospace; word-break:break-all; }
+  .sharefoot .tx { font-family:ui-monospace, Menlo, monospace; font-size:.68rem; line-height:1.3; overflow-wrap:anywhere; }
   .cardwrap .bar { display:flex; gap:10px; }
   .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
   .note .meta { margin-top:8px; font-size:.78rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
@@ -278,22 +279,37 @@ function openReader(note) {
   overlay.innerHTML = `
     <button class="cardclose" aria-label="Close">&times;</button>
     <div class="sharecard${note.viaSatoshi ? ' branded' : ''}" style="background-image:${pattern.css}">
-      ${note.viaSatoshi ? '<img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">' : ''}
-      <div class="sharetext">${(note.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+      <img class="share-logo" src="/android-chrome-192x192.png" alt="satoshi.si">
+      <div class="sharetext${new TextEncoder().encode(note.text || '').length > 56 ? ' is-long' : ''}">${(note.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
       <div class="sharefoot">
         ${note.viaSatoshi ? '<span class="brand">satoshi.si/opreturn</span>' : ''}
         ${note.viaSatoshi ? '<span class="badge">written through satoshi.si</span>' : ''}
-        <span class="tx">${note.txid ? note.txid.slice(0, 32) + '…' : ''}</span>
-        <span class="when">public OP_RETURN${note.publishedAt ? ' · ' + new Date(note.publishedAt).toUTCString() : ''}</span>
+        <span class="tx">Transaction ID: ${note.txid || 'unavailable'}</span>
+        <span class="when">Date and time: ${note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable'}</span>
       </div>
     </div>
     <div class="bar"><button id="dl">Download PNG</button><button class="ghost" id="closeCard">Close</button></div>`;
   document.body.appendChild(overlay);
   openOverlay = overlay;
+  fitShareText(overlay.querySelector('.sharecard'));
   overlay.querySelector('.cardclose').onclick = () => overlay.remove();
   overlay.querySelector('#closeCard').onclick = () => overlay.remove();
   overlay.onclick = (event) => { if (event.target === overlay) overlay.remove(); };
   overlay.querySelector('#dl').onclick = () => downloadCard(note, pattern);
+}
+
+function fitShareText(card) {
+  const text = card?.querySelector('.sharetext');
+  const foot = card?.querySelector('.sharefoot');
+  if (!text || !foot) return;
+  requestAnimationFrame(() => {
+    let size = Number.parseFloat(getComputedStyle(text).fontSize) || 16;
+    const available = Math.max(70, card.clientHeight - foot.offsetHeight - 76);
+    while (text.scrollHeight > available && size > 8) {
+      size -= 1;
+      text.style.fontSize = `${size}px`;
+    }
+  });
 }
 
 function downloadCard(note, pattern) {
@@ -351,32 +367,32 @@ function downloadCard(note, pattern) {
   ctx.strokeStyle = note.viaSatoshi ? accent : '#7d848f';
   ctx.lineWidth = 14;
   ctx.strokeRect(28, 28, size - 56, size - 56);
-  const words = String(note.text || '').split(/\s+/);
-  let fontSize = words.length > 34 ? 40 : words.length > 18 ? 52 : 66;
+  let fontSize = 66;
+  let lines = [];
+  do {
+    ctx.font = `600 ${fontSize}px ${face}`;
+    lines = wrapCanvasText(ctx, String(note.text || ''), size - 190);
+    if (lines.length * fontSize * 1.25 <= 610) break;
+    fontSize -= 2;
+  } while (fontSize > 10);
   ctx.fillStyle = note.viaSatoshi ? accent : '#ffffff';
-  ctx.font = `600 ${fontSize}px ${face}`;
-  const lines = [];
-  let line = '';
-  for (const word of words) {
-    const candidate = line ? line + ' ' + word : word;
-    if (ctx.measureText(candidate).width > size - 190 && line) { lines.push(line); line = word; }
-    else line = candidate;
-  }
-  if (line) lines.push(line);
-  const shown = lines.slice(0, 11);
-  const startY = 520 - (shown.length * fontSize * 1.25) / 2;
-  shown.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
+  const startY = 475 - (lines.length * fontSize * 1.25) / 2;
+  lines.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
   if (note.viaSatoshi) {
     ctx.fillStyle = accent;
     ctx.font = `600 30px ${face}`;
     ctx.fillText('satoshi.si/opreturn', 95, 900);
   }
   ctx.fillStyle = '#e8eaed';
-  ctx.font = '400 26px system-ui, sans-serif';
-  if (note.viaSatoshi) ctx.fillText('written through satoshi.si', 95, 942);
+  ctx.font = '400 25px system-ui, sans-serif';
+  if (note.viaSatoshi) ctx.fillText('written through satoshi.si', 95, 900);
+  ctx.fillText(`Date and time: ${note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable'}`, 95, 936);
   ctx.fillStyle = '#9aa3af';
-  ctx.font = '400 24px ui-monospace, Menlo, monospace';
-  if (note.txid) ctx.fillText(note.txid.slice(0, 44) + '…', 95, 988);
+  ctx.font = '400 22px ui-monospace, Menlo, monospace';
+  ctx.fillText('Transaction ID:', 95, 972);
+  const txid = String(note.txid || 'unavailable');
+  ctx.fillText(txid.slice(0, 32), 95, 1002);
+  if (txid.length > 32) ctx.fillText(txid.slice(32), 95, 1032);
   const finish = () => canvas.toBlob((blob) => {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -384,17 +400,34 @@ function downloadCard(note, pattern) {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 4000);
   }, 'image/png');
-  if (!note.viaSatoshi) {
-    finish();
-    return;
-  }
   const logo = new Image();
   logo.onload = () => {
-    ctx.drawImage(logo, size - 155, 70, 80, 80);
+    ctx.drawImage(logo, size - 145, size - 145, 72, 72);
     finish();
   };
   logo.onerror = finish;
   logo.src = '/android-chrome-192x192.png';
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const lines = [];
+  let line = '';
+  for (const character of Array.from(text)) {
+    if (character === '\n') {
+      lines.push(line);
+      line = '';
+      continue;
+    }
+    const candidate = line + character;
+    if (line && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(line.trimEnd());
+      line = character.trimStart();
+    } else {
+      line = candidate;
+    }
+  }
+  if (line || !lines.length) lines.push(line);
+  return lines;
 }
 
 function noteCard(note) {
