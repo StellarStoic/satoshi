@@ -58,6 +58,51 @@ class Bech32Vector(unittest.TestCase):
         self.assertTrue(wallet.segwit_address("bc", 1, program).startswith("bc1p"))
 
 
+class Addresses(unittest.TestCase):
+    def test_the_published_witness_program_decodes(self):
+        version, program = wallet.decode_segwit("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")
+        self.assertEqual(version, 0)
+        self.assertEqual(program.hex(), "751e76e8199196d454941c45d1b3a323f1433bd6")
+        self.assertEqual(wallet.script_for_address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4").hex(),
+                         "0014751e76e8199196d454941c45d1b3a323f1433bd6")
+
+    def test_taproot_round_trips(self):
+        program = bytes.fromhex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+        address = wallet.segwit_address("bc", 1, program)
+        version, decoded = wallet.decode_segwit(address)
+        self.assertEqual((version, decoded), (1, program))
+        self.assertEqual(wallet.script_for_address(address), b"\x51\x20" + program)
+
+    def test_a_typo_is_refused(self):
+        good = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+        bad = good[:-1] + ("q" if good[-1] != "q" else "p")
+        with self.assertRaises(ValueError):
+            wallet.decode_segwit(bad)
+
+
+class Withdrawal(unittest.TestCase):
+    def test_a_sweep_pays_the_named_address_and_costs_one_fee(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = pathlib.Path(tmp) / "k.pem"
+            pubkey = wallet.generate_key(key)
+            destination = wallet.segwit_address("bc", 0, bytes.fromhex("11" * 20))
+            utxos = [{"txid": "ab" * 32, "vout": 1, "value": 30000}]
+            raw, summary = wallet.build_payment(utxos, destination, key, pubkey, feerate=2.0)
+            self.assertEqual(summary["to"], destination)
+            self.assertEqual(summary["sent"] + summary["fee"], 30000)
+            self.assertIn(wallet.script_for_address(destination).hex(), raw)
+            self.assertEqual(len(summary["txid"]), 64)
+
+    def test_a_dust_pool_is_refused_rather_than_sending_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = pathlib.Path(tmp) / "k.pem"
+            pubkey = wallet.generate_key(key)
+            destination = wallet.segwit_address("bc", 0, bytes.fromhex("22" * 20))
+            with self.assertRaises(ValueError):
+                wallet.build_payment([{"txid": "cd" * 32, "vout": 0, "value": 300}],
+                                     destination, key, pubkey, feerate=2.0)
+
+
 class Bip143Vector(unittest.TestCase):
     """If the digest matches BIP143's own number, the signer is correct."""
 

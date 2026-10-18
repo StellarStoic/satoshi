@@ -13,6 +13,8 @@ Signing uses openssl, which has secp256k1 built in, so nothing needs installing.
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import pathlib
 import subprocess
 
@@ -261,15 +263,129 @@ def build_and_sign(message: str, utxos, address_program: bytes, key_path: pathli
     return raw.hex(), summary
 
 
+# --------------------------------------------------------------- plain payments ----
+
+def decode_segwit(address: str):
+    """Returns (version, program) for a bech32/bech32m segwit address."""
+    address = address.strip().lower()
+    separator = address.rfind("1")
+    if separator < 1:
+        raise ValueError("not a segwit address")
+    hrp, rest = address[:separator], address[separator + 1:]
+    words = []
+    for char in rest:
+        index = CHARSET.find(char)
+        if index < 0:
+            raise ValueError(f"bad character {char!r}")
+        words.append(index)
+    body, checksum = words[:-6], words[-6:]
+    for spec, const in (("bech32", 1), ("bech32m", 0x2BC830A3)):
+        if _polymod(_hrp_expand(hrp) + body + checksum) == const:
+            break
+    else:
+        raise ValueError("checksum does not match")
+    if not body:
+        raise ValueError("empty witness program")
+    version = body[0]
+    program = bytes(_convertbits(body[1:], 5, 8, False))
+    expected = 20 if version == 0 else 32
+    if len(program) != expected:
+        raise ValueError("unexpected witness program length")
+    if version == 0 and spec != "bech32":
+        raise ValueError("version 0 needs bech32, this address is bech32m")
+    if version > 0 and spec != "bech32m":
+        raise ValueError("this version needs bech32m")
+    return version, program
+
+
+def script_for_address(address: str) -> bytes:
+    version, program = decode_segwit(address)
+    prefix = b"\x00" if version == 0 else bytes([0x50 + version])
+    return prefix + bytes([len(program)]) + program
+
+
+def build_payment(utxos, destination_address: str, key_path: pathlib.Path, pubkey: bytes,
+                  feerate: float = 2.0, version: int = 2) -> tuple[str, dict]:
+    """Spends the pool back out to any segwit address. This is the withdrawal."""
+    if not utxos:
+        raise ValueError("no coins to spend")
+    spend_script = b"\x00\x14" + hash160(pubkey)
+    send_script = script_for_address(destination_address)
+    inputs = [(u["txid"], u["vout"], b"", SEQUENCE_FINAL) for u in utxos]
+    total_in = sum(u["value"] for u in utxos)
+    fee = int((len(_serialize_tx(version, inputs, [(0, send_script)], 0,
+                                witnesses=[[b"\x00" * 71, pubkey] for _ in inputs])) + 20) * feerate) + 1
+    amount = total_in - fee
+    if amount <= 0:
+        raise ValueError(f"{(fee)} sats of fee leaves nothing to send")
+    outputs = [(amount, send_script)]
+    witnesses = []
+    for index, utxo in enumerate(utxos):
+        digest, _ = sighash_p2wpkh(version, inputs, outputs, 0, index, utxo["value"],
+                                  hash160(pubkey), SIGHASH_ALL)
+        witnesses.append([sign_hash(key_path, digest) + bytes([SIGHASH_ALL]), pubkey])
+    raw = _serialize_tx(version, inputs, outputs, 0, witnesses=witnesses)
+    summary = {"sent": amount, "fee": fee, "totalIn": total_in, "inputs": len(inputs),
+               "to": destination_address, "txid": sha256d(raw)[::-1].hex()}
+    return raw.hex(), summary
+
+
+def fetch_utxos(address: str, base: str = "https://mempool.space/api"):
+    import json as _json
+    import urllib.request as _url
+    opener = _url.build_opener(_url.ProxyHandler({}))
+    with opener.open(f"{base}/address/{address}/utxo", timeout=25) as response:
+        return _json.loads(response.read().decode())
+
+
+def broadcast(raw_hex: str, base: str = "https://mempool.space/api"):
+    import urllib.error as _err
+    import urllib.request as _url
+    opener = _url.build_opener(_url.ProxyHandler({}))
+    request = _url.Request(f"{base}/tx", data=raw_hex.encode(),
+                           headers={"content-type": "text/plain"}, method="POST")
+    try:
+        with opener.open(request, timeout=30) as response:
+            return response.read().decode().strip()
+    except _err.HTTPError as error:
+        return "ERROR " + error.read().decode("utf-8", "replace")[:300]
+
+
 def pool_address(key_path: pathlib.Path, hrp: str = "bc") -> str:
     return segwit_address(hrp, 0, hash160(public_key(key_path)))
 
 
+DEFAULT_KEY = pathlib.Path("/opt/data/.opreturn/pool-key.pem")
+
+
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "address":
-        path = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else "/opt/data/.opreturn/pool-key.pem")
-        if not path.exists():
-            generate_key(path)
-            print("generated", path)
-        print(pool_address(path))
+
+    command = sys.argv[1] if len(sys.argv) > 1 else "address"
+    key_path = pathlib.Path(os.environ.get("OPRETURN_POOL_KEY", str(DEFAULT_KEY)))
+
+    if command == "address":
+        if not key_path.exists():
+            generate_key(key_path)
+            print("generated", key_path)
+        print(pool_address(key_path))
+    elif command == "balance":
+        utxos = fetch_utxos(pool_address(key_path))
+        print(sum(int(u["value"]) for u in utxos), "sats in", len(utxos), "coins")
+    elif command == "sweep":
+        if len(sys.argv) < 3:
+            raise SystemExit("usage: wallet.py sweep <segwit address> [--broadcast]")
+        destination = sys.argv[2]
+        script_for_address(destination)  # fails early on a bad address
+        utxos = fetch_utxos(pool_address(key_path))
+        if not utxos:
+            raise SystemExit("nothing to sweep")
+        raw, summary = build_payment(
+            [{"txid": u["txid"], "vout": u["vout"], "value": int(u["value"])} for u in utxos],
+            destination, key_path, public_key(key_path))
+        print(json.dumps(summary, indent=1))
+        if "--broadcast" in sys.argv:
+            print("broadcast:", broadcast(raw))
+        else:
+            print("raw:", raw)
+            print("add --broadcast to send it")
