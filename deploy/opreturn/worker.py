@@ -21,16 +21,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
+import sys
 import time
 import urllib.error
 import urllib.request
+
+# The signer lives with the rest of the tool in the satoshi repo.
+sys.path.insert(0, "/opt/data/repos/satoshi/deploy/opreturn")
+import wallet
 
 BTCPAY_BASE = "http://10.0.3.1:52143"
 SERVICE_BASE = "https://pay.satoshi.si/opreturn/v1"
 CONF = pathlib.Path("/opt/data/.btcpay")
 TOKEN_FILE = pathlib.Path("/opt/data/.opreturn/worker-token")
 STATE_FILE = pathlib.Path("/opt/data/.opreturn/worker-state.json")
+# The fee pool: a key of our own, because BTCPay will not write an OP_RETURN output.
+POOL_KEY = pathlib.Path("/opt/data/.opreturn/pool-key.pem")
+MEMPOOL = "https://mempool.space/api"
+FEERATE = float(os.environ.get("OPRETURN_FEERATE", "2.0"))
 CRYPTO = "BTC"
 ONCHAIN_METHOD = "BTC-CHAIN"
 # What the buyer may pay with: Ark (Bark) and Lightning arrive in seconds; on-chain is
@@ -48,11 +58,14 @@ def secret(path: pathlib.Path) -> str:
     return path.read_text().strip()
 
 
-def http(method: str, url: str, key: str = "", body=None, timeout=25, auth: str = ""):
+def http(method: str, url: str, key: str = "", body=None, timeout=25, auth: str = "", raw_text: str = ""):
     """Returns (status, parsed_or_text). Transport failure returns status 0."""
     data = None
     headers = {"accept": "application/json", "user-agent": "satoshi-opreturn-worker/1.0"}
-    if body is not None:
+    if raw_text:
+        data = raw_text.encode()
+        headers["content-type"] = "text/plain"
+    elif body is not None:
         data = json.dumps(body).encode()
         headers["content-type"] = "application/json"
     if auth:
@@ -96,6 +109,7 @@ class Worker:
         self.token = token
         self.dry_run = dry_run
         self.store = secret(CONF / "store-id")
+        self.feerate = FEERATE
         self.state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
 
     # ---- service ----
@@ -164,27 +178,45 @@ class Worker:
         return body
 
     # ---- publishing ----
+    def pool_balance(self) -> int:
+        """Sats sitting in the fee pool, as the chain sees them."""
+        address = wallet.pool_address(POOL_KEY)
+        status, body = http("GET", f"{MEMPOOL}/address/{address}/utxo")
+        if status != 200 or not isinstance(body, list):
+            return 0
+        return sum(int(u.get("value") or 0) for u in body)
+
     def publish(self, order: dict):
-        """One call: BTCPay builds, signs with the store seed and broadcasts."""
-        script = op_return_script(order["message"])
-        payload = {
-            "destinations": [{"destination": script, "amount": "0", "subtractFromAmount": False}],
-            "feerate": 2.0,
-            "proceedWithBroadcast": not self.dry_run,
-            "signWithSeed": True,
-            "noChange": False,
-            "rbf": True,
-        }
-        url = f"/api/v1/stores/{self.store}/payment-methods/{ONCHAIN_METHOD}/wallet/transactions"
+        """Builds the transaction here, signs it here, broadcasts the raw bytes.
+
+        BTCPay cannot write an OP_RETURN: its wallet API takes addresses and BIP21 links
+        only. So the message transaction is built locally and signed with the pool key,
+        whose whole job is paying miner fees.
+        """
+        address = wallet.pool_address(POOL_KEY)
+        status, utxos = http("GET", f"{MEMPOOL}/address/{address}/utxo")
+        if status != 200 or not isinstance(utxos, list) or not utxos:
+            return None, "the message wallet has no spendable coins yet"
+        spendable = [
+            {"txid": u["txid"], "vout": u["vout"], "value": int(u["value"])}
+            for u in utxos
+            if u.get("status", {}).get("confirmed", False) or True
+        ]
+        pubkey = wallet.public_key(POOL_KEY)
+        try:
+            raw, summary = wallet.build_and_sign(
+                order["message"], spendable, wallet.hash160(pubkey), POOL_KEY, pubkey,
+                feerate=self.feerate)
+        except Exception as error:  # an over-long message, a key problem, arithmetic
+            return None, f"could not build the transaction: {error}"
         if self.dry_run:
-            print("    [dry-run] would POST", url)
-            print("    [dry-run] payload:", json.dumps(payload)[:300])
+            print(f"    [dry-run] would broadcast {summary}")
             return None, "dry-run"
-        status, body = self.btcpay("POST", url, payload)
-        if status in (200, 201) and isinstance(body, dict):
-            txid = body.get("transactionHash") or body.get("txid") or ""
-            return txid or None, None
-        return None, f"broadcast failed: {status} {str(body)[:240]}"
+        # The chain is the only judge; mempool.space takes the raw hex here.
+        status, body = http("POST", f"{MEMPOOL}/tx", body=None, raw_text=raw)
+        if status == 200 and isinstance(body, str) and len(body.strip()) == 64:
+            return body.strip(), None
+        return None, f"broadcast refused: {status} {str(body)[:200]}"
 
     # ---- one pass ----
     def pass_once(self) -> int:
