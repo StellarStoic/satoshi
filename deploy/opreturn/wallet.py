@@ -211,6 +211,22 @@ def op_return_script(text: str) -> bytes:
     return b"\x6a" + push(data)
 
 
+def estimate_vsize(inputs: int, message_bytes: int, change_outputs: int = 1) -> int:
+    """Virtual size of a P2WPKH-funded transaction carrying one OP_RETURN.
+
+    The witness is discounted to a quarter, so counting raw bytes overpays. A P2WPKH
+    input is 41 bytes of base data plus 108 weight units of witness: 68 vbytes.
+    """
+    base = 4 + 1 + 1 + 4                      # version, in count, out count, locktime
+    spend_inputs = inputs * 41
+    change = change_outputs * 31              # value 8 + length 1 + P2WPKH script 22
+    push = 1 if message_bytes <= 75 else 2
+    op_return = 8 + 1 + push + message_bytes
+    witness = inputs * (1 + 1 + 72 + 1 + 33)  # stack count + lengths + signature + pubkey
+    weight = (base + spend_inputs + change + op_return) * 4 + witness
+    return (weight + 3) // 4
+
+
 def build_and_sign(message: str, utxos, address_program: bytes, key_path: pathlib.Path,
                    pubkey: bytes, feerate: float = 2.0, version: int = 2) -> tuple[str, dict]:
     """Returns (raw transaction hex, summary).
@@ -232,8 +248,8 @@ def build_and_sign(message: str, utxos, address_program: bytes, key_path: pathli
 
     total_in = sum(u["value"] for u in utxos)
     inputs = [(u["txid"], u["vout"], b"", SEQUENCE_FINAL) for u in utxos]
-    estimate = assemble(546)
-    vsize = len(_serialize_tx(version, inputs, estimate, 0, witnesses=[[b"\x00" * 71, pubkey] for _ in inputs])) + 4
+    message_bytes = len(message.encode("utf-8"))
+    vsize = estimate_vsize(len(inputs), message_bytes, 1)
     fee = int(vsize * feerate) + 1
     change = total_in - fee
     if change < 546:
