@@ -51,7 +51,7 @@
 
   <section>
     <h2>What this is</h2>
-    <p>You write up to <strong>80 bytes</strong> — roughly 80 characters, fewer if you use emoji or accented letters. You pay <span class="price" id="price">1400</span> sats. Within a minute of your payment, a transaction carrying your message is signed and broadcast by this site's own wallet. It confirms with the next block, usually ten minutes later.</p>
+    <p>You write up to <strong>80 bytes</strong> — roughly 80 characters, fewer if you use emoji or accented letters. You pay <span class="price" id="price">1999</span> sats. Within a minute of your payment, a transaction carrying your message is signed and broadcast by this site's own wallet. It confirms with the next block, usually ten minutes later.</p>
     <details>
       <summary>Technical: what exactly goes on chain</summary>
       <p>Your message is encoded as UTF-8 and written into a script of the form <span class="mono">OP_RETURN &lt;push&gt; &lt;your bytes&gt;</span>. 80 bytes is one standard output, which every node relays and every miner includes; anything larger is non-standard, so the tool refuses it rather than build something that might never confirm.</p>
@@ -92,7 +92,7 @@
     </div>
 
     <div class="row" style="margin-top:16px">
-      <button id="pay">Pay <span id="payAmount">1400</span> sats</button>
+      <button id="pay">Pay <span id="payAmount">1999</span> sats</button>
       <button id="reset" class="ghost" hidden>Write another</button>
     </div>
   </section>
