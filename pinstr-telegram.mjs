@@ -41,10 +41,96 @@ function setStatus(text, tone) {
   line.style.color = tone === 'ok' ? 'var(--accent)' : tone === 'bad' ? '#e05353' : 'var(--text-muted)';
 }
 
+function makeTelegramButton({ wide = false } = {}) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'pinstr-tg-btn';
+  button.style.cssText = `display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:24px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.88rem;cursor:pointer;${wide ? 'width:100%;margin:0 0 14px;' : ''}`;
+  button.innerHTML = '<i class="lni lni-telegram" aria-hidden="true"></i><span>Sign in with Telegram</span>';
+  return button;
+}
+
+function wireTelegramButton(button, note) {
+  const inTelegram = Boolean(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData);
+  button.addEventListener('click', () => {
+    button.disabled = true;
+    button.style.opacity = '.6';
+    setStatus('Waiting for Telegram…');
+    const run = inTelegram
+      ? bootTelegram()
+      : loginWithWidget().then(({ session, user }) => bootTelegram({ session, user }));
+    run.catch((err) => setStatus(`Telegram sign-in failed: ${String(err.message || err)}`, 'bad')).finally(() => {
+      button.disabled = false;
+      button.style.opacity = '1';
+    });
+  });
+  if (note) {
+    note.textContent = inTelegram
+      ? 'Checking your Telegram session…'
+      : 'Opens Telegram to confirm who you are, then creates your key. No password, no seed phrase to write down.';
+  }
+  return { inTelegram, wire: null };
+}
+
+// The dialog is titled "Log in to Nostr" and offers four Nostr methods before anything
+// else, which reads as if Nostr were the only way in. It becomes: a Sign in title, a
+// Telegram button, then Nostr folded away behind a summary, with anonymous last.
+function restructureLoginDialog() {
+  if (typeof document === 'undefined') return false;
+  const dialog = document.querySelector('#loginDialog');
+  if (!dialog) return false;
+
+  const title = dialog.querySelector('#loginTitle');
+  if (title && title.textContent.trim() !== 'Sign in') title.textContent = 'Sign in';
+
+  // The person button that opens the dialog should say what it does, not name a protocol.
+  for (const el of document.querySelectorAll('button, a, [role="button"]')) {
+    if (dialog.contains(el)) continue;
+    const label = (el.getAttribute('aria-label') || el.textContent || '').trim();
+    if (/^sign in( with nostr)?$/i.test(label) || /sign in with nostr/i.test(label)) {
+      if (el.textContent && el.textContent.trim()) el.textContent = 'Sign in';
+      else el.setAttribute('aria-label', 'Sign in');
+    }
+  }
+
+  if (dialog.dataset.pinstrTg === '1') return true;
+  dialog.dataset.pinstrTg = '1';
+
+  const methods = dialog.querySelector('.login-methods');
+  if (methods) {
+    const details = document.createElement('details');
+    details.className = 'pinstr-nostr';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Sign in with Nostr';
+    summary.style.cssText = 'cursor:pointer;font-size:.9rem;color:var(--text-muted);margin:0 0 10px;';
+    details.appendChild(summary);
+    methods.parentNode.insertBefore(details, methods);
+    for (const node of [
+      methods,
+      dialog.querySelector('#amberPair'),
+      dialog.querySelector('label.login-field'),
+      dialog.querySelector('#bunkerReconnect'),
+      dialog.querySelector('.private-key-login'),
+    ]) {
+      if (node) details.appendChild(node);
+    }
+
+    const button = makeTelegramButton({ wide: true });
+    const note = document.createElement('p');
+    note.className = 'pinstr-tg-status';
+    note.style.cssText = 'margin:0 0 14px;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
+    wireTelegramButton(button, note);
+    details.parentNode.insertBefore(button, details);
+    details.parentNode.insertBefore(note, details);
+  }
+  return true;
+}
+
 // The board builds its login block after the module may have loaded, so the Telegram
 // option is mounted whenever that block appears rather than once at boot.
 function mountTelegramOption() {
   if (typeof document === 'undefined') return false;
+  if (restructureLoginDialog()) return true;
   const block = document.querySelector('.anonymous-login-block');
   if (!block || block.querySelector('.pinstr-tg-row')) return Boolean(block);
 
@@ -90,7 +176,7 @@ function watchForLoginBlock() {
   };
   const observer = new MutationObserver(tryMount);
   tryMount();
-  if (!document.querySelector('.pinstr-tg-row')) {
+  if (!document.querySelector('#loginDialog') || !document.querySelector('.pinstr-tg-btn')) {
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 }
