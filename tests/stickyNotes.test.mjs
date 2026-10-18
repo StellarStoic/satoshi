@@ -625,19 +625,29 @@ test('content fingerprint binds the paid text and color', async () => {
   assert.notEqual(first, changed);
 });
 
-test('the board offers every payment rail returned by the service', () => {
+test('the board leads with one combined payment QR and retains every returned rail', () => {
   assert.deepEqual(stickyPaymentRails({payment: {
     arkAddress: 'ark1abc', paymentLink: 'bitcoin:?amount=0.00000021&ark=ark1abc',
     bolt11: 'lnbc210n1x', lightningUri: 'lightning:lnbc210n1x',
   }}), [
-    {id: 'bark', label: 'Bark', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc', copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc'},
+    {id: 'unified', label: 'Any wallet', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc&lightning=lnbc210n1x', copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc&lightning=lnbc210n1x', unified: true},
+    {id: 'ark', label: 'Ark', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc', copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc'},
     {id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc210n1x', copyValue: 'lnbc210n1x'},
+  ]);
+
+  assert.deepEqual(stickyPaymentRails({sats: 21, payment: {
+    arkAddress: 'ark1abc', bolt11: 'lnbc210n1x', onchainAddress: 'bc1qexample',
+  }}), [
+    {id: 'unified', label: 'Any wallet', uri: 'bitcoin:bc1qexample?amount=0.00000021&ark=ark1abc&lightning=lnbc210n1x', copyValue: 'bitcoin:bc1qexample?amount=0.00000021&ark=ark1abc&lightning=lnbc210n1x', unified: true},
+    {id: 'ark', label: 'Ark', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc', copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc'},
+    {id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc210n1x', copyValue: 'lnbc210n1x'},
+    {id: 'onchain', label: 'On-chain', uri: 'bitcoin:bc1qexample?amount=0.00000021', copyValue: 'bitcoin:bc1qexample?amount=0.00000021'},
   ]);
 });
 
 test('single-rail and pending orders do not show unusable payment tabs', () => {
   assert.deepEqual(stickyPaymentRails({payment: {arkAddress: 'ark1abc'}}),
-    [{id: 'bark', label: 'Bark', uri: 'ark1abc', copyValue: 'ark1abc'}]);
+    [{id: 'ark', label: 'Ark', uri: 'bitcoin:?ark=ark1abc', copyValue: 'bitcoin:?ark=ark1abc'}]);
   assert.deepEqual(stickyPaymentRails({payment: {bolt11: 'lnbc110n1y'}}),
     [{id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc110n1y', copyValue: 'lnbc110n1y'}]);
   assert.deepEqual(stickyPaymentRails({payment: null}), []);
@@ -743,6 +753,9 @@ test('payment sheet opens during invoice creation and pinned state stays complet
   // A note covered by a subscription is born settled, so this path now names the
   // subscription rather than a free membership.
   assert.match(script, /Included in your subscription/);
+  assert.match(html, /id="openStickyPayment"/);
+  assert.match(script, /elements\.openPayment\.href = rail\.uri/);
+  assert.match(script, /Your wallet can choose any supported payment method/);
   assert.doesNotMatch(`${html}\n${script}`, /Bark/i);
 });
 

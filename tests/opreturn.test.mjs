@@ -8,6 +8,7 @@ import {
   BORDER_PAID, BORDER_CHAIN, orderView, isOrderTerminal, sharePattern, recentBoardNotes,
 } from '../opreturnModel.mjs';
 import { helpCopy, helpSections, PAGE_HELP } from '../siteHelp.mjs';
+import { opReturnPaymentOptions, unifiedPaymentUri } from '../opreturnPayment.mjs';
 
 test('OP_RETURN pages use the shared site navigation, controls, and footer', async () => {
   const pages = await Promise.all([
@@ -67,6 +68,29 @@ test('the price is the service fee plus the miner fee, nothing hidden', () => {
   assert.equal(priceSats(), OP_RETURN.serviceSats + OP_RETURN.networkSatsEstimate);
   assert.equal(TOTAL_SATS, priceSats());
   assert.equal(priceSats({ serviceSats: 0, networkSats: 0 }), 0);
+});
+
+test('one payment request carries Ark, Lightning, and on-chain fallbacks', () => {
+  const order = {sats: 1999, rails: {
+    ark: {destination: 'ark1example'},
+    lightning: {destination: 'lnbc19990n1example'},
+    onchain: {destination: 'bc1qexample'},
+  }};
+  const combined = unifiedPaymentUri(order);
+  assert.equal(combined, 'bitcoin:bc1qexample?amount=0.00001999&ark=ark1example&lightning=lnbc19990n1example');
+  assert.deepEqual(opReturnPaymentOptions(order).map(option => option.id),
+    ['unified', 'ark', 'lightning', 'onchain']);
+  assert.equal(opReturnPaymentOptions(order)[0].uri, combined);
+});
+
+test('a single available payment rail stays usable without a combined tab', () => {
+  assert.deepEqual(opReturnPaymentOptions({sats: 21, rails: {lightning: {destination: 'lnbc210n1x'}}}), [{
+    id: 'lightning', label: 'Lightning', uri: 'lightning:lnbc210n1x', copyValue: 'lnbc210n1x',
+  }]);
+  assert.deepEqual(opReturnPaymentOptions({sats: 21, rails: {ark: {destination: 'ark1abc'}}}), [{
+    id: 'ark', label: 'Ark', uri: 'bitcoin:?amount=0.00000021&ark=ark1abc',
+    copyValue: 'bitcoin:?amount=0.00000021&ark=ark1abc',
+  }]);
 });
 
 test('a message becomes an OP_RETURN script with the right push opcode', () => {

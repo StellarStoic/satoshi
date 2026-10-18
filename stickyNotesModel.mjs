@@ -986,14 +986,14 @@ export function describeStickyAction({ anonymous = false, stranger = false, subs
   };
 }
 
-export const STICKY_RAILS = Object.freeze(['bark', 'lightning']);
+export const STICKY_RAILS = Object.freeze(['unified', 'ark', 'lightning', 'onchain']);
 
 /**
- * The rails this order can be paid on, in the order to offer them: Bark first (the
- * native rail) then Lightning.
+ * The payment choices in display order: one combined request first, followed by
+ * the individual Ark, Lightning, and on-chain fallbacks that the order supports.
  *
  * A rail appears only when the payment service actually handed back a destination
- * for it, so a Bark-only or Lightning-only order keeps a single-rail checkout
+ * for it, so an Ark-only or Lightning-only order keeps a single-rail checkout
  * instead of showing a tab that cannot pay. `uri` is what the QR encodes, and
  * `copyValue` is what the buyer pastes into a wallet.
  */
@@ -1054,13 +1054,34 @@ export function stickyPowProgress({ hashes = 0, rate = 0, secondsLeft = null, be
 
 export function stickyPaymentRails(order) {
   const payment = order?.payment || {};
-  const rails = [];
-  const bark = String(payment.paymentLink || payment.arkAddress || payment.ark || '').trim();
-  if (bark) rails.push({ id: 'bark', label: 'Bark', uri: bark, copyValue: bark });
+  const paymentLink = String(payment.paymentLink || '').trim();
+  const match = paymentLink.match(/^bitcoin:([^?]*)(?:\?(.*))?$/i);
+  const address = String(payment.onchainAddress || payment.bitcoinAddress || match?.[1] || '').trim();
+  const linkParams = new URLSearchParams(match?.[2] || '');
+  const arkAddress = String(payment.arkAddress || payment.ark || linkParams.get('ark') || '').trim();
 
   const lightningUri = String(payment.lightningUri || '');
   const bolt11 = String(payment.bolt11 || '').trim()
-    || (lightningUri.toLowerCase().startsWith('lightning:') ? lightningUri.slice('lightning:'.length) : '');
+    || (lightningUri.toLowerCase().startsWith('lightning:') ? lightningUri.slice('lightning:'.length) : '')
+    || String(linkParams.get('lightning') || '').trim();
+
+  const explicitSats = Number(order?.sats ?? payment.sats ?? payment.amountSats);
+  const amount = String(linkParams.get('amount') || (
+    Number.isSafeInteger(explicitSats) && explicitSats > 0 ? (explicitSats / 1e8).toFixed(8) : ''
+  ));
+  const bitcoinUri = (baseAddress, params) => {
+    const query = new URLSearchParams();
+    if (amount) query.set('amount', amount);
+    for (const [key, value] of params) if (value) query.set(key, value);
+    const suffix = query.toString();
+    return `bitcoin:${baseAddress || ''}${suffix ? `?${suffix}` : ''}`;
+  };
+
+  const rails = [];
+  if (arkAddress) {
+    const uri = bitcoinUri('', [['ark', arkAddress]]);
+    rails.push({id: 'ark', label: 'Ark', uri, copyValue: uri});
+  }
   if (bolt11) {
     rails.push({
       id: 'lightning',
@@ -1068,6 +1089,15 @@ export function stickyPaymentRails(order) {
       uri: lightningUri.toLowerCase().startsWith('lightning:') ? lightningUri : `lightning:${bolt11}`,
       copyValue: bolt11,
     });
+  }
+  if (address) {
+    const uri = bitcoinUri(address, []);
+    rails.push({id: 'onchain', label: 'On-chain', uri, copyValue: uri});
+  }
+
+  if (rails.length > 1) {
+    const combined = bitcoinUri(address, [['ark', arkAddress], ['lightning', bolt11]]);
+    rails.unshift({id: 'unified', label: 'Any wallet', uri: combined, copyValue: combined, unified: true});
   }
   return rails;
 }

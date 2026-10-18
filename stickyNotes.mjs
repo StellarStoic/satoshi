@@ -218,7 +218,7 @@ const elements = {
   paymentDialog: document.getElementById('paymentDialog'), payment: document.getElementById('stickyPayment'), paymentAmount: document.getElementById('stickyPaymentAmount'),
   paymentQr: document.getElementById('stickyPaymentQr'), paymentValue: document.getElementById('stickyPaymentValue'),
   paymentRails: document.getElementById('stickyPaymentRails'), paymentHint: document.getElementById('stickyPaymentHint'),
-  copyPayment: document.getElementById('copyStickyPayment'),
+  copyPayment: document.getElementById('copyStickyPayment'), openPayment: document.getElementById('openStickyPayment'),
   closePayment: document.getElementById('closeStickyPayment'),
   pin: document.getElementById('pinSticky'), bunker: document.getElementById('bunkerInput'),
   bunkerReconnect: document.getElementById('bunkerReconnect'),
@@ -1544,7 +1544,7 @@ async function renderPayment(order) {
   stopInvoiceMessages();
   const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_SUB_WEEK_SATS);
   currentRails = rails;
-  elements.paymentAmount.textContent = rails.length > 1 ? `Pay ${sats} sats` : `Pay ${sats} sats with ${rails[0].label}`;
+  elements.paymentAmount.textContent = `Pay ${sats} sats`;
   elements.paymentRails.hidden = rails.length < 2;
   elements.paymentRails.replaceChildren(...rails.map(rail => {
     const button = document.createElement('button');
@@ -1554,7 +1554,8 @@ async function renderPayment(order) {
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-selected', 'false');
     const icon = document.createElement('i');
-    icon.className = `lni lni-${rail.id === 'lightning' ? 'bolt' : 'map-marker-1'}`;
+    const icons = {unified: 'bitcoin', ark: 'layers-1', lightning: 'bolt-2', onchain: 'link-2-angular-right'};
+    icon.className = `lni lni-${icons[rail.id] || 'wallet-1'}`;
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon, Object.assign(document.createElement('span'), {textContent: rail.label}));
     button.addEventListener('click', () => selectRail(rail.id));
@@ -1563,7 +1564,7 @@ async function renderPayment(order) {
   elements.paymentQr.hidden = false;
   elements.paymentValue.hidden = false;
   elements.copyPayment.hidden = false;
-  elements.paymentHint.textContent = `Waiting for the ${sats}-sat payment...`;
+  elements.openPayment.hidden = false;
   showDialog(elements.paymentDialog);
   const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
   await selectRail(wanted);
@@ -1581,6 +1582,10 @@ async function selectRail(id) {
     button.setAttribute('aria-selected', String(active));
   }
   elements.paymentValue.textContent = rail.uri;
+  elements.openPayment.href = rail.uri;
+  elements.paymentHint.textContent = rail.unified
+    ? 'Scan once. Your wallet can choose any supported payment method.'
+    : `${rail.label} only. Use this if your wallet cannot read the combined QR.`;
   elements.paymentQr.alt = `${rail.label} payment QR code`;
   if (await loadQr()) {
     try {
@@ -1663,6 +1668,7 @@ function showPaymentPreparing(sats = quotedPrice) {
   elements.paymentQr.removeAttribute('src');
   elements.paymentValue.hidden = true;
   elements.copyPayment.hidden = true;
+  elements.openPayment.hidden = true;
   showDialog(elements.paymentDialog);
   startInvoiceMessages();
 }
@@ -3771,6 +3777,7 @@ async function discardInvoice() {
   elements.paymentValue.textContent = '';
   elements.paymentValue.hidden = true;
   elements.copyPayment.hidden = true;
+  elements.openPayment.hidden = true;
   elements.paymentHint.textContent = '';
   currentRails = [];
   currentRailId = '';

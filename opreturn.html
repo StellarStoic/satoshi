@@ -45,17 +45,12 @@
   .opreturn-app button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:400; }
   .price { font-variant-numeric: tabular-nums; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.82rem; word-break:break-all; }
-  .rail { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px; }
-  .rail h3 { margin:0 0 6px; font-size:.9rem; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
-  .qr { background:#fff; padding:8px; border-radius:6px; display:inline-block; margin:8px 0; }
-  .qr svg, .qr img { display:block; width:180px; height:180px; }
   .status { margin-top:14px; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--surface-raised); }
   .status strong { display:block; margin-bottom:4px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
   .hint { color: var(--dim); font-size:.85rem; }
   [hidden] { display:none !important; }
   a { color: var(--accent); }
-  #orderPanel { margin-top:18px; }
   .cardwrap canvas { max-width:min(92vw, 760px); max-height:74vh; width:auto; height:auto; }
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
@@ -89,6 +84,30 @@
   .note .meta a { color:var(--dim); }
   .banner { background:linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.55)); border-radius:6px; padding:10px 12px; }
   .banner p { color:#fff; }
+  .payment-dialog { width:min(520px, calc(100% - 24px)); max-height:min(90dvh,760px); margin:auto; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--panel); color:var(--ink); box-shadow:0 22px 70px rgba(0,0,0,.62); overflow:hidden; }
+  .payment-dialog::backdrop { background:rgba(0,0,0,.78); backdrop-filter:blur(5px); }
+  .payment-shell { display:flex; flex-direction:column; max-height:min(90dvh,760px); }
+  .payment-head { position:relative; padding:18px 58px 14px 20px; border-bottom:1px solid var(--line); }
+  .payment-head h2 { margin:0; color:var(--ink); font-size:1.05rem; text-transform:none; letter-spacing:0; }
+  .payment-dialog button { font:inherit; cursor:pointer; }
+  .payment-head .dialog-close { position:absolute; top:11px; right:12px; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; background:transparent; color:var(--dim); font-size:22px; }
+  .payment-head .dialog-close:is(:hover,:focus-visible) { color:var(--accent); }
+  .payment-body { padding:18px 20px 20px; overflow:auto; text-align:center; }
+  .payment-body .status { margin:0 0 14px; text-align:left; }
+  .payment-amount { display:block; margin:0 0 12px; color:var(--ink); font-size:1.15rem; }
+  .payment-qr { display:grid; place-items:center; width:min(280px,100%); aspect-ratio:1; margin:0 auto 14px; padding:10px; border-radius:8px; background:#fff; }
+  .payment-qr:empty { background:transparent; }
+  .payment-qr svg { display:block; width:100%; height:100%; }
+  .payment-methods { display:flex; justify-content:center; gap:7px; flex-wrap:wrap; margin:0 0 12px; }
+  .payment-methods button { padding:8px 11px; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--dim); font-size:.78rem; font-weight:500; }
+  .payment-methods button.is-active { border-color:var(--accent); color:var(--accent); box-shadow:0 0 10px color-mix(in srgb,var(--accent) 20%,transparent); }
+  .payment-value { display:block; max-height:68px; margin:0; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:var(--surface-raised); color:var(--dim); text-align:left; overflow:auto; }
+  .payment-actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .payment-actions a { display:inline-flex; align-items:center; justify-content:center; border-radius:8px; padding:11px 18px; background:var(--accent); color:var(--accent-contrast); font-weight:600; text-decoration:none; }
+  .payment-actions button { border-radius:8px; padding:11px 18px; }
+  .payment-actions .ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:400; }
+  .payment-hint { margin:12px 0 0; color:var(--dim); font-size:.78rem; }
+  @media (max-width:520px) { .payment-dialog { width:calc(100% - 16px); } .payment-body { padding:14px; } .payment-qr { width:min(68vw,270px); } }
 </style>
 </head>
 <body class="opreturn-page">
@@ -127,16 +146,8 @@
       <input type="checkbox" id="viaSatoshi">
     </label>
     <div class="row" style="margin-top:16px">
-      <button id="pay">Pay <span id="payAmount">1999</span> sats</button>
-      <button id="reset" class="ghost" hidden>Write another</button>
+      <button id="pay"><span id="payLabel">Pay</span> <span id="payPrice"><span id="payAmount">1999</span> sats</span></button>
     </div>
-  </section>
-
-  <section id="orderPanel" hidden>
-    <h2>Payment</h2>
-    <div id="statusBox" class="status"><strong id="statusLabel">Preparing the invoice</strong><span id="statusDetail" class="hint"></span></div>
-    <div id="rails"></div>
-    <p class="hint" style="margin-top:12px">Pay any one rail. The message goes out once the payment is seen; this page follows it through to the transaction.</p>
   </section>
 
   <section id="boardSection">
@@ -153,6 +164,24 @@
     <p class="hint">The order answers with the rail destinations and the amount. Poll it until <span class="mono">state</span> is <span class="mono">published</span>, then read <span class="mono">opReturnTxid</span>.</p>
   </section>
 </div>
+<dialog class="payment-dialog" id="paymentDialog" aria-labelledby="paymentTitle">
+  <div class="payment-shell">
+    <header class="payment-head"><h2 id="paymentTitle">Pay for your message</h2><button type="button" class="dialog-close" id="closePayment" aria-label="Close payment"><i class="lni lni-xmark" aria-hidden="true"></i></button></header>
+    <div class="payment-body">
+      <div id="statusBox" class="status"><strong id="statusLabel">Preparing the invoice</strong><span id="statusDetail" class="hint"></span></div>
+      <strong class="payment-amount" id="paymentAmount"></strong>
+      <div class="payment-qr" id="paymentQr" aria-label="Payment QR code"></div>
+      <div class="payment-methods" id="paymentMethods" role="tablist" aria-label="Payment method" hidden></div>
+      <code class="payment-value mono" id="paymentValue" hidden></code>
+      <div class="payment-actions">
+        <a id="openPayment" href="#" hidden>Open wallet</a>
+        <button type="button" class="ghost" id="copyPayment" hidden>Copy</button>
+        <button type="button" class="ghost" id="reset" hidden>Write another</button>
+      </div>
+      <p class="payment-hint" id="paymentHint">One QR contains every available payment method. Choose one below if your wallet cannot read it.</p>
+    </div>
+  </div>
+</dialog>
 <footer class="footer" data-live-footer>
   <a href="mailto:one@satoshi.si">one@satoshi.si</a>
   <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
@@ -165,18 +194,30 @@
 <script type="module">
 import { validateMessage, priceSats, OP_RETURN, orderView, isOrderTerminal, sharePattern, recentBoardNotes } from './opreturnModel.mjs';
 import { downloadOpReturnCard, shareOpReturnCard } from './opreturnCard.mjs';
+import { opReturnPaymentOptions } from './opreturnPayment.mjs';
 
 const API = 'https://pay.satoshi.si/opreturn/v1';
 const el = (id) => document.getElementById(id);
 const messageEl = el('message');
 const countEl = el('count');
 const payBtn = el('pay');
+const payLabel = el('payLabel');
+const payPrice = el('payPrice');
 const resetBtn = el('reset');
-const orderPanel = el('orderPanel');
-const railsEl = el('rails');
+const paymentDialog = el('paymentDialog');
+const paymentMethods = el('paymentMethods');
+const paymentQr = el('paymentQr');
+const paymentValue = el('paymentValue');
+const paymentAmount = el('paymentAmount');
+const paymentHint = el('paymentHint');
+const copyPayment = el('copyPayment');
+const openPayment = el('openPayment');
 const statusLabel = el('statusLabel');
 const statusDetail = el('statusDetail');
 let pollTimer = null;
+let activeOrder = null;
+let paymentOptions = [];
+let selectedPaymentId = 'unified';
 
 function paintPrice() {
   const sats = priceSats();
@@ -205,30 +246,64 @@ function qrInto(node, text) {
   }
 }
 
-function rail(title, value, kind) {
-  const wrap = document.createElement('div');
-  wrap.className = 'rail';
-  const h = document.createElement('h3');
-  h.textContent = title;
-  wrap.appendChild(h);
-  const qr = document.createElement('div');
-  qr.className = 'qr';
-  qrInto(qr, value);
-  wrap.appendChild(qr);
-  const text = document.createElement('div');
-  text.className = 'mono';
-  text.textContent = value;
-  wrap.appendChild(text);
-  const copy = document.createElement('button');
-  copy.className = 'ghost';
-  copy.style.marginTop = '8px';
-  copy.textContent = 'Copy';
-  copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(value); copy.textContent = 'Copied'; }
-    catch { copy.textContent = 'Select the text above'; }
-  };
-  wrap.appendChild(copy);
-  return wrap;
+function showPaymentDialog() {
+  if (!paymentDialog.open) paymentDialog.showModal();
+}
+
+function offerPaymentAgain(label = 'Open payment') {
+  payLabel.textContent = label;
+  payPrice.hidden = true;
+  payBtn.disabled = false;
+}
+
+function selectPayment(id) {
+  const option = paymentOptions.find(item => item.id === id) || paymentOptions[0];
+  if (!option) return;
+  selectedPaymentId = option.id;
+  paymentMethods.querySelectorAll('button').forEach(button => {
+    const active = button.dataset.payment === option.id;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  qrInto(paymentQr, option.uri);
+  paymentValue.hidden = false;
+  paymentValue.textContent = option.uri;
+  copyPayment.hidden = false;
+  copyPayment.dataset.value = option.copyValue;
+  copyPayment.textContent = 'Copy';
+  openPayment.hidden = false;
+  openPayment.href = option.uri;
+  paymentHint.textContent = option.unified
+    ? 'This QR contains every available payment method. Your wallet can choose the one it supports.'
+    : `${option.label} only. Use this when your wallet cannot read the combined QR.`;
+}
+
+function renderPaymentOptions(order) {
+  paymentOptions = opReturnPaymentOptions(order);
+  paymentMethods.replaceChildren(...paymentOptions.map(option => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.payment = option.id;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', 'false');
+    button.textContent = option.label;
+    button.addEventListener('click', () => selectPayment(option.id));
+    return button;
+  }));
+  paymentMethods.hidden = paymentOptions.length < 2;
+  paymentAmount.textContent = paymentOptions.length ? `Pay ${Number(order.sats).toLocaleString()} sats` : '';
+  if (!paymentOptions.length) {
+    paymentQr.textContent = '';
+    paymentValue.hidden = true;
+    copyPayment.hidden = true;
+    openPayment.hidden = true;
+    paymentHint.textContent = 'Creating the payment request…';
+    return;
+  }
+  const wanted = paymentOptions.some(option => option.id === selectedPaymentId)
+    ? selectedPaymentId
+    : paymentOptions[0].id;
+  selectPayment(wanted);
 }
 
 async function getJson(url, options) {
@@ -241,34 +316,23 @@ async function getJson(url, options) {
 }
 
 function paintOrder(order) {
+  activeOrder = order;
   const view = orderView(order);
   statusLabel.textContent = view.label;
   statusLabel.className = view.done ? 'ok' : view.failed ? 'bad' : '';
   statusDetail.textContent = [view.detail, order.id ? `order ${order.id}` : ''].filter(Boolean).join(' · ');
-  if (order.rails) {
-    railsEl.textContent = '';
-    if (order.rails.lightning?.destination) {
-      railsEl.appendChild(rail('Lightning', order.rails.lightning.destination, 'ln'));
-    }
-    if (order.rails.ark?.destination) {
-      railsEl.appendChild(rail('Ark', order.rails.ark.destination, 'ark'));
-    }
-    if (order.rails.onchain?.destination) {
-      const bip21 = `bitcoin:${order.rails.onchain.destination}?amount=${(Number(order.sats) / 1e8).toFixed(8)}`;
-      railsEl.appendChild(rail('On-chain', bip21, 'chain'));
-    }
-    if (!railsEl.children.length) {
-      const wait = document.createElement('p');
-      wait.className = 'hint';
-      wait.textContent = 'Preparing the invoice…';
-      railsEl.appendChild(wait);
-    }
-  }
+  renderPaymentOptions(order);
   if (view.txid) {
-    const link = document.createElement('p');
-    link.className = 'mono';
-    link.innerHTML = `Transaction: <a href="https://mempool.space/tx/${view.txid}" target="_blank" rel="noopener">${view.txid}</a>`;
-    railsEl.appendChild(link);
+    paymentQr.textContent = '';
+    paymentMethods.hidden = true;
+    paymentValue.hidden = false;
+    paymentValue.innerHTML = `Transaction: <a href="https://mempool.space/tx/${view.txid}" target="_blank" rel="noopener">${view.txid}</a>`;
+    copyPayment.hidden = true;
+    openPayment.hidden = true;
+    paymentHint.textContent = 'Your message has been written to Bitcoin.';
+  }
+  if (!paymentDialog.open) {
+    offerPaymentAgain(isOrderTerminal(order) ? 'Write another' : 'Open payment');
   }
 }
 
@@ -404,13 +468,29 @@ async function poll(orderId) {
 }
 
 payBtn.addEventListener('click', async () => {
+  if (activeOrder) {
+    if (isOrderTerminal(activeOrder)) {
+      resetOrder();
+      return;
+    }
+    paintOrder(activeOrder);
+    showPaymentDialog();
+    payBtn.disabled = true;
+    return;
+  }
   const check = validateMessage(messageEl.value);
   if (!check.ok) {
     return;
   }
   payBtn.disabled = true;
-  orderPanel.hidden = false;
-  railsEl.textContent = '';
+  showPaymentDialog();
+  paymentMethods.replaceChildren();
+  paymentQr.textContent = '';
+  paymentValue.hidden = true;
+  copyPayment.hidden = true;
+  openPayment.hidden = true;
+  paymentAmount.textContent = '';
+  paymentHint.textContent = 'Creating the payment request…';
   statusLabel.textContent = 'Preparing the invoice';
   statusLabel.className = '';
   statusDetail.textContent = 'This takes a moment.';
@@ -435,13 +515,35 @@ payBtn.addEventListener('click', async () => {
   }
 });
 
-resetBtn.addEventListener('click', () => {
-  orderPanel.hidden = true;
+function resetOrder() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+  activeOrder = null;
+  paymentOptions = [];
+  selectedPaymentId = 'unified';
   resetBtn.hidden = true;
-  railsEl.textContent = '';
   messageEl.value = '';
+  payLabel.textContent = 'Pay';
+  payPrice.hidden = false;
   paintCount();
   payBtn.disabled = false;
+  paymentDialog.close();
+}
+
+resetBtn.addEventListener('click', resetOrder);
+el('closePayment').addEventListener('click', () => paymentDialog.close());
+paymentDialog.addEventListener('click', event => { if (event.target === paymentDialog) paymentDialog.close(); });
+paymentDialog.addEventListener('close', () => {
+  if (!activeOrder) return;
+  offerPaymentAgain(isOrderTerminal(activeOrder) ? 'Write another' : 'Open payment');
+});
+copyPayment.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(copyPayment.dataset.value || paymentValue.textContent);
+    copyPayment.textContent = 'Copied';
+  } catch {
+    copyPayment.textContent = 'Select the request above';
+  }
 });
 
 messageEl.addEventListener('input', paintCount);

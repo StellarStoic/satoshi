@@ -395,7 +395,10 @@
       <strong id="stickyPaymentAmount"></strong>
       <div class="rail-tabs" id="stickyPaymentRails" role="tablist" aria-label="Payment rail" hidden></div>
       <img id="stickyPaymentQr" alt="Payment QR code" hidden>
-      <button type="button" id="copyStickyPayment" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy payment</span></button>
+      <div class="sticky-payment-actions">
+        <a id="openStickyPayment" class="secondary-action" href="#" hidden><i class="lni lni-wallet-1" aria-hidden="true"></i><span>Open wallet</span></a>
+        <button type="button" id="copyStickyPayment" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy payment</span></button>
+      </div>
       <code id="stickyPaymentValue"></code>
       <p id="stickyPaymentHint">Preparing invoice...</p>
     </div>

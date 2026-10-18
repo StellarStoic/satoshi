@@ -107,9 +107,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' creates a new one.',
                     'When a pass runs out, it does not change notes you already pinned. Satoshi.si keeps showing them'
                     + ' until their chosen board time ends; only new notes need another pass.',
-                    'You pay in sats over Lightning or Ark, straight from your own wallet. Satoshi.si never sees your'
-                    + ' private key or controls your wallet. The payment service receives only the quoted payment and'
-                    + ' keeps a record of the pass that the board checks when you post.',
+                    'You pay in sats straight from your own wallet. The first QR includes every method offered for the'
+                    + ' invoice, so your wallet can choose; the buttons below it show separate Ark, Lightning, or on-chain'
+                    + ' codes when available. Satoshi.si never sees your private key or controls your wallet. The payment'
+                    + ' service receives only the quoted payment and keeps a record of the pass that the board checks when you post.',
                 ]
             },
             {
@@ -188,8 +189,10 @@ export const PAGE_HELP = Object.freeze({
                     + ' publish one pin only; it cannot buy a subscription. An anonymous note must carry the'
                     + ' ["anonymous","24h-local-key"] marker; a named'
                     + ' note must not.',
-                    'Payments are in sats over Lightning or Ark, for the amount the service calculated for that order,'
-                    + ' and a rail asking for any other amount is refused. Reading is always free: the relay serves every'
+                    'The payment sheet builds a BIP-321 bitcoin: URI from the exact order amount and every destination'
+                    + ' returned by the service. It can carry Ark and Lightning parameters beside an on-chain address;'
+                    + ' compatible wallets choose a rail, while the individual tabs contain only one rail. A rail asking'
+                    + ' for any other amount is refused. Reading is always free: the relay serves every'
                     + ' published note to anyone, and an expired pass deletes, hides and rewrites nothing.',
                 ]
             },
@@ -208,7 +211,7 @@ export const PAGE_HELP = Object.freeze({
                 paragraphs: [
                     'OP_RETURN is a small space in a Bitcoin transaction for data instead of money. This page lets you place a short message there. The message carries zero sats and cannot be spent.',
                     'The limit is 80 bytes, which is not always the same as 80 visible characters. For example, 80 basic English letters use 80 bytes and fit exactly. One orange-heart emoji uses 4 bytes, so 20 orange hearts fill the same space. The counter below the message shows the real size as you type.',
-                    'Write up to 80 bytes, pay the displayed price, and the service prepares and broadcasts the Bitcoin transaction. Confirmation depends on miners and the network, just like any other on-chain transaction.',
+                    'Write up to 80 bytes, then pay the displayed price. One QR contains every payment method currently available for the order, while the buttons below it let you choose Ark, Lightning, or on-chain separately when a wallet cannot read the combined request. The service then prepares and broadcasts the Bitcoin transaction. Confirmation depends on miners and the network, just like any other on-chain transaction.',
                     'Everything written this way is public. Anyone can read, copy, quote, or archive it, and a confirmed transaction cannot be edited. Never write a password, recovery phrase, private key, personal information, or anything else that should remain secret.',
                     'Every new message written here is eligible for OP_RETURN read because it is public anyway. The optional checkbox colors the card border and message with the current theme and adds a “via satoshi.si” label. It does not identify or authenticate the writer.',
                     'Each opened card gets a background pattern from its transaction ID. Think of the ID as a recipe: the same transaction always makes the same colors and shapes. The full message, transaction ID, date, time, and a small satoshi.si logo remain visible on the card.'
@@ -219,7 +222,7 @@ export const PAGE_HELP = Object.freeze({
                 paragraphs: [
                     'The page encodes the message as UTF-8 and limits the result to 80 bytes. ASCII characters usually use one byte; emoji and accented characters may use several, which is why the byte counter matters more than the number of visible characters.',
                     'The transaction output script begins with OP_RETURN (0x6a), followed by a data-push opcode and the message bytes. Messages up to 75 bytes use a direct push length; messages from 76 to 80 bytes use OP_PUSHDATA1. The output value is zero, and the script is provably unspendable.',
-                    'Creating an order returns supported Bitcoin payment instructions. After payment is detected, a separate service wallet selects its own coins, creates the zero-value OP_RETURN output and a change output when appropriate, applies an on-chain mining fee, signs the transaction, and broadcasts it. No wallet key or signing secret is sent to this page.',
+                    'Creating an order returns supported Bitcoin payment instructions. The payment modal combines the returned on-chain address, BOLT11 invoice, and Ark address into a BIP-321 request when at least two are available, while retaining each instruction as a separate fallback. After payment is detected, a separate service wallet selects its own coins, creates the zero-value OP_RETURN output and a change output when appropriate, applies an on-chain mining fee, signs the transaction, and broadcasts it. No wallet key or signing secret is sent to this page.',
                     'The displayed total combines the service charge with a mining-fee estimate. The final transaction fee depends on its actual input count, virtual size, and fee rate. The page follows the order through payment, broadcast, and publication and then exposes the resulting transaction id.',
                     'For the share card, a deterministic hash of the transaction ID selects a hue, one of four CSS pattern families, an angle, and pattern spacing. The result is layered over a dark gradient. No random value or private data is used, so the same transaction ID reproduces the same pattern on both pages and in the downloadable PNG.',
                     'A confirmed OP_RETURN is committed by the block and remains verifiable through Bitcoin’s chain of hashes. Archival nodes and indexes may retain its full contents indefinitely, while pruning nodes may discard old block bodies after validation. Either way, publishing should be treated as irreversible and public.'
