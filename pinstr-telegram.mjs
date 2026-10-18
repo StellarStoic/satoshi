@@ -204,8 +204,9 @@ function makeTelegramButton({ wide = false } = {}) {
 }
 
 function wireTelegramButton(button, note) {
-  const inTelegram = Boolean(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData);
   button.addEventListener('click', () => {
+    // Checked at click time, not at mount: Telegram's script may not have run yet.
+    const inTelegram = Boolean(miniAppInitData());
     button.disabled = true;
     button.style.opacity = '.6';
     setStatus('Waiting for Telegram…');
@@ -218,7 +219,7 @@ function wireTelegramButton(button, note) {
     });
   });
   if (note) {
-    note.textContent = inTelegram
+    note.textContent = miniAppInitData()
       ? 'Checking your Telegram session…'
       : 'Opens Telegram to confirm who you are, then creates your key. No password, no seed phrase to write down.';
   }
@@ -360,6 +361,40 @@ function announce(detail) {
 const BOT_ID = 8513984991; // @pinstrsibot
 const WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
 
+// Inside a Mini App the launch parameters can be read even before Telegram's own script
+// runs: tgWebAppData sits in the URL. Asking the WebView first, then the URL, is what
+// makes the detection work no matter how the page was opened.
+function miniAppInitData() {
+  const wa = globalThis.Telegram && globalThis.Telegram.WebApp;
+  if (wa && wa.initData) return wa.initData;
+  const loc = globalThis.location;
+  for (const part of [loc && loc.hash, loc && loc.search]) {
+    if (!part) continue;
+    const m = /(?:^|[#&?])tgWebAppData=([^&]+)/.exec(part);
+    if (m) {
+      try {
+        return decodeURIComponent(m[1]);
+      } catch {
+        return m[1];
+      }
+    }
+  }
+  return '';
+}
+
+function loadWebAppScript() {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (globalThis.Telegram && globalThis.Telegram.WebApp) return Promise.resolve();
+  return new Promise((resolve) => {
+    const tag = document.createElement('script');
+    tag.src = 'https://telegram.org/js/telegram-web-app.js';
+    tag.async = true;
+    tag.onload = resolve;
+    tag.onerror = resolve;
+    document.head.appendChild(tag);
+  });
+}
+
 function loadLoginWidgetScript() {
   if (typeof document === 'undefined') return Promise.resolve();
   if (globalThis.Telegram && globalThis.Telegram.Login) return Promise.resolve();
@@ -405,12 +440,16 @@ async function loginWithWidget() {
 
 export async function bootTelegram(pre = null) {
   const wa = globalThis.Telegram && globalThis.Telegram.WebApp;
-  const insideTelegram = Boolean(wa && wa.initData);
-  if (!pre && !insideTelegram) return announce({ active: false, reason: 'not opened from telegram' });
-  if (insideTelegram) {
+  const initData = pre ? '' : miniAppInitData();
+  if (!pre && !initData) return announce({ active: false, reason: 'not opened from telegram' });
+  if (initData) {
+    await loadWebAppScript();
+    const app = (globalThis.Telegram && globalThis.Telegram.WebApp) || wa;
     try {
-      wa.ready();
-      wa.expand();
+      if (app) {
+        app.ready();
+        app.expand();
+      }
     } catch {}
   }
 
@@ -420,7 +459,7 @@ export async function bootTelegram(pre = null) {
     session = pre.session;
     user = pre.user;
   } else {
-    const verified = await post('/verify', { initData: wa.initData });
+    const verified = await post('/verify', { initData });
     if (!verified.ok) return announce({ active: false, reason: `verify ${verified.status}`, detail: verified.data });
     session = verified.data.session;
     user = verified.data.user;
@@ -483,9 +522,11 @@ if (typeof document !== 'undefined') {
   const start = () => {
     if (!ON_PINSTR) return;
     watchForLoginBlock();
+    // Inside a Mini App the WebView script gives ready(), expand() and themeParams.
+    if (miniAppInitData()) loadWebAppScript();
     // The widget script defines Telegram.Login; loading it early is what lets the
     // popup open from the click instead of being blocked.
-    if (!(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData)) loadLoginWidgetScript();
+    if (!miniAppInitData()) loadLoginWidgetScript();
     ensureBooted();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
