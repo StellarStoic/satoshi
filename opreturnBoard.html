@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OP_RETURN board: messages written into bitcoin | Satoshi.si</title>
+<meta name="description" content="Every readable OP_RETURN message found on the Bitcoin blockchain, newest first, paid ones marked in orange.">
+<link rel="canonical" href="https://satoshi.si/opreturnBoard.html">
+<link rel="icon" href="/favicon-32x32.png">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  :root { color-scheme: dark; --bg:#14161a; --panel:#1c1f25; --line:#2b3038; --ink:#e8eaed; --dim:#9aa3af; --accent:#f7931a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:26px 18px 70px; }
+  h1 { font-size:1.5rem; margin:0 0 6px; }
+  .lede { color:var(--dim); margin:0 0 18px; font-size:.92rem; }
+  .list { display:flex; flex-direction:column; gap:12px; }
+  .note { border:1px solid var(--line); border-left:6px solid #7d848f; border-radius:8px; padding:12px; background:var(--panel); cursor:pointer; }
+  .note.mine { border:2px solid var(--accent); }
+  .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
+  .note .meta { margin-top:8px; font-size:.76rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .note .via { color:var(--accent); font-weight:600; }
+  .sentinel { height:2px; }
+  #helpIcon { position:fixed; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--accent); cursor:pointer; z-index:20; }
+  .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.84); display:flex; align-items:center; justify-content:center; padding:16px; z-index:60; overflow:auto; }
+  .cardclose { position:fixed; top:14px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:1.4rem; cursor:pointer; z-index:70; }
+  .sharecard { width:min(92vw,620px); aspect-ratio:1/1; max-height:72vh; border-radius:14px; padding:24px; display:flex; flex-direction:column; justify-content:space-between; position:relative; box-shadow:0 14px 44px rgba(0,0,0,.6); }
+  .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
+  .sharecard > * { position:relative; }
+  .sharetext { font-size:clamp(1.05rem,3.4vw,1.85rem); font-weight:600; }
+  .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
+  .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
+</style>
+</head>
+<body class="dark-theme">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+  <button type="button" id="helpIcon" aria-label="How to read this board" title="How to read this board">?</button>
+  <a href="/opreturn.html" style="position:fixed;top:14px;right:58px;width:34px;height:34px;border-radius:50%;border:1px solid #2b3038;background:#1c1f25;color:#f7931a;display:flex;align-items:center;justify-content:center;text-decoration:none;z-index:20" title="Write a message" aria-label="Write a message">&#9998;</a>
+  <main>
+    <h1>The OP_RETURN board</h1>
+    <p class="lede">Every readable message written into the Bitcoin blockchain, newest first. Orange is a message someone paid for here; grey was found on the chain. Tap one to see it whole.</p>
+    <div class="list" id="list"><p class="lede">Loading&hellip;</p></div>
+  </main>
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
+    <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+  </footer>
+  <script src="/burgerMenu.js" defer></script>
+  <script type="module" src="/siteFooter.mjs"></script>
+<script type="module">
+const API = 'https://pay.satoshi.si/opreturn/v1';
+const list = document.getElementById('list');
+let cursor = null, busy = false;
+
+function patternOf(txid) {
+  let hash = 2166136261;
+  for (const char of String(txid || '')) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  const m = Math.abs(hash);
+  const hue = m % 360, shape = (m >> 8) % 4, angle = (m >> 16) % 180, size = 14 + ((m >> 20) % 22);
+  const ink = 'hsl(' + hue + ' 72% 58%)';
+  const base = 'linear-gradient(160deg, hsl(' + ((hue + 40) % 360) + ' 62% 20%), #0b0d11)';
+  const shapes = [
+    'repeating-linear-gradient(' + angle + 'deg, ' + ink + ' 0 3px, transparent 3px ' + size + 'px)',
+    'radial-gradient(' + ink + ' 2px, transparent 2.5px)',
+    'linear-gradient(' + angle + 'deg, transparent 47%, ' + ink + ' 49%, ' + ink + ' 51%, transparent 53%)',
+    'repeating-conic-gradient(from ' + angle + 'deg at 50% 50%, ' + ink + ' 0 7deg, transparent 7deg ' + (size * 2) + 'deg)'
+  ];
+  return shapes[shape] + ', ' + base;
+}
+
+function openCard(note) {
+  const overlay = document.createElement('div');
+  overlay.className = 'cardwrap';
+  const safe = (note.text || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  overlay.innerHTML = '<button class="cardclose" aria-label="Close">&times;</button>'
+    + '<div class="sharecard" style="background-image:' + patternOf(note.txid) + '">'
+    + '<div class="sharetext">' + safe + '</div>'
+    + '<div class="sharefoot"><span class="brand">satoshi.si/opreturn</span>'
+    + (note.viaSatoshi ? '<span>shared by a satoshi.si user</span>' : '')
+    + '<span style="font-family:ui-monospace,Menlo,monospace">' + (note.txid ? note.txid.slice(0, 32) + '&hellip;' : '') + '</span>'
+    + '<span>' + (note.mine ? 'paid message' : 'found on chain') + (note.publishedAt ? ' &middot; ' + new Date(note.publishedAt).toUTCString() : '') + '</span></div></div>';
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.cardclose').onclick = close;
+  overlay.onclick = (event) => { if (event.target === overlay) close(); };
+  document.addEventListener('keydown', function esc(event) {
+    if (event.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+  });
+}
+
+function noteCard(note) {
+  const card = document.createElement('div');
+  card.className = 'note ' + (note.mine ? 'mine' : '');
+  const text = document.createElement('p');
+  text.textContent = note.text;
+  card.appendChild(text);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.appendChild(Object.assign(document.createElement('span'), { textContent: note.mine ? 'paid' : 'found on chain' }));
+  if (note.viaSatoshi) meta.appendChild(Object.assign(document.createElement('span'), { className: 'via', textContent: 'via satoshi.si' }));
+  if (note.publishedAt) meta.appendChild(Object.assign(document.createElement('span'), { textContent: new Date(note.publishedAt).toUTCString() }));
+  if (note.txid) meta.appendChild(Object.assign(document.createElement('span'), { textContent: note.txid.slice(0, 14) + '\u2026' }));
+  card.appendChild(meta);
+  card.onclick = () => openCard(note);
+  return card;
+}
+
+function sentinel() {
+  const node = document.createElement('div');
+  node.className = 'sentinel';
+  node.id = 'sentinel';
+  return node;
+}
+
+async function firstPage() {
+  try {
+    const response = await fetch(API + '/latest');
+    const data = await response.json();
+    const notes = [...(data.paid || []), ...(data.chain || [])];
+    list.textContent = '';
+    if (!notes.length) { list.innerHTML = '<p class="lede">No messages yet.</p>'; return; }
+    notes.forEach(note => list.appendChild(noteCard(note)));
+    cursor = data.nextBefore || null;
+    list.appendChild(sentinel());
+  } catch (error) {
+    list.innerHTML = '<p class="lede">The board could not be loaded: ' + error.message + '</p>';
+  }
+}
+
+async function more() {
+  if (!cursor || busy) return;
+  busy = true;
+  const end = document.getElementById('sentinel');
+  try {
+    const response = await fetch(API + '/chain?before=' + encodeURIComponent(cursor) + '&limit=20');
+    const data = await response.json();
+    cursor = data.nextBefore || null;
+    for (const note of data.chain || []) {
+      const card = noteCard(note);
+      if (end && end.parentNode === list) list.insertBefore(card, end); else list.appendChild(card);
+    }
+    if (!cursor && end) end.remove();
+  } catch (error) {
+    console.warn('deeper history failed:', error.message);
+  } finally {
+    busy = false;
+  }
+}
+
+firstPage();
+if ('IntersectionObserver' in window) {
+  const observer = new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.isIntersecting)) more();
+  }, { rootMargin: '300px' });
+  setInterval(() => {
+    const end = document.getElementById('sentinel');
+    if (end) observer.observe(end);
+  }, 4000);
+}
+setInterval(firstPage, 60000);
+</script>
+</body>
+</html>

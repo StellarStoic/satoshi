@@ -6,6 +6,10 @@
 <title>OP_RETURN: write a message on the blockchain | Satoshi.si</title>
 <meta name="description" content="Write a short message into the Bitcoin blockchain in an OP_RETURN output. Pay 1400 sats with Ark, Lightning or on-chain. It stays there as long as Bitcoin does.">
 <link rel="canonical" href="https://satoshi.si/opreturn.html">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/siteEffects.css">
+<script src="/burgerMenu.js" defer></script>
+<script src="/vendor/lucide/lucide.min.js" defer></script>
 <style>
   :root { color-scheme: dark; --bg:#14161a; --panel:#1c1f25; --line:#2b3038; --ink:#e8eaed; --dim:#9aa3af; --accent:#f7931a; --ok:#2fbf71; --bad:#e05353; }
   * { box-sizing: border-box; }
@@ -40,6 +44,9 @@
   [hidden] { display:none !important; }
   a { color: var(--accent); }
   #orderPanel { margin-top:18px; }
+  #helpIcon { position:fixed; top:14px; right:58px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--accent); font-size:1rem; cursor:pointer; z-index:20; }
+  #listIcon { position:fixed; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--accent); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:1rem; z-index:20; }
+  .cardwrap canvas { max-width:min(92vw, 760px); max-height:74vh; width:auto; height:auto; }
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
   .board-list { max-height:64vh; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
@@ -48,8 +55,16 @@
   .note.chain { border:1px solid var(--line); border-left:6px solid #7d848f; }
   .note .via { color:var(--accent); font-weight:600; }
   .sentinel { height:2px; }
-  .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.78); display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; padding:16px; z-index:60; }
-  .cardwrap canvas { max-width:min(92vw, 760px); border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); }
+  .cardwrap { position:fixed; inset:0; background:rgba(0,0,0,.82); display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; padding:16px; z-index:60; overflow:auto; }
+  .cardclose { position:fixed; top:14px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:1.4rem; line-height:1; cursor:pointer; z-index:70; }
+  .sharecard { width:min(92vw, 640px); aspect-ratio:1/1; max-height:72vh; border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65); display:flex; flex-direction:column; justify-content:space-between; padding:26px; background-size:cover; position:relative; }
+  .sharecard::before { content:''; position:absolute; inset:0; background:rgba(10,12,16,.80); border-radius:14px; }
+  .sharecard > * { position:relative; }
+  .sharetext { font-size:clamp(1.05rem, 3.4vw, 1.9rem); font-weight:600; white-space:pre-wrap; overflow:hidden; }
+  .sharefoot { display:flex; flex-direction:column; gap:4px; font-size:.75rem; color:#c9ced6; }
+  .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
+  .sharefoot .badge { color:#e8eaed; }
+  .sharefoot .tx { font-family:ui-monospace, Menlo, monospace; word-break:break-all; }
   .cardwrap .bar { display:flex; gap:10px; }
   .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
   .note .meta { margin-top:8px; font-size:.78rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
@@ -58,7 +73,11 @@
   .banner p { color:#fff; }
 </style>
 </head>
-<body>
+<body class="dark-theme">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+  <button type="button" id="helpIcon" aria-label="What is an OP_RETURN message" title="How this tool works">?</button>
+  <a href="/opreturnBoard.html" id="listIcon" aria-label="Open the full OP_RETURN board" title="Browse every message">&#9776;</a>
 <main>
   <h1>Write a message on the blockchain</h1>
   <p class="lede">Your words go into an OP_RETURN output, inside a real Bitcoin transaction. Nobody can edit them, and nobody can delete them while Bitcoin exists.</p>
@@ -135,6 +154,12 @@
     <p class="hint">The order answers with the rail destinations and the amount. Poll it until <span class="mono">state</span> is <span class="mono">published</span>, then read <span class="mono">opReturnTxid</span>.</p>
   </section>
 </main>
+<footer class="footer" data-live-footer>
+  <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+  <a id="block-height" href="https://mempool.space/blocks" target="_blank" rel="noopener noreferrer" title="Current block height"></a>
+  <a id="fee-rate" href="https://mempool.space/" target="_blank" rel="noopener noreferrer" title="Current network fee rate"></a>
+</footer>
+<script type="module" src="/siteFooter.mjs"></script>
 
 <script src="qrCodeGenerator_1_4_4.js"></script>
 <script type="module">
@@ -359,14 +384,147 @@ function openCard(note) {
   image.src = THUMB(textureOf(note));
 }
 
+// The opened card is styled from the transaction id: same message, same look, no image
+// files. Four shapes, a hue, an angle and a spacing, all derived from the hash.
+function patternOf(txid) {
+  let hash = 2166136261;
+  for (const char of String(txid || '')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const magnitude = Math.abs(hash);
+  const hue = magnitude % 360;
+  const shape = (magnitude >> 8) % 4;
+  const angle = (magnitude >> 16) % 180;
+  const size = 14 + ((magnitude >> 20) % 22);
+  const ink = `hsl(${hue} 72% 58%)`;
+  const base = `linear-gradient(160deg, hsl(${(hue + 40) % 360} 62% 20%), #0b0d11)`;
+  const shapes = [
+    `repeating-linear-gradient(${angle}deg, ${ink} 0 3px, transparent 3px ${size}px)`,
+    `radial-gradient(${ink} 2px, transparent 2.5px)`,
+    `linear-gradient(${angle}deg, transparent 47%, ${ink} 49%, ${ink} 51%, transparent 53%)`,
+    `repeating-conic-gradient(from ${angle}deg at 50% 50%, ${ink} 0 7deg, transparent 7deg ${size * 2}deg)`,
+  ];
+  return { hue, shape, angle, size, ink, css: `${shapes[shape]}, ${base}` };
+}
+let openOverlay = null;
+
+function openReader(note) {
+  if (openOverlay) openOverlay.remove();
+  const pattern = patternOf(note.txid);
+  const overlay = document.createElement('div');
+  overlay.className = 'cardwrap';
+  overlay.innerHTML = `
+    <button class="cardclose" aria-label="Close">&times;</button>
+    <div class="sharecard" style="background-image:${pattern.css}">
+      <div class="sharetext">${(note.text || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+      <div class="sharefoot">
+        <span class="brand">satoshi.si/opreturn</span>
+        ${note.viaSatoshi ? '<span class="badge">shared by a satoshi.si user</span>' : ''}
+        <span class="tx">${note.txid ? note.txid.slice(0, 32) + '…' : ''}</span>
+        <span class="when">${note.mine ? 'paid message' : 'found on chain'}${note.publishedAt ? ' · ' + new Date(note.publishedAt).toUTCString() : ''}</span>
+      </div>
+    </div>
+    <div class="bar"><button id="dl">Download PNG</button><button class="ghost" id="closeCard">Close</button></div>`;
+  document.body.appendChild(overlay);
+  openOverlay = overlay;
+  overlay.querySelector('.cardclose').onclick = () => overlay.remove();
+  overlay.querySelector('#closeCard').onclick = () => overlay.remove();
+  overlay.onclick = (event) => { if (event.target === overlay) overlay.remove(); };
+  overlay.querySelector('#dl').onclick = () => downloadCard(note, pattern);
+}
+
+function downloadCard(note, pattern) {
+  const size = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0b0d11';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = `hsl(${(pattern.hue + 40) % 360} 62% 20%)`;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = pattern.ink;
+  ctx.fillStyle = pattern.ink;
+  if (pattern.shape === 0) {
+    ctx.lineWidth = 3;
+    for (let offset = -size; offset < size * 2; offset += pattern.size) {
+      ctx.beginPath();
+      ctx.moveTo(offset, 0);
+      ctx.lineTo(offset - size, size);
+      ctx.stroke();
+    }
+  } else if (pattern.shape === 1) {
+    for (let y = 0; y < size; y += pattern.size) {
+      for (let x = 0; x < size; x += pattern.size) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (pattern.shape === 2) {
+    ctx.lineWidth = 4;
+    const step = pattern.size * 2;
+    for (let offset = -size; offset < size * 2; offset += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, offset);
+      ctx.lineTo(size, offset + size * Math.tan((pattern.angle * Math.PI) / 180));
+      ctx.stroke();
+    }
+  } else {
+    const step = pattern.size * 2;
+    for (let x = 0; x < size; x += step) {
+      for (let y = 0; y < size; y += step) {
+        ctx.beginPath();
+        ctx.arc(x, y, step * 0.4, 0, Math.PI * 0.35);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.fillStyle = 'rgba(10,12,16,0.82)';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = note.mine ? '#f7931a' : '#7d848f';
+  ctx.lineWidth = 14;
+  ctx.strokeRect(28, 28, size - 56, size - 56);
+  const words = String(note.text || '').split(/\s+/);
+  let fontSize = words.length > 34 ? 40 : words.length > 18 ? 52 : 66;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? line + ' ' + word : word;
+    if (ctx.measureText(candidate).width > size - 190 && line) { lines.push(line); line = word; }
+    else line = candidate;
+  }
+  if (line) lines.push(line);
+  const shown = lines.slice(0, 11);
+  const startY = 520 - (shown.length * fontSize * 1.25) / 2;
+  shown.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
+  ctx.fillStyle = '#f7931a';
+  ctx.font = '600 30px system-ui, sans-serif';
+  ctx.fillText('satoshi.si/opreturn', 95, 900);
+  ctx.fillStyle = '#e8eaed';
+  ctx.font = '400 26px system-ui, sans-serif';
+  if (note.viaSatoshi) ctx.fillText('shared by a satoshi.si user', 95, 942);
+  ctx.fillStyle = '#9aa3af';
+  ctx.font = '400 24px ui-monospace, Menlo, monospace';
+  if (note.txid) ctx.fillText(note.txid.slice(0, 44) + '…', 95, 988);
+  canvas.toBlob((blob) => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `opreturn-${(note.txid || 'message').slice(0, 12)}.png`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  }, 'image/png');
+}
+
 function noteCard(note) {
   const card = document.createElement('div');
   card.className = 'note ' + (note.mine ? 'mine' : 'chain');
   const banner = document.createElement('div');
   banner.className = 'banner';
-  banner.style.backgroundImage =
-    `linear-gradient(rgba(16,19,24,.74), rgba(16,19,24,.74)), url(${THUMB(textureOf(note))})`;
-  banner.style.backgroundSize = 'auto, auto';
+
   const text = document.createElement('p');
   text.textContent = note.text;
   banner.appendChild(text);
@@ -386,7 +544,7 @@ function noteCard(note) {
   cardBtn.style.padding = '2px 10px';
   cardBtn.style.fontSize = '.75rem';
   cardBtn.textContent = 'Card';
-  cardBtn.onclick = () => openCard(note);
+  cardBtn.onclick = () => openReader(note);
   meta.appendChild(cardBtn);
   if (note.txid) {
     const link = document.createElement('a');
@@ -531,6 +689,13 @@ resetBtn.addEventListener('click', () => {
 messageEl.addEventListener('input', paintCount);
 publicEl.addEventListener('change', () => { themeRow.hidden = !publicEl.checked; });
 
+document.getElementById('helpIcon').onclick = () => {
+  const details = document.querySelector('details');
+  if (details) {
+    details.open = true;
+    details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+};
 paintPrice();
 paintCount();
 loadBoard();
