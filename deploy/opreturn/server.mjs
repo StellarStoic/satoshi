@@ -227,8 +227,44 @@ async function scanOnce() {
   }
 }
 
-setInterval(scanOnce, SCAN_INTERVAL_MS);
-scanOnce();
+// opreturn.xyz already indexes and decodes OP_RETURN traffic, so instead of scanning
+// blocks ourselves (which found mostly protocol markers) the feed is the source. Its
+// rows arrive classified with protocol "text" for prose.
+const FEED_URL = process.env.OPRETURN_FEED_URL || 'https://opreturn.xyz/api/messages?sort=new&limit=60';
+const FEED_INTERVAL_MS = Number(process.env.OPRETURN_FEED_INTERVAL_MS || 180000);
+
+async function refreshFeed() {
+  try {
+    const response = await fetch(FEED_URL, { headers: { accept: 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`feed ${response.status}`);
+    }
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : payload.messages || [];
+    const seen = new Set();
+    const messages = [];
+    for (const row of rows) {
+      const text = String(row.content ?? '').trim();
+      if (!text || !looksLikeLanguage(text)) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const when = typeof row.block_time === 'number'
+        ? row.block_time
+        : Math.floor(new Date(row.block_time || Date.now()).getTime() / 1000);
+      messages.push({ text, txid: row.txid, blockHeight: row.block_height ?? null, blockTime: when });
+    }
+    chain.messages = messages.slice(0, KEEP_MESSAGES);
+    chain.cursor = { blockId: 'opreturn.xyz', page: 0 };
+    saveChain();
+    console.log(`feed refreshed: ${messages.length} readable of ${rows.length}`);
+  } catch (error) {
+    console.error('feed refresh failed:', error.message);
+  }
+}
+
+setInterval(refreshFeed, FEED_INTERVAL_MS);
+refreshFeed();
 
 // ------------------------------------------------------------------- routes ----
 
@@ -265,6 +301,34 @@ const server = http.createServer(async (req, res) => {
         maxBytes: OP_RETURN.maxBytes,
         latestCount: OP_RETURN.latestCount,
       });
+      return;
+    }
+
+    // One message by txid: the receipt a buyer can keep.
+    if (route.startsWith('/opreturn/v1/message/') && req.method === 'GET') {
+      const txid = route.slice('/opreturn/v1/message/'.length);
+      if (!/^[0-9a-fA-F]{64}$/.test(txid)) {
+        send(res, 400, { error: 'that is not a transaction id' });
+        return;
+      }
+      try {
+        const response = await fetch(`https://opreturn.xyz/api/message/${txid}`, {
+          headers: { accept: 'application/json' },
+        });
+        if (response.status === 404) {
+          send(res, 404, { error: 'no message in this transaction' });
+          return;
+        }
+        const row = await response.json();
+        const text = String(row.content ?? '').trim();
+        if (!response.ok || !text) {
+          send(res, 404, { error: 'no message in this transaction' });
+          return;
+        }
+        send(res, 200, { txid, text, blockHeight: row.block_height ?? null, blockTime: row.block_time ?? null });
+      } catch (error) {
+        send(res, 502, { error: 'the index could not be read', detail: error.message });
+      }
       return;
     }
 
