@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OP_RETURN: write a message on the blockchain | Satoshi.si</title>
+<meta name="description" content="Write a short message into the Bitcoin blockchain in an OP_RETURN output. Pay 1400 sats with Ark, Lightning or on-chain. It stays there as long as Bitcoin does.">
+<link rel="canonical" href="https://satoshi.si/opreturn.html">
+<style>
+  :root { color-scheme: dark; --bg:#14161a; --panel:#1c1f25; --line:#2b3038; --ink:#e8eaed; --dim:#9aa3af; --accent:#f7931a; --ok:#2fbf71; --bad:#e05353; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 28px 18px 80px; }
+  h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  .lede { color: var(--dim); margin: 0 0 22px; }
+  h2 { font-size: 1rem; margin: 26px 0 8px; color: var(--accent); letter-spacing: .02em; text-transform: uppercase; }
+  section { background: var(--panel); border:1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  details { border-top:1px solid var(--line); padding-top:12px; margin-top:12px; }
+  summary { cursor:pointer; color: var(--accent); }
+  label { display:block; font-size:.9rem; color: var(--dim); margin: 10px 0 4px; }
+  textarea { width:100%; min-height:88px; background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; resize:vertical; }
+  input[type=text] { width:100%; background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
+  select { background:#101318; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .count { font-variant-numeric: tabular-nums; color: var(--dim); font-size:.85rem; }
+  .count.over { color: var(--bad); }
+  button { background: var(--accent); color:#101318; border:0; border-radius:8px; padding:11px 18px; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:400; }
+  .price { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.82rem; word-break:break-all; }
+  .rail { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px; }
+  .rail h3 { margin:0 0 6px; font-size:.9rem; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
+  .qr { background:#fff; padding:8px; border-radius:6px; display:inline-block; margin:8px 0; }
+  .qr svg, .qr img { display:block; width:180px; height:180px; }
+  .status { margin-top:14px; padding:12px; border-radius:8px; border:1px solid var(--line); background:#101318; }
+  .status strong { display:block; margin-bottom:4px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .hint { color: var(--dim); font-size:.85rem; }
+  [hidden] { display:none !important; }
+  a { color: var(--accent); }
+  #orderPanel { margin-top:18px; }
+  .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+  @media (max-width:520px){ .board { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Write a message on the blockchain</h1>
+  <p class="lede">Your words go into an OP_RETURN output, inside a real Bitcoin transaction. Nobody can edit them, and nobody can delete them while Bitcoin exists.</p>
+
+  <section>
+    <h2>What this is</h2>
+    <p>You write up to <strong>80 bytes</strong> — roughly 80 characters, fewer if you use emoji or accented letters. You pay <span class="price" id="price">1400</span> sats. Within a minute of your payment, a transaction carrying your message is signed and broadcast by this site's own wallet. It confirms with the next block, usually ten minutes later.</p>
+    <details>
+      <summary>Technical: what exactly goes on chain</summary>
+      <p>Your message is encoded as UTF-8 and written into a script of the form <span class="mono">OP_RETURN &lt;push&gt; &lt;your bytes&gt;</span>. 80 bytes is one standard output, which every node relays and every miner includes; anything larger is non-standard, so the tool refuses it rather than build something that might never confirm.</p>
+      <p>The transaction spends from this service's wallet, pays the miner fee from that wallet, and returns the change to it. The OP_RETURN output itself carries zero value — you pay for the space, not for an amount. Messages are paid for over Ark or Lightning, which settle in seconds; the message transaction itself is always on-chain, because that is the only place an OP_RETURN can live.</p>
+      <p>The price is the service fee plus the miner fee at the feerate this site's node reports when you order. There is no account, no login, and no identifier linking the message to you: a different address pays each order, and this site stores only your message and its transaction id.</p>
+      <p>The plain truth about permanence: a confirmation makes the message part of the chain, but nothing stops someone from copying it, and nothing on chain is confidential. Do not put secrets in it.</p>
+    </details>
+  </section>
+
+  <section>
+    <h2>Your message</h2>
+    <label for="message">Text (80 bytes maximum)</label>
+    <textarea id="message" maxlength="400" placeholder="Something worth leaving behind."></textarea>
+    <div class="row" style="margin-top:6px">
+      <span class="count" id="count">0 / 80 bytes</span>
+      <span class="hint" id="priceHint"></span>
+    </div>
+
+    <label class="row" style="margin-top:14px">
+      <span>Show it on the board at satoshi.si/pinstr</span>
+      <input type="checkbox" id="isPublic">
+    </label>
+    <div id="themeRow" class="board" hidden>
+      <div>
+        <label for="theme">Border of your note</label>
+        <select id="theme">
+          <option value="cork">Cork</option>
+          <option value="wheat">Wheat</option>
+          <option value="fancy-cushion">Fancy cushion</option>
+          <option value="woven">Woven</option>
+          <option value="graphy">Graphy</option>
+          <option value="dark-grey-terrazzo">Dark grey terrazzo</option>
+          <option value="folk-pattern">Folk pattern</option>
+          <option value="pool-table">Pool table</option>
+        </select>
+      </div>
+      <p class="hint" style="margin:0">The latest 21 messages found on the chain are shown with a grey border, so a paid one is easy to tell apart.</p>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <button id="pay">Pay <span id="payAmount">1400</span> sats</button>
+      <button id="reset" class="ghost" hidden>Write another</button>
+    </div>
+  </section>
+
+  <section id="orderPanel" hidden>
+    <h2>Payment</h2>
+    <div id="statusBox" class="status"><strong id="statusLabel">Preparing the invoice</strong><span id="statusDetail" class="hint"></span></div>
+    <div id="rails"></div>
+    <p class="hint" style="margin-top:12px">Pay any one rail. The message goes out once the payment is seen; this page follows it through to the transaction.</p>
+  </section>
+
+  <section>
+    <h2>Using it from code</h2>
+    <p>The same service is a public API, with no key:</p>
+    <p class="mono">POST https://pay.satoshi.si/opreturn/v1/orders<br>{ "message": "hello", "isPublic": false }<br><br>GET https://pay.satoshi.si/opreturn/v1/orders/&lt;id&gt;<br>GET https://pay.satoshi.si/opreturn/v1/config<br>GET https://pay.satoshi.si/opreturn/v1/latest</p>
+    <p class="hint">The order answers with the rail destinations and the amount. Poll it until <span class="mono">state</span> is <span class="mono">published</span>, then read <span class="mono">opReturnTxid</span>.</p>
+  </section>
+</main>
+
+<script src="qrCodeGenerator_1_4_4.js"></script>
+<script type="module">
+import { validateMessage, priceSats, OP_RETURN, orderView, isOrderTerminal } from './opreturnModel.mjs';
+
+const API = 'https://pay.satoshi.si/opreturn/v1';
+const el = (id) => document.getElementById(id);
+const messageEl = el('message');
+const countEl = el('count');
+const payBtn = el('pay');
+const resetBtn = el('reset');
+const publicEl = el('isPublic');
+const themeRow = el('themeRow');
+const themeEl = el('theme');
+const orderPanel = el('orderPanel');
+const railsEl = el('rails');
+const statusLabel = el('statusLabel');
+const statusDetail = el('statusDetail');
+let pollTimer = null;
+
+function paintPrice() {
+  const sats = priceSats();
+  el('price').textContent = String(sats);
+  el('payAmount').textContent = String(sats);
+  el('priceHint').textContent = `${OP_RETURN.serviceSats} service + ~${OP_RETURN.networkSatsEstimate} miner`;
+}
+
+function paintCount() {
+  const bytes = new TextEncoder().encode(messageEl.value).length;
+  countEl.textContent = `${bytes} / ${OP_RETURN.maxBytes} bytes`;
+  countEl.classList.toggle('over', bytes > OP_RETURN.maxBytes);
+  const check = validateMessage(messageEl.value);
+  payBtn.disabled = !check.ok;
+}
+
+function qrInto(node, text) {
+  node.textContent = '';
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    node.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
+  } catch {
+    node.textContent = '';
+  }
+}
+
+function rail(title, value, kind) {
+  const wrap = document.createElement('div');
+  wrap.className = 'rail';
+  const h = document.createElement('h3');
+  h.textContent = title;
+  wrap.appendChild(h);
+  const qr = document.createElement('div');
+  qr.className = 'qr';
+  qrInto(qr, value);
+  wrap.appendChild(qr);
+  const text = document.createElement('div');
+  text.className = 'mono';
+  text.textContent = value;
+  wrap.appendChild(text);
+  const copy = document.createElement('button');
+  copy.className = 'ghost';
+  copy.style.marginTop = '8px';
+  copy.textContent = 'Copy';
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(value); copy.textContent = 'Copied'; }
+    catch { copy.textContent = 'Select the text above'; }
+  };
+  wrap.appendChild(copy);
+  return wrap;
+}
+
+async function getJson(url, options) {
+  const response = await fetch(url, options);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `request failed (${response.status})`);
+  }
+  return body;
+}
+
+function paintOrder(order) {
+  const view = orderView(order);
+  statusLabel.textContent = view.label;
+  statusLabel.className = view.done ? 'ok' : view.failed ? 'bad' : '';
+  statusDetail.textContent = view.detail || '';
+  if (order.rails) {
+    railsEl.textContent = '';
+    if (order.rails.lightning?.destination) {
+      railsEl.appendChild(rail('Lightning', order.rails.lightning.destination, 'ln'));
+    }
+    if (order.rails.ark?.destination) {
+      railsEl.appendChild(rail('Ark', order.rails.ark.destination, 'ark'));
+    }
+    if (order.rails.onchain?.destination) {
+      const bip21 = `bitcoin:${order.rails.onchain.destination}?amount=${(Number(order.sats) / 1e8).toFixed(8)}`;
+      railsEl.appendChild(rail('On-chain', bip21, 'chain'));
+    }
+    if (!railsEl.children.length) {
+      const wait = document.createElement('p');
+      wait.className = 'hint';
+      wait.textContent = 'Preparing the invoice…';
+      railsEl.appendChild(wait);
+    }
+  }
+  if (view.txid) {
+    const link = document.createElement('p');
+    link.className = 'mono';
+    link.innerHTML = `Transaction: <a href="https://mempool.space/tx/${view.txid}" target="_blank" rel="noopener">${view.txid}</a>`;
+    railsEl.appendChild(link);
+  }
+}
+
+async function poll(orderId) {
+  try {
+    const order = await getJson(`${API}/orders/${orderId}`);
+    paintOrder(order);
+    if (isOrderTerminal(order)) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      resetBtn.hidden = false;
+      return;
+    }
+  } catch (error) {
+    statusDetail.textContent = error.message;
+  }
+}
+
+payBtn.addEventListener('click', async () => {
+  const check = validateMessage(messageEl.value);
+  if (!check.ok) {
+    return;
+  }
+  payBtn.disabled = true;
+  orderPanel.hidden = false;
+  railsEl.textContent = '';
+  statusLabel.textContent = 'Preparing the invoice';
+  statusLabel.className = '';
+  statusDetail.textContent = 'This takes a moment.';
+  try {
+    const order = await getJson(`${API}/orders`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        message: check.value,
+        isPublic: publicEl.checked,
+        theme: publicEl.checked ? themeEl.value : null,
+      }),
+    });
+    paintOrder(order);
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => poll(order.id), 3000);
+    poll(order.id);
+  } catch (error) {
+    statusLabel.textContent = 'Could not start the order';
+    statusLabel.className = 'bad';
+    statusDetail.textContent = error.message;
+    payBtn.disabled = false;
+  }
+});
+
+resetBtn.addEventListener('click', () => {
+  orderPanel.hidden = true;
+  resetBtn.hidden = true;
+  railsEl.textContent = '';
+  messageEl.value = '';
+  paintCount();
+  payBtn.disabled = false;
+});
+
+messageEl.addEventListener('input', paintCount);
+publicEl.addEventListener('change', () => { themeRow.hidden = !publicEl.checked; });
+
+paintPrice();
+paintCount();
+</script>
+</body>
+</html>
