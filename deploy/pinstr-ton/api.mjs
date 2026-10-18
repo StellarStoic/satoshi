@@ -7,6 +7,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { verifyInitData, verifyLoginWidget } from './telegramAuth.mjs';
 import { sealSecret, openSecret, checkKind0, publishToAll } from './profile.mjs';
+import { nsecToBytes, bytesToHex } from './bech32.mjs';
+import { schnorr } from './vendor/noble/secp256k1.js';
+
+const SIGNABLE_KINDS = new Set([0, 1, 7]);
+const MAX_CONTENT = 8192;
+
+function signEventFor(pubkey, priv, { kind, created_at, tags, content }) {
+  const createdAt = Number.isFinite(created_at) ? Math.floor(created_at) : Math.floor(Date.now() / 1000);
+  const serialised = JSON.stringify([0, pubkey, createdAt, kind, tags, content]);
+  const idHex = crypto.createHash('sha256').update(serialised, 'utf8').digest('hex');
+  const sig = Buffer.from(schnorr.sign(Buffer.from(idHex, 'hex'), priv)).toString('hex');
+  return { id: idHex, pubkey, created_at: createdAt, kind, tags, content, sig };
+}
 
 const PORT = Number(process.env.PINSTR_TG_PORT || 8851);
 const TOKEN = process.env.PINSTR_TG_BOT_TOKEN || '';
@@ -211,6 +224,34 @@ export function createServer(env = {}) {
           deletedAt: new Date().toISOString(),
         });
         send(res, 200, { deleted: true, pubkey: record.pubkey });
+        return;
+      }
+      if (url.pathname === '/tg/sign' && req.method === 'POST') {
+        // Signs one event with the sealed key. The key never leaves this box, and the
+        // event always carries the session's pubkey, whatever the caller sent.
+        if (!secret) return send(res, 503, { error: 'session secret not configured' });
+        const auth = req.headers.authorization || '';
+        const session = readSession(auth.startsWith('Bearer ') ? auth.slice(7) : '', secret);
+        if (!session) return send(res, 401, { error: 'no valid session' });
+        const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+        if (rateLimited(`sign:${ip}:${session.tg}`, Date.now())) return send(res, 429, { error: 'too many events' });
+        const record = readProfile(profileDir, session.user.id);
+        if (!record || !record.sealed) return send(res, 409, { error: 'no key to sign with' });
+        const body = await readJson(req, 64 * 1024);
+        const draft = body.event || {};
+        if (!SIGNABLE_KINDS.has(draft.kind)) return send(res, 400, { error: 'that event kind cannot be signed here' });
+        if (typeof draft.content !== 'string' || draft.content.length > MAX_CONTENT) return send(res, 400, { error: 'bad content' });
+        if (!Array.isArray(draft.tags) || draft.tags.some((t) => !Array.isArray(t))) return send(res, 400, { error: 'bad tags' });
+        let priv;
+        try {
+          priv = nsecToBytes(openSecret(record.sealed, secret));
+        } catch (err) {
+          return send(res, 500, { error: 'the stored key cannot be opened' });
+        }
+        const derived = bytesToHex(schnorr.getPublicKey(priv));
+        if (derived !== record.pubkey) return send(res, 500, { error: 'the stored key does not match its pubkey' });
+        const event = signEventFor(record.pubkey, priv, draft);
+        send(res, 200, { event });
         return;
       }
       if (url.pathname === '/tg/profile' && req.method === 'POST') {

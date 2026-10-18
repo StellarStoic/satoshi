@@ -87,6 +87,37 @@ function injectLoginStyles() {
 // The key lives sealed on the server, so the only way a Telegram user can take it with
 // them is to ask for it. This is that button, and the one that deletes our copy after
 // they have imported it somewhere they trust.
+// The board publishes through window.nostr, so a Telegram session exposes one: the
+// public key it holds, and signEvent forwarded to the server that keeps the key. An
+// existing browser extension is never replaced.
+function installSessionSigner(detail) {
+  if (!detail || !detail.pubkey || !detail.session) return;
+  if (globalThis.nostr && typeof globalThis.nostr.signEvent === 'function') return;
+  const unsupported = () => {
+    throw new Error('This signer signs notes only. Use your own signer for encrypted messages.');
+  };
+  globalThis.nostr = {
+    getPublicKey: async () => detail.pubkey,
+    signEvent: async (event) => {
+      const draft = {
+        kind: event && event.kind,
+        created_at: event && event.created_at,
+        tags: (event && event.tags) || [],
+        content: (event && event.content) || '',
+      };
+      const res = await post('/sign', { event: draft }, detail.session);
+      if (!res.ok) throw new Error((res.data && res.data.error) || `signing failed (${res.status})`);
+      return res.data.event;
+    },
+    getRelays: async () => ({}),
+    nip04: { encrypt: unsupported, decrypt: unsupported },
+    nip44: { encrypt: unsupported, decrypt: unsupported },
+  };
+  try {
+    globalThis.dispatchEvent(new CustomEvent('nostr:loggedin', { detail: { pubkey: detail.pubkey } }));
+  } catch {}
+}
+
 function mountKeyTools(detail) {
   if (typeof document === 'undefined' || !detail || !detail.session) return;
   const host = document.querySelector('#loginDialog .dialog-inner');
@@ -314,6 +345,7 @@ function announce(detail) {
   try {
     if (detail && detail.active && detail.signedIn) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
+      installSessionSigner(detail);
       mountKeyTools(detail);
     } else if (detail && detail.active) {
       setStatus(`Telegram sign-in failed: ${detail.reason || 'unknown reason'}`, 'bad');
