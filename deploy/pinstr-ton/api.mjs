@@ -3,7 +3,10 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { verifyInitData } from './telegramAuth.mjs';
+import { sealSecret, checkKind0, publishToAll } from './profile.mjs';
 
 const PORT = Number(process.env.PINSTR_TG_PORT || 8851);
 const TOKEN = process.env.PINSTR_TG_BOT_TOKEN || '';
@@ -11,6 +14,24 @@ const SECRET = process.env.PINSTR_TG_SESSION_SECRET || '';
 const SESSION_TTL_S = Number(process.env.PINSTR_TG_SESSION_TTL || 604800);
 const ALLOWED_ORIGINS = (process.env.PINSTR_TG_ORIGINS || 'https://pinstr.si,https://www.pinstr.si').split(',').map((s) => s.trim()).filter(Boolean);
 const VERIFY_PER_MIN = Number(process.env.PINSTR_TG_VERIFY_PER_MIN || 12);
+const PROFILE_DIR = process.env.PINSTR_TG_PROFILE_DIR || '/opt/pinstr-tg/profiles';
+const RELAYS = (process.env.PINSTR_TG_RELAYS || 'wss://nostr.satoshi.si').split(',').map((s) => s.trim()).filter(Boolean);
+
+function readProfile(dir, tgId) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, `${Number(tgId)}.json`), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeProfile(dir, tgId, record) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const target = path.join(dir, `${Number(tgId)}.json`);
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(record, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, target);
+}
 
 function sign(payload, secret = SECRET) {
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -82,6 +103,9 @@ function rateLimited(key, now) {
 export function createServer(env = {}) {
   const token = env.token ?? TOKEN;
   const secret = env.secret ?? SECRET;
+  const publish = env.publish ?? ((urls, event) => publishToAll(urls, event));
+  const profileDir = env.profileDir ?? PROFILE_DIR;
+  const relays = env.relays ?? RELAYS;
   return http.createServer(async (req, res) => {
     cors(req, res);
     const url = new URL(req.url, 'http://localhost');
@@ -119,7 +143,53 @@ export function createServer(env = {}) {
         const raw = auth.startsWith('Bearer ') ? auth.slice(7) : cookie ? decodeURIComponent(cookie[1]) : '';
         const session = readSession(raw, secret);
         if (!session) return send(res, 401, { error: 'no valid session' });
-        send(res, 200, { user: session.user, expiresAt: new Date(session.exp * 1000).toISOString() });
+        const record = readProfile(profileDir, session.user.id);
+        send(res, 200, {
+          user: session.user,
+          expiresAt: new Date(session.exp * 1000).toISOString(),
+          profile: record ? { pubkey: record.pubkey, published: Boolean(record.published) } : null,
+        });
+        return;
+      }
+      if (url.pathname === '/tg/profile' && req.method === 'POST') {
+        if (!secret) return send(res, 503, { error: 'session secret not configured' });
+        const auth = req.headers.authorization || '';
+        const session = readSession(auth.startsWith('Bearer ') ? auth.slice(7) : '', secret);
+        if (!session) return send(res, 401, { error: 'no valid session' });
+        const body = await readJson(req);
+        const event = body.event;
+        const nsec = typeof body.nsec === 'string' ? body.nsec.trim() : '';
+        if (!event || !event.pubkey) return send(res, 400, { error: 'event required' });
+        const existing = readProfile(profileDir, session.user.id);
+        if (existing && existing.pubkey !== event.pubkey) {
+          // First write wins: a Telegram id keeps the key it was given.
+          return send(res, 409, { error: 'a different key is already bound to this account', pubkey: existing.pubkey });
+        }
+        const content = JSON.parse(event.content || '{}');
+        if (content.name !== String(session.user.id)) return send(res, 400, { error: 'profile name must be the telegram id' });
+        const checked = checkKind0(event, { pubkey: event.pubkey });
+        if (!checked.ok) return send(res, 400, { error: 'profile rejected', reason: checked.reason });
+        let published = false;
+        let publishReason = '';
+        try {
+          const outcome = await publish(relays, event);
+          published = Boolean(outcome && outcome.ok);
+          publishReason = published ? '' : JSON.stringify(outcome && outcome.results ? outcome.results : outcome).slice(0, 200);
+        } catch (err) {
+          publishReason = String(err.message || err).slice(0, 200);
+        }
+        const record = {
+          tgId: session.user.id,
+          pubkey: event.pubkey,
+          eventId: event.id,
+          sealed: nsec ? sealSecret(nsec, secret) : (existing ? existing.sealed : null),
+          published,
+          publishReason,
+          updatedAt: new Date().toISOString(),
+          dir: profileDir,
+        };
+        writeProfile(profileDir, session.user.id, record);
+        send(res, 200, { pubkey: event.pubkey, published, relays: published ? relays : [], reason: publishReason || undefined });
         return;
       }
       send(res, 404, { error: 'not found' });
