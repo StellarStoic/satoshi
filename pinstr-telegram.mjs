@@ -75,7 +75,7 @@ function injectLoginStyles() {
   style.id = 'pinstr-tg-styles';
   style.textContent = `
     .pinstr-nostr { margin: 0 0 10px; }
-    .pinstr-nostr > summary { list-style: none; }
+    .pinstr-nostr > summary { list-style: none; display: flex; align-items: center; gap: 10px; width: 100%; }
     .pinstr-nostr > summary::-webkit-details-marker { display: none; }
     .pinstr-nostr > summary::after { content: '\\25BE'; margin-left: auto; font-size: .9em; opacity: .7; }
     .pinstr-nostr[open] > summary::after { transform: rotate(180deg); }
@@ -270,17 +270,35 @@ function restructureLoginDialog() {
     }
 
     injectLoginStyles();
-    const button = makeTelegramButton({ wide: true });
+    const reference = dialog.querySelector('.anonymous-login');
+
+    // Clone the board's own button rather than copying its computed style: at mount the
+    // anonymous button can be inside a hidden block, and copying a hidden element's
+    // resolved styles made the Telegram button invisible.
+    let button;
+    if (reference) {
+      button = reference.cloneNode(true);
+      button.removeAttribute('data-login');
+      button.classList.add('pinstr-tg-btn');
+      button.innerHTML = '<i class="lni lni-telegram" aria-hidden="true"></i><span>Sign in with Telegram</span>';
+      button.style.display = 'flex';
+      button.style.alignItems = 'center';
+      button.style.justifyContent = 'center';
+      button.style.gap = '10px';
+      button.style.width = '100%';
+      button.style.margin = '0 0 12px';
+      button.style.cursor = 'pointer';
+      if (summary) summary.className = (reference.className || '') + ' pinstr-nostr-summary';
+    } else {
+      button = makeTelegramButton({ wide: true });
+    }
+
     const note = document.createElement('p');
     note.className = 'pinstr-tg-status';
     note.style.cssText = 'margin:0 0 14px;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
     wireTelegramButton(button, note);
     details.parentNode.insertBefore(button, details);
     details.parentNode.insertBefore(note, details);
-
-    const reference = dialog.querySelector('.anonymous-login');
-    copyLoginLook(button, reference);
-    copyLoginLook(summary, reference, { stretch: true });
     summary.textContent = 'Sign in with Nostr';
   }
   return true;
