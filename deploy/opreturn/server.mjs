@@ -320,8 +320,15 @@ const server = http.createServer(async (req, res) => {
         }));
       // The index was built before the filter earned its keep, and a restart should not
       // resurrect what it threw out: judge every stored entry again on the way out.
-      const fromChain = chain.messages
-        .filter(m => looksLikeLanguage(m.text))
+      const seen = new Set();
+      const readable = chain.messages.filter(m => {
+        if (!looksLikeLanguage(m.text)) return false;
+        const key = m.text.trim().toLowerCase();
+        if (seen.has(key)) return false;      // one entry per message, not per transaction
+        seen.add(key);
+        return true;
+      });
+      const fromChain = readable
         .slice(0, OP_RETURN.latestCount)
         .map(m => boardNote({
           text: m.text,

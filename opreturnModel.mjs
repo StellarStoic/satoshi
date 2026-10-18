@@ -153,6 +153,9 @@ export function looksLikeLanguage(value) {
   if (/\bto:(usdt|usdc|eth|btc|trx)\b/i.test(text)) {
     return false; // bridge receipts
   }
+  if (/^[A-Z0-9:_\-\/]{4,}$/.test(text)) {
+    return false; // BRC20PROG, OP_RETURN and other protocol shouting
+  }
   const tokens = text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
   if (tokens.some(token => token.length >= 26)) {
     return false; // an address or a hash wore a message's clothes
@@ -160,6 +163,9 @@ export function looksLikeLanguage(value) {
   const words = tokens.filter(token => /\p{L}{3,}/u.test(token));
   if (text.length > 20 && words.length < 2) {
     return false; // one long blob is not a sentence
+  }
+  if (!/\s/.test(text)) {
+    return false; // a single token is a ticker or a protocol name, not something a person wrote
   }
   const shouting = (text.match(/[A-Z]/g) || []).length / Math.max(letters, 1);
   if (text.length > 24 && shouting > 0.8) {
