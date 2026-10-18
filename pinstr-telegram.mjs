@@ -63,16 +63,16 @@ function mountTelegramOption() {
   note.style.cssText = 'margin:0;font-size:.8rem;line-height:1.5;color:var(--text-muted);flex:1 1 100%;';
 
   const inTelegram = Boolean(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData);
-  note.textContent = inTelegram ? 'Checking your Telegram session…' : 'Inside Telegram this signs you in with one tap, with no key to save.';
+  note.textContent = inTelegram ? 'Checking your Telegram session…' : 'Opens Telegram to confirm who you are, then creates your key. No password, no seed phrase to write down.';
 
   button.addEventListener('click', () => {
-    if (!inTelegram) {
-      setStatus('Open @pinstrsibot in Telegram and choose Open Pinstr.', 'bad');
-      return;
-    }
     button.disabled = true;
     button.style.opacity = '.6';
-    bootTelegram().finally(() => {
+    setStatus('Waiting for Telegram…');
+    const run = inTelegram
+      ? bootTelegram()
+      : loginWithWidget().then(({ session, user }) => bootTelegram({ session, user }));
+    run.catch((err) => setStatus(`Telegram sign-in failed: ${String(err.message || err)}`, 'bad')).finally(() => {
       button.disabled = false;
       button.style.opacity = '1';
     });
@@ -110,19 +110,74 @@ function announce(detail) {
   return detail;
 }
 
-export async function bootTelegram() {
+const BOT_ID = 8513984991; // @pinstrsibot
+const WIDGET_SRC = 'https://telegram.org/js/telegram-widget.js?22';
+
+function loadLoginWidgetScript() {
+  if (typeof document === 'undefined') return Promise.resolve();
+  if (globalThis.Telegram && globalThis.Telegram.Login) return Promise.resolve();
+  return new Promise((resolve) => {
+    const tag = document.createElement('script');
+    tag.src = WIDGET_SRC;
+    tag.async = true;
+    tag.onload = resolve;
+    tag.onerror = resolve;
+    document.head.appendChild(tag);
+  });
+}
+
+// Outside Telegram the only way in is the Login Widget: a popup on
+// oauth.telegram.org which hands back a signed user object. It has to be opened from
+// the click itself, or the browser blocks it.
+async function loginWithWidget() {
+  await loadLoginWidgetScript();
+  const login = globalThis.Telegram && globalThis.Telegram.Login;
+  if (!login || typeof login.auth !== 'function') throw new Error('Telegram login widget did not load');
+  const user = await new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) reject(new Error('Telegram login was not completed'));
+    }, 180000);
+    try {
+      login.auth({ bot_id: BOT_ID, request_access: 'write' }, (data) => {
+        settled = true;
+        clearTimeout(timer);
+        if (!data || !data.id) reject(new Error('Telegram returned no account'));
+        else resolve(data);
+      });
+    } catch (err) {
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    }
+  });
+  const res = await post('/login', user);
+  if (!res.ok) throw new Error(`login ${res.status}`);
+  return { session: res.data.session, user: res.data.user };
+}
+
+export async function bootTelegram(pre = null) {
   const wa = globalThis.Telegram && globalThis.Telegram.WebApp;
-  if (!wa || !wa.initData) return announce({ active: false, reason: 'not opened from telegram' });
-  try {
-    wa.ready();
-    wa.expand();
-  } catch {}
+  const insideTelegram = Boolean(wa && wa.initData);
+  if (!pre && !insideTelegram) return announce({ active: false, reason: 'not opened from telegram' });
+  if (insideTelegram) {
+    try {
+      wa.ready();
+      wa.expand();
+    } catch {}
+  }
 
-  const verified = await post('/verify', { initData: wa.initData });
-  if (!verified.ok) return announce({ active: false, reason: `verify ${verified.status}`, detail: verified.data });
-
-  const session = verified.data.session;
-  const user = verified.data.user;
+  let session;
+  let user;
+  if (pre) {
+    session = pre.session;
+    user = pre.user;
+  } else {
+    const verified = await post('/verify', { initData: wa.initData });
+    if (!verified.ok) return announce({ active: false, reason: `verify ${verified.status}`, detail: verified.data });
+    session = verified.data.session;
+    user = verified.data.user;
+  }
   const resumed = await getJson('/session', session);
   if (!resumed.ok) return announce({ active: true, signedIn: false, reason: `session ${resumed.status}`, user, session });
 
@@ -177,6 +232,9 @@ export async function ensureBooted() {
 if (typeof document !== 'undefined') {
   const start = () => {
     watchForLoginBlock();
+    // The widget script defines Telegram.Login; loading it early is what lets the
+    // popup open from the click instead of being blocked.
+    if (!(globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData)) loadLoginWidgetScript();
     ensureBooted();
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

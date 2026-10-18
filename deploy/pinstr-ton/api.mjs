@@ -5,7 +5,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { verifyInitData } from './telegramAuth.mjs';
+import { verifyInitData, verifyLoginWidget } from './telegramAuth.mjs';
 import { sealSecret, checkKind0, publishToAll } from './profile.mjs';
 
 const PORT = Number(process.env.PINSTR_TG_PORT || 8851);
@@ -134,6 +134,28 @@ export function createServer(env = {}) {
         const exp = Math.floor(now / 1000) + SESSION_TTL_S;
         const session = sign({ tg: result.user.id, user: result.user, iat: Math.floor(now / 1000), exp }, secret);
         send(res, 200, { session, user: result.user, startParam: result.startParam, expiresAt: new Date(exp * 1000).toISOString() });
+        return;
+      }
+      if (url.pathname === '/tg/login' && req.method === 'POST') {
+        // The web Login Widget signs with sha256 of the bot token, not the WebAppData
+        // derivation, so it gets its own verification path.
+        if (!token) return send(res, 503, { error: 'bot token not configured' });
+        if (!secret) return send(res, 503, { error: 'session secret not configured' });
+        const body = await readJson(req);
+        const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+        const now = Date.now();
+        if (rateLimited(ip, now)) return send(res, 429, { error: 'too many attempts' });
+        const result = verifyLoginWidget(body, token, { now });
+        if (!result.valid) return send(res, 401, { error: 'verification failed', reason: result.reason });
+        const exp = Math.floor(now / 1000) + SESSION_TTL_S;
+        const session = sign({ tg: result.user.id, user: result.user, iat: Math.floor(now / 1000), exp, via: 'widget' }, secret);
+        const record = readProfile(profileDir, result.user.id);
+        send(res, 200, {
+          session,
+          user: result.user,
+          expiresAt: new Date(exp * 1000).toISOString(),
+          profile: record ? { pubkey: record.pubkey, published: Boolean(record.published) } : null,
+        });
         return;
       }
       if (url.pathname === '/tg/session' && req.method === 'GET') {
