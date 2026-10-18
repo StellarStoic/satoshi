@@ -429,6 +429,9 @@ export async function bootTelegram(pre = null) {
 // Load the vendored bundle if the page did not already, then boot. The bundle is a
 // classic script that defines a global, so it is injected rather than imported.
 export async function ensureBooted() {
+  // Telegram sign-in is pinstr.si only. satoshi.si is the Bitcoin site, and its domain is
+  // not registered for the bot, so the popup cannot complete there: stay completely inert.
+  if (!ON_PINSTR) return announce({ active: false, reason: 'telegram sign-in is only offered on pinstr.si' });
   if (globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData) {
     if (!globalThis.NostrTools) {
       await new Promise((resolve) => {
@@ -446,6 +449,7 @@ export async function ensureBooted() {
 
 if (typeof document !== 'undefined') {
   const start = () => {
+    if (!ON_PINSTR) return;
     watchForLoginBlock();
     // The widget script defines Telegram.Login; loading it early is what lets the
     // popup open from the click instead of being blocked.
