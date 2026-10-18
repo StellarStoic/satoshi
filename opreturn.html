@@ -11,10 +11,12 @@
 <script src="/burgerMenu.js" defer></script>
 <script src="/vendor/lucide/lucide.min.js" defer></script>
 <style>
-  :root { color-scheme: dark; --bg:#14161a; --panel:#1c1f25; --line:#2b3038; --ink:#e8eaed; --dim:#9aa3af; --accent:#f7931a; --ok:#2fbf71; --bad:#e05353; }
+  /* The site's palette and face come from /theme.css; these are only short names. */
+  :root { --bg: var(--page-bg); --panel: var(--surface); --line: var(--border); --ink: var(--text); --dim: var(--text-muted); --ok: var(--success); --bad: var(--danger); }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 28px 18px 80px; }
+  body { margin: 0; background: var(--page-bg); color: var(--text); font-family: var(--site-font); font-size: 15px; line-height: 1.65; }
+  main { width: min(100% - 24px, 720px); margin: 0 auto; padding: 84px 0 70px; }
+  main > section, main > h1, main > p { margin-left: 0; margin-right: 0; }
   h1 { font-size: 1.6rem; margin: 0 0 6px; }
   .lede { color: var(--dim); margin: 0 0 22px; }
   h2 { font-size: 1rem; margin: 26px 0 8px; color: var(--accent); letter-spacing: .02em; text-transform: uppercase; }
@@ -44,8 +46,16 @@
   [hidden] { display:none !important; }
   a { color: var(--accent); }
   #orderPanel { margin-top:18px; }
-  #helpIcon { position:fixed; top:14px; right:58px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--accent); font-size:1rem; cursor:pointer; z-index:20; }
-  #listIcon { position:fixed; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--accent); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:1rem; z-index:20; }
+  /* Same treatment as the help icon on the site's other pages: no chrome, just a glyph. */
+  #helpIcon, #listIcon { position:absolute; top:max(22px, env(safe-area-inset-top)); z-index:2100; display:grid; place-items:center; width:36px; height:36px; min-height:0; margin:0; padding:0; border:0; background:transparent; color:var(--text-muted); font:400 1.25rem/1 var(--site-font); cursor:pointer; text-decoration:none; }
+  #helpIcon { right:58px; }
+  #listIcon { right:22px; }
+  #helpIcon:hover, #helpIcon:focus-visible, #listIcon:hover, #listIcon:focus-visible { color: var(--accent); outline: none; }
+  @media (max-width:600px) {
+    #helpIcon, #listIcon { top:max(14px, env(safe-area-inset-top)); width:34px; height:34px; font-size:1.1rem; }
+    #helpIcon { right:48px; }
+    #listIcon { right:12px; }
+  }
   .cardwrap canvas { max-width:min(92vw, 760px); max-height:74vh; width:auto; height:auto; }
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
@@ -489,7 +499,7 @@ function downloadCard(note, pattern) {
   const words = String(note.text || '').split(/\s+/);
   let fontSize = words.length > 34 ? 40 : words.length > 18 ? 52 : 66;
   ctx.fillStyle = '#ffffff';
-  ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+  ctx.font = `600 ${fontSize}px ${getComputedStyle(document.documentElement).getPropertyValue('--site-font').trim() || 'monospace'}`;
   const lines = [];
   let line = '';
   for (const word of words) {
@@ -501,8 +511,8 @@ function downloadCard(note, pattern) {
   const shown = lines.slice(0, 11);
   const startY = 520 - (shown.length * fontSize * 1.25) / 2;
   shown.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
-  ctx.fillStyle = '#f7931a';
-  ctx.font = '600 30px system-ui, sans-serif';
+  ctx.fillStyle = accent;
+  ctx.font = '600 30px ' + (getComputedStyle(document.documentElement).getPropertyValue('--site-font').trim() || 'monospace');
   ctx.fillText('satoshi.si/opreturn', 95, 900);
   ctx.fillStyle = '#e8eaed';
   ctx.font = '400 26px system-ui, sans-serif';
