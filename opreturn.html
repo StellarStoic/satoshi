@@ -445,6 +445,9 @@ function openReader(note) {
 }
 
 function downloadCard(note, pattern) {
+  const computed = getComputedStyle(document.documentElement);
+  const accent = computed.getPropertyValue('--accent').trim() || '#f2a900';
+  const face = computed.getPropertyValue('--site-font').trim() || 'monospace';
   const size = 1080;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -499,7 +502,7 @@ function downloadCard(note, pattern) {
   const words = String(note.text || '').split(/\s+/);
   let fontSize = words.length > 34 ? 40 : words.length > 18 ? 52 : 66;
   ctx.fillStyle = '#ffffff';
-  ctx.font = `600 ${fontSize}px ${getComputedStyle(document.documentElement).getPropertyValue('--site-font').trim() || 'monospace'}`;
+  ctx.font = `600 ${fontSize}px ${face}`;
   const lines = [];
   let line = '';
   for (const word of words) {
@@ -512,7 +515,7 @@ function downloadCard(note, pattern) {
   const startY = 520 - (shown.length * fontSize * 1.25) / 2;
   shown.forEach((row, index) => ctx.fillText(row, 95, startY + index * fontSize * 1.25));
   ctx.fillStyle = accent;
-  ctx.font = '600 30px ' + (getComputedStyle(document.documentElement).getPropertyValue('--site-font').trim() || 'monospace');
+  ctx.font = `600 30px ${face}`;
   ctx.fillText('satoshi.si/opreturn', 95, 900);
   ctx.fillStyle = '#e8eaed';
   ctx.font = '400 26px system-ui, sans-serif';
