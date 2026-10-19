@@ -4218,6 +4218,16 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // stored for this order. A written note's content stays its words.
     const pictureAddress = pending.image ? stickyImageUrl(pending.image) : '';
     const template = makeStickyTemplate({...pending, ...placement, content: pictureAddress || pending.content, liveliness: pending.liveliness || STICKY_DEFAULT_LIVELINESS, anonymous: Boolean(pending.anonymous), paid: pending.paidBadge || ''});
+    // Mining hashes [0, pubkey, created_at, kind, tags, content], so the template needs the
+    // writer's key. The note body does not carry it - the signer does - so it is taken from
+    // the session, and from the signer itself when the session does not have it yet.
+    if (!template.pubkey) {
+      template.pubkey = (getNostrSession() || {}).pubkey
+        || (globalThis.nostr && typeof globalThis.nostr.getPublicKey === 'function'
+          ? await globalThis.nostr.getPublicKey().catch(() => '')
+          : '');
+    }
+    if (!template.pubkey) throw new Error('Sign in before pinning: the note has to be mined on your own key, and no signer answered.');
     // The hand-over goes in front of the reader *before* the request leaves for Amber, which is the
     // order the sign-in route has always used (showAmberCopyDialog() then beginAmberLogin()) and the
     // one this device is known to complete. The navigation to the signer happens inside
