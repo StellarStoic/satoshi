@@ -404,6 +404,53 @@ function watchForLoginBlock() {
   }
 }
 
+// The key tools were mounted only on the login path, so a reload that restored the session from
+// storage left the account dialog without its export and delete controls - it looked like a smaller,
+// poorer dialog than the one just after signing in. Re-mount from the stored session as well, both
+// once the DOM is there and every time the account dialog opens.
+function remountKeyToolsFromSession() {
+  let session;
+  try {
+    session = JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
+  } catch {
+    return;
+  }
+  if (!session || !session.pubkey) return;
+  // adoptBoardSession writes { pubkey, method: 'telegram', npub, profile }; older shapes used
+  // signer/source/via, so accept any of them rather than assuming one.
+  const hosted = ['method', 'signer', 'source', 'via'].some((key) => session[key] === 'telegram');
+  if (!hosted) return;
+  mountKeyTools({
+    active: true,
+    signedIn: true,
+    session,
+    user: (session.user && typeof session.user === 'object' ? session.user : {}),
+    npub: session.npub || '',
+  });
+}
+
+function armKeyToolsFromStorage() {
+  const run = () => {
+    remountKeyToolsFromSession();
+    const dialog = document.querySelector('#accountDialog');
+    if (!dialog || dialog.dataset.pinstrKeyWatch === '1') return;
+    dialog.dataset.pinstrKeyWatch = '1';
+    new MutationObserver(() => {
+      if (dialog.open) remountKeyToolsFromSession();
+    }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
+  };
+  if (typeof document === 'undefined') return;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+  else run();
+  // The board may build the account dialog after this module runs, so look again shortly after and
+  // whenever a session appears.
+  setTimeout(run, 1500);
+  setTimeout(run, 4000);
+  document.addEventListener('satoshi-nostr-session', () => setTimeout(run, 200));
+}
+
+armKeyToolsFromStorage();
+
 function announce(detail) {
   globalThis.PinstrTelegram = detail;
   try {
