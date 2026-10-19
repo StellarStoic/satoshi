@@ -327,9 +327,11 @@ function restructureLoginDialog() {
       button = makeTelegramButton({ wide: true });
     }
 
-    const note = document.createElement('p');
-    note.className = 'pinstr-tg-status';
-    note.style.cssText = 'margin:0 0 14px;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
+    let note = dialog.querySelector('.pinstr-tg-status');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'pinstr-tg-status';
+    }
     wireTelegramButton(button, note);
     // Insert without assuming the details element exists: the board may build its method
     // list later, and the previous version threw here, taking the button and the status
@@ -588,7 +590,11 @@ export async function ensureBooted() {
 
 if (typeof document !== 'undefined') {
   const start = () => {
-    if (!ON_PINSTR) return;
+    if (!ON_PINSTR) {
+      document.querySelectorAll('.pinstr-tg-signin, #pinstrTgSignIn, .pinstr-tg-status')
+        .forEach((element) => { element.hidden = true; });
+      return;
+    }
     watchForLoginBlock();
     // Inside a Mini App the WebView script gives ready(), expand() and themeParams.
     if (miniAppInitData()) loadWebAppScript();

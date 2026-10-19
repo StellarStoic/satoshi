@@ -850,6 +850,24 @@ test('board chrome stays compact over the board', async () => {
   assert.match(script, /localStorage\.removeItem\(BOARD_KEY\)/);
 });
 
+test('the Pinstr mirror keeps Telegram visible and every top control in one aligned row', async () => {
+  const [html, css, telegram] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../pinstr-telegram.mjs', import.meta.url), 'utf8'),
+  ]);
+  const telegramButton = html.indexOf('id="pinstrTgSignIn"');
+  const nostrMethods = html.indexOf('<div class="login-methods">');
+  assert.ok(telegramButton > 0 && telegramButton < nostrMethods,
+    'Telegram is a visible first-class option, not buried in the collapsible Nostr methods');
+  assert.match(html, /class="pinstr-tg-status"/);
+  assert.match(css, /\.sticky-top-actions \{[^}]*position:absolute;[^}]*display:flex;[^}]*align-items:center;/);
+  assert.match(css, /@media \(max-width: 480px\)[\s\S]*?\.sticky-top-button \{ width:40px; height:40px;/,
+    'mobile toolbar buttons retain the same 40px box as help');
+  assert.match(telegram, /if \(!ON_PINSTR\) \{[\s\S]*?\.pinstr-tg-status'[\s\S]*?element\.hidden = true/,
+    'the static Telegram option stays specific to the pinstr.si mirror');
+});
+
 test('published notes resolve a readable author label in relay batches', async () => {
   const [script, css] = await Promise.all([
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),

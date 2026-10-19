@@ -42,7 +42,12 @@ test('Pinstr help explains its signed Nostr layout without backend details', () 
 
 test('top controls are document-positioned and share one horizontal center line', () => {
     assert.match(siteHelpSource, /document\.body\.append\(trigger, companion\)/);
-    assert.match(siteHelpSource, /trigger\.parentElement !== document\.body/);
+    assert.match(siteHelpSource, /'\/stickyNotes\.html': \{selector: '\.sticky-help-slot', mount: true\}/);
+    assert.match(siteHelpSource, /companion\.append\(trigger\)/);
+    assert.match(siteHelpSource, /if \(!trigger\.parentElement\) document\.body\.append\(trigger\)/,
+        'an embedded Pinstr help button must not be pulled back out of its toolbar');
+    assert.match(siteHelpSource, /path === '\/' && document\.body\?\.classList\.contains\('sticky-page'\)/,
+        'the pinstr.si root mirror resolves to Pinstr help and controls');
     assert.doesNotMatch(siteHelpSource, /document\.documentElement\.append/);
     assert.doesNotMatch(siteHelpSource, /setProperty\('position', 'fixed'/);
     assert.doesNotMatch(siteHelpCss, /position:\s*fixed\s*!important/);

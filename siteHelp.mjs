@@ -297,6 +297,15 @@ function normalisePath(pathname) {
     return filename.endsWith('.html') ? filename : cleanPath;
 }
 
+function currentPagePath() {
+    const path = normalisePath(location.pathname);
+    // pinstr.si mirrors stickyNotes.html at its root. The page body is the reliable
+    // identity there; using only "/" would load the home-page help and leave its
+    // trigger outside the Pinstr toolbar.
+    if (path === '/' && document.body?.classList.contains('sticky-page')) return '/stickyNotes.html';
+    return path;
+}
+
 export function helpForPath(pathname) {
     return PAGE_HELP[normalisePath(pathname)] || null;
 }
@@ -345,7 +354,7 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
     '/isBip39.html': {selector: '#openWordlistSettings', group: true, icon: true},
     '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true},
     '/MoscowTime.html': {selector: '#openMoscowSettings', group: true, icon: true},
-    '/stickyNotes.html': {selector: '.sticky-top-actions', wide: true}
+    '/stickyNotes.html': {selector: '.sticky-help-slot', mount: true}
 });
 
 function groupTopRightControls(trigger, companion) {
@@ -357,10 +366,16 @@ function groupTopRightControls(trigger, companion) {
 }
 
 function alignTopRightControls(trigger) {
-    const config = TOP_RIGHT_COMPANIONS[normalisePath(location.pathname)];
+    const config = TOP_RIGHT_COMPANIONS[currentPagePath()];
     if (!config) return;
     const companion = document.querySelector(config.selector);
     if (!companion) return;
+    if (config.mount) {
+        companion.removeAttribute('aria-hidden');
+        companion.append(trigger);
+        trigger.classList.add('site-help-trigger--embedded');
+        return;
+    }
     companion.classList.add('site-help-companion');
     if (config.icon) companion.classList.add('site-help-companion--icon');
     if (config.group) {
@@ -502,7 +517,7 @@ function createHelpTrigger(dialog, help) {
     trigger.innerHTML = iconMarkup();
     trigger.addEventListener('click', () => dialog.showModal());
     alignTopRightControls(trigger);
-    if (trigger.parentElement !== document.body) document.body.append(trigger);
+    if (!trigger.parentElement) document.body.append(trigger);
 }
 
 export function initialiseSiteHelp() {
@@ -513,7 +528,7 @@ export function initialiseSiteHelp() {
     }
 
     if (document.getElementById('siteHelpTrigger')) return;
-    const help = helpForPath(location.pathname);
+    const help = PAGE_HELP[currentPagePath()] || null;
     if (!help) return;
     const dialog = createHelpDialog(help);
     createHelpTrigger(dialog, help);

@@ -3,15 +3,14 @@
 .sticky-page { min-height: 100vh; overflow: hidden; }
 .sticky-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; margin: 0; padding: 0; }
 .sticky-page-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.sticky-top-actions { display: flex; align-items: center; gap: 10px; }
-.sticky-help-slot { flex:0 0 40px; width:40px; height:40px; }
+.sticky-top-actions { position:absolute; top:calc(19px + env(safe-area-inset-top)); right:max(24px,env(safe-area-inset-right)); z-index:2200; display:flex; align-items:center; gap:10px; max-width:calc(100vw - 24px); }
+.sticky-help-slot { display:block; flex:0 0 40px; width:40px; height:40px; }
 .sticky-top-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; background: rgba(18,19,19,.68); color: #f4f4f1; font: inherit; font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.2); backdrop-filter: blur(5px); cursor: pointer; }
 .sticky-top-button:hover, .sticky-top-button:focus-visible { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); outline: none; }
 .sticky-top-button:disabled { opacity:.6; cursor:default; }
 .note-sort-button { border:2px solid transparent; }
 .note-sort-button.has-active-filter { border-color:#7cfc00; box-shadow:0 0 10px rgba(124,252,0,.24); color:#b7ff79; }
 .sticky-page .site-help-trigger { border: 1px solid rgba(255,255,255,.24) !important; border-radius: 6px !important; background: rgba(18,19,19,.68) !important; box-shadow: 0 4px 14px rgba(0,0,0,.2) !important; color: #f4f4f1 !important; backdrop-filter: blur(5px); }
-.sticky-page .site-help-trigger.site-help-trigger--wide-offset { right: max(288px, calc(272px + env(safe-area-inset-right))) !important; }
 .icon-text-button, .primary-action, .secondary-action, .pay-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border: 1px solid #555; border-radius: 6px; padding: 9px 14px; color: #f6f5ef; background: #202223; font: inherit; cursor: pointer; }
 .primary-action, .pay-button { border-color: var(--accent, #f2a900); background: var(--accent, #f2a900); color: #111; font-weight: 700; }
 /* The board's own area stops above fixed chrome across the foot of the page (satoshi.si's footer),
@@ -307,6 +306,9 @@
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }
 .login-methods button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #505354; border-radius: 6px; background: #242627; color: #f1f1ee; font: inherit; cursor: pointer; }
+.pinstr-tg-signin { display:flex; align-items:center; justify-content:center; gap:9px; width:100%; min-height:50px; margin:18px 0 0; border:1px solid #279bd7; border-radius:6px; background:#207db0; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+.pinstr-tg-signin:hover, .pinstr-tg-signin:focus-visible { border-color:#72c8f3; background:#258abd; outline:2px solid color-mix(in srgb,#279bd7 42%,transparent); outline-offset:2px; }
+.pinstr-tg-status { margin:7px 0 15px; color:var(--text-muted,#aeb0ae); font-size:.78rem; line-height:1.45; }
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }
@@ -391,9 +393,14 @@
 }
 
 @media (max-width: 480px) {
-  .sticky-top-actions { gap: 8px; }
-  .sticky-top-button { width:32px; height:40px; font-size:19px; }
-  .sticky-page .site-help-trigger.site-help-trigger--wide-offset { right:max(216px,calc(200px + env(safe-area-inset-right))) !important; }
+  .sticky-top-actions { right:max(12px,env(safe-area-inset-right)); gap:7px; }
+  .sticky-top-button { width:40px; height:40px; font-size:22px; }
+}
+
+@media (max-width: 360px) {
+  .sticky-top-actions { gap:4px; }
+  .sticky-top-button, .sticky-help-slot { width:38px; height:38px; flex-basis:38px; }
+  .sticky-top-actions .site-help-trigger { width:38px !important; height:38px !important; min-width:38px !important; min-height:38px !important; }
 }
 
 /* Subscription state and the plan picker inside the composer */
@@ -755,9 +762,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   width: 40px !important;
   height: 40px !important;
   padding: 0 !important;
-  /* A question mark at the icon size reads larger than an icon of the same size, so it is
-     drawn smaller inside the same box: the buttons match even though the glyphs differ. */
-  font-size: 15px !important;
+  /* The help control uses the same icon and hit-target size as every neighbour. */
+  font-size: 22px !important;
   line-height: 1 !important;
   border-radius: 6px !important;
   color: #f4f4f1 !important;
@@ -788,7 +794,7 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   padding: 0 !important;
   display: grid !important;
   place-items: center !important;
-  font-size: 15px !important;
+  font-size: 22px !important;
   line-height: 1 !important;
   border-radius: 6px !important;
 }
