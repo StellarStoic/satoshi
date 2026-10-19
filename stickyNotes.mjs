@@ -1766,6 +1766,27 @@ elements.mine.addEventListener('click', () => {
  * The note has to be finished before this runs: the placement, the words and the moment it
  * was written all feed the id, so mining an unfinished note would be work on a different id.
  */
+/**
+ * The NIP-05 name on a key, asked of the relays rather than trusted to a cached profile.
+ *
+ * A profile is fetched when the board feels like it; the name is needed exactly when a mined
+ * order is created. First answer wins.
+ */
+async function nip05ForMining(pubkey) {
+  const cached = String(getNostrSession()?.profile?.nip05 || '').trim();
+  if (cached) return cached;
+  if (!/^[0-9a-f]{64}$/.test(pubkey || '')) return '';
+  for (const relay of [RELAY, 'wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.ditto.pub']) {
+    try {
+      const event = await readProfileFromRelay(relay, pubkey);
+      const content = event && typeof event.content === 'string' ? JSON.parse(event.content) : null;
+      const value = String((content && content.nip05) || '').trim();
+      if (value) return value;
+    } catch { /* try the next relay */ }
+  }
+  return '';
+}
+
 async function mineThisNote(template, bits) {
   // The pubkey is the signer's, not the note's, so it is ensured here as well: a template
   // rebuilt from the saved pending note between placing and pinning would not carry it, and
@@ -3724,6 +3745,14 @@ async function startPayment() {
       // it is baked into the stored picture and never travels in the note.
       image: noteKind === 'image' ? String(pending?.image || '') : '',
       imageGrade: noteKind === 'image' ? selectedImageGrade : ''};
+    // Mining is the NIP-05 perk, so the name has to be in hand before the order is asked for.
+    // session.profile is only filled when a profile happened to load, which is why a key that
+    // does have a name could still be told it had none: the name is looked up on the relays
+    // here rather than assumed to be cached.
+    let nip05Name = miningRequested ? await nip05ForMining(session.pubkey) : '';
+    if (miningRequested && !nip05Name) {
+      throw new Error('Mining is free for keys with a NIP-05 name, and none was found on the relays for this key. Pay in sats, or check that your profile carries one — name@domain, on any domain.');
+    }
     let order;
     try {
       order = await api('/orders', {
@@ -3731,13 +3760,7 @@ async function startPayment() {
         body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
           geohash: activeGeohash, geohashes: [...activeGeohashes],
           ...(pictureHash ? {pictureHash} : {}),
-          ...(miningRequested ? {pow: true, powName: String(session.profile?.nip05 || '').trim()} : {}),
-          // Mining is the NIP-05 perk: the desk refuses pow without a name, and its refusal is
-          // written for whoever reads the spec, not for the reader who just pressed a button.
-          // So the board checks first and says the useful thing instead.
-          ...(miningRequested && !String(session.profile?.nip05 || '').trim()
-            ? (() => { throw new Error('Mining is free for keys with a NIP-05 name. This key has none, so pay in sats or add a name first — name@domain, on any domain.'); })()
-            : {}),
+          ...(miningRequested ? {pow: true, powName: nip05Name} : {}),
           geohashMode: exactGeohash ? 'exact' : 'prefix',
           // Say it rather than let the desk infer it: the two sides agree on what this
           // key is, so the order that comes back is priced the way the composer showed.
