@@ -299,8 +299,14 @@ function restructureLoginDialog() {
     // Clone the board's own button rather than copying its computed style: at mount the
     // anonymous button can be inside a hidden block, and copying a hidden element's
     // resolved styles made the Telegram button invisible.
-    let button;
-    if (reference) {
+    // The markup carries the button so it cannot fail to appear: the module only unhides it
+    // and wires it. Cloning a reference button remains the fallback for pages without it.
+    let button = dialog.querySelector('#pinstrTgSignIn');
+    if (button) {
+      button.hidden = false;
+      button.classList.add('pinstr-tg-btn');
+      if (summary && reference) summary.className = (reference.className || '') + ' pinstr-nostr-summary';
+    } else if (reference) {
       button = reference.cloneNode(true);
       button.removeAttribute('data-login');
       button.classList.add('pinstr-tg-btn');
