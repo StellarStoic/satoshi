@@ -176,8 +176,16 @@ function mountTonPanel() {
     if (!payment || payment.dataset.pinstrTonWatch === '1') return;
     payment.dataset.pinstrTonWatch = '1';
     new MutationObserver(() => {
-      if (!payment.open) return;
       if (readChoice() !== 'ton') return;
+      if (!payment.open) return;
+      // The board's own poll re-opens its invoice dialog every few seconds. In TON mode that dialog
+      // offers sats, which is the wrong rail, so close it every time it appears and keep the TON
+      // panel in its place. Without this the sats buttons come back and the reader is asked to
+      // subscribe in a currency they did not choose.
+      if (tonDialog.open) {
+        payment.close();
+        return;
+      }
       setTimeout(() => openTonPanel(), 60);
     }).observe(payment, { attributes: true, attributeFilter: ['open'] });
   };
@@ -201,7 +209,7 @@ async function openTonPanel() {
   const payment = document.getElementById('paymentDialog');
   if (payment && payment.open) payment.close();
   tonDialog.querySelector('[data-ton-state]').textContent = 'Preparing the TON amount…';
-  tonDialog.showModal();
+  if (!tonDialog.open) tonDialog.showModal();
   let quote;
   try {
     const response = await fetch(`/pinstr/v1/orders/${encodeURIComponent(orderId)}/ton`, { headers: { accept: 'application/json' } });
