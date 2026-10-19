@@ -531,6 +531,27 @@ function updateBoardUrl() {
 let noticeText = '';
 let loginConfirmationTimer = 0;
 
+// A warning that names a dead end should not become part of the furniture: it fades on
+// its own, and tapping it dismisses it sooner. Without this the one-time-key notice sat
+// on the board until the page was reloaded.
+let boardStatusTimer = 0;
+const BOARD_STATUS_LINGER_MS = 8000;
+
+function dismissBoardStatusAfter(ms = BOARD_STATUS_LINGER_MS) {
+  if (!elements.boardStatus) return;
+  clearTimeout(boardStatusTimer);
+  elements.boardStatus.hidden = false;
+  elements.boardStatus.style.cursor = 'pointer';
+  elements.boardStatus.title = 'Tap to dismiss';
+  elements.boardStatus.onclick = () => {
+    clearTimeout(boardStatusTimer);
+    elements.boardStatus.hidden = true;
+  };
+  boardStatusTimer = setTimeout(() => {
+    elements.boardStatus.hidden = true;
+  }, ms);
+}
+
 function status(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle('is-error', error);
@@ -1589,10 +1610,18 @@ function startCountdown(untilSeconds, label, doneLabel) {
 }
 
 async function renderPayment(order) {
+  const rails = stickyPaymentRails(order);
+  if (!rails.length) {
+    stopCountdown();
+    elements.paymentQr.hidden = true;
+    elements.paymentValue.textContent = '';
+    startInvoiceMessages();
+    return false;
+  }
+  stopInvoiceMessages();
   // A paid order that was never published is not a new purchase: saying so is the
   // difference between a flow that resumes and a flow that looks broken.
   if (order && order.paid) {
-    stopInvoiceMessages();
     stopPaymentWatch();
     currentRails = [];
     elements.paymentQr.hidden = true;
@@ -1607,15 +1636,6 @@ async function renderPayment(order) {
     showDialog(elements.paymentDialog);
     return true;
   }
-  const rails = stickyPaymentRails(order);
-  if (!rails.length) {
-    stopCountdown();
-    elements.paymentQr.hidden = true;
-    elements.paymentValue.textContent = '';
-    startInvoiceMessages();
-    return false;
-  }
-  stopInvoiceMessages();
   const sats = stickyOrderPrice(order, pending?.sats ?? STICKY_SUB_WEEK_SATS);
   currentRails = rails;
   elements.paymentAmount.textContent = `Pay ${sats} sats`;
@@ -4904,6 +4924,7 @@ function openComposer() {
   if (!session) { showDialog(elements.login); return; }
   if (session.method === 'anonymous' && session.noteEventId) {
     status(elements.boardStatus, 'This one-time key already posted its note. Leave anonymous mode, then start again for a fresh key.');
+    dismissBoardStatusAfter();
     elements.boardStatus.hidden = false;
     return;
   }
