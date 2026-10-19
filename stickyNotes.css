@@ -805,3 +805,29 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   font-size: 22px !important;
   line-height: 1 !important;
 }
+
+/* Telegram's WebView draws a <select> as a native control and ignores a background it inherits, so a
+   transparent select with light text came out white on white there and only there; the option list
+   came from the platform's light theme, black on white. Give the control and its options their own
+   colours, and declare the page dark so the native popup matches instead of fighting it. */
+.sticky-page { color-scheme: dark; }
+.sticky-page select,
+.sticky-page select option,
+.sticky-page .note-font-select {
+  background-color: #141515;
+  color: #f4f4f1;
+  border-color: rgba(255, 255, 255, .24);
+}
+.sticky-page select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #f4f4f1 50%),
+    linear-gradient(135deg, #f4f4f1 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
