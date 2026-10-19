@@ -1095,6 +1095,15 @@ const handleRequest = async (req, res) => {
       const id = decodeURIComponent(tonMatch[1]);
       const order = loadSticky(now)[id];
       if (!order) return send(res, 404, { ok: false, error: 'unknown order' }, { 'cache-control': 'no-store' });
+      // Only a live order has a price worth showing: a paid, cancelled or expired one must not
+      // tempt anybody into sending money for something already settled or gone.
+      if (!['awaiting_invoice', 'awaiting_payment'].includes(order.status)) {
+        return send(res, 409, {
+          ok: false,
+          error: `this order is ${order.status} and has no TON price for a closed order`,
+          status: order.status,
+        }, { 'cache-control': 'no-store' });
+      }
       const quote = tonRailQuote(order);
       if (!quote.ok) return send(res, 409, quote, { 'cache-control': 'no-store' });
       return send(res, 200, { ok: true, orderId: id, ...quote }, { 'cache-control': 'no-store' });
