@@ -1772,6 +1772,37 @@ elements.mine.addEventListener('click', () => {
  * A profile is fetched when the board feels like it; the name is needed exactly when a mined
  * order is created. First answer wins.
  */
+/**
+ * Which build of the board is on screen.
+ *
+ * The service worker's cache name carries the version, and reading it back is the only
+ * answer that describes what the reader actually has rather than what the server would send
+ * them now. Cache storage can be unavailable, so this reports nothing rather than guessing.
+ */
+async function showBoardStyleVersion() {
+  const dialog = elements.boardStyleDialog;
+  if (!dialog) return;
+  let line = dialog.querySelector('.board-style-version');
+  if (!line) {
+    line = document.createElement('p');
+    line.className = 'board-style-version';
+    line.style.cssText = 'margin:20px 0 0;padding-top:14px;border-top:1px solid var(--border);font:400 .78rem/1.5 "Roboto Mono", monospace;color:var(--text-muted);';
+    const inner = dialog.querySelector('.dialog-inner') || dialog;
+    inner.appendChild(line);
+  }
+  line.textContent = 'Board build: reading…';
+  try {
+    const names = await caches.keys();
+    const mine = names.filter((name) => /^pinstr-static-v[0-9]+$/.test(name) || /^satoshi-static-v[0-9]+$/.test(name));
+    const newest = mine.map((name) => Number(name.replace(/^.*-v/, ''))).sort((a, b) => b - a)[0];
+    line.textContent = newest
+      ? `Board build v${newest} · cached on this device`
+      : 'Board build: not cached yet';
+  } catch {
+    line.textContent = 'Board build: this browser does not expose its caches';
+  }
+}
+
 async function nip05ForMining(pubkey) {
   const cached = String(getNostrSession()?.profile?.nip05 || '').trim();
   if (cached) return cached;
@@ -2586,6 +2617,7 @@ function openBoardStyle() {
   elements.boardTextureUrl.value = boardTextureChoice;
   if (elements.boardPatternCss) elements.boardPatternCss.value = boardPatternCssChoice;
   sayBoardStyle('');
+  showBoardStyleVersion();
   showDialog(elements.boardStyleDialog);
   renderUserRelays();
   checkUserRelays();
