@@ -247,7 +247,11 @@ function wireTelegramButton(button, note) {
       ? 'Checking your Telegram session…'
       : 'Opens Telegram to confirm who you are, then creates your key. No password, no seed phrase to write down.';
   }
-  return { inTelegram, wire: null };
+  // inTelegram moved inside the click handler when detection became click-time; this
+  // return kept referring to it and threw at load, killing the mount after the dialog had
+  // already been restructured - which is why the button existed in the DOM and never
+  // appeared or answered a click.
+  return { inTelegram: Boolean(miniAppInitData()), wire: null };
 }
 
 // The dialog is titled "Log in to Nostr" and offers four Nostr methods before anything

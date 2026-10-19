@@ -769,3 +769,32 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   outline: none !important;
 }
 .sticky-top-actions .site-help-trigger { margin: 0 !important; }
+
+/* The site help trigger is absolutely positioned by the site's own CSS, so inside the top
+   group it floated over the gear instead of sitting beside it. Here it is put back in the
+   flow, in the same box as its neighbours, with a smaller glyph: a question mark fills its
+   em box where the line icons leave margins, so at icon size it reads heavier. */
+.sticky-top-actions .site-help-trigger,
+.sticky-help-slot .site-help-trigger {
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  border-radius: 6px !important;
+}
+.sticky-page .site-help-trigger *,
+.sticky-page .site-help-trigger::before,
+.sticky-page .site-help-trigger::after {
+  font-size: 15px !important;
+  line-height: 1 !important;
+}
