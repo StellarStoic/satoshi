@@ -86,6 +86,39 @@ const STICKY_INVOICE_WAIT_MS = Number(process.env.STICKY_INVOICE_WAIT_MS || 2000
 const STICKY_WORKER_MAX_WAIT_MS = Number(process.env.STICKY_WORKER_MAX_WAIT_MS || 25000);
 
 const ORDERS_FILE = `${STATE_DIR}/orders.json`;
+
+// TON rail pricing for Pinstr. Fixed ladder, fee on top, order id as the transfer comment.
+const TON_MERCHANT_ADDRESS = process.env.TON_MERCHANT_ADDRESS
+  || 'UQBabpCfz6dDmTfDIw1TDOdt13pRAEMD35V3hgHFI_7ETxRf';
+const TON_TRANSFER_FEE = 10_000_000n; // 0.01 TON
+const TON_PRICE_LADDER = { anonymous: 500_000_000n, week: 1_000_000_000n, year: 3_000_000_000n };
+
+function tonActionFor(order) {
+  if (order && order.action === 'subscribe') return (order.plan === 'year' ? 'year' : 'week');
+  return 'anonymous';
+}
+
+function tonRailQuote(order) {
+  const action = tonActionFor(order);
+  const price = TON_PRICE_LADDER[action];
+  if (!price) return { ok: false, error: `no TON price for ${action}` };
+  const nano = price + TON_TRANSFER_FEE;
+  return {
+    ok: true,
+    rail: 'TON',
+    action,
+    address: TON_MERCHANT_ADDRESS,
+    comment: order.id,
+    priceNano: price.toString(),
+    feeNano: TON_TRANSFER_FEE.toString(),
+    nano: nano.toString(),
+    priceTon: Number(price) / 1e9,
+    feeTon: Number(TON_TRANSFER_FEE) / 1e9,
+    ton: Number(nano) / 1e9,
+    payUrl: `ton://transfer/${TON_MERCHANT_ADDRESS}?amount=${nano}&text=${encodeURIComponent(order.id)}`,
+  };
+}
+
 const NAMES_FILE = `${STATE_DIR}/names.json`;
 // Names this desk minted itself (Telegram identities). Kept apart from names.json, which the
 // worker regenerates from the published nostr.json and would therefore wipe.
@@ -1048,6 +1081,23 @@ const handleRequest = async (req, res) => {
               ? 'Pay the Bark rail, then poll this order for your publish token.'
               : 'Invoice is being prepared. Poll this order for the Bark rail.'))),
       }, { 'cache-control': 'no-store' });
+    }
+
+    // A TON rail for the same order. TON has no invoice object, so the order id travels in the
+    // transfer comment; the payer sends the ladder price plus the network fee, because that fee is
+    // taken out of what arrives. The prices are the TON ladder itself (0.5 / 1 / 3 TON) and not a
+    // conversion of the sats price: at these sizes a live rate would let the fee dictate the price.
+    const tonMatch = /^\/(?:sticky|pinstr)\/v1\/orders\/([^/]+)\/ton$/.exec(path);
+    if (tonMatch) {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return send(res, 405, { ok: false, error: 'method not allowed' }, { allow: 'GET' });
+      }
+      const id = decodeURIComponent(tonMatch[1]);
+      const order = loadSticky(now)[id];
+      if (!order) return send(res, 404, { ok: false, error: 'unknown order' }, { 'cache-control': 'no-store' });
+      const quote = tonRailQuote(order);
+      if (!quote.ok) return send(res, 409, quote, { 'cache-control': 'no-store' });
+      return send(res, 200, { ok: true, orderId: id, ...quote }, { 'cache-control': 'no-store' });
     }
 
     const stickyOrderMatch = /^\/(?:sticky|pinstr)\/v1\/orders\/([^/]+)$/.exec(path);
