@@ -755,7 +755,9 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   width: 40px !important;
   height: 40px !important;
   padding: 0 !important;
-  font-size: 20px !important;
+  /* A question mark at the icon size reads larger than an icon of the same size, so it is
+     drawn smaller inside the same box: the buttons match even though the glyphs differ. */
+  font-size: 15px !important;
   line-height: 1 !important;
   border-radius: 6px !important;
   color: #f4f4f1 !important;
