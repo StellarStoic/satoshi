@@ -730,3 +730,18 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 #stickyPayment.is-paid #stickyPaymentHint {
   color: #4cd97b;
 }
+
+/* A countdown for things that actually expire: the invoice while you find a wallet,
+   and the publish window after paying. */
+.sticky-countdown {
+  margin: 10px 0 0;
+  font: 400 0.8rem/1.4 "Roboto Mono", monospace;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.sticky-countdown.is-over {
+  color: #e06a5a;
+}
+#stickyPayment.is-paid .sticky-countdown {
+  color: #4cd97b;
+}

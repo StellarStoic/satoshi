@@ -1536,9 +1536,80 @@ function loadQr() {
   return qrPromise;
 }
 
+// Seconds left on a thing the user paid for is information, not decoration: an invoice
+// that expires while they are finding a wallet, or a publish window that closes after
+// payment, both need to be visible before they bite.
+let countdownTimer = null;
+
+function stopCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = null;
+}
+
+function ensureCountdown() {
+  let element = elements.paymentDialog.querySelector('.sticky-countdown');
+  if (!element) {
+    element = document.createElement('p');
+    element.className = 'sticky-countdown';
+    element.setAttribute('aria-live', 'polite');
+    const host = elements.paymentHint.parentNode || elements.paymentDialog;
+    host.insertBefore(element, elements.paymentHint.nextSibling);
+  }
+  return element;
+}
+
+function startCountdown(untilSeconds, label, doneLabel) {
+  stopCountdown();
+  const element = ensureCountdown();
+  const until = Number(untilSeconds);
+  if (!Number.isFinite(until) || until <= 0) {
+    element.textContent = '';
+    element.hidden = true;
+    return;
+  }
+  element.hidden = false;
+  element.classList.remove('is-over');
+  const tick = () => {
+    if (!elements.paymentDialog.open) {
+      stopCountdown();
+      return;
+    }
+    const left = until * 1000 - Date.now();
+    if (left <= 0) {
+      element.textContent = doneLabel;
+      element.classList.add('is-over');
+      stopCountdown();
+      return;
+    }
+    const seconds = Math.floor(left / 1000);
+    element.textContent = `${label} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
 async function renderPayment(order) {
+  // A paid order that was never published is not a new purchase: saying so is the
+  // difference between a flow that resumes and a flow that looks broken.
+  if (order && order.paid) {
+    stopInvoiceMessages();
+    stopPaymentWatch();
+    currentRails = [];
+    elements.paymentQr.hidden = true;
+    elements.paymentValue.hidden = true;
+    elements.copyPayment.hidden = true;
+    elements.openPayment.hidden = true;
+    elements.paymentRails.hidden = true;
+    elements.paymentAmount.textContent = 'Already paid';
+    elements.paymentHint.textContent = 'This note is paid for and waiting to be published. Finish it — a second payment is not needed.';
+    elements.paymentDialog.classList.add('is-paid');
+    startCountdown(order.publishTokenExpiresAt, 'Publish within', 'Publish window closed — make a new order.');
+    showDialog(elements.paymentDialog);
+    return true;
+  }
   const rails = stickyPaymentRails(order);
   if (!rails.length) {
+    stopCountdown();
     elements.paymentQr.hidden = true;
     elements.paymentValue.textContent = '';
     startInvoiceMessages();
@@ -1571,6 +1642,7 @@ async function renderPayment(order) {
   showDialog(elements.paymentDialog);
   const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
   await selectRail(wanted);
+  startCountdown(order.expiresAt, 'Invoice expires in', 'Invoice expired — tap Pay to make a new one.');
   watchForPayment(order);
   return true;
 }
@@ -1613,6 +1685,7 @@ function watchForPayment(order) {
     elements.paymentAmount.textContent = 'Payment received';
     elements.paymentHint.textContent = 'The desk confirmed your payment. Close this and finish your note — your publish token is ready.';
     elements.paymentDialog.classList.add('is-paid');
+    startCountdown(fresh.publishTokenExpiresAt, 'Publish within', 'Publish window closed — make a new order.');
   }, PAYMENT_POLL_MS);
 }
 
