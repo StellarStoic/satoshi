@@ -91,6 +91,38 @@ function injectLoginStyles() {
 // public key it holds, and signEvent forwarded to the server that keeps the key. An
 // existing browser extension is never replaced.
 const BOARD_SESSION_KEY = 'satoshi:nostr:session:v1';
+// The signed session string is what /tg/sign accepts, and it lived only in memory: a reload kept the
+// board logged in but left nothing able to sign, which the board reported as "Reconnect your signer".
+// It is a bearer token for a key sealed on the server, so it is kept beside the board session and
+// dropped when its own exp has passed. The private key itself never comes near this.
+const TG_SESSION_KEY = 'pinstr:tg-session:v1';
+
+function rememberTelegramSession(detail) {
+  if (!detail || !detail.session || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(TG_SESSION_KEY, JSON.stringify({
+      session: detail.session,
+      user: detail.user || null,
+      expiresAt: detail.expiresAt || '',
+    }));
+  } catch { /* storage blocked: signing works until this page is closed */ }
+}
+
+function readTelegramSession() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(TG_SESSION_KEY) || 'null');
+    if (!stored || !stored.session) return null;
+    // The token carries its own exp; trust a missing expiresAt but never a future-dated stale one.
+    if (stored.expiresAt) {
+      const at = Date.parse(stored.expiresAt);
+      if (Number.isFinite(at) && at <= Date.now()) return null;
+    }
+    return stored;
+  } catch {
+    return null;
+  }
+}
 
 function adoptBoardSession(pubkey) {
   if (!/^[0-9a-f]{64}$/.test(pubkey || '') || typeof localStorage === 'undefined') return;
@@ -408,6 +440,24 @@ function watchForLoginBlock() {
 // storage left the account dialog without its export and delete controls - it looked like a smaller,
 // poorer dialog than the one just after signing in. Re-mount from the stored session as well, both
 // once the DOM is there and every time the account dialog opens.
+function restoreTelegramSession() {
+  const stored = readTelegramSession();
+  if (!stored) return;
+  let boardSession;
+  try {
+    boardSession = JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
+  } catch {
+    boardSession = null;
+  }
+  const pubkey = boardSession && /^[0-9a-f]{64}$/.test(boardSession.pubkey || '') ? boardSession.pubkey : '';
+  if (!pubkey) return;
+  const detail = { active: true, signedIn: true, pubkey, session: stored.session, user: stored.user || {}, npub: boardSession.npub || '' };
+  try {
+    installSessionSigner(detail);
+  } catch { /* the board will say it needs a signer rather than pretending to have one */ }
+  mountKeyTools(detail);
+}
+
 function remountKeyToolsFromSession() {
   let session;
   try {
@@ -431,6 +481,7 @@ function remountKeyToolsFromSession() {
 
 function armKeyToolsFromStorage() {
   const run = () => {
+    restoreTelegramSession();
     remountKeyToolsFromSession();
     const dialog = document.querySelector('#accountDialog');
     if (!dialog || dialog.dataset.pinstrKeyWatch === '1') return;
@@ -458,6 +509,7 @@ function announce(detail) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
       installSessionSigner(detail);
       mountKeyTools(detail);
+      rememberTelegramSession(detail);
       const login = document.querySelector('#loginDialog');
       if (login?.open) login.close();
       if (detail.created) {
