@@ -3,7 +3,7 @@
 .sticky-page { min-height: 100vh; overflow: hidden; }
 .sticky-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; margin: 0; padding: 0; }
 .sticky-page-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.sticky-top-actions { display: flex; align-items: center; gap: 4px; }
+.sticky-top-actions { display: flex; align-items: center; gap: 10px; }
 .sticky-help-slot { flex:0 0 40px; width:40px; height:40px; }
 .sticky-top-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; background: rgba(18,19,19,.68); color: #f4f4f1; font: inherit; font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.2); backdrop-filter: blur(5px); cursor: pointer; }
 .sticky-top-button:hover, .sticky-top-button:focus-visible { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); outline: none; }
@@ -391,7 +391,7 @@
 }
 
 @media (max-width: 480px) {
-  .sticky-top-actions { gap:0; }
+  .sticky-top-actions { gap: 8px; }
   .sticky-top-button { width:32px; height:40px; font-size:19px; }
   .sticky-page .site-help-trigger.site-help-trigger--wide-offset { right:max(216px,calc(200px + env(safe-area-inset-right))) !important; }
 }
