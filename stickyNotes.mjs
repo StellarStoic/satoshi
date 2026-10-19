@@ -3732,6 +3732,12 @@ async function startPayment() {
           geohash: activeGeohash, geohashes: [...activeGeohashes],
           ...(pictureHash ? {pictureHash} : {}),
           ...(miningRequested ? {pow: true, powName: String(session.profile?.nip05 || '').trim()} : {}),
+          // Mining is the NIP-05 perk: the desk refuses pow without a name, and its refusal is
+          // written for whoever reads the spec, not for the reader who just pressed a button.
+          // So the board checks first and says the useful thing instead.
+          ...(miningRequested && !String(session.profile?.nip05 || '').trim()
+            ? (() => { throw new Error('Mining is free for keys with a NIP-05 name. This key has none, so pay in sats or add a name first — name@domain, on any domain.'); })()
+            : {}),
           geohashMode: exactGeohash ? 'exact' : 'prefix',
           // Say it rather than let the desk infer it: the two sides agree on what this
           // key is, so the order that comes back is priced the way the composer showed.
