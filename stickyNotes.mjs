@@ -2223,14 +2223,13 @@ function renderBoardTextures() {
     button.dataset.textureUrl = texture.url;
     button.classList.toggle('is-selected', selected);
     button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('aria-label', texture.label);
+    button.title = texture.label;
     const swatch = document.createElement('span');
     swatch.className = 'board-texture__swatch';
     swatch.style.backgroundImage = `url("${texture.url}")`;
     swatch.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.className = 'board-texture__label';
-    label.textContent = texture.label;
-    button.append(swatch, label);
+    button.append(swatch);
     button.addEventListener('click', () => applyBoardTexture(texture.url));
     group.append(button);
   }
@@ -3783,7 +3782,7 @@ async function startPayment() {
     // here rather than assumed to be cached.
     let nip05Name = miningRequested ? await nip05ForMining(session.pubkey) : '';
     if (miningRequested && !nip05Name) {
-      throw new Error('Mining is free for keys with a NIP-05 name, and none was found on the relays for this key. Pay in sats, or check that your profile carries one — name@domain, on any domain.');
+      throw new Error('Mining requires a NIP-05 name. Anonymous one-time keys cannot mine. Add a name to your Nostr profile or pay in sats.');
     }
     let order;
     try {
@@ -4785,6 +4784,7 @@ function openNoteMenu(eventId, pin) {
   // note that says nothing — as every note published before the mark existed does — shows no row.
   const badge = stickyPaymentBadge(record.sticky?.paid);
   elements.notePaidBadge.hidden = !badge;
+  elements.notePaidBadge.dataset.payment = badge?.id || '';
   if (badge) {
     elements.notePaidBadgeIcon.className = `lni ${badge.icon}`;
     elements.notePaidBadgeLabel.textContent = badge.label;

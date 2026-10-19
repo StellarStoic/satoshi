@@ -1873,6 +1873,11 @@ test('the board style dialog keeps its choice in this browser, never in the note
     'a new pattern clears the painted flag, or the canvas keeps the old picture');
   assert.match(script, /boardTextureFallback = true;/,
     'a pattern that will not load falls back without erasing the address the reader typed');
+  assert.match(script, /button\.setAttribute\('aria-label', texture\.label\)/);
+  assert.match(script, /button\.title = texture\.label/,
+    'the pattern name appears as a hover tooltip');
+  assert.doesNotMatch(script, /className = 'board-texture__label'/,
+    'pattern names do not occupy permanent space under the swatches');
   assert.match(html, /<dialog id="boardStyleDialog"[\s\S]{0,1600}id="boardTextureUrl"/,
     'the dialog offers a pattern address');
   assert.match(html, /id="stickySettings"[^>]*aria-label="Board style"/);
@@ -3259,6 +3264,12 @@ test('mining is offered to a key with a name, and never to a throwaway', () => {
   }
 });
 
+test('the missing-name mining message is short and rules out one-time identities', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(page, /Mining requires a NIP-05 name\. Anonymous one-time keys cannot mine\. Add a name to your Nostr profile or pay in sats\./);
+  assert.doesNotMatch(page, /Mining is free for keys with a NIP-05 name, and none was found/);
+});
+
 test('the difficulty is read from the desk, and only from the desk', () => {
   assert.equal(stickyPowDifficulty({pow: {bits: 25}}), 25);
   assert.equal(stickyPowDifficulty({pow: {bits: 1}}), 1);
@@ -3362,6 +3373,12 @@ test('the note details say how the note was paid for, and can copy its own JSON'
   assert.ok(details.indexOf('id="noteEventJson"') < details.indexOf('id="copyNoteJson"'), 'below the JSON');
   // It copies the record's own event, not the panel's text, and says so the way the id button does.
   assert.match(page, /elements\.notePaidBadge\.hidden = !badge/);
+  assert.match(page, /elements\.notePaidBadge\.dataset\.payment = badge\?\.id \|\| ''/);
+  assert.match(css, /\.note-menu__paid\[data-payment="bitcoin"\] i \{ color: #f7931a; \}/);
+  assert.match(css, /\.note-menu__paid\[data-payment="pow"\] i \{ color: #e5484d; \}/);
+  assert.match(css, /\.note-menu__paid\[data-payment="cash"\] i \{ color: #2fbf71; \}/);
+  assert.doesNotMatch(css, /\.note-menu__paid i \{[^}]*var\(--accent/,
+    'payment provenance colors never follow the selected theme');
   assert.match(page, /await navigator\.clipboard\.writeText\(json\)/, 'it copies the event it built');
   assert.match(page, /elements\.copyNoteJson\.addEventListener\('click', copySelectedNoteJson\)/);
   // And the mark has left the note's own paper: no class, no rule.
