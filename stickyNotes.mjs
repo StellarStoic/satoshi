@@ -552,64 +552,6 @@ function dismissBoardStatusAfter(ms = BOARD_STATUS_LINGER_MS) {
   }, ms);
 }
 
-// The play/stop switch in the sort panel had nothing behind it. It now freezes animated
-// images on the board to their current frame and puts them back, remembering the choice.
-// A cross-origin image cannot be drawn to a canvas, so it is left playing rather than
-// replaced with a blank: a switch that quietly destroys pictures is worse than one that
-// admits it cannot reach them.
-const GIF_PLAY_KEY = 'pinstr.gifPlay';
-
-function noteMediaImages() {
-  return [...document.querySelectorAll('img')].filter(img =>
-    /\.gif(\?|#|$)/i.test(img.currentSrc || img.getAttribute('src') || ''));
-}
-
-function freezeNoteMedia() {
-  for (const img of noteMediaImages()) {
-    if (img.dataset.frozen === '1' || !img.complete) continue;
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || 1;
-      canvas.height = img.naturalHeight || 1;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      const still = canvas.toDataURL('image/png');
-      img.dataset.originalSrc = img.getAttribute('src') || '';
-      img.setAttribute('src', still);
-      img.dataset.frozen = '1';
-    } catch { /* cross-origin: leave it playing */ }
-  }
-}
-
-function thawNoteMedia() {
-  for (const img of document.querySelectorAll('img[data-frozen="1"]')) {
-    if (img.dataset.originalSrc) img.setAttribute('src', img.dataset.originalSrc);
-    delete img.dataset.frozen;
-    delete img.dataset.originalSrc;
-  }
-}
-
-function applyGifPlay(on) {
-  if (on) thawNoteMedia();
-  else freezeNoteMedia();
-}
-
-function wireGifPlay() {
-  const input = document.getElementById('gifPlay');
-  if (!input) return;
-  let on = true;
-  try {
-    on = window.localStorage.getItem(GIF_PLAY_KEY) !== 'off';
-  } catch { /* storage blocked: keep playing */ }
-  input.checked = on;
-  if (!on) applyGifPlay(false);
-  input.addEventListener('change', () => {
-    try {
-      window.localStorage.setItem(GIF_PLAY_KEY, input.checked ? 'on' : 'off');
-    } catch { /* not fatal */ }
-    applyGifPlay(input.checked);
-  });
-}
-
 function status(target, message, error = false) {
   target.textContent = message;
   target.classList.toggle('is-error', error);
@@ -5623,7 +5565,6 @@ function openNoteSort() {
 }
 
 elements.noteSort.addEventListener('click', openNoteSort);
-wireGifPlay();
 elements.noteViewOptions.addEventListener('change', event => {
   if (!event.target.matches('input[name="noteView"]') || !STICKY_NOTE_VIEWS.includes(event.target.value)) return;
   noteView = event.target.value;
