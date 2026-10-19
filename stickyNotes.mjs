@@ -2365,7 +2365,11 @@ let gifPlay = localStorage.getItem(GIF_PLAY_KEY) !== '0';
  * back exactly as it was: same class, so the same size and filter, and the same artwork.
  */
 function freezePicture(image) {
-  if (!image || image.dataset.gifSource || !animatedPicture(image.src)) return;
+  // Board pictures are served from /pinstr/v1/images/<hash>, so their address carries no
+  // extension and animatedPicture() cannot tell a moving picture from a still one. Every
+  // print image is frozen instead: holding a still picture still looks like itself, and a
+  // switch that decides nothing is animated never does anything.
+  if (!image || image.dataset.gifSource || !image.src) return;
   if (!image.complete || !image.naturalWidth) {
     image.addEventListener('load', () => { if (!gifPlay) freezePicture(image); }, {once: true});
     return;
