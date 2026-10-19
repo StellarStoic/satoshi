@@ -66,12 +66,24 @@ export function satsToNano(sats, btcUsd, tonUsd) {
   return nano === 0n ? 1n : nano;
 }
 
-export function tonQuote({ sats, btcUsd, tonUsd, ttlMs = 300_000, now = Date.now() }) {
-  const nano = satsToNano(sats, btcUsd, tonUsd);
+// A TON transfer's fee is deducted from what arrives, so a quote that ignores it underpays the
+// merchant by 0.005-0.01 TON - up to a quarter of a 69-sat pin. The fee is added to every price,
+// single pins and subscriptions alike, and shown separately so a reader can see why the amount is
+// what it is.
+export const TON_TRANSFER_FEE_NANO = 10_000_000n; // 0.01 TON, the top of the observed range
+
+export function tonQuote({ sats, btcUsd, tonUsd, ttlMs = 300_000, now = Date.now(), feeNano = TON_TRANSFER_FEE_NANO }) {
+  const price = satsToNano(sats, btcUsd, tonUsd);
+  const fee = BigInt(feeNano);
+  const nano = price + fee;
   return {
     sats,
     nano: nano.toString(),
     ton: Number(nano) / 1e9,
+    priceNano: price.toString(),
+    priceTon: Number(price) / 1e9,
+    feeNano: fee.toString(),
+    feeTon: Number(fee) / 1e9,
     rateSatsPerTon: Math.round((tonUsd / btcUsd) * 1e8),
     quotedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ttlMs).toISOString(),
