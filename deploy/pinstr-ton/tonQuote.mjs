@@ -66,6 +66,31 @@ export function satsToNano(sats, btcUsd, tonUsd) {
   return nano === 0n ? 1n : nano;
 }
 
+// TON prices are their own numbers, not a conversion of the sats prices. At these sizes an hourly
+// rate turning 10 sats into 0.006 TON would put the transfer fee in charge of the price, so the TON
+// ladder is fixed and deliberately larger than the Bitcoin one - a TON reader pays for the rail,
+// not for the note.
+export const TON_PRICES = Object.freeze({
+  anonymous: 500_000_000n, // 0.5 TON
+  week: 1_000_000_000n, // 1 TON
+  year: 3_000_000_000n, // 3 TON
+});
+
+/** The advertised TON price for an action, with the transfer fee added on top. */
+export function tonPriceFor(action, { feeNano = TON_TRANSFER_FEE_NANO } = {}) {
+  const price = TON_PRICES[action];
+  if (price === undefined) throw new Error(`no TON price for ${action}`);
+  return {
+    action,
+    priceNano: price.toString(),
+    priceTon: Number(price) / 1e9,
+    feeNano: BigInt(feeNano).toString(),
+    feeTon: Number(BigInt(feeNano)) / 1e9,
+    nano: (price + BigInt(feeNano)).toString(),
+    ton: Number(price + BigInt(feeNano)) / 1e9,
+  };
+}
+
 // A TON transfer's fee is deducted from what arrives, so a quote that ignores it underpays the
 // merchant by 0.005-0.01 TON - up to a quarter of a 69-sat pin. The fee is added to every price,
 // single pins and subscriptions alike, and shown separately so a reader can see why the amount is
