@@ -1548,8 +1548,21 @@ export function boardPatternCss(text) {
   if (trimmed.length > BOARD_PATTERN_CSS_MAX) {
     return {ok: false, error: `A pasted pattern may be at most ${BOARD_PATTERN_CSS_MAX} characters.`};
   }
+  // A pattern pasted from a generator arrives as a whole rule — "html { ... }" — with the
+  // selector and braces tangled into the first and last chunks. The board supplies the selector
+  // itself, so unwrap one outer rule rather than refusing it: the braces say where the CSS came
+  // from, not what it means. More than one rule is still refused, because a pattern is one set
+  // of declarations and a second rule would be silently dropped.
+  let body = trimmed;
+  const outerRule = /^[^{}]*\{([^{}]*)\}[^{}]*$/u.exec(trimmed);
+  if (outerRule) {
+    body = outerRule[1].trim();
+    if (!body) return {ok: false, error: 'That rule is empty — paste the declarations inside it.'};
+  } else if (/[{}]/u.test(trimmed)) {
+    return {ok: false, error: 'Paste one pattern, not several — a pattern is a single set of declarations.'};
+  }
   const declarations = [];
-  for (const chunk of trimmed.split(';')) {
+  for (const chunk of body.split(';')) {
     const piece = chunk.trim();
     if (!piece) continue;
     const colon = piece.indexOf(':');
