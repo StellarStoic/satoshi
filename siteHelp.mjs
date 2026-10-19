@@ -373,7 +373,7 @@ function alignTopRightControls(trigger) {
     if (config.mount) {
         companion.removeAttribute('aria-hidden');
         companion.append(trigger);
-        trigger.classList.add('site-help-trigger--embedded');
+        trigger.classList.add('site-help-trigger--embedded', 'sticky-top-button');
         return;
     }
     companion.classList.add('site-help-companion');

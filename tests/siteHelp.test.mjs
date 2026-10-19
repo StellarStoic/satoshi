@@ -44,6 +44,8 @@ test('top controls are document-positioned and share one horizontal center line'
     assert.match(siteHelpSource, /document\.body\.append\(trigger, companion\)/);
     assert.match(siteHelpSource, /'\/stickyNotes\.html': \{selector: '\.sticky-help-slot', mount: true\}/);
     assert.match(siteHelpSource, /companion\.append\(trigger\)/);
+    assert.match(siteHelpSource, /site-help-trigger--embedded', 'sticky-top-button'/,
+        'the embedded question button receives the exact Pinstr toolbar button class');
     assert.match(siteHelpSource, /if \(!trigger\.parentElement\) document\.body\.append\(trigger\)/,
         'an embedded Pinstr help button must not be pulled back out of its toolbar');
     assert.match(siteHelpSource, /path === '\/' && document\.body\?\.classList\.contains\('sticky-page'\)/,

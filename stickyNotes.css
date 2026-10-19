@@ -306,9 +306,9 @@
 .geohash-map-selection__status { min-height:0; margin:0; text-align:left; }
 .login-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 20px 0; }
 .login-methods button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #505354; border-radius: 6px; background: #242627; color: #f1f1ee; font: inherit; cursor: pointer; }
-.pinstr-tg-signin { display:flex; align-items:center; justify-content:center; gap:9px; width:100%; min-height:50px; margin:18px 0 0; border:1px solid #279bd7; border-radius:6px; background:#207db0; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
-.pinstr-tg-signin:hover, .pinstr-tg-signin:focus-visible { border-color:#72c8f3; background:#258abd; outline:2px solid color-mix(in srgb,#279bd7 42%,transparent); outline-offset:2px; }
+.pinstr-tg-signin { margin:18px 0 0; }
 .pinstr-tg-status { margin:7px 0 15px; color:var(--text-muted,#aeb0ae); font-size:.78rem; line-height:1.45; }
+.pinstr-tg-signin[hidden], .pinstr-tg-status[hidden] { display:none; }
 .login-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin: 10px 0; }
 .login-field input { min-width: 0; height: 42px; border: 1px solid #505354; border-radius: 5px; padding: 0 10px; background: #101112; color: #f2f2ef; font: inherit; }
 .login-field button { height: 42px; border: 1px solid var(--accent, #f2a900); border-radius: 5px; background: transparent; color: var(--accent, #f2a900); cursor: pointer; }
@@ -325,6 +325,7 @@
 .inline-status { min-height: 1.4em; margin-top: 12px; color: #c6c8c6; font-size: .88rem; text-align: center; }
 .inline-status.is-error { color: #ff7b75; }
 .account-card { display: grid; gap: 10px; }.account-card code { overflow: hidden; color: #aaa; text-overflow: ellipsis; }.account-card .secondary-action { margin-top: 10px; }
+.telegram-identity-dialog { width:min(390px,calc(100vw - 24px)); }.telegram-identity-inner { display:grid; justify-items:center; gap:10px; text-align:center; }.telegram-identity-inner h2, .telegram-identity-inner p { margin:0; }.telegram-identity-icon { color:#2aa9e0; font-size:34px; }.telegram-identity-path { width:100%; padding:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface-raised); line-height:1.55; }.telegram-identity-note { color:var(--text-muted); font-size:.78rem; line-height:1.45; }.telegram-identity-inner .primary-action { margin-top:3px; }
 .account-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }.account-identity img { width: 54px; height: 54px; flex: 0 0 auto; border: 1px solid #555; border-radius: 50%; object-fit: cover; background: #101112; }.account-identity > div { display: grid; min-width: 0; gap: 3px; }.account-identity strong, .account-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.account-identity span { color: var(--accent, #f2a900); font-size: .82rem; }.anonymous-expiry { color: #d2d4d2; font-size: .86rem; }.anonymous-expiry strong { color: var(--accent, #f2a900); font-variant-numeric: tabular-nums; }
 .composer-dialog { width: min(440px, calc(100vw - 20px)); }.composer-inner { display: grid; justify-items: center; }
 .draft-note { position: relative; width: min(280px, calc(100vw - 82px)); margin: 16px auto 12px; padding: 22px; transform: none; }
@@ -776,10 +777,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 }
 .sticky-top-actions .site-help-trigger { margin: 0 !important; }
 
-/* The site help trigger is absolutely positioned by the site's own CSS, so inside the top
-   group it floated over the gear instead of sitting beside it. Here it is put back in the
-   flow, in the same box as its neighbours, with a smaller glyph: a question mark fills its
-   em box where the line icons leave margins, so at icon size it reads heavier. */
+/* The site help trigger is normally positioned by the shared help CSS. Inside Pinstr it
+   belongs to the toolbar instead, with the exact box and icon size used by its neighbours. */
 .sticky-top-actions .site-help-trigger,
 .sticky-help-slot .site-help-trigger {
   position: static !important;
@@ -801,6 +800,6 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .sticky-page .site-help-trigger *,
 .sticky-page .site-help-trigger::before,
 .sticky-page .site-help-trigger::after {
-  font-size: 15px !important;
+  font-size: 22px !important;
   line-height: 1 !important;
 }

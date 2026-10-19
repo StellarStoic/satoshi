@@ -272,8 +272,8 @@
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="loginTitle">Log in to Nostr</h2>
       <p>Your signer proves the note is yours. Satoshi.si never needs your private key.</p>
-      <button type="button" class="pinstr-tg-signin" id="pinstrTgSignIn"><i class="lni lni-telegram" aria-hidden="true"></i><span>Sign in with Telegram</span></button>
-      <p class="pinstr-tg-status">Opens Telegram to confirm who you are, then creates your Nostr identity. No password or seed phrase.</p>
+      <button type="button" class="anonymous-login pinstr-tg-signin" id="pinstrTgSignIn" hidden><i class="lni lni-telegram" aria-hidden="true"></i><span>Sign in with Telegram</span></button>
+      <p class="pinstr-tg-status" hidden>Opens Telegram to confirm who you are, then creates your Nostr identity. No password or seed phrase.</p>
       <div class="login-methods">
         <button type="button" data-login="extension"><i class="lni lni-plug-1" aria-hidden="true"></i><span>Browser extension</span></button>
         <button type="button" data-login="amber"><i class="lni lni-phone" aria-hidden="true"></i><span>Amber</span></button>
@@ -315,6 +315,17 @@
       <p class="nostr-connect-help">In Amber, tap <strong>Add a new application</strong>, then <strong>Paste from clipboard</strong> (or <strong>Scan a QR Code</strong>). That is this invitation link, pasted once — not a signature.</p>
       <div id="nostrConnectStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
+  </dialog>
+  <dialog id="telegramIdentityDialog" class="sticky-dialog telegram-identity-dialog" aria-labelledby="telegramIdentityTitle">
+    <form method="dialog" class="dialog-inner telegram-identity-inner">
+      <button type="submit" class="dialog-close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <i class="lni lni-telegram telegram-identity-icon" aria-hidden="true"></i>
+      <h2 id="telegramIdentityTitle">Your Nostr ID is ready</h2>
+      <p>Pinstr generated a Nostr identity for your Telegram account.</p>
+      <p class="telegram-identity-path"><strong>To export its private key:</strong><br>Top-right person icon → Nostr account → Your key → Export my key.</p>
+      <p class="telegram-identity-note">You can export it later while Pinstr keeps its encrypted copy. Choosing “Remove our copy” makes your exported key your only recovery.</p>
+      <button type="submit" class="primary-action">Got it</button>
+    </form>
   </dialog>
   <dialog id="accountDialog" class="sticky-dialog" aria-labelledby="accountTitle">
     <form method="dialog" class="dialog-inner account-card">

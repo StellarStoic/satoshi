@@ -144,7 +144,7 @@ function installSessionSigner(detail) {
 
 function mountKeyTools(detail) {
   if (typeof document === 'undefined' || !detail || !detail.session) return;
-  const host = document.querySelector('#loginDialog .dialog-inner');
+  const host = document.querySelector('#accountDialog .account-card');
   if (!host || host.querySelector('.pinstr-key-tools')) return;
 
   const box = document.createElement('div');
@@ -332,6 +332,7 @@ function restructureLoginDialog() {
       note = document.createElement('p');
       note.className = 'pinstr-tg-status';
     }
+    note.hidden = false;
     wireTelegramButton(button, note);
     // Insert without assuming the details element exists: the board may build its method
     // list later, and the previous version threw here, taking the button and the status
@@ -411,6 +412,12 @@ function announce(detail) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
       installSessionSigner(detail);
       mountKeyTools(detail);
+      if (detail.created) {
+        const login = document.querySelector('#loginDialog');
+        const welcome = document.querySelector('#telegramIdentityDialog');
+        if (login?.open) login.close();
+        if (welcome && !welcome.open) requestAnimationFrame(() => welcome.showModal());
+      }
     } else if (detail && detail.active) {
       setStatus(`Telegram sign-in failed: ${detail.reason || 'unknown reason'}`, 'bad');
     }
