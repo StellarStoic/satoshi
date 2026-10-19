@@ -49,9 +49,14 @@ function start() {
       if (!login.open && !readChoice()) openChooser({ firstTime: true });
     }).observe(login, { attributes: true, attributeFilter: ['open'] });
   }
-  document.addEventListener('satoshi-nostr-session', () => setTimeout(() => openChooser({}), 600));
-  document.addEventListener('pinstr-currency-changed', applyCurrency);
+  // On every sign-in the question is asked again, choice or no choice: the stored answer decides
+  // which rail is shown, not whether the reader gets to confirm it.
+  document.addEventListener('satoshi-nostr-session', () => setTimeout(() => openChooser({ firstTime: true }), 600));
+  document.addEventListener('pinstr-currency-changed', () => { applyCurrency(); applyComposerCopy(); });
   applyCurrency();
+  watchComposer();
+  setTimeout(() => { watchComposer(); applyComposerCopy(); }, 1200);
+  setTimeout(() => { watchComposer(); applyComposerCopy(); }, 3000);
 }
 
 function readChoice() {
@@ -124,6 +129,74 @@ function setStatus(text) {
   if (!box) return;
   box.textContent = text;
   box.className = 'inline-status is-ok';
+}
+
+
+// The composer prices a note before any order exists: Week 10 sats, Year 411 sats, "Subscribe & pin",
+// "Free with POW", and a paragraph about discounts. All of that is the Bitcoin rail, so in TON mode
+// it is replaced with the TON ladder. Originals are kept and restored when the reader switches back,
+// rather than being rebuilt from assumptions about the board's markup.
+const TON_PLAN_COPY = { week: '1 TON', year: '3 TON' };
+
+function applyComposerCopy() {
+  const composer = document.getElementById('composerDialog');
+  if (!composer) return;
+  const on = readChoice() === 'ton';
+
+  for (const button of composer.querySelectorAll('.plan-button[data-plan]')) {
+    const plan = button.getAttribute('data-plan');
+    if (on) {
+      if (!button.dataset.pinstrOriginal) button.dataset.pinstrOriginal = button.innerHTML;
+      button.innerHTML = `Pay ${TON_PLAN_COPY[plan] || ''} · ${plan}`;
+    } else if (button.dataset.pinstrOriginal) {
+      button.innerHTML = button.dataset.pinstrOriginal;
+      delete button.dataset.pinstrOriginal;
+    }
+  }
+
+  const pay = document.getElementById('payForSticky');
+  const payLabel = pay && pay.querySelector('span');
+  if (payLabel) {
+    if (on) {
+      if (!payLabel.dataset.pinstrOriginal) payLabel.dataset.pinstrOriginal = payLabel.textContent;
+      payLabel.textContent = 'Pay';
+    } else if (payLabel.dataset.pinstrOriginal) {
+      payLabel.textContent = payLabel.dataset.pinstrOriginal;
+      delete payLabel.dataset.pinstrOriginal;
+    }
+  }
+
+  // Mining for work is free on either rail, so it stays reachable; only the sats wording goes.
+  const mine = document.getElementById('mineForSticky');
+  if (mine && on && mine.dataset.pinstrOriginalHidden === undefined) {
+    mine.dataset.pinstrOriginalHidden = mine.hidden ? '1' : '0';
+  } else if (mine && !on && mine.dataset.pinstrOriginalHidden !== undefined) {
+    mine.hidden = mine.dataset.pinstrOriginalHidden === '1';
+    delete mine.dataset.pinstrOriginalHidden;
+  }
+
+  for (const node of composer.querySelectorAll('p, span, small, div')) {
+    if (node.children.length) continue;
+    const text = (node.textContent || '').trim();
+    if (on && /^Posting needs a subscription/.test(text)) {
+      if (!node.dataset.pinstrOriginal) node.dataset.pinstrOriginal = node.textContent;
+      node.textContent = 'Posting in TON: 1 TON a week or 3 TON a year, plus the 0.01 TON network fee.';
+    } else if (!on && node.dataset.pinstrOriginal) {
+      node.textContent = node.dataset.pinstrOriginal;
+      delete node.dataset.pinstrOriginal;
+    }
+  }
+}
+
+function watchComposer() {
+  const composer = document.getElementById('composerDialog');
+  if (!composer || composer.dataset.pinstrCopyWatch === '1') return;
+  composer.dataset.pinstrCopyWatch = '1';
+  new MutationObserver(() => {
+    if (composer.open) applyComposerCopy();
+  }).observe(composer, { attributes: true, attributeFilter: ['open'] });
+  // The board rewrites these labels as it prices a note, so re-apply after it has.
+  if (composer.open) applyComposerCopy();
 }
 
 // ---------------------------------------------------------------- the TON panel
