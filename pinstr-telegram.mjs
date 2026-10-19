@@ -559,7 +559,14 @@ export async function bootTelegram(pre = null) {
 export async function ensureBooted() {
   // Telegram sign-in is pinstr.si only. satoshi.si is the Bitcoin site, and its domain is
   // not registered for the bot, so the popup cannot complete there: stay completely inert.
-  if (!ON_PINSTR) return announce({ active: false, reason: 'telegram sign-in is only offered on pinstr.si' });
+  if (!ON_PINSTR) {
+    // The button ships visible so that a failure anywhere below cannot hide it; this is the
+    // one place that takes it away again, and only off pinstr.
+    try {
+      document.querySelectorAll('.pinstr-tg-signin, #pinstrTgSignIn').forEach((element) => { element.hidden = true; });
+    } catch {}
+    return announce({ active: false, reason: 'telegram sign-in is only offered on pinstr.si' });
+  }
   if (globalThis.Telegram && globalThis.Telegram.WebApp && globalThis.Telegram.WebApp.initData) {
     if (!globalThis.NostrTools) {
       await new Promise((resolve) => {
