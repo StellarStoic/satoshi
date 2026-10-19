@@ -132,6 +132,24 @@ export function createServer(env = {}) {
         send(res, 200, { ok: true, service: 'pinstr-telegram', botConfigured: Boolean(token), sessionConfigured: Boolean(secret), sessionTtlS: SESSION_TTL_S });
         return;
       }
+      // A Telegram identity needs a face, and it should not be stored: the avatar is
+      // derived from the pubkey, so it is stable for the life of the key. DiceBear shadows
+      // is vendored under ./vendor/dicebear (core 10.7.0 plus that one style definition)
+      // because this service has no package manager and must start offline.
+      if (url.pathname.startsWith('/tg/avatar/') && req.method === 'GET') {
+        const wanted = decodeURIComponent(url.pathname.slice('/tg/avatar/'.length)).replace(/\.svg$/i, '');
+        if (!/^[0-9a-f]{64}$/i.test(wanted)) {
+          return send(res, 400, { ok: false, error: 'avatar needs a 64-character hex pubkey' });
+        }
+        const svg = await renderAvatar(wanted.toLowerCase());
+        res.writeHead(200, {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'Content-Length': Buffer.byteLength(svg),
+        });
+        return res.end(svg);
+      }
+
       if (url.pathname === '/tg/verify' && req.method === 'POST') {
         if (!token) return send(res, 503, { error: 'bot token not configured' });
         if (!secret) return send(res, 503, { error: 'session secret not configured' });
@@ -307,4 +325,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   server.listen(PORT, '127.0.0.1', () => {
     console.log(`pinstr-telegram api on 127.0.0.1:${PORT} bot=${Boolean(TOKEN)} secret=${Boolean(SECRET)}`);
   });
+}
+
+// Vendored lazily: a missing or broken avatar tree must not stop the service from booting,
+// because signing and key custody matter more than a picture.
+let avatarStyle = null;
+async function renderAvatar(seed) {
+  if (!avatarStyle) {
+    const [{ Avatar, Style }, { readFileSync }] = await Promise.all([
+      import('./vendor/dicebear/lib/index.js'),
+      import('node:fs'),
+    ]);
+    const file = new URL('./vendor/dicebear/shadows.min.json', import.meta.url);
+    avatarStyle = { Avatar, Style, definition: JSON.parse(readFileSync(file, 'utf8')) };
+  }
+  const { Avatar, Style, definition } = avatarStyle;
+  return new Avatar(new Style(definition), { seed, size: 128 }).toString();
 }
