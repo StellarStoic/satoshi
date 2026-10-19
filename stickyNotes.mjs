@@ -1767,6 +1767,15 @@ elements.mine.addEventListener('click', () => {
  * was written all feed the id, so mining an unfinished note would be work on a different id.
  */
 async function mineThisNote(template, bits) {
+  // The pubkey is the signer's, not the note's, so it is ensured here as well: a template
+  // rebuilt from the saved pending note between placing and pinning would not carry it, and
+  // the miner would refuse with "the template needs a pubkey to mine" on a signed-in board.
+  if (template && !template.pubkey) {
+    template.pubkey = (getNostrSession() || {}).pubkey || '';
+    if (!template.pubkey && globalThis.nostr && typeof globalThis.nostr.getPublicKey === 'function') {
+      template.pubkey = await globalThis.nostr.getPublicKey().catch(() => '');
+    }
+  }
   mining = new AbortController();
   elements.pin.querySelector('span').textContent = 'Stop mining';
   try {
