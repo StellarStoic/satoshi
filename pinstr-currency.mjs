@@ -10,6 +10,12 @@ const KEY = 'pinstr:currency:v1';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const POLL_MS = 4000;
 
+// Mutable module state, declared before the boot call below: start() runs at import time, so
+// anything it assigns to must already be initialised or the module dies in the temporal dead zone.
+let chooser = null;
+let tonDialog = null;
+let tonPoll = null;
+
 if (ON_PINSTR && typeof document !== 'undefined') {
   // Loaded loudly on purpose: when a modal does not appear, the first question is whether the
   // module ran at all, and a console line answers that without a debugger.
@@ -69,7 +75,6 @@ function applyCurrency() {
 
 // ---------------------------------------------------------------- the chooser
 
-let chooser = null;
 
 function mountChooser() {
   chooser = document.createElement('dialog');
@@ -123,8 +128,6 @@ function setStatus(text) {
 
 // ---------------------------------------------------------------- the TON panel
 
-let tonDialog = null;
-let tonPoll = null;
 
 function mountTonPanel() {
   tonDialog = document.createElement('dialog');
