@@ -10,7 +10,17 @@ const KEY = 'pinstr:currency:v1';
 const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const POLL_MS = 4000;
 
-if (ON_PINSTR && typeof document !== 'undefined') start();
+if (ON_PINSTR && typeof document !== 'undefined') {
+  // Loaded loudly on purpose: when a modal does not appear, the first question is whether the
+  // module ran at all, and a console line answers that without a debugger.
+  try {
+    start();
+  } catch (err) {
+    console.error('[pinstr-currency] failed to start', err);
+  }
+} else {
+  console.info('[pinstr-currency] not pinstr.si, staying out of the way');
+}
 
 function start() {
   injectStyles();
@@ -18,7 +28,21 @@ function start() {
   mountTonPanel();
   // Ask on arrival if nothing is chosen, and again on every sign-in: the choice is remembered but
   // re-confirmed, because a reader who came for a quick pin may not remember what they picked.
+  console.info('[pinstr-currency] loaded', { choice: readChoice() || 'none yet' });
   if (!readChoice()) setTimeout(() => openChooser({ firstTime: true }), 1200);
+  // A cached shell or a slow board can miss every timed trigger, so the first tap anywhere brings
+  // the question up once as well. Nobody should have to know a setting exists to be asked.
+  document.addEventListener('click', () => {
+    if (!readChoice()) openChooser({ firstTime: true });
+  }, { once: true, capture: true });
+  // The sign-in dialog is the moment the reader is being identified; ask right after it closes
+  // rather than talking over it.
+  const login = document.getElementById('loginDialog');
+  if (login) {
+    new MutationObserver(() => {
+      if (!login.open && !readChoice()) openChooser({ firstTime: true });
+    }).observe(login, { attributes: true, attributeFilter: ['open'] });
+  }
   document.addEventListener('satoshi-nostr-session', () => setTimeout(() => openChooser({}), 600));
   document.addEventListener('pinstr-currency-changed', applyCurrency);
   applyCurrency();
