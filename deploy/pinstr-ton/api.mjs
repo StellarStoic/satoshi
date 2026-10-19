@@ -28,6 +28,89 @@ const SESSION_TTL_S = Number(process.env.PINSTR_TG_SESSION_TTL || 604800);
 const ALLOWED_ORIGINS = (process.env.PINSTR_TG_ORIGINS || 'https://pinstr.si,https://www.pinstr.si').split(',').map((s) => s.trim()).filter(Boolean);
 const VERIFY_PER_MIN = Number(process.env.PINSTR_TG_VERIFY_PER_MIN || 12);
 const PROFILE_DIR = process.env.PINSTR_TG_PROFILE_DIR || '/opt/pinstr-tg/profiles';
+
+// A Telegram identity carries a face and a name of its own. Both derive from the pubkey, so they
+// are stable for the life of the key and never need storing to be recomputed: three hex characters
+// summarise the key, kind 0 shows tele<id>+<hex>, and the NIP-05 - whose local part has no "+" -
+// uses a dash in the same string.
+const TG_NAME_ENDPOINT = process.env.PINSTR_TG_NAME_ENDPOINT || 'http://127.0.0.1:8790/pinstr/v1/tg/name';
+const TG_NAME_TOKEN = process.env.PINSTR_TG_NAME_TOKEN || '';
+
+function telegramIdentity(tgId, pubkey) {
+  const hex = crypto.createHash('sha256').update(`pinstr-tg:${pubkey}`).digest('hex').slice(0, 3);
+  const id = String(tgId);
+  return {
+    hex,
+    name: `tele${id}+${hex}`,
+    nip05: `tele${id}-${hex}@pinstr.si`,
+    picture: `https://pinstr.si/tg/avatar/${pubkey}.svg`,
+  };
+}
+
+// Mints the NIP-05 into the snapshot the desk publishes. Best effort: a name is worth having, a
+// profile is worth more, so a desk that is down must not stop a profile from being published.
+async function mintTelegramName(name, pubkey) {
+  if (!TG_NAME_TOKEN) return { ok: false, reason: 'no name token configured' };
+  try {
+    const response = await fetch(TG_NAME_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TG_NAME_TOKEN}` },
+      body: JSON.stringify({ name, pubkey }),
+    });
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, created: Boolean(body && body.created), reason: body && body.error ? String(body.error) : '' };
+  } catch (err) {
+    return { ok: false, reason: String(err.message || err).slice(0, 120) };
+  }
+}
+
+// Brings a stored Telegram profile up to the current shape: kind 0 carrying its name, NIP-05 and
+// picture, signed here because the sealed key is here. It runs on every sign-in, so accounts made
+// before any of this existed repair themselves the next time they are used.
+export async function refreshTelegramProfile({ tgId, record, relays, secret }) {
+  if (!record || !record.sealed || record.deleted || !record.pubkey) {
+    return { refreshed: false, reason: 'no key stored' };
+  }
+  const identity = telegramIdentity(tgId, record.pubkey);
+  const minted = await mintTelegramName(identity.nip05.split('@')[0], record.pubkey);
+  let priv;
+  try {
+    // The sealed value is a bech32 nsec, not hex: nsecToBytes is the decoder for it.
+    priv = Buffer.from(nsecToBytes(openSecret(record.sealed, secret)));
+  } catch (err) {
+    return { refreshed: false, reason: `sealed key unreadable: ${String(err.message || err).slice(0, 80)}` };
+  }
+  const event = signEventFor(record.pubkey, priv, {
+    kind: 0,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [],
+    content: JSON.stringify({ name: identity.name, nip05: identity.nip05, picture: identity.picture }),
+  });
+  priv.fill(0);
+  let published = false;
+  let publishReason = '';
+  try {
+    const outcome = await publishToAll(relays, event);
+    published = Boolean(outcome && outcome.ok);
+    publishReason = published ? '' : JSON.stringify(outcome && outcome.results ? outcome.results : outcome).slice(0, 200);
+  } catch (err) {
+    publishReason = String(err.message || err).slice(0, 200);
+  }
+  writeProfile(record.dir, tgId, {
+    ...record,
+    eventId: event.id,
+    name: identity.name,
+    nip05: identity.nip05,
+    picture: identity.picture,
+    nameMinted: Boolean(minted.ok),
+    nameReason: minted.ok ? '' : String(minted.reason || '').slice(0, 160),
+    published,
+    publishReason,
+    updatedAt: new Date().toISOString(),
+  });
+  return { refreshed: true, published, minted: minted.ok, name: identity.name, nip05: identity.nip05, picture: identity.picture };
+}
+
 const RELAYS = (process.env.PINSTR_TG_RELAYS || 'wss://nostr.satoshi.si').split(',').map((s) => s.trim()).filter(Boolean);
 
 function readProfile(dir, tgId) {
@@ -181,6 +264,17 @@ export function createServer(env = {}) {
         const exp = Math.floor(now / 1000) + SESSION_TTL_S;
         const session = sign({ tg: result.user.id, user: result.user, iat: Math.floor(now / 1000), exp, via: 'widget' }, secret);
         const record = readProfile(profileDir, result.user.id);
+        // Existing accounts repair themselves here: a profile gains its name, NIP-05 and picture
+        // the first time it is used after this shipped, because the sealed key lets the server
+        // re-sign the kind 0 instead of asking the user to do anything.
+        let identity = null;
+        if (record && record.sealed && !record.deleted && (!record.nip05 || !record.picture)) {
+          try {
+            identity = await refreshTelegramProfile({ tgId: result.user.id, record, relays, secret });
+          } catch (err) {
+            identity = { refreshed: false, reason: String(err.message || err).slice(0, 120) };
+          }
+        }
         send(res, 200, {
           session,
           user: result.user,
