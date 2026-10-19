@@ -2370,6 +2370,10 @@ function freezePicture(image) {
   // print image is frozen instead: holding a still picture still looks like itself, and a
   // switch that decides nothing is animated never does anything.
   if (!image || image.dataset.gifSource || !image.src) return;
+  // Board pictures come from /pinstr/v1/images/<hash> with no extension, so
+  // animatedPicture() cannot recognise one; a print image is treated as possibly moving
+  // because holding a still picture still looks like itself.
+  if (!animatedPicture(image.src) && !image.classList.contains('sticky-note__print-image')) return;
   if (!image.complete || !image.naturalWidth) {
     image.addEventListener('load', () => { if (!gifPlay) freezePicture(image); }, {once: true});
     return;
