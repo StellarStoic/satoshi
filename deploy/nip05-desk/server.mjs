@@ -87,6 +87,9 @@ const STICKY_WORKER_MAX_WAIT_MS = Number(process.env.STICKY_WORKER_MAX_WAIT_MS |
 
 const ORDERS_FILE = `${STATE_DIR}/orders.json`;
 const NAMES_FILE = `${STATE_DIR}/names.json`;
+// Names this desk minted itself (Telegram identities). Kept apart from names.json, which the
+// worker regenerates from the published nostr.json and would therefore wipe.
+const MINTED_NAMES_FILE = `${STATE_DIR}/names-minted.json`;
 const STICKY_FILE = `${STATE_DIR}/sticky.json`;
 // {pubkey: {plan, sats, startedAt, expandedAt, expiresAt, orderId}}. Written when a
 // subscription order settles and read on every order, quote and status call; a
@@ -1206,6 +1209,73 @@ const handleRequest = async (req, res) => {
       }));
       void sweepPrints(orders, nowS());
       return send(res, 200, { ok: true, url: stored.url, grade, bytes: stored.bytes },
+        { 'cache-control': 'no-store' });
+    }
+
+
+    // The nameset itself, so a minted name resolves the moment it exists instead of waiting
+    // for a commit. NIP-05 wants { names } and, optionally, relays for those names.
+    if (path === '/pinstr/v1/nostr.json' && req.method === 'GET') {
+      const names = { ...readJson(MINTED_NAMES_FILE, {}), ...readJson(NAMES_FILE, {}) };
+      const relays = {};
+      for (const [name, pubkey] of Object.entries(names)) {
+        if (typeof pubkey === 'string' && /^[0-9a-f]{64}$/i.test(pubkey)) {
+          relays[pubkey.toLowerCase()] = ['wss://nostr.satoshi.si'];
+        }
+      }
+      return send(res, 200, { names, relays },
+        { 'cache-control': 'public, max-age=60' });
+    }
+
+    // ------------------------------------------------------ pinstr: telegram
+
+    // A Telegram sign-up is given a name of its own: kind 0 carries tele<id>+<hex> for
+    // display, and this route mints the NIP-05 that goes beside it. It writes into the
+    // name snapshot the worker publishes from, so a minted name resolves on the next
+    // tick with no git commit - the same store a paid name lands in, minus the order.
+    if (path === '/pinstr/v1/tg/name') {
+      if (req.method !== 'POST') {
+        return send(res, 405, { ok: false, error: 'method not allowed' }, { allow: 'POST' });
+      }
+      if (!tokenOk(req.headers.authorization)) {
+        return send(res, 401, { ok: false, error: 'unauthorized' }, { 'cache-control': 'no-store' });
+      }
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch {
+        return send(res, 400, { ok: false, error: 'invalid json' }, { 'cache-control': 'no-store' });
+      }
+      const wanted = String(body?.name ?? '').trim().toLowerCase();
+      const owner = String(body?.pubkey ?? '').trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,64}$/.test(wanted)) {
+        return send(res, 400, {
+          ok: false,
+          error: 'name must be 3-64 characters of a-z, 0-9, dot, dash or underscore',
+        }, { 'cache-control': 'no-store' });
+      }
+      if (!/^[0-9a-f]{64}$/.test(owner)) {
+        return send(res, 400, { ok: false, error: 'pubkey must be 64 hex characters' },
+          { 'cache-control': 'no-store' });
+      }
+      const published = readJson(NAMES_FILE, {});
+      const names = readJson(MINTED_NAMES_FILE, {});
+      if (typeof published[wanted] === 'string' && published[wanted].toLowerCase() !== owner) {
+        return send(res, 409, { ok: false, error: 'name is already published for another key' },
+          { 'cache-control': 'no-store' });
+      }
+      const existing = typeof names[wanted] === 'string' ? names[wanted].toLowerCase() : '';
+      if (existing && existing !== owner) {
+        return send(res, 409, { ok: false, error: 'name already belongs to another key' },
+          { 'cache-control': 'no-store' });
+      }
+      if (existing) {
+        return send(res, 200, { ok: true, name: wanted, pubkey: owner, created: false },
+          { 'cache-control': 'no-store' });
+      }
+      names[wanted] = owner;
+      writeJson(MINTED_NAMES_FILE, names);
+      return send(res, 201, { ok: true, name: wanted, pubkey: owner, created: true },
         { 'cache-control': 'no-store' });
     }
 
