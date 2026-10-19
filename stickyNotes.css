@@ -745,3 +745,25 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 #stickyPayment.is-paid .sticky-countdown {
   color: #4cd97b;
 }
+
+
+/* The help glyph arrives from the site's own trigger rather than as a .sticky-top-button,
+   so it has to be given the same body and the same hover as its neighbours. */
+.sticky-page .site-help-trigger {
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  border-radius: 6px !important;
+  color: #f4f4f1 !important;
+}
+.sticky-page .site-help-trigger:hover,
+.sticky-page .site-help-trigger:focus-visible {
+  border-color: var(--accent, #f2a900) !important;
+  color: var(--accent, #f2a900) !important;
+  outline: none !important;
+}
+.sticky-top-actions .site-help-trigger { margin: 0 !important; }
