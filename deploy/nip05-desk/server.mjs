@@ -1251,12 +1251,27 @@ const handleRequest = async (req, res) => {
         if (typeof invoiceId !== 'string' || invoiceId.length === 0) {
           return send(res, 400, { ok: false, error: 'invoiceId is required' }, { 'cache-control': 'no-store' });
         }
+        // The model decides whether this invoice may be attached: it checks the status,
+        // requires at least one payable rail and refuses a BOLT11 asking for anything
+        // other than the order's price. Writing the fields here instead would skip all
+        // of that, which is how a mispriced invoice could be accepted quietly.
+        let attached;
+        try {
+          attached = attachInvoice(order, { ...rails, amountSats: Number(amountSats) || order.sats });
+        } catch (err) {
+          return send(res, 400, { ok: false, error: String(err.message || err) },
+            { 'cache-control': 'no-store' });
+        }
+        if (!attached || !attached.ok) {
+          return send(res, 400, { ok: false, error: (attached && attached.error) || 'invoice refused' },
+            { 'cache-control': 'no-store' });
+        }
         // The board reads the rail data from order.payment (stickyPaymentRails in
         // stickyNotesModel.mjs), not from a rails field: bolt11, lightningUri, arkAddress
         // and paymentLink. Storing them anywhere else looks attached on the server and
         // leaves the board spinning forever.
         orders[orderId] = {
-          ...order,
+          ...attached.order,
           status: 'awaiting_payment',
           invoiceId,
           amountSats: Number(amountSats) || order.sats,
@@ -1277,7 +1292,16 @@ const handleRequest = async (req, res) => {
       }
       // BTCPay says Settled; the desk's own vocabulary says paid.
       const next = asked === 'settled' ? 'paid' : asked;
-      orders[orderId] = { ...order, status: next, ...(next === 'paid' ? { paidAt: nowS() } : {}) };
+      // A settled payment goes through the model, which stamps paidAt and extends
+      // publishTokenExpiresAt so the token the order was created with is still usable
+      // long after the invoice was made. The board renders from order.paid, so that
+      // flag is added on top — settleOrder reports paidAt, not the display flag.
+      if (next === 'paid') {
+        const settled = settleOrder(order, nowS());
+        orders[orderId] = { ...settled.order, paid: true };
+      } else {
+        orders[orderId] = { ...order, status: next };
+      }
       writeJson(STICKY_FILE, orders);
       console.log(JSON.stringify({ event: 'sticky_order_status', orderId, status: next }));
       wakeStickyWaiters();
