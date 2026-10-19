@@ -297,8 +297,17 @@ function restructureLoginDialog() {
     note.className = 'pinstr-tg-status';
     note.style.cssText = 'margin:0 0 14px;font-size:.8rem;line-height:1.5;color:var(--text-muted);';
     wireTelegramButton(button, note);
-    details.parentNode.insertBefore(button, details);
-    details.parentNode.insertBefore(note, details);
+    // Insert without assuming the details element exists: the board may build its method
+    // list later, and the previous version threw here, taking the button and the status
+    // line with it and failing silently.
+    const host = (details && details.parentNode) || dialog.querySelector('.dialog-inner') || dialog;
+    if (details && details.parentNode) {
+      host.insertBefore(button, details);
+      host.insertBefore(note, details);
+    } else {
+      host.insertBefore(button, host.firstChild);
+      host.insertBefore(note, button.nextSibling);
+    }
     summary.textContent = 'Sign in with Nostr';
   }
   return true;
