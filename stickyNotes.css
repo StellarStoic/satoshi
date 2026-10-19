@@ -715,3 +715,18 @@ body.is-card .sticky-shell { padding: 0; margin: 0; max-width: none; min-height:
    wider than it is tall would push the board's own height, and the plate with it, out of the frame. */
 body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; right: 0; margin-inline: auto;
   width: min(calc(100vw - 68px), calc(100vh - 96px)); aspect-ratio: 1 / 1; overflow: visible; --board-chrome-bottom: 0px; }
+
+/* Paid state of the payment dialog: the rail is gone and the panel glows green so a
+   confirmed payment cannot be mistaken for one still waiting. */
+#stickyPayment.is-paid,
+#stickyPayment.is-paid .payment-inner {
+  box-shadow: 0 0 0 1px rgba(76, 217, 123, 0.55), 0 0 28px rgba(76, 217, 123, 0.28);
+}
+#stickyPayment.is-paid .payment-amount,
+#stickyPayment.is-paid #stickyPaymentAmount {
+  color: #4cd97b;
+  letter-spacing: 0.02em;
+}
+#stickyPayment.is-paid #stickyPaymentHint {
+  color: #4cd97b;
+}

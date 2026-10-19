@@ -345,6 +345,9 @@ let currentRailId = '';
 let profileFetchPubkey = '';
 let composingPubkey = '';
 let composingGeohashes = [];
+const PAYMENT_POLL_MS = 4000;
+const PAYMENT_WATCH_MS = 30 * 60 * 1000;
+
 const INVOICE_WAIT_MESSAGES = Object.freeze([
   'Creating your invoice...',
   'Waking up the invoice machine...',
@@ -1568,7 +1571,49 @@ async function renderPayment(order) {
   showDialog(elements.paymentDialog);
   const wanted = rails.some(rail => rail.id === currentRailId) ? currentRailId : rails[0].id;
   await selectRail(wanted);
+  watchForPayment(order);
   return true;
+}
+
+// The rail arriving and the payment landing are two different moments. The wait
+// messages stop as soon as the rails exist, which left nothing watching the order
+// afterwards: you paid, and the dialog never said so. This keeps looking until the
+// desk reports paid, then turns the panel into a confirmation.
+let paymentWatchTimer = null;
+
+function stopPaymentWatch() {
+  if (paymentWatchTimer) clearInterval(paymentWatchTimer);
+  paymentWatchTimer = null;
+}
+
+function watchForPayment(order) {
+  stopPaymentWatch();
+  const id = order && order.id;
+  if (!id) return;
+  const startedAt = Date.now();
+  paymentWatchTimer = setInterval(async () => {
+    if (!elements.paymentDialog.open || Date.now() - startedAt > PAYMENT_WATCH_MS) {
+      stopPaymentWatch();
+      return;
+    }
+    let fresh = null;
+    try {
+      const body = await api(`/pinstr/v1/orders/${encodeURIComponent(id)}`);
+      fresh = body && body.order ? body.order : body;
+    } catch {
+      return;
+    }
+    if (!fresh || !fresh.paid) return;
+    stopPaymentWatch();
+    elements.paymentQr.hidden = true;
+    elements.paymentValue.hidden = true;
+    elements.copyPayment.hidden = true;
+    elements.openPayment.hidden = true;
+    elements.paymentRails.hidden = true;
+    elements.paymentAmount.textContent = 'Payment received';
+    elements.paymentHint.textContent = 'The desk confirmed your payment. Close this and finish your note — your publish token is ready.';
+    elements.paymentDialog.classList.add('is-paid');
+  }, PAYMENT_POLL_MS);
 }
 
 async function selectRail(id) {
