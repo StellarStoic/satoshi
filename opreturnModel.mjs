@@ -240,7 +240,33 @@ export function latestFromBlocks(blocks, limit = OP_RETURN.latestCount) {
 export const BORDER_PAID = 'paid';
 export const BORDER_CHAIN = 'grey';
 
-export function boardNote({ text, txid = null, mine = false, publishedAt = null, source = 'chain', viaSatoshi = false } = {}) {
+function numberOrNull(value) {
+  return value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+    ? null
+    : Number(value);
+}
+
+export function boardNote({
+  text,
+  txid = null,
+  mine = false,
+  publishedAt = null,
+  source = 'chain',
+  viaSatoshi = false,
+  blockHeight = null,
+  isMempool = false,
+  category = null,
+  protocol = 'text',
+  ticker = null,
+  collectionId = null,
+  address = null,
+  sender = null,
+  recipient = null,
+  feeSats = null,
+  feeRate = null,
+  duplicateCount = 1,
+  outputs = [],
+} = {}) {
   return {
     kind: 'opreturn',
     text: String(text ?? ''),
@@ -249,9 +275,73 @@ export function boardNote({ text, txid = null, mine = false, publishedAt = null,
     border: viaSatoshi ? BORDER_PAID : BORDER_CHAIN,
     publishedAt,
     source,
+    blockHeight: numberOrNull(blockHeight),
+    isMempool: Boolean(isMempool),
+    category: category || null,
+    protocol: protocol || 'text',
+    ticker: ticker || null,
+    collectionId: collectionId || null,
+    address: address || null,
+    sender: sender || null,
+    recipient: recipient || null,
+    feeSats: numberOrNull(feeSats),
+    feeRate: numberOrNull(feeRate),
+    duplicateCount: Math.max(1, Number(duplicateCount) || 1),
+    outputs: Array.isArray(outputs) ? outputs : [],
     // Only a writer who ticked the box gets visible satoshi.si branding.
     viaSatoshi: Boolean(viaSatoshi),
   };
+}
+
+function indexedTime(row) {
+  if (row?.block_time !== null && row?.block_time !== undefined && row?.block_time !== '' && Number.isFinite(Number(row.block_time))) {
+    return new Date(Number(row.block_time) * 1000).toISOString();
+  }
+  const value = row?.created_at ? new Date(`${row.created_at}Z`) : null;
+  return value && !Number.isNaN(value.getTime()) ? value.toISOString() : null;
+}
+
+function decodePayloadHex(value) {
+  const hex = String(value || '');
+  if (!hex || hex.length % 2 || !/^[0-9a-f]+$/i.test(hex)) return null;
+  try {
+    const bytes = Uint8Array.from(hex.match(/../g).map(part => Number.parseInt(part, 16)));
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim();
+    return decoded && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+// Convert the public index response into the deliberately small shape used by the UI.
+// OP_RETURN text is untrusted data; this function never turns it into markup or instructions.
+export function indexedBoardNote(row = {}) {
+  const text = String(row.content ?? '').trim();
+  const outputs = (Array.isArray(row.ops) ? row.ops : []).map(output => ({
+    vout: Number.isFinite(Number(output.vout)) ? Number(output.vout) : null,
+    protocol: output.protocol || null,
+    ticker: output.tick || null,
+    amount: output.amount ?? null,
+    decoded: decodePayloadHex(output.payload_hex),
+  }));
+  return boardNote({
+    text,
+    txid: row.txid || null,
+    publishedAt: indexedTime(row),
+    blockHeight: row.block_height,
+    isMempool: Boolean(Number(row.is_mempool)),
+    category: row.category,
+    protocol: row.protocol,
+    ticker: row.tick,
+    collectionId: row.collection_id,
+    address: row.address,
+    sender: row.sender,
+    recipient: row.recipient,
+    feeSats: row.fee_sats,
+    feeRate: row.fee_rate,
+    duplicateCount: row.dup_count,
+    outputs,
+  });
 }
 
 export function recentBoardNotes({ paid = [], chain = [] } = {}, limit = Infinity) {

@@ -879,6 +879,10 @@ export async function signerReady() {
   if (!session) return false;
   if (session.method === 'private') return Boolean(privateSecret);
   if (session.method === 'extension') return Boolean(window.nostr?.signEvent);
+  if (session.method === 'telegram') {
+    return globalThis.PinstrTelegramSigner?.pubkey === session.pubkey
+      && typeof globalThis.PinstrTelegramSigner?.signEvent === 'function';
+  }
   if (session.method === 'amber') return /Android/i.test(navigator.userAgent || '');
   if (session.method === 'anonymous') {
     const saved = readJson(localStorage, ANONYMOUS_KEY);
@@ -898,6 +902,13 @@ export async function signNostrEvent(template, context = null) {
   const session = getNostrSession();
   if (!session) throw new Error('Log in to Nostr first.');
   if (session.method === 'extension') return window.nostr.signEvent(template);
+  if (session.method === 'telegram') {
+    const signer = globalThis.PinstrTelegramSigner;
+    if (!signer || signer.pubkey !== session.pubkey || typeof signer.signEvent !== 'function') {
+      throw new Error('Sign in with Telegram again to sign this note.');
+    }
+    return signer.signEvent(template);
+  }
   if (session.method === 'private') {
     if (!privateSecret) throw new Error('Enter your private key again to sign. It was not saved by this site.');
     return tools().finalizeEvent(template, privateSecret);

@@ -96,13 +96,12 @@ function adoptBoardSession(pubkey) {
   if (!/^[0-9a-f]{64}$/.test(pubkey || '') || typeof localStorage === 'undefined') return;
   try {
     const existing = JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
-    if (existing && existing.pubkey === pubkey && existing.method) return;
     const nip19 = globalThis.NostrTools && globalThis.NostrTools.nip19;
     const session = {
       pubkey,
-      method: 'extension',
+      method: 'telegram',
       npub: nip19 ? nip19.npubEncode(pubkey) : '',
-      profile: null,
+      profile: existing?.pubkey === pubkey ? existing.profile || null : null,
     };
     localStorage.setItem(BOARD_SESSION_KEY, JSON.stringify(session));
     globalThis.dispatchEvent(new CustomEvent('satoshi-nostr-session', { detail: session }));
@@ -111,11 +110,13 @@ function adoptBoardSession(pubkey) {
 
 function installSessionSigner(detail) {
   if (!detail || !detail.pubkey || !detail.session) return;
-  if (globalThis.nostr && typeof globalThis.nostr.signEvent === 'function') return;
   const unsupported = () => {
     throw new Error('This signer signs notes only. Use your own signer for encrypted messages.');
   };
-  globalThis.nostr = {
+  // Keep Telegram separate from window.nostr. A real browser extension may already own that
+  // object, and treating Telegram as an extension can mismatch the active key and signer.
+  globalThis.PinstrTelegramSigner = {
+    pubkey: detail.pubkey,
     getPublicKey: async () => detail.pubkey,
     signEvent: async (event) => {
       const draft = {
@@ -133,10 +134,8 @@ function installSessionSigner(detail) {
     nip44: { encrypt: unsupported, decrypt: unsupported },
   };
   try {
-    // A shim on window.nostr is a signer, not a session: the board composes, prices and
-    // mines from session.pubkey, so without one it asks for a pubkey it already has. The
-    // session is written in the same shape the extension login writes, because that is
-    // exactly what this is - a signer the board reaches through window.nostr.
+    // The board composes, prices and mines from session.pubkey, so the signer and session
+    // are installed together before the successful login is announced.
     adoptBoardSession(detail.pubkey);
     try { document.dispatchEvent(new CustomEvent('nostr:login', { detail: { pubkey: detail.pubkey } })); } catch {}
   } catch {}
@@ -412,10 +411,10 @@ function announce(detail) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
       installSessionSigner(detail);
       mountKeyTools(detail);
+      const login = document.querySelector('#loginDialog');
+      if (login?.open) login.close();
       if (detail.created) {
-        const login = document.querySelector('#loginDialog');
         const welcome = document.querySelector('#telegramIdentityDialog');
-        if (login?.open) login.close();
         if (welcome && !welcome.open) requestAnimationFrame(() => welcome.showModal());
       }
     } else if (detail && detail.active) {

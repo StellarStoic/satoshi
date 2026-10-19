@@ -102,6 +102,28 @@ test('the identity parked behind a temporary one is readable, and only when it c
   assert.equal(sessionModule.parkedSession(), null, 'a method is what makes it signable');
 });
 
+test('a Telegram session signs through its own signer, not a browser extension', async () => {
+  const storage = memoryStorage();
+  const pubkey = '7'.repeat(64);
+  storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey, method: 'telegram', npub: `npub1${'7'.repeat(58)}`}));
+  globalThis.localStorage = storage;
+  globalThis.window = {
+    dispatchEvent() {},
+    nostr: {signEvent: async () => { throw new Error('the extension must not be used'); }},
+    NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}},
+  };
+  const signed = {...{kind: 1, content: 'hello', tags: [], created_at: 1}, pubkey, id: '8'.repeat(64), sig: '9'.repeat(128)};
+  globalThis.PinstrTelegramSigner = {pubkey, signEvent: async () => signed};
+
+  const sessionModule = await import(`../nostrSession.mjs?telegram-signer-test=${Date.now()}`);
+  assert.equal(await sessionModule.signerReady(), true);
+  assert.deepEqual(await sessionModule.signNostrEvent({kind: 1, content: 'hello', tags: [], created_at: 1}), signed);
+
+  globalThis.PinstrTelegramSigner = null;
+  assert.equal(await sessionModule.signerReady(), false, 'the persisted identity alone cannot sign after a reload');
+  await assert.rejects(() => sessionModule.signNostrEvent({kind: 1, content: '', tags: [], created_at: 2}), /Telegram again/);
+});
+
 test('a signing request that was never answered is readable, and a stale one is not', async () => {
   const storage = memoryStorage();
   storage.setItem('satoshi:nostr:session:v1', JSON.stringify({pubkey: 'a'.repeat(64), method: 'amber', npub: 'npub1' + 'a'.repeat(58)}));

@@ -55,7 +55,7 @@
   .board { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
   @media (max-width:520px){ .board { grid-template-columns:1fr; } }
   .board-list { display:flex; flex-direction:column; gap:12px; }
-  .note { border-radius:8px; padding:12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:var(--surface-raised); background-size:auto; background-repeat:repeat; cursor:pointer; }
+  .note { position:relative; border-radius:8px; padding:12px 48px 12px 12px; border:1px solid var(--line); border-left:6px solid var(--accent); background:var(--surface-raised); background-size:auto; background-repeat:repeat; cursor:pointer; }
   .note.branded { border:2px solid var(--accent); }
   .note.branded .banner p { color:var(--accent); }
   .note.chain { border:1px solid var(--line); border-left:6px solid #7d848f; }
@@ -78,10 +78,12 @@
   .sharefoot .brand { color:var(--accent); font-weight:700; font-size:.9rem; }
   .sharefoot .badge { color:#e8eaed; }
   .sharefoot .tx { font-family:ui-monospace, Menlo, monospace; font-size:.68rem; line-height:1.3; overflow-wrap:anywhere; }
-  .cardwrap .bar { display:flex; gap:10px; }
+  .cardwrap .bar { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
   .note p { margin:0; white-space:pre-wrap; word-break:break-word; }
   .note .meta { margin-top:8px; font-size:.78rem; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
   .note .meta a { color:var(--dim); }
+  .note-copy { position:absolute; top:8px; right:8px; display:grid; place-items:center; width:34px; height:34px; padding:0 !important; border:0 !important; background:transparent !important; color:var(--dim) !important; }
+  .note-copy:is(:hover,:focus-visible) { color:var(--accent) !important; }
   .banner { background:linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.55)); border-radius:6px; padding:10px 12px; }
   .banner p { color:#fff; }
   .payment-dialog { width:min(520px, calc(100% - 24px)); max-height:min(90dvh,760px); margin:auto; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--panel); color:var(--ink); box-shadow:0 22px 70px rgba(0,0,0,.62); overflow:hidden; }
@@ -355,13 +357,14 @@ function openReader(note) {
         <span class="when">Date and time: ${note.publishedAt ? new Date(note.publishedAt).toUTCString() : 'unavailable'}</span>
       </div>
     </div>
-    <div class="bar"><button id="dl"><i class="lni lni-download-1" aria-hidden="true"></i> Download</button><button id="share"><i class="lni lni-share-1" aria-hidden="true"></i> Share</button></div>`;
+    <div class="bar"><button id="dl"><i class="lni lni-download-1" aria-hidden="true"></i> Download</button><button id="share"><i class="lni lni-share-1" aria-hidden="true"></i> Share</button><button id="copyReader"><i class="lni lni-copy-2" aria-hidden="true"></i> Copy message</button></div>`;
   document.body.appendChild(overlay);
   openOverlay = overlay;
   fitShareText(overlay.querySelector('.sharecard'));
   overlay.querySelector('.cardclose').onclick = () => overlay.remove();
   overlay.onclick = (event) => { if (event.target === overlay) overlay.remove(); };
   overlay.querySelector('#dl').onclick = () => downloadOpReturnCard(note, pattern);
+  overlay.querySelector('#copyReader').onclick = event => copyBoardMessage(note.text, event.currentTarget);
   overlay.querySelector('#share').onclick = async (event) => {
     const button = event.currentTarget;
     try {
@@ -374,6 +377,17 @@ function openReader(note) {
       if (error?.name !== 'AbortError') console.warn('card share failed:', error);
     }
   };
+}
+
+async function copyBoardMessage(text, button) {
+  try {
+    await navigator.clipboard.writeText(text || '');
+    const previous = button.innerHTML;
+    button.textContent = 'Copied';
+    setTimeout(() => { if (button.isConnected) button.innerHTML = previous; }, 1400);
+  } catch (error) {
+    console.warn('copy failed:', error);
+  }
 }
 
 function fitShareText(card) {
@@ -415,11 +429,19 @@ function noteCard(note) {
     meta.appendChild(link);
   }
   card.appendChild(meta);
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'note-copy';
+  copy.title = 'Copy message';
+  copy.setAttribute('aria-label', 'Copy message');
+  copy.innerHTML = '<i class="lni lni-copy-2" aria-hidden="true"></i>';
+  copy.onclick = event => { event.stopPropagation(); copyBoardMessage(note.text, copy); };
+  card.appendChild(copy);
   card.tabIndex = 0;
   card.setAttribute('role', 'button');
   card.setAttribute('aria-label', 'Open message card');
   card.onclick = (event) => {
-    if (event.target.closest('a')) return;
+    if (event.target.closest('a, button')) return;
     openReader(note);
   };
   card.onkeydown = (event) => {

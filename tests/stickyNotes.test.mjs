@@ -877,6 +877,12 @@ test('the Pinstr mirror keeps Telegram visible and every top control in one alig
     'the private-key export remains reachable from the signed-in account dialog');
   assert.match(telegram, /if \(detail\.created\)[\s\S]*?#telegramIdentityDialog[\s\S]*?welcome\.showModal\(\)/,
     'only a newly generated identity opens the explanation prompt');
+  assert.match(telegram, /globalThis\.PinstrTelegramSigner = \{/,
+    'Telegram has its own signer and cannot be shadowed by a browser extension');
+  assert.match(telegram, /method: 'telegram'/,
+    'the board session records the signer it actually needs');
+  assert.match(telegram, /const login = document\.querySelector\('#loginDialog'\);[\s\S]*?if \(login\?\.open\) login\.close\(\);/,
+    'every successful Telegram login leaves the sign-in modal');
 });
 
 test('published notes resolve a readable author label in relay batches', async () => {

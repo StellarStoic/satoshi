@@ -11,7 +11,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { OP_RETURN, validateMessage, priceSats, latestFromBlocks, boardNote, looksLikeLanguage } from './opreturnModel.mjs';
+import { OP_RETURN, validateMessage, priceSats, latestFromBlocks, boardNote, looksLikeLanguage, indexedBoardNote } from './opreturnModel.mjs';
 
 const PORT = Number(process.env.OPRETURN_PORT || 8791);
 const DATA_DIR = process.env.OPRETURN_DATA || path.resolve('./data');
@@ -24,6 +24,9 @@ const CHAIN_BASE = process.env.OPRETURN_CHAIN_BASE || 'https://mempool.space/api
 const SCAN_PAGES_PER_REFRESH = Math.max(1, Number(process.env.OPRETURN_SCAN_PAGES || 3));
 const SCAN_INTERVAL_MS = Number(process.env.OPRETURN_SCAN_INTERVAL_MS || 120000);
 const KEEP_MESSAGES = 60;
+const INDEX_BASE = process.env.OPRETURN_INDEX_BASE || 'https://opreturn.xyz/api';
+const INDEX_CACHE_MS = Math.max(60000, Number(process.env.OPRETURN_INDEX_CACHE_MS || 180000));
+const indexCache = new Map();
 
 const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
 const CHAIN_FILE = path.join(DATA_DIR, 'chain.json');
@@ -152,6 +155,52 @@ function workerAuthorized(req) {
   return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(WORKER_TOKEN));
 }
 
+async function indexGet(pathname, { cacheMs = INDEX_CACHE_MS } = {}) {
+  const key = String(pathname);
+  const cached = indexCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const response = await fetch(`${INDEX_BASE}${key}`, {
+    headers: { accept: 'application/json', 'user-agent': 'satoshi.si-opreturn/1.0' },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!response.ok) throw new Error(`index ${response.status}`);
+  const value = await response.json();
+  indexCache.set(key, { value, expiresAt: Date.now() + cacheMs });
+  if (indexCache.size > 80) {
+    const oldest = indexCache.keys().next().value;
+    indexCache.delete(oldest);
+  }
+  return value;
+}
+
+function feedParams(searchParams, { requireCursor = false } = {}) {
+  const params = new URLSearchParams({ sort: 'new', kind: 'text' });
+  const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 20, 1), 50);
+  params.set('limit', String(limit));
+  const before = searchParams.get('before') || '';
+  if (requireCursor && !before) return null;
+  if (before) params.set('before', before.slice(0, 160));
+  for (const name of ['category', 'address', 'protocol', 'tick', 'collection_id']) {
+    const value = (searchParams.get(name) || '').trim();
+    if (value) params.set(name, value.slice(0, 120));
+  }
+  return params;
+}
+
+function readableIndexedRows(payload, query = '') {
+  const rows = Array.isArray(payload) ? payload : payload.messages || [];
+  const needle = String(query).trim().toLocaleLowerCase();
+  const seen = new Set();
+  return rows.flatMap(row => {
+    const note = indexedBoardNote(row);
+    if (!note.txid || !looksLikeLanguage(note.text)) return [];
+    if (needle && !note.text.toLocaleLowerCase().includes(needle)) return [];
+    if (seen.has(note.txid)) return [];
+    seen.add(note.txid);
+    return [note];
+  });
+}
+
 // ---------------------------------------------------------------- chain index ----
 
 let scanning = false;
@@ -229,7 +278,7 @@ async function scanOnce() {
 // opreturn.xyz already indexes and decodes OP_RETURN traffic, so instead of scanning
 // blocks ourselves (which found mostly protocol markers) the feed is the source. Its
 // rows arrive classified with protocol "text" for prose.
-const FEED_URL = process.env.OPRETURN_FEED_URL || 'https://opreturn.xyz/api/messages?sort=new&limit=60';
+const FEED_URL = process.env.OPRETURN_FEED_URL || `${INDEX_BASE}/messages?kind=text&sort=new&limit=60`;
 const FEED_INTERVAL_MS = Number(process.env.OPRETURN_FEED_INTERVAL_MS || 180000);
 
 async function refreshFeed() {
@@ -240,19 +289,7 @@ async function refreshFeed() {
     }
     const payload = await response.json();
     const rows = Array.isArray(payload) ? payload : payload.messages || [];
-    const seen = new Set();
-    const messages = [];
-    for (const row of rows) {
-      const text = String(row.content ?? '').trim();
-      if (!text || !looksLikeLanguage(text)) continue;
-      const key = text.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const when = typeof row.block_time === 'number'
-        ? row.block_time
-        : Math.floor(new Date(row.block_time || Date.now()).getTime() / 1000);
-      messages.push({ text, txid: row.txid, blockHeight: row.block_height ?? null, blockTime: when });
-    }
+    const messages = readableIndexedRows(payload);
     chain.messages = messages.slice(0, KEEP_MESSAGES);
     chain.cursor = { blockId: 'opreturn.xyz', page: 0, before: payload.next_before || null };
     saveChain();
@@ -305,36 +342,50 @@ const server = http.createServer(async (req, res) => {
 
     // Deeper pages of the chain feed, for the board's scrolling.
     if (route === '/opreturn/v1/chain' && req.method === 'GET') {
-      const before = url.searchParams.get('before') || '';
-      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
-      if (!before) {
+      const params = feedParams(url.searchParams);
+      if (!params) {
         send(res, 200, { chain: [], nextBefore: null });
         return;
       }
       try {
-        const response = await fetch(
-          `https://opreturn.xyz/api/messages?sort=new&limit=${limit}&before=${encodeURIComponent(before)}`,
-          { headers: { accept: 'application/json' } });
-        const payload = await response.json();
-        const rows = Array.isArray(payload) ? payload : payload.messages || [];
-        const seen = new Set();
-        const out = [];
-        for (const row of rows) {
-          const text = String(row.content ?? '').trim();
-          if (!text || !looksLikeLanguage(text)) continue;
-          const key = text.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          out.push(boardNote({
-            text,
-            txid: row.txid,
-            publishedAt: row.block_time ? new Date(Number(row.block_time) * 1000).toISOString() : null,
-            source: 'chain',
-          }));
-        }
+        const payload = await indexGet(`/messages?${params}`);
+        const out = readableIndexedRows(payload, url.searchParams.get('q'));
         send(res, 200, { chain: out, nextBefore: payload.next_before || null });
       } catch (error) {
         send(res, 502, { error: 'the index could not be read', detail: error.message });
+      }
+      return;
+    }
+
+    if (route === '/opreturn/v1/categories' && req.method === 'GET') {
+      try {
+        const categories = await indexGet('/categories');
+        send(res, 200, { categories: Array.isArray(categories) ? categories : [] }, {
+          'cache-control': 'public, max-age=180',
+        });
+      } catch (error) {
+        send(res, 502, { error: 'categories could not be read', detail: error.message });
+      }
+      return;
+    }
+
+    if (route === '/opreturn/v1/activity' && req.method === 'GET') {
+      try {
+        const activity = await indexGet('/chain');
+        send(res, 200, activity, { 'cache-control': 'public, max-age=180' });
+      } catch (error) {
+        send(res, 502, { error: 'chain activity could not be read', detail: error.message });
+      }
+      return;
+    }
+
+    const blockMatch = route.match(/^\/opreturn\/v1\/block\/(\d{1,9})$/);
+    if (blockMatch && req.method === 'GET') {
+      try {
+        const block = await indexGet(`/block/${blockMatch[1]}`);
+        send(res, 200, block, { 'cache-control': 'public, max-age=180' });
+      } catch (error) {
+        send(res, 404, { error: 'that indexed block could not be read', detail: error.message });
       }
       return;
     }
@@ -347,20 +398,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       try {
-        const response = await fetch(`https://opreturn.xyz/api/message/${txid}`, {
-          headers: { accept: 'application/json' },
-        });
-        if (response.status === 404) {
-          send(res, 404, { error: 'no message in this transaction' });
-          return;
-        }
-        const row = await response.json();
+        const row = await indexGet(`/message/${txid}`);
         const text = String(row.content ?? '').trim();
-        if (!response.ok || !text) {
+        if (!text) {
           send(res, 404, { error: 'no message in this transaction' });
           return;
         }
-        send(res, 200, { txid, text, blockHeight: row.block_height ?? null, blockTime: row.block_time ?? null });
+        send(res, 200, indexedBoardNote(row), { 'cache-control': 'public, max-age=180' });
       } catch (error) {
         send(res, 502, { error: 'the index could not be read', detail: error.message });
       }
@@ -424,19 +468,14 @@ const server = http.createServer(async (req, res) => {
       const seen = new Set();
       const readable = chain.messages.filter(m => {
         if (!looksLikeLanguage(m.text)) return false;
-        const key = m.text.trim().toLowerCase();
-        if (seen.has(key)) return false;      // one entry per message, not per transaction
+        const key = m.txid;
+        if (seen.has(key)) return false;      // one entry per transaction
         seen.add(key);
         return true;
       });
       const fromChain = readable
         .slice(0, OP_RETURN.latestCount)
-        .map(m => boardNote({
-          text: m.text,
-          txid: m.txid,
-          publishedAt: m.blockTime ? new Date(m.blockTime * 1000).toISOString() : null,
-          source: 'chain',
-        }));
+        .map(m => ({ ...m, source: 'chain' }));
       send(res, 200, { paid, chain: fromChain, nextBefore: chain.cursor?.before || null });
       return;
     }

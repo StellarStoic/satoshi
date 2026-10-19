@@ -6269,6 +6269,13 @@ function handleNostrSessionChange() {
   refreshPriceQuote(session).catch(() => {});
 }
 window.addEventListener('satoshi-nostr-session', handleNostrSessionChange);
+window.addEventListener('pinstr-telegram-ready', event => {
+  if (!event.detail?.signedIn) return;
+  const session = getNostrSession();
+  updateAccount();
+  if (elements.login.open) elements.login.close();
+  if (!event.detail.created && session) showLoginConfirmation(session);
+});
 // Amber commonly opens its HTTPS callback in a browser tab even when the request came from
 // the installed PWA. Both contexts share origin storage; let the original page see the login
 // completed instead of leaving its older dialog on "Connecting".

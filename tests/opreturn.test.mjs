@@ -6,6 +6,7 @@ import {
   OP_RETURN, TOTAL_SATS, priceSats, validateMessage, bytesLeft, messageBytes,
   opReturnScript, scriptToText, chainMessage, latestFromBlocks, boardNote,
   BORDER_PAID, BORDER_CHAIN, orderView, isOrderTerminal, sharePattern, recentBoardNotes,
+  indexedBoardNote,
 } from '../opreturnModel.mjs';
 import { helpCopy, helpSections, PAGE_HELP } from '../siteHelp.mjs';
 import { opReturnPaymentOptions, unifiedPaymentUri } from '../opreturnPayment.mjs';
@@ -30,6 +31,10 @@ test('OP_RETURN pages use the shared site navigation, controls, and footer', asy
   assert.doesNotMatch(pages[0], /\.board-list\s*\{[^}]*overflow-y\s*:\s*auto/);
   assert.doesNotMatch(pages[0], /\.board-list\s*\{[^}]*max-height/);
   assert.match(pages[1], /id="writeIcon"[\s\S]*lni-pencil-1/);
+  assert.match(pages[1], /id="messageSearch"/);
+  assert.match(pages[1], /id="categoryFilter"/);
+  assert.match(pages[1], /id="blockStrip"/);
+  assert.match(pages[1], /Copy message/);
 });
 
 test('OP_RETURN help separates plain guidance from public technical details', () => {
@@ -126,6 +131,37 @@ test('only an explicit branding choice gives a board message the accent border',
   const branded = boardNote({ text: 'mine', txid: 'bb', mine: true, viaSatoshi: true });
   assert.equal(branded.border, BORDER_PAID);
   assert.equal('theme' in branded, false);
+});
+
+test('indexed messages retain confirmation, fees, duplicates, and decoded outputs', () => {
+  const note = indexedBoardNote({
+    txid: 'ab'.repeat(32),
+    content: 'hello from bitcoin',
+    is_mempool: 1,
+    block_height: null,
+    block_time: null,
+    created_at: '2026-10-19 20:33:49',
+    fee_sats: 256,
+    fee_rate: 2,
+    dup_count: 4,
+    sender: 'bc1qsender',
+    recipient: 'bc1qrecipient',
+    category: 'Graffiti / Greetings',
+    protocol: 'text',
+    ops: [{ vout: 1, protocol: 'text', payload_hex: '68656c6c6f' }],
+  });
+  assert.equal(note.isMempool, true);
+  assert.equal(note.blockHeight, null);
+  assert.equal(note.feeSats, 256);
+  assert.equal(note.feeRate, 2);
+  assert.equal(note.duplicateCount, 4);
+  assert.equal(note.outputs[0].decoded, 'hello');
+  assert.match(note.publishedAt, /^2026-10-19T20:33:49/);
+});
+
+test('malformed output hex is never decoded into board markup', () => {
+  const note = indexedBoardNote({ content: 'still readable text', txid: 'cd'.repeat(32), ops: [{ payload_hex: '<script>' }] });
+  assert.equal(note.outputs[0].decoded, null);
 });
 
 test('the write-page board helper merges, sorts, deduplicates, and keeps five', () => {
