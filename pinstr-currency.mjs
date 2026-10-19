@@ -303,3 +303,9 @@ function injectStyles() {
 `;
   document.head.appendChild(style);
 }
+
+// A door for the case where every automatic trigger missed: from the console,
+// pinstrCurrency.open() asks the question.
+if (ON_PINSTR && typeof window !== 'undefined') {
+  window.pinstrCurrency = { open: () => openChooser({ firstTime: true }), choice: readChoice };
+}
