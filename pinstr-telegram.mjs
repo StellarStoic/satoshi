@@ -90,6 +90,25 @@ function injectLoginStyles() {
 // The board publishes through window.nostr, so a Telegram session exposes one: the
 // public key it holds, and signEvent forwarded to the server that keeps the key. An
 // existing browser extension is never replaced.
+const BOARD_SESSION_KEY = 'satoshi:nostr:session:v1';
+
+function adoptBoardSession(pubkey) {
+  if (!/^[0-9a-f]{64}$/.test(pubkey || '') || typeof localStorage === 'undefined') return;
+  try {
+    const existing = JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
+    if (existing && existing.pubkey === pubkey && existing.method) return;
+    const nip19 = globalThis.NostrTools && globalThis.NostrTools.nip19;
+    const session = {
+      pubkey,
+      method: 'extension',
+      npub: nip19 ? nip19.npubEncode(pubkey) : '',
+      profile: null,
+    };
+    localStorage.setItem(BOARD_SESSION_KEY, JSON.stringify(session));
+    globalThis.dispatchEvent(new CustomEvent('satoshi-nostr-session', { detail: session }));
+  } catch { /* storage blocked: the board will keep asking, but nothing breaks */ }
+}
+
 function installSessionSigner(detail) {
   if (!detail || !detail.pubkey || !detail.session) return;
   if (globalThis.nostr && typeof globalThis.nostr.signEvent === 'function') return;
@@ -114,7 +133,12 @@ function installSessionSigner(detail) {
     nip44: { encrypt: unsupported, decrypt: unsupported },
   };
   try {
-    globalThis.dispatchEvent(new CustomEvent('nostr:loggedin', { detail: { pubkey: detail.pubkey } }));
+    // A shim on window.nostr is a signer, not a session: the board composes, prices and
+    // mines from session.pubkey, so without one it asks for a pubkey it already has. The
+    // session is written in the same shape the extension login writes, because that is
+    // exactly what this is - a signer the board reaches through window.nostr.
+    adoptBoardSession(detail.pubkey);
+    try { document.dispatchEvent(new CustomEvent('nostr:login', { detail: { pubkey: detail.pubkey } })); } catch {}
   } catch {}
 }
 
