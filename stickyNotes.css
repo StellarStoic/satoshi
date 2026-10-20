@@ -886,7 +886,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
    The picture is rotated and scaled per note inside a wrapper that clips it, so no two notes wear the same
    creases and a rotated square never leaves a corner of the note bare. Multiply keeps the note's colour. */
 .sticky-note__texture {
-  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  /* no z-index: painted last, so it lies over a print and under the writing, which has its own */
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
   opacity: var(--texture-opacity, 0); mix-blend-mode: multiply;
   transition: opacity .5s ease;
 }

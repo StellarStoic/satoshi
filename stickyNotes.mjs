@@ -3249,22 +3249,6 @@ function renderNote(sticky, event = null, temporary = false) {
   note.classList.toggle('sticky-note--print', Boolean(picture));
   if (sticky.id) note.dataset.eventId = sticky.id;
   note.dataset.createdAt = String(sticky.createdAt || 0);
-  // An old note looks handled. The picture is rotated and scaled per note inside a wrapper that clips it,
-  // and how visible it is follows how much of the note's own life has been spent.
-  const ageOpacity = noteAgeTextureOpacity(noteAgeFraction(sticky.createdAt, sticky.expiration));
-  if (ageOpacity > 0) {
-    const texture = document.createElement('div');
-    texture.className = 'sticky-note__texture';
-    texture.setAttribute('aria-hidden', 'true');
-    texture.dataset.born = String(sticky.createdAt || 0);
-    texture.dataset.dies = String(sticky.expiration || 0);
-    const placement = noteTexturePlacement(sticky.id);
-    texture.style.setProperty('--texture-angle', `${placement.angle}deg`);
-    texture.style.setProperty('--texture-scale', placement.scale.toFixed(3));
-    texture.style.setProperty('--texture-shift', `${placement.shiftX}px ${placement.shiftY}px`);
-    texture.style.setProperty('--texture-opacity', ageOpacity.toFixed(3));
-    note.append(texture);
-  }
   // Some paper has lifted at a corner. The wear comes from the note's id, so it is the same on every
   // redraw - and a print is a photograph, not paper, so it stays flat.
   const wear = picture ? null : noteWear(sticky.id);
@@ -3375,7 +3359,23 @@ function renderNote(sticky, event = null, temporary = false) {
   // Limits such as "last 5" must be recalculated whenever a newer note arrives.
   if (!temporary) applyNoteFilters();
   if (!temporary) scheduleBuriedPins();
-  return note;
+  // An old note looks handled. The picture is rotated and scaled per note inside a wrapper that clips it,
+  // and how visible it is follows how much of the note's own life has been spent.
+  const ageOpacity = noteAgeTextureOpacity(noteAgeFraction(sticky.createdAt, sticky.expiration));
+  if (ageOpacity > 0) {
+    const texture = document.createElement('div');
+    texture.className = 'sticky-note__texture';
+    texture.setAttribute('aria-hidden', 'true');
+    texture.dataset.born = String(sticky.createdAt || 0);
+    texture.dataset.dies = String(sticky.expiration || 0);
+    const placement = noteTexturePlacement(sticky.id);
+    texture.style.setProperty('--texture-angle', `${placement.angle}deg`);
+    texture.style.setProperty('--texture-scale', placement.scale.toFixed(3));
+    texture.style.setProperty('--texture-shift', `${placement.shiftX}px ${placement.shiftY}px`);
+    texture.style.setProperty('--texture-opacity', ageOpacity.toFixed(3));
+    note.append(texture);
+  }
+    return note;
 }
 
 /** Take every note that has passed its NIP-40 moment off the board. True when any went. */

@@ -4186,5 +4186,8 @@ test('the crease picture is painted under the writing, never over it', async () 
   assert.ok(css.includes('mix-blend-mode: multiply'), 'multiply keeps the note its own colour');
   assert.ok(css.includes('overflow: hidden'), 'the rotated picture is clipped to the note');
   assert.ok(css.includes('.sticky-note { isolation: isolate;'), 'the note is its own blending group');
-  assert.ok(css.includes('z-index: 0'), 'the texture sits under the text');
+  const printAt = script.indexOf('note.appendChild(print)');
+  const textureAt = script.indexOf("texture.className = 'sticky-note__texture'");
+  assert.ok(printAt !== -1 && textureAt > printAt, 'the creases are built after the photograph, so they lie over it');
+  assert.ok(script.includes('note.append(texture)'), 'and are the last thing on the note');
 });
