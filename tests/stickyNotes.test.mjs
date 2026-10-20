@@ -3988,6 +3988,6 @@ test('the GIF and buried-pin switches belong to Board style, not sort and filter
     assert.ok(style.includes(`id="${control}"`), `${control} must be a Board style setting`);
     assert.ok(!sort.includes(`id="${control}"`), `${control} must not sit in sort and filter`);
   }
-  assert.match(script, /function openBoardStyle\(\) \{
-  elements\.gifPlay\.checked = gifPlay;/);
+  assert.ok(script.includes('elements.gifPlay.checked = gifPlay;'), 'the panel reads the stored switch state');
+  assert.ok(script.includes('elements.buriedPins.checked = showBuriedPins;'), 'both switches are restored');
 });
