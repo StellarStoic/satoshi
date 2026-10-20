@@ -6493,6 +6493,40 @@ elements.shareBoardNative.addEventListener('click', async () => {
   }
 });
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+/**
+ * Close a modal when the reader clicks outside it, which is how every modal on this page behaves.
+ *
+ * The click that lands on the backdrop is delivered to the dialog element itself, so the target is the first
+ * test; the rectangle test keeps a click on the dialog's own padding, which also targets the dialog, from
+ * closing a card the reader was aiming at. Closing through close() rather than hiding runs the dialog's own
+ * close handlers, so anything a dialog cancels on close - a waiting signer, a poll - still cancels.
+ */
+function closeOutsideModal(dialog) {
+  if (!dialog || dialog.dataset.outsideClose === 'on') return;
+  dialog.dataset.outsideClose = 'on';
+  dialog.addEventListener('click', event => {
+    if (event.target !== dialog) return;
+    const box = dialog.getBoundingClientRect();
+    const outside = event.clientX < box.left || event.clientX > box.right
+      || event.clientY < box.top || event.clientY > box.bottom;
+    if (outside) dialog.close();
+  });
+}
+
+// Every modal on the board, wired once, including the ones added by markup later in this file.
+document.querySelectorAll('dialog').forEach(closeOutsideModal);
+
+/**
+ * The same for the two explainers, which are <details> rather than dialogs: a reader who opened the question
+ * mark expects a click anywhere else to put it away, and nothing was doing that.
+ */
+document.querySelectorAll('details.board-depth-help, details.user-relays__explainer').forEach(explainer => {
+  document.addEventListener('click', event => {
+    if (!explainer.open || explainer.contains(event.target)) return;
+    explainer.open = false;
+  });
+});
+
 elements.linkExpand.addEventListener('click', toggleLinkRest);
 elements.linkCancel.addEventListener('click', () => elements.linkDialog.close());
 elements.linkOpen.addEventListener('click', () => {

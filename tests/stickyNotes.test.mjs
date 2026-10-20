@@ -4264,3 +4264,30 @@ test('a free-tier name is covered for life, not missing a subscription', async (
     'a free name is never called Not active');
   assert.ok(script.includes('elements.accountSubscriptionNone.textContent = free.sentence'));
 });
+
+test('a click outside a modal puts it away, and a click on the card does not', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+
+  // Every modal on the page, not a hand-kept list of them: a dialog added later is wired by the same pass.
+  assert.ok(script.includes("document.querySelectorAll('dialog').forEach(closeOutsideModal)"),
+    'the wiring is by selector, so no modal is left out');
+  assert.ok(script.includes('if (event.target !== dialog) return;'),
+    'a click on a child targets the child, so it never closes the dialog');
+  const box = script.slice(script.indexOf('const box = dialog.getBoundingClientRect();'));
+  assert.ok(box.includes('event.clientX < box.left'), 'the rectangle keeps a padding click from closing it');
+  assert.ok(script.includes('if (outside) dialog.close();'), 'and it closes through close(), so the close handlers run');
+  assert.ok(script.includes("dialog.dataset.outsideClose === 'on'"), 'wiring twice would close it on the first click');
+
+  // The page really does carry the dialogs this is for.
+  const count = (html.match(/<dialog\b/g) || []).length;
+  assert.ok(count >= 15, `expected the board's dialogs, found ${count}`);
+
+  // The question-mark explainers are <details>, not dialogs, and a reader expects the same of them.
+  assert.ok(script.includes('details.board-depth-help, details.user-relays__explainer'));
+  assert.ok(script.includes('if (!explainer.open || explainer.contains(event.target)) return;'),
+    'a click inside an open explainer leaves it open');
+  assert.ok(script.includes('explainer.open = false;'), 'a click anywhere else puts it away');
+});
