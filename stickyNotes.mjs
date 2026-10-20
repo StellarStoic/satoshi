@@ -78,7 +78,7 @@ import {
   stickyPowOffer,
   stickyPowSentence,
   stickyPowProgress,
-  stickyPowDifficulty,} from './stickyNotesModel.mjs';
+  stickyPowDifficulty, safeProfileLink, safeLightningAddress,} from './stickyNotesModel.mjs';
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
@@ -197,6 +197,12 @@ const elements = {
   accountDialog: document.getElementById('accountDialog'), accountName: document.getElementById('accountName'),
   accountNpub: document.getElementById('accountNpub'), accountMethod: document.getElementById('accountMethod'),
   accountPicture: document.getElementById('accountPicture'), accountNip05: document.getElementById('accountNip05'),
+  accountBanner: document.getElementById('accountBanner'), accountFields: document.getElementById('accountFields'),
+  accountHandleRow: document.getElementById('accountHandleRow'), accountHandle: document.getElementById('accountHandle'),
+  accountAboutRow: document.getElementById('accountAboutRow'), accountAbout: document.getElementById('accountAbout'),
+  accountWebsiteRow: document.getElementById('accountWebsiteRow'), accountWebsite: document.getElementById('accountWebsite'),
+  accountLightningRow: document.getElementById('accountLightningRow'), accountLightning: document.getElementById('accountLightning'),
+  accountBotRow: document.getElementById('accountBotRow'),
   anonymousExpiry: document.getElementById('anonymousExpiry'), logout: document.getElementById('logoutNostr'),
   composer: document.getElementById('composerDialog'), editor: document.getElementById('stickyEditor'),
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
@@ -1346,6 +1352,42 @@ function labelNoteAuthor(author, sticky) {
   authorProfileTimer = setTimeout(flushAuthorProfiles, 90);
 }
 
+/**
+ * Everything a kind 0 says about the reader, as far as the account dialog shows it.
+ * Empty values stay empty so a row can be hidden rather than printed blank.
+ */
+function renderAccountDetails(session) {
+  const profile = session?.profile || {};
+  const anonymous = session?.method === 'anonymous';
+  const banner = anonymous ? '' : safeProfilePicture(profile.banner);
+  elements.accountBanner.hidden = !banner;
+  if (banner) { elements.accountBanner.src = banner; elements.accountBanner.alt = `${sessionLabel(session)} profile banner`; }
+  else elements.accountBanner.removeAttribute('src');
+
+  const handle = anonymous ? '' : String(profile.name || '').trim();
+  const about = anonymous ? '' : String(profile.about || '').trim();
+  const website = anonymous ? '' : safeProfileLink(profile.website);
+  const lightning = anonymous ? '' : safeLightningAddress(profile.lud16);
+  const bot = !anonymous && profile.bot === true;
+
+  elements.accountHandle.textContent = handle;
+  elements.accountHandleRow.hidden = !handle;
+  elements.accountAbout.textContent = about;
+  elements.accountAboutRow.hidden = !about;
+  if (website) {
+    elements.accountWebsite.textContent = website.replace(/^https?:\/\//i, '').replace(/\/$/, '').slice(0, 80);
+    elements.accountWebsite.href = website;
+  } else {
+    elements.accountWebsite.textContent = '';
+    elements.accountWebsite.removeAttribute('href');
+  }
+  elements.accountWebsiteRow.hidden = !website;
+  elements.accountLightning.textContent = lightning;
+  elements.accountLightningRow.hidden = !lightning;
+  elements.accountBotRow.hidden = !bot;
+  elements.accountFields.hidden = !handle && !about && !website && !lightning && !bot;
+}
+
 async function loadAccountProfile(session) {
   if (!session || session.method === 'anonymous' || profileFetchPubkey === session.pubkey) return;
   profileFetchPubkey = session.pubkey;
@@ -1365,6 +1407,12 @@ async function loadAccountProfile(session) {
       display_name: String(source.display_name || source.displayName || '').trim().slice(0, 80),
       nip05: String(source.nip05 || '').trim().slice(0, 180),
       picture: safeProfilePicture(source.picture),
+      // The rest of what a kind 0 may say, kept short enough to show and never trusted as markup.
+      about: String(source.about || '').trim().slice(0, 600),
+      banner: safeProfilePicture(source.banner),
+      website: safeProfileLink(source.website),
+      lud16: safeLightningAddress(source.lud16),
+      bot: source.bot === true,
     };
     updateNostrProfile(session.pubkey, profile);
     if (!elements.loginConfirmation.hidden) showLoginConfirmation(getNostrSession());
@@ -1408,6 +1456,7 @@ function updateAccount() {
       elements.accountPicture.alt = `${sessionLabel(session)} profile image`;
     }
     else elements.accountPicture.removeAttribute('src');
+    renderAccountDetails(session);
     elements.logout.querySelector('span').textContent = session.method === 'anonymous' ? 'Leave anonymous mode' : 'Log out';
     loadAccountProfile(session);
   } else {
@@ -1416,6 +1465,9 @@ function updateAccount() {
     elements.accountMethod.textContent = '';
     elements.accountNip05.hidden = true;
     elements.accountPicture.hidden = true;
+    elements.accountBanner.hidden = true;
+    elements.accountBanner.removeAttribute('src');
+    elements.accountFields.hidden = true;
   }
   updateAnonymousCountdown();
   refreshPriceQuote(session);

@@ -4008,3 +4008,39 @@ test('a kept place sets the remember switch aside instead of outvoting it', asyn
   assert.ok(seed !== -1, 'the chooser still seeds the switch');
   assert.ok(script.indexOf('renderLockControls();', seed) !== -1, 'the chooser refreshes the row before it shows');
 });
+
+
+test('a profile link is only followed when it really is http(s)', async () => {
+  const { safeProfileLink, safeLightningAddress } = await import('../stickyNotesModel.mjs');
+  assert.equal(safeProfileLink('https://a.si/x'), 'https://a.si/x');
+  assert.equal(safeProfileLink('a.si'), 'https://a.si/');
+  assert.equal(safeProfileLink('javascript:alert(1)'), '');
+  assert.equal(safeProfileLink('data:text/html,x'), '');
+  assert.equal(safeProfileLink('ftp://x.si'), '');
+  assert.equal(safeProfileLink('a sentence'), '');
+  assert.equal(safeProfileLink(''), '');
+  assert.equal(safeLightningAddress('someone@getalby.com'), 'someone@getalby.com');
+  assert.equal(safeLightningAddress('not an address'), '');
+  assert.equal(safeLightningAddress(''), '');
+});
+
+test('the account dialog shows what a kind 0 says and hides what it does not', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const dialog = html.slice(html.indexOf('id="accountDialog"'), html.indexOf('id="composerDialog"'));
+  for (const id of ['accountBanner', 'accountFields', 'accountHandleRow', 'accountHandle',
+                    'accountAboutRow', 'accountAbout', 'accountWebsiteRow', 'accountWebsite',
+                    'accountLightningRow', 'accountLightning', 'accountBotRow']) {
+    assert.ok(dialog.includes(`id="${id}"`), `${id} must be part of the account dialog`);
+  }
+  assert.ok(script.includes("about: String(source.about || '').trim().slice(0, 600)"), 'the bio is capped');
+  assert.ok(script.includes('banner: safeProfilePicture(source.banner)'), 'the banner is sanitised like a picture');
+  assert.ok(script.includes('website: safeProfileLink(source.website)'));
+  assert.ok(script.includes('lud16: safeLightningAddress(source.lud16)'));
+  assert.ok(script.includes('elements.accountFields.hidden = !handle && !about && !website && !lightning && !bot;'),
+    'an empty profile must not leave an empty block on screen');
+  assert.ok(script.includes("const anonymous = session?.method === 'anonymous';"),
+    'a throwaway key has no profile to show');
+});

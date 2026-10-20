@@ -1912,3 +1912,24 @@ export function spentAmberHandOver({parked = null, handed = null} = {}) {
     error: Boolean(handed.error),
   };
 }
+
+
+/**
+ * A profile link is only a link if it really is http(s) once parsed. A bare domain gets https, and
+ * anything else - javascript:, data:, ftp:, a sentence - is dropped rather than shown as clickable.
+ */
+export function safeProfileLink(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    return url.toString().slice(0, 300);
+  } catch { return ''; }
+}
+
+/** lud16 is a Lightning address and nothing else; anything that is not one is dropped. */
+export function safeLightningAddress(value) {
+  const raw = String(value || '').trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw) ? raw.slice(0, 120) : '';
+}

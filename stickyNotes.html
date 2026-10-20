@@ -335,11 +335,19 @@
     <form method="dialog" class="dialog-inner account-card">
       <button type="submit" class="dialog-close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="accountTitle">Nostr account</h2>
+      <img id="accountBanner" class="account-banner" alt="" hidden>
       <div class="account-identity">
         <img id="accountPicture" alt="" hidden>
         <div><strong id="accountName"></strong><span id="accountNip05" hidden></span></div>
       </div>
       <code id="accountNpub"></code><span id="accountMethod"></span>
+      <dl id="accountFields" class="account-fields" hidden>
+        <div class="account-field" id="accountHandleRow" hidden><dt>Name</dt><dd id="accountHandle"></dd></div>
+        <div class="account-field" id="accountAboutRow" hidden><dt>About</dt><dd id="accountAbout"></dd></div>
+        <div class="account-field" id="accountWebsiteRow" hidden><dt>Website</dt><dd><a id="accountWebsite" target="_blank" rel="noopener noreferrer"></a></dd></div>
+        <div class="account-field" id="accountLightningRow" hidden><dt>Lightning</dt><dd id="accountLightning"></dd></div>
+        <div class="account-field" id="accountBotRow" hidden><dt>Account</dt><dd id="accountBot">Run by a bot</dd></div>
+      </dl>
       <span id="anonymousExpiry" class="anonymous-expiry" hidden></span>
       <button type="button" id="logoutNostr" class="secondary-action"><span>Log out</span></button>
     </form>

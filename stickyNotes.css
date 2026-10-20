@@ -840,3 +840,11 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 /* While a place is kept, the remember switch is set aside rather than silently outvoted. */
 .board-memory-toggle.is-inert { opacity:.5; cursor:not-allowed; }
 .board-memory-hint { margin:6px 0 0; font-size:.75rem; line-height:1.35; color:#9ea19f; }
+
+/* The account dialog shows what a kind 0 says about the reader: banner, bio, links, Lightning. */
+.account-banner { width:100%; height:96px; object-fit:cover; border-radius:10px; margin:0 0 12px; display:block; }
+.account-fields { display:grid; gap:9px; margin:12px 0 4px; padding:12px 0 0; border-top:1px solid #3a3d3f; }
+.account-field { display:grid; gap:2px; }
+.account-field dt { color:#9ea19f; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; }
+.account-field dd { margin:0; color:#f2f2ef; font-size:.86rem; line-height:1.4; overflow-wrap:anywhere; }
+.account-field dd a { color:var(--accent,#f2a900); }
