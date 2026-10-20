@@ -343,6 +343,36 @@ function softenExpiredCopy() {
   }
 }
 
+
+// The board talks to an absolute API - meta[name="pinstr-api"] or pay.satoshi.si - and appends paths
+// that already contain /pinstr/v1. Using a relative path here resolved against pinstr.si, hit the static
+// mirror, returned HTML, and the JSON parse failed, which the panel reported as "Could not reach the
+// desk". Same base, same paths.
+function deskBase() {
+  const meta = document.querySelector('meta[name="pinstr-api"]');
+  if (meta && meta.content) return meta.content.replace(/\/+$/, '');
+  return 'https://pay.satoshi.si';
+}
+
+async function deskJson(path) {
+  const response = await fetch(deskBase() + path, { headers: { accept: 'application/json' } });
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = null;
+  }
+  if (!response.ok) {
+    const error = new Error((body && body.error) || `Desk answered ${response.status}`);
+    error.status = response.status;
+    error.body = body;
+    throw error;
+  }
+  if (!body) throw new Error('Desk answered with something that is not JSON');
+  return body;
+}
+
 // Any path can create the order - the Pay button, a plan button, a resubscribe after expiry - and the
 // board polls it itself, sees no invoice because a TON order has none, and reports "Invoice expired".
 // So the panel is opened by watching for a new pending order id rather than by one specific button.
@@ -518,10 +548,11 @@ async function openTonPanel() {
   if (!tonDialog.open) tonDialog.showModal();
   let quote;
   try {
-    const response = await fetch(`/pinstr/v1/orders/${encodeURIComponent(orderId)}/ton`, { headers: { accept: 'application/json' } });
-    quote = await response.json();
+    quote = await deskJson(`/pinstr/v1/orders/${encodeURIComponent(orderId)}/ton`);
   } catch (err) {
-    tonDialog.querySelector('[data-ton-state]').textContent = 'Could not reach the desk for a TON amount. Try again, or switch to Bitcoin.';
+    console.warn('[pinstr-currency] TON quote failed', err && err.status, err && err.message);
+    tonDialog.querySelector('[data-ton-state]').textContent =
+      `Could not get a TON amount (${(err && (err.status || err.message)) || 'no answer'}). Try again, or switch to Bitcoin.`;
     return;
   }
   if (!quote || !quote.ok) {
@@ -598,8 +629,7 @@ function startTonPoll(orderId) {
   tonPoll = setInterval(async () => {
     if (!tonDialog.open) { stopTonPoll(); return; }
     try {
-      const response = await fetch(`/pinstr/v1/orders/${encodeURIComponent(orderId)}`, { headers: { accept: 'application/json' } });
-      const order = await response.json();
+      const order = await deskJson(`/pinstr/v1/orders/${encodeURIComponent(orderId)}`);
       if (!order) return;
       if (order.paid || order.status === 'paid' || order.status === 'published') {
         stopTonPoll();
