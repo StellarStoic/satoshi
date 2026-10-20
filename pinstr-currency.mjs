@@ -40,6 +40,8 @@ function start() {
   // Nothing is asked on arrival, on sign-in, or on a stray tap. Payment belongs where a note is
   // being written, so the choice lives inside the composer and nowhere else.
   mountComposerCurrency();
+  installOrderRail();
+  installPayHook();
   document.addEventListener('pinstr-currency-changed', () => {
     applyCurrency();
     applyComposerCurrency();
@@ -274,6 +276,52 @@ function watchComposer() {
     });
   }).observe(composer, { attributes: true, attributeFilter: ['open'], childList: true, subtree: true, characterData: true });
   if (composer.open) applyComposerCopySafely();
+}
+
+
+// The board decides the order body, so the rail has to be added on the way out. Without it the desk
+// creates an ordinary order and the worker attaches a Bark invoice to a reader who chose TON - a
+// bolt11 and an ark address for a payment they never intended to make.
+function installOrderRail() {
+  if (!ON_PINSTR || typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  if (window.pinstrOrderRail) return;
+  const native = window.fetch.bind(window);
+  window.fetch = function patchedFetch(input, init) {
+    try {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+      if (method === 'POST' && /\/pinstr\/v1\/orders\/?$/.test(url.split('?')[0]) && readChoice() === 'ton') {
+        const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+        if (body && typeof body === 'object' && !body.rail) {
+          body.rail = 'TON';
+          init = { ...(init || {}), body: JSON.stringify(body) };
+        }
+      }
+    } catch { /* a body we cannot parse is the board's business, not ours */ }
+    return native(input, init);
+  };
+  window.pinstrOrderRail = true;
+}
+
+// With no invoice there is no payment dialog for the TON panel to replace, so the panel opens from the
+// press of Pay itself: wait for the board to create the order, then show the TON amount.
+function installPayHook() {
+  document.addEventListener('click', (event) => {
+    const pay = event.target.closest('#payForSticky');
+    if (!pay || readChoice() !== 'ton') return;
+    const before = currentOrderId();
+    const startedAt = Date.now();
+    const waitForOrder = () => {
+      if (readChoice() !== 'ton') return;
+      const id = currentOrderId();
+      if (id && id !== before) {
+        openTonPanel();
+        return;
+      }
+      if (Date.now() - startedAt < 15000) setTimeout(waitForOrder, 400);
+    };
+    setTimeout(waitForOrder, 500);
+  }, true);
 }
 
 // ---------------------------------------------------------------- the TON panel
