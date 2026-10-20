@@ -563,7 +563,9 @@
    layer and below the two the board already uses (490, a revealed note, and 500, a placement). */
 .board-pin-layer { position: absolute; inset: 0; z-index: 460; pointer-events: none; }
 .board-pin-layer__note { position: absolute; pointer-events: none; }
-.board-pin-layer__pin { pointer-events: auto; }
+/* A stand-in pin is a control, so it has to read as one: without the hand, a pin that opens a note looks exactly
+   like the decoration it is standing in for. */
+.board-pin-layer__pin { pointer-events: auto; cursor: pointer; }
 .sticky-note--raised { box-shadow: 7px 16px 34px rgba(31, 16, 5, .5); }
 .sticky-note--filter-revealed { z-index:490; opacity:1; filter:none; outline:2px solid #7cfc00; box-shadow:0 0 18px rgba(124,252,0,.3),2px 5px 12px rgba(31,16,5,.3); }
 .sticky-note__reveal-countdown { position:absolute; top:8px; right:9px; z-index:4; min-width:34px; border:1px solid rgba(38,35,30,.3); border-radius:12px; padding:2px 7px; background:rgba(255,255,255,.72); color:#20231d; font-family:var(--site-font,monospace); font-size: .75rem; font-weight:700; line-height:1.4; text-align:center; }

@@ -4469,3 +4469,26 @@ test('the plates are reachable, not just labelled', async () => {
     'a plate keeps its own press');
   assert.match(script, /strip\.addEventListener\('click', openLampLegend\)/);
 });
+
+test('a stand-in pin is the real thing, not a picture of one', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+
+  // The layer refuses the pointer so a stand-in cannot block the board, and the stand-in's own class is the only
+  // thing that puts it back in front of the pointer. The pin was built with the note's class alone, so the CSS rule
+  // for the layer's pin matched nothing: the stand-ins were painted above the pile but inert, and a press landed on
+  // whatever note was underneath - the pin of the covered note looked present and did not work.
+  assert.match(css, /\.board-pin-layer \{[^}]*pointer-events:\s*none/, 'the layer stays out of the way of the board');
+  assert.match(css, /\.board-pin-layer__pin \{[^}]*pointer-events:\s*auto/, 'and its pins are put back in front of it');
+  assert.ok(script.includes("pin.className = 'sticky-note__pin board-pin-layer__pin';"),
+    'so the pin wears both names: the look of a note pin and the reach of a layer pin');
+
+  // Nothing else in the layer may claim the pointer, or a stand-in would be a wall over the pile.
+  assert.equal((css.match(/pointer-events:\s*auto/g) || []).filter(Boolean).length >= 1, true);
+  const layerPins = script.slice(script.indexOf('function buriedPinProxy'), script.indexOf('function raiseNote'));
+  assert.ok(layerPins.includes("pin.addEventListener('click'"), 'the stand-in pin opens its own note');
+  assert.ok(layerPins.includes('raiseNote(record.sticky.id);'), 'and lifts it over the pile');
+  assert.ok(layerPins.includes('openNoteMenu(record.sticky.id, pin);'), 'showing that note, not the one in front');
+});

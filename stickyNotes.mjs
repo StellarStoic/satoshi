@@ -3309,7 +3309,9 @@ function buriedPinProxy(record) {
   const ownArt = note.querySelector('.sticky-note__pin-art');
   const pin = document.createElement('button');
   pin.type = 'button';
-  pin.className = 'sticky-note__pin';
+  // Both names matter: sticky-note__pin is what makes it look like a pin, board-pin-layer__pin is what makes it
+  // reachable - the layer is pointer-events: none, and only this class puts a stand-in back in front of the pointer.
+  pin.className = 'sticky-note__pin board-pin-layer__pin';
   pin.setAttribute('aria-label', 'Open this note\u2019s details and bring it to the front');
   pin.style.setProperty('--pin-left', ownPin?.style.getPropertyValue('--pin-left') || '50%');
   if (ownArt) {
