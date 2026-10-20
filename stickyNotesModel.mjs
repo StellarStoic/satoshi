@@ -1706,6 +1706,48 @@ export function boardLampLit(index, lit) {
 }
 
 /**
+ * What one socket on a rail stands for, said in words a reader can use on hover.
+ *
+ * The plate's first socket is the first level under the shallowest board, so socket `n` stands for cells of
+ * GEOHASH_MIN_LENGTH + 1 + n letters. A board already owns one level - its own cell length - and everything
+ * deeper is what a note pinned down there can still reach from this board, which is why the plate lights from
+ * its foot upwards and why the sockets above the board's own level stay dark.
+ */
+export function boardLampInfo(index, cells = []) {
+  const step = Number(index);
+  if (!Number.isInteger(step) || step < 0 || step >= BOARD_LAMP_SOCKETS) return null;
+  const level = GEOHASH_MIN_LENGTH + 1 + step;
+  // geohashCells, not normaliseGeohashes: the plate describes the board that is open, and a set the board itself
+  // would refuse is not a reason to tell a reader there is no board.
+  const own = geohashCells(cells);
+  const cell = own[0] || '';
+  const lit = cell ? boardLampLit(step, boardLampCount(cell)) : false;
+  const others = own.length > 1 ? ` (+${own.length - 1} more)` : '';
+  let where;
+  if (!cell) where = 'no board open';
+  else if (level === cell.length) where = `${cell} is this board's own cell${others}`;
+  else if (level < cell.length) where = `${cell.slice(0, level)} is a board above this one${others}`;
+  else {
+    const deeper = level - cell.length;
+    where = `${cell}… is ${deeper} letter${deeper === 1 ? '' : 's'} deeper${others}`;
+  }
+  return {index: step, level, lit, cell, title: `Level ${level} · ${where}`};
+}
+
+/**
+ * The one sentence the whole plate stands for: how many levels are still open below this board, and what that
+ * means for a reader. It names no cell of its own, because a board can be several cells and the count is the
+ * same for all of them.
+ */
+export function boardLampSummary(cells = []) {
+  const own = geohashCells(cells);
+  const cell = own[0] || '';
+  if (!cell) return 'Levels open below this board: no board open.';
+  const lit = boardLampCount(cell);
+  return `Levels open below this board: ${lit} of ${BOARD_LAMP_SOCKETS}. A note pinned in a deeper cell still shows here.`;
+}
+
+/**
  * The link a board is shared by: the page the desk serves for that board, which carries the board's
  * own picture so a chat unfurls the board itself instead of the site's generic card. An empty set
  * of cells has no board to point at, so there is no link.

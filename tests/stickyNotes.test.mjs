@@ -2137,7 +2137,7 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   // Nothing hides the plate for having nothing lit: only a board with no cell at all shows none.
   assert.doesNotMatch(css, /\.board-frame__lamps:empty/,
     'the plate is not hidden for being empty at the deepest level');
-  assert.match(script, /strip\.hidden = !activeGeohash;/,
+  assert.match(script, /strip\.hidden = !activeGeohashes\.length;/,
     'and it is only the board with no cell at all that wears no plate');
   assert.match(css, /\.board-frame__lamps\[hidden\] \{ display: none; \}/);
   assert.equal((css.match(/\.board-frame__lamps\[hidden\] \{ display: none; \}/g) || []).length, 1);
@@ -4331,4 +4331,56 @@ test('an empty board shows where to press, and stops asking once pressed', async
   assert.ok(showDialog.includes('renderBoardEmptyHint();'), 'opening any dialog re-checks the clue');
   assert.ok(script.includes("elements.boardDialog.addEventListener('close', renderBoardEmptyHint);"),
     'and closing the chooser lets it come back');
+});
+
+test('every socket on the rail says what it stands for', async () => {
+  const { boardLampInfo, boardLampSummary, boardLampCount, BOARD_LAMP_SOCKETS } =
+    await import('../stickyNotesModel.mjs');
+
+  assert.equal(BOARD_LAMP_SOCKETS, 6);
+
+  // A four-letter board: the first socket is its own level and stays dark, the five below it are open.
+  const four = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267']));
+  assert.deepEqual(four.map(lamp => lamp.level), [4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(four.map(lamp => lamp.lit), [false, true, true, true, true, true]);
+  assert.equal(four[0].title, "Level 4 · u267 is this board's own cell");
+  assert.equal(four[1].title, 'Level 5 · u267… is 1 letter deeper');
+  assert.equal(four[5].title, 'Level 9 · u267… is 5 letters deeper', 'and the deepest says how deep');
+  assert.equal(boardLampCount('u267'), 5);
+
+  // A five-letter board opens one level fewer, and the socket for a shorter board names that shorter cell.
+  const five = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['eznv2']));
+  assert.deepEqual(five.map(lamp => lamp.lit), [false, false, true, true, true, true]);
+  assert.equal(five[0].title, 'Level 4 · eznv is a board above this one');
+  assert.equal(five[1].title, "Level 5 · eznv2 is this board's own cell");
+
+  // The deepest board opens nothing at all, and every socket still explains itself rather than going quiet.
+  const nine = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u2678kx9z']));
+  assert.deepEqual(nine.map(lamp => lamp.lit), [false, false, false, false, false, false]);
+  assert.equal(nine[5].title, "Level 9 · u2678kx9z is this board's own cell");
+
+  // A board of several cells names the first and counts the rest.
+  assert.match(boardLampInfo(0, ['u267', 'u268']).title, /\(\+1 more\)$/);
+  // Nothing at all is not a crash, and says so.
+  assert.equal(boardLampInfo(0, []).title, 'Level 4 · no board open');
+  assert.equal(boardLampInfo(6, ['u267']), null);
+  assert.equal(boardLampInfo(-1, ['u267']), null);
+  assert.equal(boardLampInfo('x', ['u267']), null);
+
+  // The sentence the whole plate stands for.
+  assert.equal(boardLampSummary(['u267']),
+    'Levels open below this board: 5 of 6. A note pinned in a deeper cell still shows here.');
+  assert.equal(boardLampSummary(['u2678kx9z']),
+    'Levels open below this board: 0 of 6. A note pinned in a deeper cell still shows here.');
+  assert.equal(boardLampSummary([]), 'Levels open below this board: no board open.');
+
+  // And the plate carries it: one sentence on the strip, one line per socket on hover.
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const rails = script.slice(script.indexOf('function renderBoardLamps()'), script.indexOf('function pulseLamps()'));
+  assert.ok(rails.includes('strip.title = summary;'), 'the plate explains itself once');
+  assert.ok(rails.includes("strip.setAttribute('role', 'img')"), 'and reads as one thing rather than six');
+  assert.ok(rails.includes('lamp.title = info.title;'), 'each socket explains its own level');
+  assert.ok(rails.includes("lamp.setAttribute('aria-hidden', 'true')"), 'the sockets are not repeated to a screen reader');
 });

@@ -66,6 +66,8 @@ import {
   boardPlateFontSize,
   boardLampCount,
   boardLampLit,
+  boardLampInfo,
+  boardLampSummary,
   BOARD_LAMP_SOCKETS,
   AMBER_HAND_OVER_WAITING_LINE,
   AMBER_HANDED_OVER_LINE,
@@ -2221,13 +2223,22 @@ function lampStrips() {
  */
 function renderBoardLamps() {
   const lit = boardLampCount(activeGeohash);
+  // The plate is a gauge, so it is one thing to a screen reader and a row of sockets to a mouse: the strip
+  // carries the sentence, each socket carries its own level and the cell that level is on this board.
+  const summary = boardLampSummary(activeGeohashes);
   for (const strip of lampStrips()) {
     // No cell at all is no board, so there is no depth to read and no plate to show. A board cut to
     // the deepest cell is not that case: it keeps its plate, all six sockets dark.
-    strip.hidden = !activeGeohash;
+    strip.hidden = !activeGeohashes.length;
+    strip.title = summary;
+    strip.setAttribute('aria-label', summary);
+    strip.setAttribute('role', 'img');
     strip.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
       const lamp = document.createElement('span');
       lamp.className = boardLampLit(index, lit) ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
+      const info = boardLampInfo(index, activeGeohashes);
+      if (info) lamp.title = info.title;
+      lamp.setAttribute('aria-hidden', 'true');
       return lamp;
     }));
   }
