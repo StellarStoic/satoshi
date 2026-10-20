@@ -457,6 +457,7 @@ function mountTonPanel() {
       <label class="ptd-field"><span>Send to</span><input data-ton-address readonly><button type="button" data-copy="address">Copy</button></label>
       <label class="ptd-field"><span>Comment — this is how your payment is found</span><input data-ton-comment readonly><button type="button" data-copy="comment">Copy</button></label>
       <a class="ptd-wallet" data-ton-wallet href="#" target="_blank" rel="noopener">Open in a TON wallet</a>
+      <button type="button" class="ptd-copyall" data-ton-copyall>Copy payment details</button>
       <p class="ptd-state" data-ton-state>Waiting for the transfer…</p>
       <p class="ptd-hint"><span data-ton-savings>Sats are cheaper on the Bitcoin rail.</span> <button type="button" class="ptd-switch" data-ton-switch>Switch to Bitcoin</button></p>
     </div>`;
@@ -472,6 +473,25 @@ function mountTonPanel() {
       stopTonPoll();
       tonDialog.close();
       setStatus('Switched to sats. Tap pay again and the Bitcoin invoice will appear.');
+      return;
+    }
+    if (event.target.closest('[data-ton-copyall]')) {
+      // One block for a desktop wallet, or for the reader to paste into a wallet on another device. The
+      // ton:// link is last so it is easy to drop when a wallet wants the fields by hand.
+      const lines = [
+        `Amount: ${tonDialog.querySelector('[data-ton-nano]').value} TON`,
+        `Send to: ${tonDialog.querySelector('[data-ton-address]').value}`,
+        `Comment: ${tonDialog.querySelector('[data-ton-comment]').value}`,
+        `Link: ${tonDialog.querySelector('[data-ton-wallet]').href}`,
+      ];
+      const button = event.target.closest('[data-ton-copyall]');
+      try {
+        await navigator.clipboard.writeText(lines.join(String.fromCharCode(10)));
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy payment details'; }, 1600);
+      } catch {
+        button.textContent = 'Copy refused — select the fields';
+      }
       return;
     }
     const copy = event.target.closest('[data-copy]');
@@ -689,6 +709,7 @@ function injectStyles() {
 .ptd-field span { grid-column: 1 / -1; }
 .ptd-field input { min-width: 0; padding: 8px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; background: #0d0e0e; color: #f4f4f1; font: inherit; font-family: ui-monospace, monospace; font-size: .78rem; }
 .ptd-field button { padding: 8px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; background: rgba(18,19,19,.7); color: inherit; font: inherit; font-size: .78rem; cursor: pointer; }
+.ptd-copyall { padding: 9px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; background: rgba(18,19,19,.7); color: inherit; font: inherit; font-size: .8rem; cursor: pointer; }
 .ptd-wallet { display: block; text-align: center; padding: 11px; border-radius: 8px; background: rgba(120,220,150,.16); border: 1px solid rgba(120,220,150,.5); color: #d8f5df; text-decoration: none; font-size: .86rem; }
 .ptd-state { margin: 0; font-size: .82rem; color: rgba(244,244,241,.78); }
 .ptd-hint { margin: 4px 0 0; font-size: .74rem; color: rgba(244,244,241,.55); }
