@@ -15,6 +15,8 @@ const POLL_MS = 4000;
 let chooser = null;
 let tonDialog = null;
 let tonPoll = null;
+// Guards applyComposerCopy against re-entering itself through its own DOM writes.
+let applyingCopy = false;
 
 if (ON_PINSTR && typeof document !== 'undefined') {
   // Loaded loudly on purpose: when a modal does not appear, the first question is whether the
@@ -214,6 +216,24 @@ function applyComposerCopy() {
 
   // The sats paragraph has a <strong> inside it, so a childless-node test skipped it and the
   // discount copy stayed under a TON choice. Rewrite by walking text nodes instead.
+  // The status line under the plan buttons counts in sats as well, and is rewritten by the board on
+  // every plan change.
+  const state = document.getElementById('subscriptionState');
+  if (state) {
+    const text = (state.textContent || '').trim();
+    if (on && / sats?/.test(text)) {
+      if (!state.dataset.pinstrOriginal) state.dataset.pinstrOriginal = state.innerHTML;
+      state.textContent = text
+        .replace(/10 sats? a week/gi, '1 TON a week')
+        .replace(/411 sats? a year/gi, '3 TON a year')
+        .replace(/10 sats?/gi, '1 TON')
+        .replace(/411 sats?/gi, '3 TON');
+    } else if (!on && state.dataset.pinstrOriginal !== undefined) {
+      state.innerHTML = state.dataset.pinstrOriginal;
+      delete state.dataset.pinstrOriginal;
+    }
+  }
+
   for (const node of composer.querySelectorAll('p, div, span')) {
     const text = (node.textContent || '').trim();
     if (on && /^Posting needs a subscription/.test(text)) {
@@ -226,15 +246,34 @@ function applyComposerCopy() {
   }
 }
 
+// The board re-prices the composer whenever a plan is chosen and rewrites the pay button's label each
+// time, which is why the sats wording came back the moment week or year was pressed. Copy is therefore
+// re-applied after any content change inside the composer, guarded so its own writes cannot loop.
+function applyComposerCopySafely() {
+  if (applyingCopy) return;
+  applyingCopy = true;
+  try {
+    applyComposerCopy();
+  } finally {
+    applyingCopy = false;
+  }
+}
+
 function watchComposer() {
   const composer = document.getElementById('composerDialog');
   if (!composer || composer.dataset.pinstrCopyWatch === '1') return;
   composer.dataset.pinstrCopyWatch = '1';
+  let queued = false;
   new MutationObserver(() => {
-    if (composer.open) applyComposerCopy();
-  }).observe(composer, { attributes: true, attributeFilter: ['open'] });
-  // The board rewrites these labels as it prices a note, so re-apply after it has.
-  if (composer.open) applyComposerCopy();
+    if (!composer.open) return;
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      applyComposerCopySafely();
+    });
+  }).observe(composer, { attributes: true, attributeFilter: ['open'], childList: true, subtree: true, characterData: true });
+  if (composer.open) applyComposerCopySafely();
 }
 
 // ---------------------------------------------------------------- the TON panel
@@ -422,9 +461,9 @@ function injectStyles() {
 .ptd-switch { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .pinstr-ton-dialog.is-paid .ptd-state { color: #8fe0a6; }
 .pinstr-ton-dialog.is-paid [data-ton-qr] { display: none; }
-.pinstr-composer-currency { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
-.pcc-label { font-size: .76rem; color: rgba(244,244,241,.58); margin-right: 2px; }
-.pcc-option { padding: 6px 11px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; background: rgba(18,19,19,.7); color: inherit; font: inherit; font-size: .78rem; cursor: pointer; }
+.pinstr-composer-currency { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.pcc-label { font-size: .82rem; color: rgba(244,244,241,.62); margin-right: 4px; }
+.pcc-option { padding: 8px 16px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(18,19,19,.7); color: inherit; font: inherit; font-size: .88rem; line-height: 1.2; cursor: pointer; }
 .pcc-option small { opacity: .62; font-size: .92em; }
 .pcc-option.is-active { border-color: rgba(120,220,150,.75); background: rgba(120,220,150,.16); color: #d8f5df; }
 `;
