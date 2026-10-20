@@ -1886,7 +1886,7 @@ test('the board style dialog keeps its choice in this browser, never in the note
     'pattern names do not occupy permanent space under the swatches');
   assert.match(html, /<dialog id="boardStyleDialog"[\s\S]{0,1600}id="boardTextureUrl"/,
     'the dialog offers a pattern address');
-  assert.match(html, /id="stickySettings"[^>]*aria-label="Board style"/);
+  assert.match(html, /id="stickySettings"[^>]*aria-label="Settings"/);
   assert.doesNotMatch(html, /id="stickySettings"[^>]*disabled/, 'the gear is the settings control now');
 });
 
@@ -4218,4 +4218,13 @@ test('a print is told to put the creases over its photograph', async () => {
     'the creases lie over the photograph');
   assert.ok(css.includes('.sticky-note--print .sticky-note__author { z-index: 3; }'),
     'the caption lies over the creases');
+});
+
+test('the gear panel is titled Settings, and the button says the same', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('<h2 id="boardStyleTitle">Settings</h2>'), 'the panel heading reads Settings');
+  assert.ok(!html.includes('>Board style<'), 'the older heading is gone');
+  assert.ok(html.includes('aria-label="Settings"'), 'the gear announces the same word');
 });
