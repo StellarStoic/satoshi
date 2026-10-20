@@ -2219,6 +2219,9 @@ function lampStrips() {
 // A role of button is a promise: both plates answer to a tap, a click and the keyboard, because a phone never
 // shows the hover titles the sockets carry.
 for (const strip of lampStrips()) {
+  // The board pans from a pointerdown on its own surface, and a press on a plate would start that pan and eat the
+  // tap. A plate is a control, so it keeps its own press.
+  strip.addEventListener('pointerdown', event => event.stopPropagation());
   strip.addEventListener('click', openLampLegend);
   strip.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;

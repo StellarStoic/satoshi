@@ -68,8 +68,16 @@
    rails and the lamp plates on the side rails are the same metal, so the edge, the bevel and the wear
    are written here rather than invented a second time for the lamps. Only what sits on the plate
    differs - an engraved line, or a column of sockets - and both are cut to the same measure. */
+/* The frame is decorative chrome, so it refuses the pointer - and that refusal was inherited by the plates,
+   which is why their sockets never answered a hover or a tap. The plates alone take the pointer back; the
+   rails still let a pan start on them. */
 .board-plate,
-.board-frame__lamps { box-sizing: border-box; border: 1px solid rgba(52, 30, 10, .82); border-radius: 5px; background: linear-gradient(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 3px 8px rgba(18, 10, 2, .6), 0 1px 2px rgba(18, 10, 2, .5), inset 0 1px rgba(255, 246, 214, .45), inset 0 -2px rgba(52, 28, 7, .5), inset 0 0 0 3px rgba(255, 240, 200, .07), inset 0 0 22px rgba(60, 34, 8, .3); }
+.board-frame__lamps { box-sizing: border-box; border: 1px solid rgba(52, 30, 10, .82); border-radius: 5px; background: linear-gradient(168deg, #cbab6c 0%, #b6944f 30%, #9c7b3c 62%, #7d5c2b 100%); box-shadow: 0 3px 8px rgba(18, 10, 2, .6), 0 1px 2px rgba(18, 10, 2, .5), inset 0 1px rgba(255, 246, 214, .45), inset 0 -2px rgba(52, 28, 7, .5), inset 0 0 0 3px rgba(255, 240, 200, .07), inset 0 0 22px rgba(60, 34, 8, .3);
+  /* Decorative chrome refuses the pointer, and a child of a pointer-events:none box inherits that refusal:
+     the sockets' titles could not be hovered and their taps went nowhere, and the name plate could not be
+     pressed either. The two plates - the only two things on the frame that are controls - take it back, so
+     the rails still let a pan start on them. */
+  pointer-events: auto; }
 /* The board's own name, engraved on a small brass plate on the bottom rail - the one place on the
    board that says which place this is. It is a fixed plaque, so the type is cut to fit rather than
    the plate growing (see renderBoardPlate). It sits in the transformed canvas, above the texture and

@@ -4440,3 +4440,22 @@ test('every top button wears the same resting border', async () => {
   assert.ok(page.includes('id="noteSort"'), 'the sort button exists');
   assert.ok(page.includes('class="sticky-top-button note-sort-button"'), 'and is one of the top buttons');
 });
+
+test('the plates are reachable, not just labelled', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+
+  // The frame is decorative chrome and refuses the pointer. A title on a descendant of a pointer-events:none box is
+  // a title nobody can hover, and a click handler on it never runs - which is exactly what happened: the sockets
+  // were labelled and unreachable at the same time.
+  const frame = css.slice(css.indexOf('.board-frame {'), css.indexOf('.board-frame {') + 200);
+  assert.match(frame, /pointer-events:\s*none/, 'the frame still refuses the pointer');
+  assert.match(css, /\.board-frame__lamps \{[^}]*pointer-events:\s*auto/, 'and the plates take it back');
+
+  // A press on a plate must not start a pan on the board underneath, or the pan eats the tap.
+  assert.match(script, /strip\.addEventListener\('pointerdown', event => event\.stopPropagation\(\)\)/,
+    'a plate keeps its own press');
+  assert.match(script, /strip\.addEventListener\('click', openLampLegend\)/);
+});
