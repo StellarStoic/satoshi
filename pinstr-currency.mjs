@@ -48,6 +48,7 @@ function start() {
   // being written, so the choice lives inside the composer and nowhere else.
   mountComposerCurrency();
   installOrderRail();
+  watchPendingOrders();
   ensureQrLibrary();
   installPayHook();
   document.addEventListener('pinstr-currency-changed', () => {
@@ -287,6 +288,47 @@ function watchComposer() {
 }
 
 
+
+
+// A TON order has no invoice by design, so the board's own copy - "Invoice expired - tap Pay to make a
+// new one" - is wrong and alarming. In TON mode that sentence is replaced with what is actually true.
+const EXPIRED_COPY = /invoice expired|tap pay to make a new one|no longer open/i;
+const TON_TRUTH = 'Waiting for your TON transfer — the panel has the amount and the comment.';
+
+function softenExpiredCopy() {
+  if (readChoice() !== 'ton') return;
+  const roots = ['composerDialog', 'paymentDialog']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const status = document.getElementById('loginStatus');
+  if (status) roots.push(status);
+  for (const root of roots) {
+    for (const node of root.querySelectorAll('p, span, div, small, output')) {
+      if (node.children.length) continue;
+      const text = (node.textContent || '').trim();
+      if (!EXPIRED_COPY.test(text)) continue;
+      if (!node.dataset.pinstrOriginal) node.dataset.pinstrOriginal = node.textContent;
+      node.textContent = TON_TRUTH;
+    }
+  }
+}
+
+// Any path can create the order - the Pay button, a plan button, a resubscribe after expiry - and the
+// board polls it itself, sees no invoice because a TON order has none, and reports "Invoice expired".
+// So the panel is opened by watching for a new pending order id rather than by one specific button.
+function watchPendingOrders() {
+  let lastSeen = currentOrderId();
+  setInterval(() => {
+    if (readChoice() !== 'ton') return;
+    const id = currentOrderId();
+    if (!id || id === lastSeen) return;
+    lastSeen = id;
+    softenExpiredCopy();
+    if (id === tonDismissedFor) return;
+    openTonPanel();
+  }, 1200);
+}
+
 // The board decides the order body, so the rail has to be added on the way out. Without it the desk
 // creates an ordinary order and the worker attaches a Bark invoice to a reader who chose TON - a
 // bolt11 and an ark address for a payment they never intended to make.
@@ -432,6 +474,8 @@ async function openTonPanel() {
     return;
   }
   tonShownFor = orderId;
+  setTimeout(softenExpiredCopy, 300);
+  setTimeout(softenExpiredCopy, 1500);
   if (tonDialog.open && orderId === tonOrderId) {
     const paymentDialog = document.getElementById('paymentDialog');
     if (paymentDialog && paymentDialog.open) paymentDialog.close();
