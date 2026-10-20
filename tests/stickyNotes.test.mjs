@@ -4032,14 +4032,14 @@ test('the account dialog shows what a kind 0 says and hides what it does not', a
   const dialog = html.slice(html.indexOf('id="accountDialog"'), html.indexOf('id="composerDialog"'));
   for (const id of ['accountBanner', 'accountFields', 'accountHandleRow', 'accountHandle',
                     'accountAboutRow', 'accountAbout', 'accountWebsiteRow', 'accountWebsite',
-                    'accountLightningRow', 'accountLightning', 'accountBotRow']) {
+                    'accountLightningRow', 'accountLightning']) {
     assert.ok(dialog.includes(`id="${id}"`), `${id} must be part of the account dialog`);
   }
   assert.ok(script.includes("about: String(source.about || '').trim().slice(0, 600)"), 'the bio is capped');
   assert.ok(script.includes('banner: safeProfilePicture(source.banner)'), 'the banner is sanitised like a picture');
   assert.ok(script.includes('website: safeProfileLink(source.website)'));
   assert.ok(script.includes('lud16: safeLightningAddress(source.lud16)'));
-  assert.ok(script.includes('elements.accountFields.hidden = !handle && !about && !website && !lightning && !bot;'),
+  assert.ok(script.includes('elements.accountFields.hidden = !handle && !about && !website && !lightning;'),
     'an empty profile must not leave an empty block on screen');
   assert.ok(script.includes("const anonymous = session?.method === 'anonymous';"),
     'a throwaway key has no profile to show');
@@ -4072,4 +4072,38 @@ test('the desk tells the page what was paid, when it started and when it last pa
   assert.ok(desk.includes('paidSats: active && Number.isInteger(active.sats)'), 'the amount paid must be reported');
   assert.ok(desk.includes('startedAt: active && Number.isInteger(active.startedAt)'), 'the start must be reported');
   assert.ok(desk.includes('paidAt: active && Number.isInteger(active.extendedAt)'), 'the last payment must be reported');
+});
+
+
+test('a NIP-38 status is read as the person set it', async () => {
+  const { pickUserStatus } = await import('../stickyNotesModel.mjs');
+  const now = 1000;
+  const ev = (d, text, at, extra = []) => ({ kind: 30315, content: text, created_at: at, tags: [['d', d], ...extra] });
+  assert.equal(pickUserStatus([ev('music', 'Beastie Boys', 900), ev('general', 'Hiking', 800)], now).text, 'Hiking',
+    'general is the status a reader means');
+  assert.equal(pickUserStatus([ev('general', 'old', 500), ev('general', 'new', 900)], now).text, 'new',
+    'the newest of one type wins');
+  assert.equal(pickUserStatus([ev('music', 'Track', 900)], now).type, 'music');
+  assert.equal(pickUserStatus([ev('general', '', 900)], now), null, 'empty content is how a status is cleared');
+  assert.equal(pickUserStatus([ev('music', 'Track', 900, [['expiration', '999']])], now), null,
+    'a status whose expiration has passed is over');
+  const live = pickUserStatus([ev('music', 'Track', 900, [['expiration', '1200'], ['r', 'https://x.si/t']])], now);
+  assert.equal(live.url, 'https://x.si/t');
+  assert.equal(pickUserStatus([], now), null);
+  assert.equal(pickUserStatus([{ kind: 1, content: 'hi', created_at: 900, tags: [] }], now), null, 'only kind 30315 counts');
+});
+
+test('the board shows a status and never writes one', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const dialog = html.slice(html.indexOf('id="accountDialog"'), html.indexOf('id="composerDialog"'));
+  for (const id of ['accountStatus', 'accountStatusType', 'accountStatusText', 'accountStatusLink', 'accountStatusWhen']) {
+    assert.ok(dialog.includes(`id="${id}"`), `${id} must be in the account dialog`);
+  }
+  assert.ok(!dialog.includes('accountBotRow'), 'the bot label is gone: it told the wrong story');
+  assert.ok(script.includes('kinds: [30315]'), 'statuses are read from the relays');
+  assert.equal(/kind:\s*30315/.test(script), false, 'the board must never build a status event');
+  assert.ok(script.includes('elements.accountStatusText.textContent = status.text'), 'the text goes in as text');
 });

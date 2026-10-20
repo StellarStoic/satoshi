@@ -1933,3 +1933,48 @@ export function safeLightningAddress(value) {
   const raw = String(value || '').trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw) ? raw.slice(0, 120) : '';
 }
+
+
+/**
+ * The latest NIP-38 status a reader has set, or null.
+ *
+ * A status is a kind 30315 addressable event whose `d` tag is its type: `general` for "Hiking", `music`
+ * for what is playing, and anything else the writer invented. An empty content is how a client clears a
+ * status, so it counts as no status; a NIP-40 `expiration` in the past means the status is over even
+ * though the event is still on the relay. `general` wins over the other types because it is the one a
+ * reader means when they set a status at all, and the newest wins inside a type.
+ */
+export function pickUserStatus(events, now = Math.floor(Date.now() / 1000)) {
+  const fresh = (Array.isArray(events) ? events : []).filter(event => {
+    if (!event || Number(event.kind) !== 30315) return false;
+    const text = String(event.content || '').trim();
+    if (!text) return false;
+    const tags = Array.isArray(event.tags) ? event.tags : [];
+    const expiry = tags.find(tag => Array.isArray(tag) && tag[0] === 'expiration');
+    const until = Number(expiry?.[1]);
+    if (Number.isInteger(until) && until > 0 && until <= now) return false;
+    return Number.isFinite(Number(event.created_at));
+  });
+  if (!fresh.length) return null;
+  const typeOf = event => {
+    const tag = (Array.isArray(event.tags) ? event.tags : []).find(entry => Array.isArray(entry) && entry[0] === 'd');
+    const value = String(tag?.[1] ?? 'general').trim();
+    return value || 'general';
+  };
+  const newestBy = new Map();
+  for (const event of fresh) {
+    const type = typeOf(event);
+    const held = newestBy.get(type);
+    if (!held || Number(event.created_at) > Number(held.created_at)) newestBy.set(type, event);
+  }
+  const chosen = newestBy.get('general')
+    || [...newestBy.values()].sort((a, b) => Number(b.created_at) - Number(a.created_at))[0];
+  const tags = Array.isArray(chosen.tags) ? chosen.tags : [];
+  const link = tags.find(tag => Array.isArray(tag) && tag[0] === 'r');
+  return {
+    type: typeOf(chosen),
+    text: String(chosen.content || '').trim().slice(0, 280),
+    url: String(link?.[1] ?? '').trim().slice(0, 300),
+    createdAt: Number(chosen.created_at),
+  };
+}

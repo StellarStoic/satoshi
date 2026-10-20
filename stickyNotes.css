@@ -860,3 +860,10 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .account-subscription__rows dt { color:#9ea19f; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; }
 .account-subscription__rows dd { margin:0; color:#f2f2ef; font-size:.86rem; text-align:right; overflow-wrap:anywhere; }
 .account-subscription__none { margin:0; color:#9ea19f; font-size:.8rem; }
+
+/* A NIP-38 status, shown as the reader set it and never written from here. */
+.account-status { display:grid; gap:3px; margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--accent,#f2a900); border-radius:0 8px 8px 0; background:#1d1f20; }
+.account-status__type { color:#9ea19f; font-size:.7rem; letter-spacing:.05em; text-transform:uppercase; }
+.account-status__text { margin:0; color:#f2f2ef; font-size:.88rem; line-height:1.4; overflow-wrap:anywhere; }
+.account-status__link { color:var(--accent,#f2a900); font-size:.78rem; overflow-wrap:anywhere; }
+.account-status__when { color:#7f8385; font-size:.72rem; }

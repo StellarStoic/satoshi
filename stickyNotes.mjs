@@ -78,7 +78,7 @@ import {
   stickyPowOffer,
   stickyPowSentence,
   stickyPowProgress,
-  stickyPowDifficulty, safeProfileLink, safeLightningAddress,} from './stickyNotesModel.mjs';
+  stickyPowDifficulty, safeProfileLink, safeLightningAddress, pickUserStatus,} from './stickyNotesModel.mjs';
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
@@ -202,7 +202,11 @@ const elements = {
   accountAboutRow: document.getElementById('accountAboutRow'), accountAbout: document.getElementById('accountAbout'),
   accountWebsiteRow: document.getElementById('accountWebsiteRow'), accountWebsite: document.getElementById('accountWebsite'),
   accountLightningRow: document.getElementById('accountLightningRow'), accountLightning: document.getElementById('accountLightning'),
-  accountBotRow: document.getElementById('accountBotRow'),
+  accountStatus: document.getElementById('accountStatus'),
+  accountStatusType: document.getElementById('accountStatusType'),
+  accountStatusText: document.getElementById('accountStatusText'),
+  accountStatusLink: document.getElementById('accountStatusLink'),
+  accountStatusWhen: document.getElementById('accountStatusWhen'),
   accountSubscription: document.getElementById('accountSubscription'),
   accountSubscriptionState: document.getElementById('accountSubscriptionState'),
   accountSubscriptionRows: document.getElementById('accountSubscriptionRows'),
@@ -1376,7 +1380,6 @@ function renderAccountDetails(session) {
   const about = anonymous ? '' : String(profile.about || '').trim();
   const website = anonymous ? '' : safeProfileLink(profile.website);
   const lightning = anonymous ? '' : safeLightningAddress(profile.lud16);
-  const bot = !anonymous && profile.bot === true;
 
   elements.accountHandle.textContent = handle;
   elements.accountHandleRow.hidden = !handle;
@@ -1392,8 +1395,96 @@ function renderAccountDetails(session) {
   elements.accountWebsiteRow.hidden = !website;
   elements.accountLightning.textContent = lightning;
   elements.accountLightningRow.hidden = !lightning;
-  elements.accountBotRow.hidden = !bot;
-  elements.accountFields.hidden = !handle && !about && !website && !lightning && !bot;
+  elements.accountFields.hidden = !handle && !about && !website && !lightning;
+}
+
+/** NIP-38 statuses live on the same relays as the profile, as addressable kind 30315 events. */
+function readUserStatusesFromRelay(url, pubkey) {
+  return new Promise(resolve => {
+    let socket;
+    try { socket = new WebSocket(url); } catch { resolve([]); return; }
+    const subscription = `sticky-status-${crypto.randomUUID?.() || Date.now()}`;
+    const found = [];
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      try { socket.close(); } catch {}
+      resolve(found);
+    };
+    const timer = setTimeout(finish, 3500);
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {authors: [pubkey], kinds: [30315], limit: 20}])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE') { clearTimeout(timer); finish(); return; }
+      if (data[0] !== 'EVENT' || !data[2]) return;
+      const event = data[2];
+      if (event.pubkey !== pubkey || event.kind !== 30315) return;
+      let verified = true;
+      try { verified = window.NostrTools.verifyEvent(event); } catch { verified = false; }
+      if (verified) found.push(event);
+    });
+    socket.addEventListener('error', finish);
+    socket.addEventListener('close', finish);
+  });
+}
+
+let statusFetchPubkey = '';
+
+/**
+ * Read the reader's own status. Shown, never written: the board has no business setting a status for
+ * anybody, and a status is a statement the person made in their own client.
+ */
+async function loadAccountStatus(session) {
+  if (!session || session.method === 'anonymous' || statusFetchPubkey === session.pubkey) return;
+  statusFetchPubkey = session.pubkey;
+  const results = await Promise.allSettled([
+    readUserStatusesFromRelay(RELAY, session.pubkey),
+    readUserStatusesFromRelay('wss://relay.damus.io', session.pubkey),
+    readUserStatusesFromRelay('wss://nos.lol', session.pubkey),
+    readUserStatusesFromRelay('wss://relay.ditto.pub', session.pubkey),
+  ]);
+  const events = results.filter(result => result.status === 'fulfilled').flatMap(result => result.value || []);
+  const current = getNostrSession();
+  if (!current || current.pubkey !== session.pubkey) return;
+  const status = pickUserStatus(events);
+  updateNostrProfile(session.pubkey, { ...(current.profile || {}), status });
+  renderAccountStatus(getNostrSession());
+}
+
+/** "just now", "5 min ago", "3 h ago", "2 days ago", then the date. */
+function timeAgo(seconds) {
+  const then = Number(seconds);
+  if (!Number.isFinite(then) || then <= 0) return '';
+  const elapsed = Math.max(0, Math.floor(Date.now() / 1000) - Math.floor(then));
+  if (elapsed < 60) return 'just now';
+  if (elapsed < 3600) return `${Math.floor(elapsed / 60)} min ago`;
+  if (elapsed < 86400) return `${Math.floor(elapsed / 3600)} h ago`;
+  if (elapsed < 86400 * 7) return `${Math.floor(elapsed / 86400)} day${elapsed < 86400 * 2 ? '' : 's'} ago`;
+  return shortDate(then);
+}
+
+function renderAccountStatus(session) {
+  const status = session?.profile?.status;
+  const show = Boolean(status && status.text) && session?.method !== 'anonymous';
+  elements.accountStatus.hidden = !show;
+  if (!show) {
+    elements.accountStatusText.textContent = '';
+    elements.accountStatusLink.hidden = true;
+    elements.accountStatusLink.removeAttribute('href');
+    elements.accountStatusWhen.textContent = '';
+    return;
+  }
+  const type = String(status.type || 'general');
+  elements.accountStatusType.textContent = type === 'general' ? 'Status' : type === 'music' ? 'Listening' : type.slice(0, 20);
+  elements.accountStatusText.textContent = status.text;
+  const link = safeProfileLink(status.url);
+  elements.accountStatusLink.hidden = !link;
+  if (link) { elements.accountStatusLink.href = link; elements.accountStatusLink.textContent = link.replace(/^https?:\/\//i, '').slice(0, 60); }
+  else elements.accountStatusLink.removeAttribute('href');
+  const when = timeAgo(status.createdAt);
+  elements.accountStatusWhen.textContent = when ? `set ${when}` : '';
 }
 
 async function loadAccountProfile(session) {
@@ -1420,7 +1511,6 @@ async function loadAccountProfile(session) {
       banner: safeProfilePicture(source.banner),
       website: safeProfileLink(source.website),
       lud16: safeLightningAddress(source.lud16),
-      bot: source.bot === true,
     };
     updateNostrProfile(session.pubkey, profile);
     if (!elements.loginConfirmation.hidden) showLoginConfirmation(getNostrSession());
@@ -1526,7 +1616,9 @@ function updateAccount() {
     }
     else elements.accountPicture.removeAttribute('src');
     renderAccountDetails(session);
+    renderAccountStatus(session);
     renderAccountSubscription(session);
+    loadAccountStatus(session);
     elements.logout.querySelector('span').textContent = session.method === 'anonymous' ? 'Leave anonymous mode' : 'Log out';
     loadAccountProfile(session);
   } else {
@@ -1539,6 +1631,7 @@ function updateAccount() {
     elements.accountBanner.removeAttribute('src');
     elements.accountFields.hidden = true;
     elements.accountSubscription.hidden = true;
+    elements.accountStatus.hidden = true;
   }
   updateAnonymousCountdown();
   refreshPriceQuote(session);
