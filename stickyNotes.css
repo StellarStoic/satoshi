@@ -137,27 +137,94 @@
 
 /* React or zap: what the signature opens. Everything in here is a choice, so it is built as rows
    of buttons, and the invoice gets a block of its own so a code is never drawn half beside it. */
-.note-gift-dialog { width: min(420px, calc(100vw - 24px)); padding: 18px; }
-.note-gift-dialog h2 { margin: 0 34px 4px 0; font-size: 1rem; }
-.note-gift-dialog h3 { margin: 14px 0 6px; color: #989b99; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
-.note-gift__author { margin: 0 0 8px; overflow: hidden; color: #ddd; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
-.note-gift__hint { margin: 0 0 6px; color: #989b99; font-size: .75rem; }
-.note-gift__reactions, .note-gift__amounts { display: flex; flex-wrap: wrap; gap: 6px; }
-.note-gift__reactions button { min-width: 48px; min-height: 42px; border: 1px solid #4b4d4d; border-radius: 6px; background: #1f2223; color: inherit; font-size: 1.15rem; cursor: pointer; }
-.note-gift__reactions button:hover:not(:disabled) { border-color: var(--accent, #f2a900); }
-.note-gift__reactions button[aria-checked="true"] { border-color: var(--accent, #f2a900); background: #26292a; }
-.note-gift__amounts button { min-height: 38px; padding: 6px 10px; border: 1px solid #4b4d4d; border-radius: 6px; background: #1f2223; color: inherit; font-size: .8rem; cursor: pointer; }
-.note-gift__amounts button:hover:not(:disabled) { border-color: var(--accent, #f2a900); }
-.note-gift__amounts button[aria-pressed="true"] { border-color: var(--accent, #f2a900); background: #26292a; }
-.note-gift__custom { display: flex; gap: 6px; margin-top: 8px; }
-.note-gift__custom input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 8px; border: 1px solid #4b4d4d; border-radius: 6px; background: #101212; color: inherit; font-size: .8rem; }
-.note-gift__invoice { margin-top: 12px; padding-top: 10px; border-top: 1px solid #333; }
-.note-gift__qr { display: grid; place-items: center; }
+/* React or zap: two questions on one card, told apart by a hairline rather than by boxes. The inset needs a
+   compound selector because .sticky-dialog declares padding: 0 further down this file and wins on order alone
+   at equal specificity - which is why the contents used to sit against the border. Every colour here is a
+   theme variable, so the card follows the reader's theme like the rest of the board. */
+.sticky-dialog.note-gift-dialog {
+  width: min(432px, calc(100vw - 24px));
+  padding: 24px 22px 22px;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+}
+.note-gift-dialog h2 { margin: 0 44px 6px 0; font-size: 1.02rem; font-weight: 600; }
+.note-gift__author { margin: 0; overflow: hidden; color: var(--text-muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.note-gift-dialog .inline-status:not(:empty) { margin-top: 12px; }
+.note-gift__block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.note-gift-dialog h3 { margin: 0 0 10px; color: var(--text-muted); font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.note-gift__hint { margin: 0 0 10px; color: var(--text-muted); font-size: .74rem; line-height: 1.45; }
+/* Equal cells, so five reactions read as one row instead of a ragged wrap. */
+.note-gift__reactions { display: grid; grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); gap: 8px; }
+.note-gift__reactions button {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .12s ease;
+}
+.note-gift__reactions button:not(:disabled):is(:hover, :focus-visible) { border-color: var(--accent); transform: translateY(-1px); }
+.note-gift__reactions button[aria-checked="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Amounts are read at a glance: even cells, and figures that do not shuffle sideways when they change. */
+.note-gift__amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+.note-gift__amounts button {
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: inherit;
+  font-size: .74rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.note-gift__amounts button:not(:disabled):is(:hover, :focus-visible) { border-color: var(--accent); }
+.note-gift__amounts button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); }
+.note-gift__custom { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+.note-gift__custom input {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--page-bg);
+  color: var(--text);
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+}
+.note-gift__custom .secondary-action { min-height: 42px; padding: 0 20px; border-radius: 10px; }
+/* The invoice arrives inside the card it belongs to: the code as a quiet block, the QR on its own white
+   field, which a phone needs whatever the theme does to the background. */
+.note-gift__invoice { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--page-bg); }
+.note-gift__qr { display: grid; place-items: center; margin-bottom: 12px; }
 .note-gift__qr:empty { display: none; }
-.note-gift__qr canvas, .note-gift__qr img { image-rendering: pixelated; }
-.note-gift__invoice code { display: block; max-height: 66px; overflow: auto; margin: 6px 0; padding: 6px 8px; background: #101212; color: #ddd; font-size: .75rem; word-break: break-all; }
-.note-gift__invoice .secondary-action { width: 100%; }
-.note-gift-dialog button:disabled { opacity: .5; cursor: default; }
+.note-gift__qr canvas, .note-gift__qr img { width: min(200px, 56vw); height: auto; border-radius: 10px; image-rendering: pixelated; }
+.note-gift__invoice code {
+  display: block;
+  max-height: 64px;
+  overflow: auto;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: .72rem;
+  word-break: break-all;
+}
+.note-gift__invoice .secondary-action { width: 100%; min-height: 40px; border-radius: 10px; }
+.note-gift-dialog button:disabled { opacity: .45; cursor: default; }
+.note-gift-dialog :is(button, input):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* The close button takes the corner the padding leaves it, instead of a row of its own. */
+.note-gift-dialog .note-menu__close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-width: 1px; font-size: 16px; }
 
 /* Your relays: the one setting here that is about the network rather than the paper. Each row is a
    lamp, the relay's host, its answer in milliseconds, and the way to take it off the list. */

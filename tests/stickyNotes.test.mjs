@@ -4228,3 +4228,17 @@ test('the gear panel is titled Settings, and the button says the same', async ()
   assert.ok(!html.includes('>Board style<'), 'the older heading is gone');
   assert.ok(html.includes('aria-label="Settings"'), 'the gear announces the same word');
 });
+
+test('the react-or-zap card keeps its contents off the border', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  // .sticky-dialog declares padding: 0 lower down the file, so an inset written on .note-gift-dialog alone is
+  // overridden on order at equal specificity - which is exactly how the contents ended up on the border.
+  assert.ok(css.includes('.sticky-dialog.note-gift-dialog {'), 'the inset needs a compound selector to win');
+  assert.ok(css.includes('padding: 24px 22px 22px;'), 'and the inset itself');
+  assert.ok(css.includes('background: var(--surface-raised)'), 'the controls follow the reader theme');
+  assert.ok(css.includes('border-top: 1px solid var(--border)'), 'the two questions are told apart by a hairline');
+  assert.ok(css.includes('white-space: nowrap'), 'an amount never breaks across two lines');
+  assert.ok(css.includes('.note-gift-dialog .note-menu__close { position: absolute;'), 'the close button takes a corner, not a row');
+});
