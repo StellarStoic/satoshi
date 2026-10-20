@@ -4044,3 +4044,32 @@ test('the account dialog shows what a kind 0 says and hides what it does not', a
   assert.ok(script.includes("const anonymous = session?.method === 'anonymous';"),
     'a throwaway key has no profile to show');
 });
+
+
+test('the account dialog carries a subscription box that states the facts', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const dialog = html.slice(html.indexOf('id="accountDialog"'), html.indexOf('id="composerDialog"'));
+  for (const id of ['accountSubscription', 'accountSubscriptionState', 'accountSubscriptionRows',
+                    'accountSubscriptionPlan', 'accountSubscriptionSince', 'accountSubscriptionPaid',
+                    'accountSubscriptionLeft', 'accountSubscriptionNone']) {
+    assert.ok(dialog.includes(`id="${id}"`), `${id} must be in the account dialog`);
+  }
+  assert.ok(script.includes("active ? 'Active' : (resolved ? 'Not active' : 'Checking…')"),
+    'a box that has not heard from the desk must not claim there is no subscription');
+  assert.ok(script.includes("session.method === 'anonymous'"), 'a throwaway key holds no subscription');
+  assert.ok(script.includes('timeLeftLabel(left)'), 'the box counts down');
+  assert.ok(script.includes("!elements.accountSubscription.hidden) renderAccountSubscription(session)"),
+    'the countdown only runs while the box is on screen');
+});
+
+test('the desk tells the page what was paid, when it started and when it last paid', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const desk = readFileSync(new URL('../deploy/nip05-desk/sticky.mjs', import.meta.url), 'utf8');
+  assert.ok(desk.includes('paidSats: active && Number.isInteger(active.sats)'), 'the amount paid must be reported');
+  assert.ok(desk.includes('startedAt: active && Number.isInteger(active.startedAt)'), 'the start must be reported');
+  assert.ok(desk.includes('paidAt: active && Number.isInteger(active.extendedAt)'), 'the last payment must be reported');
+});

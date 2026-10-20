@@ -348,6 +348,19 @@
         <div class="account-field" id="accountLightningRow" hidden><dt>Lightning</dt><dd id="accountLightning"></dd></div>
         <div class="account-field" id="accountBotRow" hidden><dt>Account</dt><dd id="accountBot">Run by a bot</dd></div>
       </dl>
+      <div id="accountSubscription" class="account-subscription" hidden>
+        <div class="account-subscription__head">
+          <strong>Subscription</strong>
+          <span id="accountSubscriptionState" class="account-subscription__state">Checking…</span>
+        </div>
+        <dl class="account-subscription__rows" id="accountSubscriptionRows" hidden>
+          <div><dt>Plan</dt><dd id="accountSubscriptionPlan"></dd></div>
+          <div><dt>Since</dt><dd id="accountSubscriptionSince"></dd></div>
+          <div><dt>Last paid</dt><dd id="accountSubscriptionPaid"></dd></div>
+          <div><dt>Time left</dt><dd id="accountSubscriptionLeft"></dd></div>
+        </dl>
+        <p id="accountSubscriptionNone" class="account-subscription__none" hidden>No active subscription.</p>
+      </div>
       <span id="anonymousExpiry" class="anonymous-expiry" hidden></span>
       <button type="button" id="logoutNostr" class="secondary-action"><span>Log out</span></button>
     </form>

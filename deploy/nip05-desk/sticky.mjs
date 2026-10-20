@@ -657,6 +657,11 @@ export function subscriptionView(subscriptions, pubkey, now = Math.floor(Date.no
     renewBy: active ? active.expiresAt : null,
     lastPlan: record?.plan ?? null,
     lastExpiresAt: record?.expiresAt ?? null,
+    // What the reader paid and when, so the account dialog can say more than "active": the record
+    // already held these and the view was throwing them away.
+    paidSats: active && Number.isInteger(active.sats) ? active.sats : null,
+    startedAt: active && Number.isInteger(active.startedAt) ? active.startedAt : null,
+    paidAt: active && Number.isInteger(active.extendedAt) ? active.extendedAt : null,
   };
 }
 

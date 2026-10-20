@@ -203,6 +203,14 @@ const elements = {
   accountWebsiteRow: document.getElementById('accountWebsiteRow'), accountWebsite: document.getElementById('accountWebsite'),
   accountLightningRow: document.getElementById('accountLightningRow'), accountLightning: document.getElementById('accountLightning'),
   accountBotRow: document.getElementById('accountBotRow'),
+  accountSubscription: document.getElementById('accountSubscription'),
+  accountSubscriptionState: document.getElementById('accountSubscriptionState'),
+  accountSubscriptionRows: document.getElementById('accountSubscriptionRows'),
+  accountSubscriptionPlan: document.getElementById('accountSubscriptionPlan'),
+  accountSubscriptionSince: document.getElementById('accountSubscriptionSince'),
+  accountSubscriptionPaid: document.getElementById('accountSubscriptionPaid'),
+  accountSubscriptionLeft: document.getElementById('accountSubscriptionLeft'),
+  accountSubscriptionNone: document.getElementById('accountSubscriptionNone'),
   anonymousExpiry: document.getElementById('anonymousExpiry'), logout: document.getElementById('logoutNostr'),
   composer: document.getElementById('composerDialog'), editor: document.getElementById('stickyEditor'),
   draft: document.getElementById('draftNote'), colors: document.getElementById('colorSwatches'),
@@ -1437,6 +1445,67 @@ function updateAnonymousCountdown() {
   elements.anonymousExpiry.innerHTML = `One-note key expires in <strong>${anonymousCountdown(session.expiresAt)}</strong>`;
 }
 
+function subscriptionPlanLabel(plan) {
+  if (plan === 'year') return 'Yearly';
+  if (plan === 'week') return 'Weekly';
+  return '';
+}
+
+function shortDate(seconds) {
+  if (!Number.isInteger(seconds) || seconds <= 0) return '';
+  try { return new Date(seconds * 1000).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}); }
+  catch { return ''; }
+}
+
+/** How long is left, in the largest unit that still says something useful. */
+function timeLeftLabel(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days} day${days === 1 ? '' : 's'} ${hours} h left`;
+  if (hours > 0) return `${hours} h ${String(minutes).padStart(2, '0')} min left`;
+  return `${minutes} min ${String(total % 60).padStart(2, '0')} s left`;
+}
+
+/**
+ * The subscription box in the account dialog.
+ *
+ * It says what the desk actually knows - the plan, when it started, what was last paid and how long is
+ * left - and says nothing at all for a throwaway key, which can never hold one. Until the desk answers
+ * it shows that it is still checking rather than claiming there is no subscription.
+ */
+function renderAccountSubscription(session) {
+  const box = elements.accountSubscription;
+  if (!box) return;
+  if (!session || session.method === 'anonymous') {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const state = subscription;
+  const resolved = subscriptionResolved && Boolean(state);
+  const active = resolved && state.active === true;
+  elements.accountSubscriptionState.textContent = active ? 'Active' : (resolved ? 'Not active' : 'Checking…');
+  elements.accountSubscriptionState.classList.toggle('is-active', active);
+  elements.accountSubscriptionRows.hidden = !active;
+  elements.accountSubscriptionNone.hidden = !resolved || active;
+  if (!active) {
+    elements.accountSubscriptionNone.textContent = resolved
+      ? (state?.lastPlan ? `No active subscription. Last one ended ${shortDate(state.lastExpiresAt) || 'earlier'}.` : 'No active subscription.')
+      : '';
+    return;
+  }
+  elements.accountSubscriptionPlan.textContent = subscriptionPlanLabel(state.plan) || '—';
+  elements.accountSubscriptionSince.textContent = shortDate(state.startedAt) || '—';
+  const paidDate = shortDate(state.paidAt);
+  elements.accountSubscriptionPaid.textContent = Number.isInteger(state.paidSats) && state.paidSats > 0
+    ? `${state.paidSats} sats${paidDate ? ` · ${paidDate}` : ''}`
+    : (paidDate || '—');
+  const left = Number.isInteger(state.expiresAt) ? state.expiresAt - Math.floor(Date.now() / 1000) : 0;
+  elements.accountSubscriptionLeft.textContent = left > 0 ? timeLeftLabel(left) : 'ended';
+}
+
 function updateAccount() {
   const session = getNostrSession();
   const accountLabel = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
@@ -1457,6 +1526,7 @@ function updateAccount() {
     }
     else elements.accountPicture.removeAttribute('src');
     renderAccountDetails(session);
+    renderAccountSubscription(session);
     elements.logout.querySelector('span').textContent = session.method === 'anonymous' ? 'Leave anonymous mode' : 'Log out';
     loadAccountProfile(session);
   } else {
@@ -1468,6 +1538,7 @@ function updateAccount() {
     elements.accountBanner.hidden = true;
     elements.accountBanner.removeAttribute('src');
     elements.accountFields.hidden = true;
+    elements.accountSubscription.hidden = true;
   }
   updateAnonymousCountdown();
   refreshPriceQuote(session);
@@ -5750,7 +5821,12 @@ elements.editor.addEventListener('keydown', handleMentionKeys);
 elements.editor.addEventListener('input', updateMentionMenu);
 elements.editor.addEventListener('click', updateMentionMenu);
 elements.account.addEventListener('click', () => {
-  if (getNostrSession()) { showDialog(elements.accountDialog); return; }
+  if (getNostrSession()) {
+    renderAccountSubscription(getNostrSession());
+    refreshPriceQuote(getNostrSession());
+    showDialog(elements.accountDialog);
+    return;
+  }
   // A way back in is put on screen before the reader has to wonder what happened.
   refreshLoginDialog();
   showDialog(elements.login);
@@ -6423,6 +6499,8 @@ setInterval(() => {
   const session = getNostrSession();
   const after = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
   if (before !== after) updateAccount();
+  // The subscription box counts down while it is on screen, and costs nothing when it is not.
+  if (elements.accountSubscription && !elements.accountSubscription.hidden) renderAccountSubscription(session);
   // A note that crosses its own NIP-40 moment while the page is open stops being shown, the
   // way the relay stops serving it. Nothing on this board outlives the moment it names.
   if (dropExpiredNotes()) applyNoteFilters();

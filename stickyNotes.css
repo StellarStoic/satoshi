@@ -848,3 +848,15 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .account-field dt { color:#9ea19f; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; }
 .account-field dd { margin:0; color:#f2f2ef; font-size:.86rem; line-height:1.4; overflow-wrap:anywhere; }
 .account-field dd a { color:var(--accent,#f2a900); }
+
+/* The subscription box: same place as the profile rows, its own frame so it reads as status not metadata. */
+.account-subscription { display:grid; gap:8px; margin:12px 0 4px; padding:12px; border:1px solid #3a3d3f; border-radius:10px; background:#1d1f20; }
+.account-subscription__head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.account-subscription__head strong { color:#f2f2ef; font-size:.9rem; }
+.account-subscription__state { font-size:.75rem; letter-spacing:.03em; text-transform:uppercase; color:#9ea19f; }
+.account-subscription__state.is-active { color:#4caf50; }
+.account-subscription__rows { display:grid; gap:7px; margin:0; }
+.account-subscription__rows div { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:baseline; }
+.account-subscription__rows dt { color:#9ea19f; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; }
+.account-subscription__rows dd { margin:0; color:#f2f2ef; font-size:.86rem; text-align:right; overflow-wrap:anywhere; }
+.account-subscription__none { margin:0; color:#9ea19f; font-size:.8rem; }
