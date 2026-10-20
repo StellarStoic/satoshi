@@ -242,7 +242,7 @@
 .board-depth-help summary:focus-visible { outline:2px solid var(--accent,#f2a900); outline-offset:2px; }
 .board-depth-help p { position:absolute; z-index:20; top:27px; left:-118px; width:min(300px,calc(100vw - 68px)); margin:0; padding:11px 12px; border:1px solid #555; border-radius:6px; background:#242627; box-shadow:0 12px 28px rgba(0,0,0,.45); color:#d5d7d5; font-size:.78rem; line-height:1.45; }
 .board-depth-help p strong,.board-depth-help p code { color:var(--accent,#f2a900); }
-.board-chooser .board-memory-toggle, .kept-place .board-memory-toggle { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; min-height:42px; cursor:pointer; }.board-memory-toggle input { position:absolute; width:1px !important; height:1px !important; opacity:0; pointer-events:none; }.board-memory-toggle__track { position:relative; width:42px; height:24px; border:1px solid #5c5f60; border-radius:12px; background:#242627; transition:background .16s ease,border-color .16s ease; }.board-memory-toggle__track::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#a9abaa; transition:translate .16s ease,background .16s ease; }.board-memory-toggle input:checked + .board-memory-toggle__track { border-color:var(--accent,#f2a900); background:rgba(242,169,0,.2); }.board-memory-toggle input:checked + .board-memory-toggle__track::after { translate:18px 0; background:var(--accent,#f2a900); }.board-memory-toggle input:focus-visible + .board-memory-toggle__track { outline:2px solid var(--accent,#f2a900); outline-offset:2px; }
+.board-chooser .board-memory-toggle { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; min-height:42px; cursor:pointer; }.board-memory-toggle input { position:absolute; width:1px !important; height:1px !important; opacity:0; pointer-events:none; }.board-memory-toggle__track { position:relative; width:42px; height:24px; border:1px solid #5c5f60; border-radius:12px; background:#242627; transition:background .16s ease,border-color .16s ease; }.board-memory-toggle__track::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#a9abaa; transition:translate .16s ease,background .16s ease; }.board-memory-toggle input:checked + .board-memory-toggle__track { border-color:var(--accent,#f2a900); background:rgba(242,169,0,.2); }.board-memory-toggle input:checked + .board-memory-toggle__track::after { translate:18px 0; background:var(--accent,#f2a900); }.board-memory-toggle input:focus-visible + .board-memory-toggle__track { outline:2px solid var(--accent,#f2a900); outline-offset:2px; }
 .note-sort-inner { display:grid; gap:16px; }
 .note-view-options { display:grid; gap:6px; margin:0; border:0; padding:0; }
 .note-view-options legend { margin-bottom:7px; color:#aeb0ae; font-size:.78rem; text-transform:uppercase; }
@@ -831,13 +831,3 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
-
-
-/* The kept-place setting sits in the gear panel, so it borrows the board chooser's switch row and only
-   adds the frame around it. Without the shared grid the switch drops to the text baseline. */
-.kept-place { display:grid; gap:8px; margin:0 0 12px; padding-top:12px; border-top:1px solid #3a3d3f; }
-.kept-place > h3 { margin:0; font-size:.95rem; }
-.kept-place > p { margin:0 0 2px; font-size:.82rem; line-height:1.4; color:#a9b0b4; }
-.kept-place .inline-status { margin:0; }
-.kept-place .secondary-action { justify-self:start; margin:0; }
-.kept-place .secondary-action[hidden] { display:none; }

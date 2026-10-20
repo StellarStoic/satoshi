@@ -110,13 +110,6 @@
         <button type="submit" class="primary-action">Use it</button>
       </div>
       <div id="boardStyleStatus" class="inline-status" role="status" aria-live="polite"></div>
-      <section class="kept-place" aria-labelledby="keptPlaceTitle">
-        <h3 id="keptPlaceTitle">This place</h3>
-        <p>Left alone, the board opens whatever board the address bar names. Kept, it remembers this one and goes there by itself on every visit.</p>
-        <label class="board-memory-toggle area-lock" for="lockToggle"><span id="lockCaption">Tick to keep this place and open it on every visit.</span><input id="lockToggle" type="checkbox" role="switch"><span class="board-memory-toggle__track" aria-hidden="true"></span></label>
-        <button type="button" id="unlockButton" class="secondary-action" hidden><i class="lni lni-unlocked-2" aria-hidden="true"></i><span>Unlock this place</span></button>
-        <div id="placeLockStatus" class="inline-status" role="status" aria-live="polite"></div>
-      </section>
 
       <section class="user-relays" aria-labelledby="userRelaysTitle">
         <h3 id="userRelaysTitle">Your relays</h3>
@@ -206,6 +199,8 @@
         <button type="button" class="area-scale" data-area-precision="4"><strong>State</strong><span data-area-size="4"></span></button>
         <button type="button" class="area-scale" data-area-precision="3"><strong>Country</strong><span data-area-size="3"></span></button>
       </div>
+      <label class="board-memory-toggle area-lock" for="lockToggle"><span id="lockCaption">Tick to keep this place and open it on every visit.</span><input id="lockToggle" type="checkbox" role="switch"><span class="board-memory-toggle__track" aria-hidden="true"></span></label>
+      <button type="button" id="unlockButton" class="secondary-action" hidden><i class="lni lni-unlocked-2" aria-hidden="true"></i><span>Unlock this place</span></button>
       <div id="areaStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>

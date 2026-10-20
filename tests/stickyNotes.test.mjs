@@ -3951,19 +3951,18 @@ test('the pasted pattern lives in the board style dialog and is wired to the mod
 });
 
 
-test('the kept-place controls live in the gear panel, not the area dialog', async () => {
+test('the kept-place controls live in the area dialog, not the gear panel', async () => {
   const { readFileSync } = await import('node:fs');
   const { URL } = await import('node:url');
   const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
   const style = html.slice(html.indexOf('id="boardStyleDialog"'), html.indexOf('id="boardDialog"'));
   const area = html.slice(html.indexOf('id="areaDialog"'), html.indexOf('id="geohashMapDialog"'));
-  assert.match(style, /id="lockToggle"/);
-  assert.match(style, /id="unlockButton"/);
-  assert.match(style, /id="placeLockStatus"/);
-  assert.match(style, /Tick to keep this place and open it on every visit\./);
-  assert.match(style, /Unlock this place/);
-  assert.ok(!area.includes('id="lockToggle"'), 'the lock toggle must not remain in the area dialog');
-  assert.ok(!area.includes('id="unlockButton"'), 'the unlock button must not remain in the area dialog');
+  assert.match(area, /id="lockToggle"/);
+  assert.match(area, /id="unlockButton"/);
+  assert.match(area, /Tick to keep this place and open it on every visit\./);
+  assert.match(area, /Unlock this place/);
+  assert.ok(!style.includes('id="lockToggle"'), 'the lock toggle belongs in Show notes around me');
+  assert.ok(!style.includes('keptPlaceTitle'), 'the gear panel must not carry a kept-place section');
 });
 
 test('the switch locks the open board and says so', async () => {
