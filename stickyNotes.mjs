@@ -3921,6 +3921,12 @@ async function pollPayment() {
       return;
     } catch (error) {
       if ((pending?.subscribeOrderId || '') !== pollingOrderId) return;
+      if (orderIsGone(error)) {
+        dropOrderFromPending('subscribe');
+        status(elements.paymentStatus, ORDER_GONE_COPY, true);
+        elements.pay.disabled = false;
+        return;
+      }
       status(elements.paymentStatus, error.message, true);
       paymentTimer = setTimeout(pollPayment, 2500);
       return;
@@ -3947,6 +3953,12 @@ async function pollPayment() {
   } catch (error) {
     if ((pending?.orderId || '') !== pollingOrderId) return;
     stopInvoiceMessages();
+    if (orderIsGone(error)) {
+      dropOrderFromPending('pin');
+      status(elements.paymentStatus, ORDER_GONE_COPY, true);
+      elements.pay.disabled = false;
+      return;
+    }
     status(elements.paymentStatus, error.message, true);
     elements.pay.disabled = false;
   }
@@ -6800,4 +6812,32 @@ if (!resumedSigning && pending?.status === 'waiting') {
 } else if (!resumedSigning && pending?.status === 'paid') {
   syncPlacementWithSession();
   if (unusableReturn) notice(unusableReturn);
+}
+
+
+// A draft can outlive its order: the desk prunes finished and abandoned ones, so a saved pending id can
+// point at nothing. It answers 404 "unknown order", and that raw string used to be printed into the
+// composer. A missing order is a stale draft, not an error to shout about: keep the note, drop the dead
+// pointer, and say what to do next.
+const ORDER_GONE_COPY = 'This draft lost its payment order. Press Pay to make a new one — your note is kept.';
+
+function orderIsGone(error) {
+  return Boolean(error) && (error.status === 404 || /unknown order/i.test(String(error.message || '')));
+}
+
+function dropOrderFromPending(kind) {
+  const draft = loadPending();
+  if (!draft) return;
+  const next = { ...draft };
+  if (kind === 'subscribe') {
+    delete next.subscribeOrderId;
+    delete next.subscribePlan;
+    delete next.subscribeSats;
+  } else {
+    delete next.orderId;
+    delete next.sats;
+    delete next.publishToken;
+  }
+  delete next.status;
+  savePending(next);
 }
