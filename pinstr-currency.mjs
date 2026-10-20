@@ -52,6 +52,9 @@ function start() {
   installOrderRail();
   watchPendingOrders();
   ensureQrLibrary();
+  // One clock for the session: whenever the composer is open in TON mode the copy is asserted, whether
+  // the dialog was open when the control mounted or opened later.
+  setInterval(keepComposerCopyInTon, 500);
   installPayHook();
   document.addEventListener('pinstr-currency-changed', () => {
     applyCurrency();
@@ -163,6 +166,27 @@ function keepComposerCopyInTon() {
   }
 }
 
+
+// Copying the plan button's computed style keeps this control looking like the rest of the composer even
+// when the board restyles it, without borrowing its class - the board's JavaScript selects .plan-button
+// and must not find these among the plans.
+function styleLikePlans(box) {
+  const plan = document.querySelector('#composerDialog .plan-button');
+  if (!plan || !box) return;
+  const cs = getComputedStyle(plan);
+  for (const button of box.querySelectorAll('.pcc-option')) {
+    button.style.font = cs.font;
+    button.style.fontSize = cs.fontSize;
+    button.style.padding = cs.padding;
+    button.style.borderRadius = cs.borderRadius;
+    button.style.border = cs.border;
+    button.style.lineHeight = cs.lineHeight;
+    button.style.minHeight = cs.minHeight === 'auto' ? '' : cs.minHeight;
+  }
+  const label = box.querySelector('.pcc-label');
+  if (label) label.style.fontSize = cs.fontSize;
+}
+
 function mountComposerCurrency() {
   const composer = document.getElementById('composerDialog');
   if (!composer || composer.querySelector('.pinstr-composer-currency')) return;
@@ -194,10 +218,16 @@ function applyComposerCurrency() {
   const composer = document.getElementById('composerDialog');
   if (!composer) return;
   const choice = readChoice();
+  const box = composer.querySelector('.pinstr-composer-currency');
+  styleLikePlans(box);
   for (const button of composer.querySelectorAll('.pcc-option')) {
     const on = button.getAttribute('data-pcc') === choice;
     button.classList.toggle('is-active', on);
     button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    // Green marks the active rail, matching how the board shows a selected plan.
+    button.style.background = on ? 'rgba(120,220,150,.16)' : 'rgba(18,19,19,.7)';
+    button.style.color = on ? '#d8f5df' : 'inherit';
+    button.style.border = on ? '1px solid rgba(120,220,150,.75)' : '1px solid rgba(255,255,255,.22)';
   }
   // Pay and mine appear only after a choice: asking a writer to price a note they have not chosen a
   // rail for is the same intrusion as asking on arrival.
