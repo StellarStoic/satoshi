@@ -4107,3 +4107,35 @@ test('the board shows a status and never writes one', async () => {
   assert.equal(/kind:\s*30315/.test(script), false, 'the board must never build a status event');
   assert.ok(script.includes('elements.accountStatusText.textContent = status.text'), 'the text goes in as text');
 });
+
+
+test('a note is worn the same way every time it is drawn', async () => {
+  const { noteWear } = await import('../stickyNotesModel.mjs');
+  const ids = Array.from({ length: 1500 }, (_, index) => `id-${index}`);
+  const worn = ids.map(id => noteWear(id)).filter(Boolean);
+  const share = worn.length / ids.length;
+  assert.ok(share > 0.3 && share < 0.55, `about four in ten notes wear a corner, saw ${(share * 100).toFixed(1)}%`);
+  assert.deepEqual(noteWear('id-42'), noteWear('id-42'), 'the same id must wear the same way');
+  const corners = new Set(worn.flatMap(wear => wear.corners));
+  assert.deepEqual([...corners].sort(), ['bl', 'br', 'tl', 'tr'], 'all four corners are used');
+  for (const wear of worn) {
+    assert.ok(wear.alpha >= 0.10 && wear.alpha <= 0.22, 'the shade is seen, and stays light enough to read through');
+    assert.ok(wear.lift >= 1 && wear.lift <= 3);
+    assert.match(wear.shade, /^radial-gradient\(circle [0-9]+px at (0%|100%) (0%|100%)/);
+  }
+  assert.equal(noteWear(''), null);
+  assert.equal(noteWear(undefined), null);
+});
+
+test('the board paints the wear on the note, and never on a print', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  assert.ok(script.includes('const wear = picture ? null : noteWear(sticky.id);'), 'prints stay flat');
+  assert.ok(script.includes("note.dataset.wear = wear.corners.join(' ')"));
+  assert.ok(script.includes("note.style.setProperty('--wear-shade', wear.shade)"));
+  assert.ok(css.includes('.sticky-note[data-wear]::after'), 'the shade is drawn by the stylesheet');
+  assert.ok(css.includes('background-image: var(--wear-shade, none)'));
+  assert.ok(css.includes('pointer-events: none'), 'the shade must not eat clicks');
+});

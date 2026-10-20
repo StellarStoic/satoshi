@@ -78,7 +78,7 @@ import {
   stickyPowOffer,
   stickyPowSentence,
   stickyPowProgress,
-  stickyPowDifficulty, safeProfileLink, safeLightningAddress, pickUserStatus,} from './stickyNotesModel.mjs';
+  stickyPowDifficulty, safeProfileLink, safeLightningAddress, pickUserStatus, noteWear,} from './stickyNotesModel.mjs';
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
@@ -3249,6 +3249,14 @@ function renderNote(sticky, event = null, temporary = false) {
   note.classList.toggle('sticky-note--print', Boolean(picture));
   if (sticky.id) note.dataset.eventId = sticky.id;
   note.dataset.createdAt = String(sticky.createdAt || 0);
+  // Some paper has lifted at a corner. The wear comes from the note's id, so it is the same on every
+  // redraw - and a print is a photograph, not paper, so it stays flat.
+  const wear = picture ? null : noteWear(sticky.id);
+  if (wear) {
+    note.dataset.wear = wear.corners.join(' ');
+    note.style.setProperty('--wear-lift', `${wear.lift}px`);
+    note.style.setProperty('--wear-shade', wear.shade);
+  }
   note.tabIndex = temporary ? 0 : -1;
   const text = document.createElement('div');
   text.className = 'sticky-note__text';

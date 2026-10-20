@@ -867,3 +867,17 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .account-status__text { margin:0; color:#f2f2ef; font-size:.88rem; line-height:1.4; overflow-wrap:anywhere; }
 .account-status__link { color:var(--accent,#f2a900); font-size:.78rem; overflow-wrap:anywhere; }
 .account-status__when { color:#7f8385; font-size:.72rem; }
+
+/* A sheet that has lifted at a corner holds a soft shade there, and sits a little more heavily on the
+   board. The corner, the reach, the depth and the lift all come from the note's id, so the same note is
+   worn the same way on every redraw and a note that wears two corners wears both patches. Most notes are
+   flat: noteWear returns nothing for six in ten. */
+.sticky-note[data-wear]::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  border-radius: inherit;
+  background-image: var(--wear-shade, none);
+  background-repeat: no-repeat;
+}
+.sticky-note[data-wear] {
+  box-shadow: 2px 5px 12px rgba(31,16,5,.3), 1px calc(var(--wear-lift, 1px) + 1px) calc(9px + var(--wear-lift, 1px) * 2) rgba(31,16,5,.12);
+}

@@ -1978,3 +1978,43 @@ export function pickUserStatus(events, now = Math.floor(Date.now() / 1000)) {
     createdAt: Number(chosen.created_at),
   };
 }
+
+
+/**
+ * How a note is worn, or null for the notes that are flat.
+ *
+ * Paper on a board does not all sit the same way: some sheets have lifted at a corner and hold a soft
+ * shade there. The choice is derived from the note's own id rather than drawn at random, so a note wears
+ * the same way every time it is redrawn - and notes are redrawn on every reorder, pan and filter.
+ *
+ * Roughly four in ten notes wear a corner; one in eight of those has cockled at the opposite corner as
+ * well. The shade is written here as the gradient the stylesheet paints, because the corner and the depth
+ * are the same decision.
+ */
+export function noteWear(id) {
+  const key = String(id ?? '').trim();
+  if (!key) return null;
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  const roll = (hash % 1000) / 1000;
+  if (roll >= 0.42) return null;
+  const at = {tl: '0% 0%', tr: '100% 0%', bl: '0% 100%', br: '100% 100%'};
+  const order = ['tl', 'tr', 'bl', 'br'];
+  const first = order[(hash >>> 8) % 4];
+  const corners = [first];
+  if (roll < 0.055) corners.push({tl: 'br', br: 'tl', tr: 'bl', bl: 'tr'}[first]);
+  // Depth and reach vary with the note, never enough to darken the writing.
+  const alpha = 0.11 + ((hash >>> 16) % 100) / 1000;
+  // The radius is stated in pixels rather than left to the layer size: a gradient sized by its box is
+  // cut off where the box ends, and that cut shows up as the straight edge of a square patch.
+  const reach = corners.map((corner, index) => 62 + ((hash >>> (4 + index * 3)) % 58));
+  const shade = corners.map((corner, index) => (
+    `radial-gradient(circle ${reach[index]}px at ${at[corner]}, rgba(31,16,5,${alpha.toFixed(3)}) 0%, `
+    + `rgba(31,16,5,${(alpha * 0.4).toFixed(3)}) 52%, rgba(31,16,5,0) 100%)`
+  )).join(', ');
+  const lift = 1 + ((hash >>> 12) % 3);
+  return {corners, alpha, reach, lift, shade};
+}
