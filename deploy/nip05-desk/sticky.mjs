@@ -85,7 +85,7 @@ export const NO_NAME_REASON = 'no satoshi.si NIP-05 name for this pubkey';
 // on a desktop and two to five minutes on a phone. It is one constant to change, and
 // /config publishes it, so the board always offers the difficulty the desk will check.
 export const POW_TAG = 'nonce';
-export const POW_BITS = 27;
+export const POW_BITS = 29;
 export const POW_NAME_MAX = 128;
 /** One note paid for by work rather than money. */
 export const POW_REASON = 'paid for with NIP-13 proof of work';
