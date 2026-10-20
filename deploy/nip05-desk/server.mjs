@@ -116,6 +116,10 @@ function tonRailQuote(order) {
     feeTon: Number(TON_TRANSFER_FEE) / 1e9,
     ton: Number(nano) / 1e9,
     payUrl: `ton://transfer/${TON_MERCHANT_ADDRESS}?amount=${nano}&text=${encodeURIComponent(order.id)}`,
+    // The sats price this replaces, so the panel can say what the reader would pay on the Bitcoin rail
+    // without carrying its own copy of the price list.
+    satsForComparison: Number(order.sats) || null,
+    plan: order.plan || null,
   };
 }
 

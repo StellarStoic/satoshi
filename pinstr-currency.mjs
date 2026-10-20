@@ -452,12 +452,13 @@ function mountTonPanel() {
       <p class="ptd-amount" data-ton-amount>—</p>
       <p class="ptd-split" data-ton-split></p>
       <div class="ptd-qr" data-ton-qr></div>
-      <label class="ptd-field"><span>Amount</span><input data-ton-nano readonly></label>
+      <label class="ptd-field"><span>Amount (TON)</span><input data-ton-nano readonly><button type="button" data-copy="amount">Copy</button></label>
+      <p class="ptd-nano" data-ton-nanohint></p>
       <label class="ptd-field"><span>Send to</span><input data-ton-address readonly><button type="button" data-copy="address">Copy</button></label>
       <label class="ptd-field"><span>Comment — this is how your payment is found</span><input data-ton-comment readonly><button type="button" data-copy="comment">Copy</button></label>
       <a class="ptd-wallet" data-ton-wallet href="#" target="_blank" rel="noopener">Open in a TON wallet</a>
       <p class="ptd-state" data-ton-state>Waiting for the transfer…</p>
-      <p class="ptd-hint">Sats are cheaper: a pin is 69 sats on the Bitcoin rail. <button type="button" class="ptd-switch" data-ton-switch>Switch to Bitcoin</button></p>
+      <p class="ptd-hint"><span data-ton-savings>Sats are cheaper on the Bitcoin rail.</span> <button type="button" class="ptd-switch" data-ton-switch>Switch to Bitcoin</button></p>
     </div>`;
   tonDialog.addEventListener('click', async (event) => {
     if (event.target.closest('[data-ton-close]')) {
@@ -475,7 +476,8 @@ function mountTonPanel() {
     }
     const copy = event.target.closest('[data-copy]');
     if (copy) {
-      const field = tonDialog.querySelector(copy.getAttribute('data-copy') === 'address' ? '[data-ton-address]' : '[data-ton-comment]');
+      const targets = { amount: '[data-ton-nano]', address: '[data-ton-address]', comment: '[data-ton-comment]' };
+      const field = tonDialog.querySelector(targets[copy.getAttribute('data-copy')] || '[data-ton-comment]');
       try {
         await navigator.clipboard.writeText(field.value);
         copy.textContent = 'Copied';
@@ -559,9 +561,22 @@ async function openTonPanel() {
     tonDialog.querySelector('[data-ton-state]').textContent = (quote && quote.error) || 'This order has no TON price.';
     return;
   }
+  const buying = quote.action === 'anonymous' ? 'the pin' : (quote.plan === 'year' ? 'a year' : 'one week');
+  const per = quote.action === 'anonymous' ? 'a pin' : (quote.plan === 'year' ? 'a year' : 'a week');
   tonDialog.querySelector('[data-ton-amount]').textContent = `${quote.ton} TON`;
-  tonDialog.querySelector('[data-ton-split]').textContent = `${quote.priceTon} TON for the ${quote.action === 'anonymous' ? 'pin' : quote.action + ' subscription'} + ${quote.feeTon} TON network fee`;
-  tonDialog.querySelector('[data-ton-nano]').value = quote.nano;
+  tonDialog.querySelector('[data-ton-split]').textContent =
+    `${quote.priceTon} TON for ${buying} + ${quote.feeTon} TON network fee`;
+  // Wallets take TON decimals; nanoTON is only there for anyone whose wallet asks for the raw integer,
+  // so it is a footnote rather than the number in the field a reader copies.
+  tonDialog.querySelector('[data-ton-nano]').value = String(quote.ton);
+  tonDialog.querySelector('[data-ton-nanohint]').textContent =
+    `Exact amount in nanoTON: ${quote.nano}. The wallet link fills it in for you.`;
+  const savings = tonDialog.querySelector('[data-ton-savings]');
+  if (savings) {
+    savings.textContent = quote.satsForComparison
+      ? `Sats are cheaper: ${quote.satsForComparison} sats ${per} on the Bitcoin rail.`
+      : 'Sats are cheaper on the Bitcoin rail.';
+  }
   tonDialog.querySelector('[data-ton-address]').value = quote.address;
   tonDialog.querySelector('[data-ton-comment]').value = quote.comment;
   tonDialog.querySelector('[data-ton-wallet]').href = quote.payUrl;
@@ -677,6 +692,7 @@ function injectStyles() {
 .ptd-wallet { display: block; text-align: center; padding: 11px; border-radius: 8px; background: rgba(120,220,150,.16); border: 1px solid rgba(120,220,150,.5); color: #d8f5df; text-decoration: none; font-size: .86rem; }
 .ptd-state { margin: 0; font-size: .82rem; color: rgba(244,244,241,.78); }
 .ptd-hint { margin: 4px 0 0; font-size: .74rem; color: rgba(244,244,241,.55); }
+.ptd-nano { margin: 0; font-size: .7rem; color: rgba(244,244,241,.45); }
 .ptd-switch { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .pinstr-ton-dialog.is-paid .ptd-state { color: #8fe0a6; }
 .pinstr-ton-dialog.is-paid [data-ton-qr] { display: none; }
