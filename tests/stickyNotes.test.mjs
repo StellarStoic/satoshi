@@ -4291,3 +4291,34 @@ test('a click outside a modal puts it away, and a click on the card does not', a
     'a click inside an open explainer leaves it open');
   assert.ok(script.includes('explainer.open = false;'), 'a click anywhere else puts it away');
 });
+
+test('an empty board shows where to press, and stops asking once pressed', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+
+  // A clue above the sentence, pressable, and out of the way until there is no board to look at.
+  assert.ok(html.includes('id="boardEmptyHint"'), 'the clue exists');
+  assert.ok(html.includes('aria-label="Choose a geohash board"'), 'and says what it opens');
+  assert.ok(/id="boardEmptyHint"[^>]*hidden/.test(html), 'it starts hidden');
+
+  // The pulse itself: from its own size to more than twice it, and back.
+  const frames = css.slice(css.indexOf('@keyframes board-hint-pulse'), css.indexOf('@keyframes board-hint-pulse') + 200);
+  const scales = [...frames.matchAll(/scale\(([\d.]+)\)/g)].map(match => Number(match[1]));
+  assert.ok(scales.includes(1), 'it starts at its own size');
+  const peak = Math.max(...scales);
+  assert.ok(peak >= 2, `the peak must be at least double, found ${peak}`);
+  assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'and it does not move for a reader who asked for less');
+  assert.ok(css.includes('.board-empty-hint.is-pulsing { animation: none; }'), 'the reduced-motion answer is to hold still');
+
+  // Shown only where it makes sense, stopped for good by one press, and the press does what the clue promises.
+  assert.ok(script.includes('const show = !activeGeohash && !boardHintSeen();'), 'no board, and not already pressed');
+  assert.ok(script.includes("localStorage.setItem(BOARD_HINT_KEY, 'seen')"), 'one press is remembered on the device');
+  assert.ok(script.includes('function settleBoardEmptyHint()'));
+  const wiring = script.slice(script.indexOf("elements.boardEmptyHint.addEventListener('click'"));
+  assert.ok(wiring.slice(0, 400).includes('settleBoardEmptyHint();'), 'the press stops the pulse');
+  assert.ok(wiring.slice(0, 400).includes('openGeohashMap()'), 'and opens the picker it points at');
+  assert.ok(script.includes('renderBoardEmptyHint();'), 'the board control keeps it in step with the board');
+});

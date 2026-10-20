@@ -174,6 +174,7 @@ const elements = {
   rememberBoardCaption: document.getElementById('rememberBoardCaption'),
   rememberBoardHint: document.getElementById('rememberBoardHint'),
   buriedPins: document.getElementById('buriedPins'), gifPlay: document.getElementById('gifPlay'),
+  boardEmptyHint: document.getElementById('boardEmptyHint'),
   openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
   closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
   geohashMapPrecision: document.getElementById('geohashMapPrecision'), geohashMapSelection: document.getElementById('geohashMapSelection'),
@@ -2145,10 +2146,43 @@ function noteBelongsToBoard(sticky) {
 }
 
 function updateBoardControl() {
+  renderBoardEmptyHint();
   const reach = boardDepth === 0 ? 'exact only' : boardDepth === GEOHASH_MAX_BOARD_DEPTH ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
   const label = activeGeohash ? `Board: ${boardCellsLabel()} (${reach})` : 'Choose a geohash board';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
+}
+
+// The empty board's clue pulses until it has been pressed once on this device; a reader who has met it before
+// does not need to be called to again, and the animation is a question, not decoration.
+const BOARD_HINT_KEY = 'satoshi:board-empty-hint:v1';
+
+function boardHintSeen() {
+  try {
+    return localStorage.getItem(BOARD_HINT_KEY) === 'seen';
+  } catch {
+    return false;
+  }
+}
+
+/** Show the pulsing map marker only while there is no board to look at, and until it has been pressed. */
+function renderBoardEmptyHint() {
+  const hint = elements.boardEmptyHint;
+  if (!hint) return;
+  const show = !activeGeohash && !boardHintSeen();
+  hint.hidden = !show;
+  hint.classList.toggle('is-pulsing', show);
+}
+
+/** Stop the pulse for good, which is what pressing the clue does. */
+function settleBoardEmptyHint() {
+  try {
+    localStorage.setItem(BOARD_HINT_KEY, 'seen');
+  } catch {
+    // A browser that refuses storage still gets the click; the clue just comes back next visit.
+  }
+  elements.boardEmptyHint.classList.remove('is-pulsing');
+  elements.boardEmptyHint.hidden = true;
 }
 
 let boardAppliedScale = 1;
@@ -6090,6 +6124,14 @@ elements.boardStyleForm.addEventListener('submit', event => {
     return;
   }
   applyBoardTexture(url);
+});
+// The clue on an empty board does exactly what the map button does, and stops pulsing once it has been used.
+elements.boardEmptyHint.addEventListener('click', () => {
+  settleBoardEmptyHint();
+  openGeohashMap().catch(error => {
+    console.error('Could not open the geohash map:', error);
+    sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
+  });
 });
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {

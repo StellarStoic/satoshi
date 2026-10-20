@@ -981,3 +981,41 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
    pin already sits higher than both, outside the note's own box. */
 .sticky-note--print .sticky-note__texture { z-index: 2; }
 .sticky-note--print .sticky-note__author { z-index: 3; }
+
+/* The clue on an empty board. "Choose a geohash to open its board" is exact and says nothing to a reader who has
+   never met the word, so a map marker sits above it and grows to a little over twice its size and back, which is
+   the one thing that reads as "press here" without being read. It stops for good on the first press, and it does
+   not move at all for a reader who asked their system for less motion. */
+.board-empty-hint {
+  position: absolute;
+  top: calc(50% - 96px);
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  translate: -50% 0;
+  border: 1px solid #54585a;
+  border-radius: 50%;
+  color: var(--accent, #f2a900);
+  background: rgba(31, 34, 35, .86);
+  font-size: 25px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .45);
+}
+.board-empty-hint[hidden] { display: none; }
+.board-empty-hint:is(:hover, :focus-visible) {
+  border-color: var(--accent, #f2a900);
+  outline: 2px solid var(--focus, #ffd15c);
+  outline-offset: 3px;
+}
+.board-empty-hint.is-pulsing { animation: board-hint-pulse 2.6s ease-in-out infinite; }
+@keyframes board-hint-pulse {
+  0%, 100% { transform: scale(1); opacity: .82; }
+  50% { transform: scale(2.15); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-empty-hint.is-pulsing { animation: none; }
+}
