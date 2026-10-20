@@ -4355,51 +4355,47 @@ test('an empty board shows where to press, and the chooser waits to be asked for
 });
 
 test('every socket on the rail says what it stands for, and whether its notes show', async () => {
-  const { boardLampInfo, boardLampSummary, boardLampCount, boardDepthCeiling, BOARD_LAMP_SOCKETS } =
+  const { boardLampInfo, boardLampSummary, boardLampCount, boardLampExampleCell, boardDepthCeiling, BOARD_LAMP_SOCKETS } =
     await import('../stickyNotesModel.mjs');
   const { readFileSync } = await import('node:fs');
   const { URL } = await import('node:url');
+  const rail = (cells, depth) => Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, cells, depth));
+  const lights = rows => rows.map(row => (row.lit ? 'green' : row.hidden ? 'red' : 'off'));
 
   assert.equal(BOARD_LAMP_SOCKETS, 6);
 
-  // The plate is the choice drawn. On u267, exact: its own cell shows and every deeper level is hidden.
-  const exact = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 0));
-  assert.deepEqual(exact.map(lamp => lamp.level), [4, 5, 6, 7, 8, 9]);
-  assert.deepEqual(exact.map(lamp => lamp.state), ['own', 'hidden', 'hidden', 'hidden', 'hidden', 'hidden']);
-  assert.deepEqual(exact.map(lamp => lamp.lit), [true, false, false, false, false, false]);
-  assert.equal(exact[0].title, "Level 4 · u267 is this board's own cell — shown");
-  assert.equal(exact[1].title, 'Level 5 · u267… is 1 letter deeper — hidden');
-
-  // One level deeper adds one green, two add two: the greens are the levels the setting reaches.
-  const one = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 1));
-  assert.deepEqual(one.map(lamp => lamp.lit), [true, true, false, false, false, false]);
-  const two = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 2));
-  assert.deepEqual(two.map(lamp => lamp.lit), [true, true, true, false, false, false]);
-  const all = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 5));
-  assert.deepEqual(all.map(lamp => lamp.lit), [true, true, true, true, true, true]);
-
+  // Only the levels UNDER the board are measured. The board's own level and every board above it stay dark, whatever
+  // the depth setting says: lighting them green or red would claim something about a level this board is not showing.
+  assert.deepEqual(lights(rail(['u267'], 0)), ['off', 'red', 'red', 'red', 'red', 'red']);
+  assert.equal(rail(['u267'], 0)[0].title, "Level 4 · u267 is this board's own cell");
+  assert.deepEqual(lights(rail(['u267'], 1)), ['off', 'green', 'red', 'red', 'red', 'red']);
+  assert.deepEqual(lights(rail(['u267'], 2)), ['off', 'green', 'green', 'red', 'red', 'red']);
+  assert.deepEqual(lights(rail(['u267'], 5)), ['off', 'green', 'green', 'green', 'green', 'green']);
   // A depth past what the cell has is the same plate as the deepest level it does have.
-  assert.deepEqual(
-    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 6)).map(lamp => lamp.lit),
-    all.map(lamp => lamp.lit),
-  );
+  assert.deepEqual(lights(rail(['u267'], 6)), lights(rail(['u267'], 5)));
+  assert.deepEqual(rail(['u267'], 2).map(row => row.level), [4, 5, 6, 7, 8, 9]);
 
-  // An eight-letter board owns one level and has one below it, which is all the reader can be offered.
+  // A deeper socket names a real cell down there, not an ellipsis: the reader can see which board it means.
+  assert.equal(boardLampExampleCell('u267', 6), 'u26700');
+  assert.equal(boardLampExampleCell('u267', 5), 'u2670');
+  assert.equal(boardLampExampleCell('u267', 4), '');
+  assert.equal(boardLampExampleCell('', 5), '');
+  assert.equal(rail(['u267'], 0)[2].title, 'Level 6 · notes from u26700 are 2 levels deeper — hidden');
+  assert.equal(rail(['u267'], 2)[2].title, 'Level 6 · notes from u26700 are 2 levels deeper — shown');
+
+  // An eight-letter board owns one level and has one below it.
   assert.equal(boardDepthCeiling(['u267tnw1']), 1);
-  const deepExact = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267tnw1'], 0));
-  assert.deepEqual(deepExact.map(lamp => lamp.state), ['above', 'above', 'above', 'above', 'own', 'hidden']);
-  assert.equal(deepExact[3].title, 'Level 7 · u267tnw is a board above this one — hidden');
-  assert.deepEqual(
-    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267tnw1'], 1)).map(lamp => lamp.lit),
-    [false, false, false, false, true, true],
-  );
+  const deep = rail(['u267tnw1'], 0);
+  assert.deepEqual(deep.map(row => row.state), ['above', 'above', 'above', 'above', 'own', 'hidden']);
+  assert.deepEqual(lights(deep), ['off', 'off', 'off', 'off', 'off', 'red']);
+  assert.equal(deep[3].title, 'Level 7 · u267tnw is a board above this one');
+  assert.equal(deep[4].title, 'Level 8 · u267tnw1 is this board\'s own cell');
+  assert.deepEqual(lights(rail(['u267tnw1'], 1)), ['off', 'off', 'off', 'off', 'off', 'green']);
 
-  // A nine-letter board has nothing under it at all: its own socket is the only green there can be.
+  // A nine-letter board has nothing under it: every socket is dark, and no depth can light one.
   assert.equal(boardDepthCeiling(['u2678kx9z']), 0);
-  assert.deepEqual(
-    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u2678kx9z'], 0)).map(lamp => lamp.lit),
-    [false, false, false, false, false, true],
-  );
+  assert.deepEqual(lights(rail(['u2678kx9z'], 0)), ['off', 'off', 'off', 'off', 'off', 'off']);
+  assert.equal(rail(['u2678kx9z'], 6)[5].state, 'own');
 
   // Nothing at all is not a crash, and says so.
   assert.equal(boardLampInfo(0, [], 0).title, 'Level 4 · no board open');
@@ -4407,19 +4403,21 @@ test('every socket on the rail says what it stands for, and whether its notes sh
   assert.equal(boardLampInfo(-1, ['u267'], 0), null);
   assert.equal(boardLampInfo('x', ['u267'], 0), null);
   // A board of several cells names the first and counts the rest.
-  assert.match(boardLampInfo(0, ['u267', 'u268'], 0).title, /\(\+1 more\)/);
+  assert.match(boardLampInfo(1, ['u267', 'u268'], 0).title, /\(\+1 more\)/);
 
-  // The sentence the plate stands for names both colours, which is D's own explainer.
+  // The sentence counts the levels below the board that are showing, and names both colours in D's own words.
   const summary = boardLampSummary(['u267'], 2);
-  assert.match(summary, /^3 of 6 levels show notes here\./);
+  assert.match(summary, /^2 of 5 levels below this board show notes here\./);
   assert.ok(summary.includes('Green = notes from this level show here. Red = notes in this level are hidden.'));
+  assert.match(boardLampSummary(['u267tnw1'], 1), /^1 of 1 level below this board show notes here\./);
+  assert.match(boardLampSummary(['u2678kx9z'], 0), /^This board is as deep as a cell goes, so no light burns\./);
   assert.equal(boardLampSummary([], 0), 'Green = notes from this level show here. Red = notes in this level are hidden.');
 
   // boardLampCount still answers the arithmetic question: how many levels lie under a cell.
   assert.equal(boardLampCount('u267'), 5);
   assert.equal(boardLampCount('u267tnw1'), 1);
 
-  // And the plate carries it: one sentence on the strip, one line per socket, red for a hidden level.
+  // And the plate carries it: one sentence on the strip, one line per socket, red only for a level the depth hides.
   const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   const sheet = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
   const rails = script.slice(script.indexOf('function renderBoardLamps()'), script.indexOf('function pulseLamps()'));
@@ -4433,7 +4431,7 @@ test('every socket on the rail says what it stands for, and whether its notes sh
   // The legend reads the same states, so a hover and a tap cannot disagree.
   const legend = script.slice(script.indexOf('function renderLampDialog()'), script.indexOf('function openLampLegend()'));
   assert.ok(legend.includes('const info = boardLampInfo(index, activeGeohashes, boardDepth);'));
-  assert.ok(legend.includes("const states = {shown: 'shown', own: 'shown', hidden: 'hidden', above: 'hidden', none: 'no board'};"));
+  assert.ok(legend.includes("const states = {shown: 'shown', own: 'this board', hidden: 'hidden', above: 'above', none: 'no board'};"));
   assert.ok(legend.includes('lamp-dialog__row--hidden'));
   const page = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
   assert.ok(page.includes('id="lampDialog"'), 'the legend has a dialog');

@@ -2262,7 +2262,7 @@ function renderLampDialog() {
   if (!rows) return;
   const summary = boardLampSummary(activeGeohashes, boardDepth);
   if (elements.lampDialogSummary) elements.lampDialogSummary.textContent = summary;
-  const states = {shown: 'shown', own: 'shown', hidden: 'hidden', above: 'hidden', none: 'no board'};
+  const states = {shown: 'shown', own: 'this board', hidden: 'hidden', above: 'above', none: 'no board'};
   rows.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
     const info = boardLampInfo(index, activeGeohashes, boardDepth);
     const row = document.createElement('li');

@@ -1739,28 +1739,45 @@ export function boardLampInfo(index, cells = [], depth = 0) {
   else if (level < cell.length) { detail = `${cell.slice(0, level)} is a board above this one${others}`; state = 'above'; }
   else {
     const deeper = level - cell.length;
-    detail = `${cell}… is ${deeper} letter${deeper === 1 ? '' : 's'} deeper${others}`;
+    // A real cell down there rather than an ellipsis: the reader can see which board the light is about.
+    detail = `notes from ${boardLampExampleCell(cell, level)} are ${deeper} level${deeper === 1 ? '' : 's'} deeper${others}`;
     state = deeper <= reached ? 'shown' : 'hidden';
   }
-  const lit = state === 'own' || state === 'shown';
-  const reading = state === 'none' ? '' : lit ? ' — shown' : ' — hidden';
-  return {index: step, level, lit, hidden: Boolean(cell) && !lit, state, cell, detail, title: `Level ${level} · ${detail}${reading}`};
+  // Only the levels BELOW the board burn, green when the depth reaches them and red when it hides them. The board's
+  // own level and every board above it stay dark: they are not what this plate is measuring.
+  const lit = state === 'shown';
+  const hidden = state === 'hidden';
+  const reading = lit ? ' — shown' : hidden ? ' — hidden' : '';
+  return {index: step, level, lit, hidden, state, cell, detail, title: `Level ${level} · ${detail}${reading}`};
 }
 
 /**
- * The one sentence the whole plate stands for: how many levels are showing notes, and what the two colours mean.
- * The colours are the legend, so they are named here rather than discovered by hovering six sockets.
+ * A cell at `level` inside `cell`, so a tooltip can name a real board instead of trailing off in an ellipsis. The
+ * first child of a cell is the cell plus a zero in geohash's base32, and the first child of that the same again.
+ */
+export function boardLampExampleCell(cell, level) {
+  const length = normaliseGeohash(cell).length;
+  const steps = Number(level) - length;
+  if (!length || !Number.isFinite(steps) || steps <= 0) return '';
+  return normaliseGeohash(cell) + '0'.repeat(steps);
+}
+
+/**
+ * The one sentence the whole plate stands for: how many of the levels under this board are showing notes, and what
+ * the two colours mean. The colours are the legend, so they are named here rather than discovered by hovering.
  */
 export function boardLampSummary(cells = [], depth = 0) {
   const own = geohashCells(cells);
-  if (!own.length) return 'Green = notes from this level show here. Red = notes in this level are hidden.';
+  const explainer = 'Green = notes from this level show here. Red = notes in this level are hidden.';
+  if (!own.length) return explainer;
+  const below = Math.max(0, GEOHASH_MAX_LENGTH - own[0].length);
+  if (!below) return `This board is as deep as a cell goes, so no light burns. ${explainer}`;
   let shown = 0;
   for (let index = 0; index < BOARD_LAMP_SOCKETS; index += 1) {
     const lamp = boardLampInfo(index, own, depth);
     if (lamp && lamp.lit) shown += 1;
   }
-  return `${shown} of ${BOARD_LAMP_SOCKETS} levels show notes here. Green = notes from this level show here. `
-    + 'Red = notes in this level are hidden.';
+  return `${shown} of ${below} level${below === 1 ? '' : 's'} below this board show notes here. ${explainer}`;
 }
 
 /**
