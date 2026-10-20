@@ -744,6 +744,9 @@ function showDialog(dialog) {
     status(elements.amberCopyStatus, 'Approve it in Amber, then come back to this page.');
   }
   if (!dialog.open) dialog.showModal();
+  // One hook for every dialog: the empty board's clue has to stand down as soon as the chooser is up, however it
+  // was opened - a reader reaching it from the plate, from the composer or from the clue itself.
+  renderBoardEmptyHint();
 }
 
 function geohashCellDimensions(precision) {
@@ -2169,7 +2172,9 @@ function boardHintSeen() {
 function renderBoardEmptyHint() {
   const hint = elements.boardEmptyHint;
   if (!hint) return;
-  const show = !activeGeohash && !boardHintSeen();
+  // Never pulse behind the chooser: the chooser is already asking the question the pulse points at, and a board
+  // opened from it must not leave the clue on screen.
+  const show = !activeGeohash && !boardHintSeen() && !elements.boardDialog?.open;
   hint.hidden = !show;
   hint.classList.toggle('is-pulsing', show);
 }
@@ -6126,12 +6131,12 @@ elements.boardStyleForm.addEventListener('submit', event => {
   applyBoardTexture(url);
 });
 // The clue on an empty board does exactly what the map button does, and stops pulsing once it has been used.
+// The clue opens the chooser itself - the dialog with the board field, the depth and the remember switch - because
+// that is where a board is picked, and the map is one button further in for a reader who wants it.
 elements.boardEmptyHint.addEventListener('click', () => {
   settleBoardEmptyHint();
-  openGeohashMap().catch(error => {
-    console.error('Could not open the geohash map:', error);
-    sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
-  });
+  showDialog(elements.boardDialog);
+  requestAnimationFrame(() => elements.boardGeohash.focus());
 });
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {
@@ -6154,6 +6159,8 @@ elements.clearPlaceSearch.addEventListener('click', () => {
   clearPlaceSearch();
   elements.placeSearch.focus();
 });
+// A chooser that is dismissed without a board leaves the clue to point at it again.
+elements.boardDialog.addEventListener('close', renderBoardEmptyHint);
 elements.closeGeohashMap.addEventListener('click', () => elements.geohashMapDialog.close());
 elements.geohashMapDialog.addEventListener('close', () => {
   // The search is an aid to this picking session, not a state of its own: the field and the

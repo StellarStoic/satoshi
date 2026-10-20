@@ -4314,11 +4314,21 @@ test('an empty board shows where to press, and stops asking once pressed', async
   assert.ok(css.includes('.board-empty-hint.is-pulsing { animation: none; }'), 'the reduced-motion answer is to hold still');
 
   // Shown only where it makes sense, stopped for good by one press, and the press does what the clue promises.
-  assert.ok(script.includes('const show = !activeGeohash && !boardHintSeen();'), 'no board, and not already pressed');
-  assert.ok(script.includes("localStorage.setItem(BOARD_HINT_KEY, 'seen')"), 'one press is remembered on the device');
   assert.ok(script.includes('function settleBoardEmptyHint()'));
+  assert.ok(script.includes("localStorage.setItem(BOARD_HINT_KEY, 'seen')"), 'one press is remembered on the device');
   const wiring = script.slice(script.indexOf("elements.boardEmptyHint.addEventListener('click'"));
   assert.ok(wiring.slice(0, 400).includes('settleBoardEmptyHint();'), 'the press stops the pulse');
-  assert.ok(wiring.slice(0, 400).includes('openGeohashMap()'), 'and opens the picker it points at');
+  assert.ok(wiring.slice(0, 400).includes('showDialog(elements.boardDialog)'), 'and opens the board chooser');
+  assert.ok(wiring.slice(0, 400).includes('elements.boardGeohash.focus()'), 'with the board field ready to type in');
   assert.ok(script.includes('renderBoardEmptyHint();'), 'the board control keeps it in step with the board');
+
+  // Never pulsing behind the chooser, which is already asking the question the clue points at.
+  assert.ok(script.includes('const show = !activeGeohash && !boardHintSeen() && !elements.boardDialog?.open;'),
+    'the clue stands down while the chooser is open');
+  // Every dialog opens through showDialog, so that is where the clue is re-checked; the chooser closing is the
+  // other half, or a reader who dismisses it would never see the clue again.
+  const showDialog = script.slice(script.indexOf('function showDialog(dialog)'), script.indexOf('function showDialog(dialog)') + 700);
+  assert.ok(showDialog.includes('renderBoardEmptyHint();'), 'opening any dialog re-checks the clue');
+  assert.ok(script.includes("elements.boardDialog.addEventListener('close', renderBoardEmptyHint);"),
+    'and closing the chooser lets it come back');
 });
