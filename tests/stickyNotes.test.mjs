@@ -40,7 +40,7 @@ import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, menti
   stickyImageUrl,  stickyPaymentBadge, STICKY_PAYMENT_TAG, STICKY_PAYMENT_BADGES,
   coveredPinNotes, PIN_COVERED_SHARE, PIN_RAISE_MS,
   USER_RELAY_LIMIT, relayLampFor, relayHostLabel, normaliseUserRelay, addUserRelay, removeUserRelay,
-  animatedPicture, isGiftAction, noteStackOrder, REACTION_SATS,
+  animatedPicture, isGiftAction, noteStackOrder,
 } from '../stickyNotesModel.mjs';
 import {readFileSync, existsSync} from 'node:fs';
 
@@ -3672,60 +3672,35 @@ test('the lamp says how the relay answered, and says so when it did not', () => 
   assert.deepEqual(removeUserRelay(null, 'wss://a.com'), []);
 });
 
-test('the board stacks by what a note collected, a like weighed against sats', () => {
-  const note = (id, createdAt, reactions, sats) => ({id, createdAt, reactions, sats});
+test('the board stacks by time: the last note posted lies on top', () => {
+  const note = (id, createdAt, reactions = 0, sats = 0) => ({id, createdAt, reactions, sats});
+  const now = 2_000;
 
-  // Nothing collected: the order it always had, oldest at the back and newest on top.
-  assert.deepEqual(noteStackOrder([note('a', 100, 0, 0), note('b', 300, 0, 0), note('c', 200, 0, 0)]),
-    ['a', 'c', 'b']);
+  // Nothing else matters: newest last, which is the note on top of the pile.
+  assert.deepEqual(noteStackOrder([note('a', 100), note('b', 300), note('c', 200)], now), ['a', 'c', 'b']);
 
-  // Reactions and sats are one score, and the highest score ends up on top.
-  assert.deepEqual(noteStackOrder([
-    note('six', 10, 6, 2345),        // 600 + 2,345 = 2,945
-    note('one-twelve', 20, 1, 12),   // 100 + 12 = 112
-    note('one-hundred', 30, 1, 100), // 100 + 100 = 200
-  ]), ['one-twelve', 'one-hundred', 'six']);
+  // The complaint this replaced: a note that had collected likes and sats covered a newer note, so a reader who
+  // had just posted would find their note underneath one from hours earlier with a few free-to-sign likes.
+  assert.deepEqual(noteStackOrder([note('older-with-tally', 10, 6, 2345), note('just-posted', 20)], now),
+    ['older-with-tally', 'just-posted'], 'the note posted last is on top whatever the older one collected');
+  assert.deepEqual(noteStackOrder([note('older', 10, 0, 100000), note('newer', 20)], now),
+    ['older', 'newer'], 'and a large zap does not hold the top either');
 
-  // The whole point: the smallest zap the board offers does not outweigh six likes.
-  assert.deepEqual(noteStackOrder([
-    note('liked', 10, 6, 0),          // 600
-    note('tipped', 20, 0, 21),        // 21
-  ]), ['tipped', 'liked'], 'six likes beat a twenty-one-sat zap');
+  // A note dated in the future is read as posted now, so a clock set forward cannot own the top for good.
+  assert.deepEqual(noteStackOrder([note('sane', 1900), note('from-2030', 1_900_000_000)], now), ['sane', 'from-2030']);
+  // Two notes from the future are both read as posted now, so they tie and keep the order they arrived in:
+  // neither date can be trusted, so neither earns a place over the other.
+  assert.deepEqual(noteStackOrder([note('a', 1_900_000_000), note('b', 1_800_000_000)], now), ['a', 'b'],
+    'both are capped at now, so arrival order decides');
 
-  // A like stands level with the board's hundred-sat zap; money leads from there up.
-  assert.deepEqual(noteStackOrder([
-    note('nothing', 10, 0, 0),
-    note('tipped', 20, 0, 21),
-    note('one-like', 30, 1, 0),       // 100
-    note('hundred', 40, 0, 100),      // 100, the same standing
-    note('ten-likes', 50, 10, 0),     // 1,000
-    note('thousand', 60, 0, 1000),    // 1,000, the same standing
-  ]), ['nothing', 'tipped', 'one-like', 'hundred', 'ten-likes', 'thousand']);
-
-  // The rate is published rather than buried in the sum, so a test can hold it to its promise.
-  assert.equal(REACTION_SATS, 100);
-  assert.ok(6 * REACTION_SATS > 21, 'six likes must beat the smallest zap the board offers');
-  assert.ok(REACTION_SATS > 21, 'one like outweighs the smallest zap the board offers');
-  assert.ok(REACTION_SATS <= 1000, 'but a like does not run away with the board either');
-
-  // More of either never moves a note back, which is what dividing did.
-  const before = noteStackOrder([note('x', 10, 2, 500), note('y', 20, 0, 0)]);
-  const afterGain = noteStackOrder([note('x', 10, 5, 500), note('y', 20, 0, 0)]);
-  assert.deepEqual(before, afterGain, 'a note that gains reactions keeps its place or gains one');
-  assert.equal(afterGain[afterGain.length - 1], 'x');
-
-  // Ties keep the creation order, so a board only ever moves when a tally says it should.
-  assert.deepEqual(noteStackOrder([note('old', 1, 2, 100), note('new', 2, 2, 100)]), ['old', 'new']);
-  assert.deepEqual(noteStackOrder([note('a', 1, 0, 0), note('b', 1, 0, 0)]), ['a', 'b']);
+  // Same second: the order the notes arrived in, so the board only moves when something is posted.
+  assert.deepEqual(noteStackOrder([note('a', 5), note('b', 5), note('c', 5)], now), ['a', 'b', 'c']);
 
   // Nothing to go on is not a crash.
-  assert.deepEqual(noteStackOrder([]), []);
-  assert.deepEqual(noteStackOrder(null), []);
-  assert.deepEqual(noteStackOrder([{id: 'x'}]), ['x']);
-  assert.deepEqual(noteStackOrder([{id: 'x', createdAt: 'nonsense', reactions: 'nonsense', sats: -5}]), ['x']);
-  // A receipt whose amount could not be read counts for nothing, rather than counting as a fault.
-  assert.deepEqual(noteStackOrder([{id: 'y', createdAt: 1, reactions: 3, sats: null}, {id: 'z', createdAt: 2, reactions: 0, sats: 0}]),
-    ['z', 'y']);
+  assert.deepEqual(noteStackOrder([], now), []);
+  assert.deepEqual(noteStackOrder(null, now), []);
+  assert.deepEqual(noteStackOrder([{id: 'x'}], now), ['x']);
+  assert.deepEqual(noteStackOrder([{id: 'x', createdAt: 'nonsense', reactions: 'nonsense', sats: -5}], now), ['x']);
 });
 
 test('only a picture that moves is treated as one', () => {

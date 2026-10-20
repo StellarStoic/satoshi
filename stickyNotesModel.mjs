@@ -1730,39 +1730,29 @@ export function isGiftAction(action) {
  * twenty-eight times over, and a five-thousand-sat zap is worth fifty likes. Raise it if a click should
  * count for more, lower it if money should lead harder; this is the whole of that judgement.
  */
-export const REACTION_SATS = 100;
-
-/** A number from anything, with anything unreadable read as zero rather than as NaN. */
-function tallyNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : 0;
-}
 
 /**
- * The board's stacking order: what a note has collected decides what covers what.
+ * The board's stacking order: a note posted last lies on top of the notes already there.
  *
- * Reactions and sats are added, not divided. Dividing looks tidy on two numbers and behaves badly on a
- * board: it makes reactions a penalty, because adding a reaction to a note raises its decimal and
- * pushes the note back, and it lets one large zap hold the top for good, because anything would have
- * to beat its ratio. A sum only ever moves a note forward: every reaction and every sat counts as one
- * point, and a reader can see the reason on the paper, since the tally printed there is the score.
+ * Time decides it, and nothing else. Reactions and sats used to raise a note over its neighbours, which meant
+ * a note that had collected a few likes - and a signature is free to make - could sit over one its author had
+ * paid to pin, and one large zap could hold the top for as long as nobody beat it. Payment buys a note's place
+ * on the board and the tally it carries, not the right to cover newer notes.
  *
- * A note nobody has touched scores nothing and keeps the order it always had, newest over oldest. A
- * reaction is worth REACTION_SATS sats rather than one, without which a twenty-one-sat zap - the
- * smallest the board offers - would outweigh twenty likes between them. Ties fall back to the creation
- * order, so the board only ever moves when a tally says it should.
+ * A note dated in the future is read as posted now, so a clock set forward cannot own the top for good, and
+ * ties fall back to the order the notes arrived in, so the board only moves when something is actually posted.
  *
  * Returned back to front: the caller lays the elements down in this order, and the last one is on top.
  */
-export function noteStackOrder(notes) {
+export function noteStackOrder(notes, now = Math.floor(Date.now() / 1000)) {
+  const ceiling = Math.max(0, Number(now) || 0);
   const keyed = (notes || []).map((note, index) => {
     const createdAt = Number(note?.createdAt) || 0;
-    const score = tallyNumber(note?.reactions) * REACTION_SATS + tallyNumber(note?.sats);
     // Ascending, because the first element laid down is the one at the back.
-    return {id: note?.id, score, createdAt, index};
+    const posted = ceiling > 0 ? Math.min(createdAt, ceiling) : createdAt;
+    return {id: note?.id, posted, index};
   });
-  keyed.sort((left, right) => (left.score - right.score)
-    || (left.createdAt - right.createdAt) || (left.index - right.index));
+  keyed.sort((left, right) => (left.posted - right.posted) || (left.index - right.index));
   return keyed.map(entry => entry.id);
 }
 
