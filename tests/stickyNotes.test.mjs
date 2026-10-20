@@ -4292,7 +4292,7 @@ test('a click outside a modal puts it away, and a click on the card does not', a
   assert.ok(script.includes('explainer.open = false;'), 'a click anywhere else puts it away');
 });
 
-test('an empty board shows where to press, and stops asking once pressed', async () => {
+test('an empty board shows where to press, and the chooser waits to be asked for', async () => {
   const { readFileSync } = await import('node:fs');
   const { URL } = await import('node:url');
   const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
@@ -4313,17 +4313,27 @@ test('an empty board shows where to press, and stops asking once pressed', async
   assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'and it does not move for a reader who asked for less');
   assert.ok(css.includes('.board-empty-hint.is-pulsing { animation: none; }'), 'the reduced-motion answer is to hold still');
 
-  // Shown only where it makes sense, stopped for good by one press, and the press does what the clue promises.
-  assert.ok(script.includes('function settleBoardEmptyHint()'));
-  assert.ok(script.includes("localStorage.setItem(BOARD_HINT_KEY, 'seen')"), 'one press is remembered on the device');
+  // The press does what the clue promises, and the clue is a standing invitation rather than a one-shot: it comes
+  // back when the reader closes the chooser without picking a board, because the empty board is where they land.
   const wiring = script.slice(script.indexOf("elements.boardEmptyHint.addEventListener('click'"));
-  assert.ok(wiring.slice(0, 400).includes('settleBoardEmptyHint();'), 'the press stops the pulse');
-  assert.ok(wiring.slice(0, 400).includes('showDialog(elements.boardDialog)'), 'and opens the board chooser');
+  assert.ok(wiring.slice(0, 400).includes('showDialog(elements.boardDialog)'), 'the press opens the board chooser');
   assert.ok(wiring.slice(0, 400).includes('elements.boardGeohash.focus()'), 'with the board field ready to type in');
+  assert.doesNotMatch(script, /BOARD_HINT_KEY|localStorage\.setItem\([^)]*hint/i,
+    'nothing is remembered about the clue, so it cannot be spent');
+  assert.doesNotMatch(script, /settleBoardEmptyHint/, 'and there is no state that could hide it for good');
   assert.ok(script.includes('renderBoardEmptyHint();'), 'the board control keeps it in step with the board');
 
+  // A first visit is read, not interrupted: the empty board carries the sentence and the marker, and the chooser
+  // waits to be asked for.
+  const bootAt = script.lastIndexOf("status(elements.boardStatus, 'Choose a geohash to open its board.')");
+  assert.ok(bootAt > 0, 'the empty board still says what to do');
+  const bootElse = script.slice(bootAt, bootAt + 600);
+  assert.ok(bootElse.includes('renderBoardEmptyHint();'), 'and shows where to press');
+  assert.doesNotMatch(bootElse.slice(0, bootElse.indexOf('}')), /showDialog\(/,
+    'no dialog is thrown at a visitor who has not asked for one');
+
   // Never pulsing behind the chooser, which is already asking the question the clue points at.
-  assert.ok(script.includes('const show = !activeGeohash && !boardHintSeen() && !elements.boardDialog?.open;'),
+  assert.ok(script.includes('const show = !activeGeohashes.length && !elements.boardDialog?.open;'),
     'the clue stands down while the chooser is open');
   // Every dialog opens through showDialog, so that is where the clue is re-checked; the chooser closing is the
   // other half, or a reader who dismisses it would never see the clue again.

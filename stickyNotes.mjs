@@ -2161,38 +2161,22 @@ function updateBoardControl() {
   elements.openBoard.title = label;
 }
 
-// The empty board's clue pulses until it has been pressed once on this device; a reader who has met it before
-// does not need to be called to again, and the animation is a question, not decoration.
-const BOARD_HINT_KEY = 'satoshi:board-empty-hint:v1';
+// The empty board's marker pulses for as long as there is no board to look at. It is a question, not decoration -
+// and not a one-shot either, because a reader who closes the chooser without picking a board is back on the empty
+// board, which is exactly where the question still applies.
 
-function boardHintSeen() {
-  try {
-    return localStorage.getItem(BOARD_HINT_KEY) === 'seen';
-  } catch {
-    return false;
-  }
-}
-
-/** Show the pulsing map marker only while there is no board to look at, and until it has been pressed. */
+/**
+ * Show the pulsing map marker while there is no board to look at. It is not a one-shot: closing the chooser without
+ * picking a board leaves the reader on the empty board, and the marker is the way back to it.
+ */
 function renderBoardEmptyHint() {
   const hint = elements.boardEmptyHint;
   if (!hint) return;
   // Never pulse behind the chooser: the chooser is already asking the question the pulse points at, and a board
-  // opened from it must not leave the clue on screen.
-  const show = !activeGeohash && !boardHintSeen() && !elements.boardDialog?.open;
+  // opened from it must not leave the marker on screen.
+  const show = !activeGeohashes.length && !elements.boardDialog?.open;
   hint.hidden = !show;
   hint.classList.toggle('is-pulsing', show);
-}
-
-/** Stop the pulse for good, which is what pressing the clue does. */
-function settleBoardEmptyHint() {
-  try {
-    localStorage.setItem(BOARD_HINT_KEY, 'seen');
-  } catch {
-    // A browser that refuses storage still gets the click; the clue just comes back next visit.
-  }
-  elements.boardEmptyHint.classList.remove('is-pulsing');
-  elements.boardEmptyHint.hidden = true;
 }
 
 let boardAppliedScale = 1;
@@ -3542,6 +3526,7 @@ function connectBoard(version = boardConnectionVersion) {
   if (!activeGeohash) {
     status(elements.boardStatus, 'Choose a geohash to open its board.');
     elements.boardStatus.hidden = false;
+    renderBoardEmptyHint();
     return;
   }
   const subscription = `sticky-${Date.now()}`;
@@ -6206,7 +6191,6 @@ elements.boardStyleForm.addEventListener('submit', event => {
 // The clue opens the chooser itself - the dialog with the board field, the depth and the remember switch - because
 // that is where a board is picked, and the map is one button further in for a reader who wants it.
 elements.boardEmptyHint.addEventListener('click', () => {
-  settleBoardEmptyHint();
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
 });
@@ -6840,9 +6824,10 @@ installBoardNavigation();
 requestAnimationFrame(fillBoard);
 if (activeGeohash) connectBoard();
 else {
+  // No board, no dialog: the empty board says what to do and the pulsing marker shows where, so a first visit is
+  // read rather than interrupted. The chooser is one press away - on the marker, the board plate or the map button.
   status(elements.boardStatus, 'Choose a geohash to open its board.');
-  showDialog(elements.boardDialog);
-  requestAnimationFrame(() => elements.boardGeohash.focus());
+  renderBoardEmptyHint();
 }
 // A signature is made in another app, so the page leaves and comes back — reloaded, or
 // resumed exactly as it was: a browser that keeps the running page only changes the URL, and
