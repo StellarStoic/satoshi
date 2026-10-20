@@ -415,7 +415,7 @@
       <div id="hashtagStatus" class="hashtag-status" role="status" aria-live="polite"></div>
       <label class="note-scope-toggle" title="Hide this note from broader parent boards"><input id="exactGeohashNote" type="checkbox"><span>Show only on this exact geohash</span></label>
       <div class="liveliness" role="group" aria-labelledby="livelinessLabel">
-        <div class="liveliness__head"><span id="livelinessLabel">Hidden here after</span><output id="noteLivelinessValue" for="noteLiveliness">1 month</output></div>
+        <div class="liveliness__head"><span id="livelinessLabel">Will be gone after</span><output id="noteLivelinessValue" for="noteLiveliness">1 month</output></div>
         <input id="noteLiveliness" class="liveliness__slider" type="range" min="0" max="4" step="1" value="2" aria-label="How long satoshi.si should show the note" aria-describedby="noteLivelinessHint">
         <div id="noteLivelinessTicks" class="liveliness__ticks" aria-hidden="true"></div>
       </div>
@@ -491,7 +491,7 @@
     <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
     <div id="notePaidBadge" class="note-menu__paid" hidden><i id="notePaidBadgeIcon" class="lni" aria-hidden="true"></i><span id="notePaidBadgeLabel"></span></div>
     <span>Posted</span><time id="notePostedAt"></time>
-    <span id="noteExpiresLabel" hidden>Hidden here</span><div id="noteExpirationValue" class="note-menu__expiration" hidden><time id="noteExpiresAt"></time><span id="noteExpiryCountdown" class="note-expiry-countdown" aria-live="off"></span></div>
+    <span id="noteExpiresLabel" hidden>Will be gone</span><div id="noteExpirationValue" class="note-menu__expiration" hidden><time id="noteExpiresAt"></time><span id="noteExpiryCountdown" class="note-expiry-countdown" aria-live="off"></span><span id="noteExpiryAged" class="note-expiry-aged" aria-live="off"></span></div>
     <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
     <details id="noteEventJsonDetails" class="note-event-json">
       <summary>Show JSON</summary>

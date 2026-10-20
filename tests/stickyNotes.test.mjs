@@ -1124,7 +1124,7 @@ test('the composer asks how long a note lives, and the menu counts down until it
   assert.match(html, /id="noteLivelinessValue"/);
   assert.match(html, /id="noteLivelinessTicks"/);
   assert.match(html, /id="noteLivelinessHint"/);
-  assert.match(html, /Hidden here after/);
+  assert.match(html, /Will be gone after/);
   assert.match(script, /Other relays, apps, archives, or screenshots may keep it/,
     'the composer does not promise global deletion of a public Nostr event');
   assert.match(html, /id="noteExpiresAt"/, 'the note menu shows when a note goes');
@@ -4190,4 +4190,18 @@ test('the crease picture is painted under the writing, never over it', async () 
   const textureAt = script.indexOf("texture.className = 'sticky-note__texture'");
   assert.ok(printAt !== -1 && textureAt > printAt, 'the creases are built after the photograph, so they lie over it');
   assert.ok(script.includes('note.append(texture)'), 'and are the last thing on the note');
+});
+
+test('the note menu says will be gone, and how much of its life is spent', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="noteExpiresLabel" hidden>Will be gone<'), 'the row reads will be gone');
+  assert.ok(!html.includes('Hidden here'), 'the old wording is gone');
+  assert.ok(html.includes('id="noteExpiryAged"'), 'the countdown has a neighbour for the age');
+  assert.ok(script.includes('noteAgeFraction(createdAt, expiresAt / 1000)'), 'the age is the same one the paper shows');
+  assert.ok(script.includes('% aged'), 'the age is written as a percentage');
+  assert.ok(script.includes('startNoteExpiryCountdown(expiresAt, Number(record.event.created_at))'),
+    'the row needs the birth time to work out its age');
 });

@@ -270,6 +270,7 @@ const elements = {
   liveliness: document.getElementById('noteLiveliness'), livelinessValue: document.getElementById('noteLivelinessValue'),
   livelinessTicks: document.getElementById('noteLivelinessTicks'), livelinessHint: document.getElementById('noteLivelinessHint'),
   noteExpiresLabel: document.getElementById('noteExpiresLabel'), noteExpirationValue: document.getElementById('noteExpirationValue'),
+  noteExpiryAged: document.getElementById('noteExpiryAged'),
   noteExpiresAt: document.getElementById('noteExpiresAt'), noteExpiryCountdown: document.getElementById('noteExpiryCountdown'),
   noteMenu: document.getElementById('noteMenu'), noteEventId: document.getElementById('noteEventId'),
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
@@ -4657,12 +4658,20 @@ function closeNoteMenu() {
   status(elements.noteMenuStatus, '');
 }
 
-function startNoteExpiryCountdown(expiresAt) {
+function startNoteExpiryCountdown(expiresAt, createdAt) {
   clearInterval(noteExpiryTimer);
   noteExpiryTimer = null;
-  if (!expiresAt) return;
+  if (!expiresAt) {
+    elements.noteExpiryAged.hidden = true;
+    return;
+  }
   const tick = () => {
     elements.noteExpiryCountdown.textContent = stickyExpiryCountdown(expiresAt / 1000);
+    // How much of its own life the note has spent, which is what the creases show on the paper itself.
+    const age = noteAgeFraction(createdAt, expiresAt / 1000);
+    const aged = age === null ? '' : `${Math.round(age * 100)}% aged`;
+    elements.noteExpiryAged.textContent = aged;
+    elements.noteExpiryAged.hidden = !aged;
   };
   tick();
   noteExpiryTimer = setInterval(tick, 1000);
@@ -5060,7 +5069,7 @@ function openNoteMenu(eventId, pin) {
     elements.noteExpiresAt.dateTime = new Date(expiresAt).toISOString();
     elements.noteExpiresAt.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(expiresAt);
   }
-  startNoteExpiryCountdown(expiresAt);
+  startNoteExpiryCountdown(expiresAt, Number(record.event.created_at));
   elements.noteMenu.hidden = false;
   const pinRect = pin.getBoundingClientRect();
   const menuRect = elements.noteMenu.getBoundingClientRect();

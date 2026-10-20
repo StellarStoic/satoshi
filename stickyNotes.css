@@ -898,3 +898,7 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   background-position: var(--texture-shift, center);
   transform: rotate(var(--texture-angle, 0deg)) scale(var(--texture-scale, 1));
 }
+
+/* The note's own age, beside the countdown it shares a row with. */
+.note-expiry-aged { margin-left: 8px; color: #9ea19f; font-size: .78rem; }
+.note-expiry-aged[hidden] { display: none; }
