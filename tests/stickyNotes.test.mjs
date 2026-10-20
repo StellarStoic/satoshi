@@ -3973,3 +3973,21 @@ test('the switch locks the open board and says so', async () => {
   assert.match(script, /lockThisPlace\(cells, cells\[0\]\.length\)/);
   assert.match(script, /Unlocked — the board will not open a place of its own\./);
 });
+
+
+test('the GIF and buried-pin switches belong to Board style, not sort and filter', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const styleStart = html.indexOf('id="boardStyleDialog"');
+  const style = html.slice(styleStart, html.indexOf('</form>', styleStart));
+  const sortStart = html.indexOf('id="noteSortDialog"');
+  const sort = html.slice(sortStart, html.indexOf('</dialog>', sortStart));
+  for (const control of ['gifPlay', 'buriedPins']) {
+    assert.ok(style.includes(`id="${control}"`), `${control} must be a Board style setting`);
+    assert.ok(!sort.includes(`id="${control}"`), `${control} must not sit in sort and filter`);
+  }
+  assert.match(script, /function openBoardStyle\(\) \{
+  elements\.gifPlay\.checked = gifPlay;/);
+});

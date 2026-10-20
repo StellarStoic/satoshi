@@ -2612,6 +2612,8 @@ function publishToUserRelays(event) {
 }
 
 function openBoardStyle() {
+  elements.gifPlay.checked = gifPlay;
+  elements.buriedPins.checked = showBuriedPins;
   renderBoardTextures();
   elements.boardTextureUrl.value = boardTextureChoice;
   if (elements.boardPatternCss) elements.boardPatternCss.value = boardPatternCssChoice;

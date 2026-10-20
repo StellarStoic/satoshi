@@ -831,3 +831,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
+
+/* Notes on the board: the reader-facing switches that were in sort and filter now sit in Board style,
+   under a heading, above the relays. */
+.board-reading { display:grid; gap:0; margin:14px 0 4px; }
+.board-reading > h3 { margin:0 0 2px; font-size:.95rem; }

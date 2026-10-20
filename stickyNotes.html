@@ -76,16 +76,6 @@
         <input id="followsOnly" type="checkbox" role="switch">
         <span class="note-filter-toggle__track" aria-hidden="true"></span>
       </label>
-      <label class="note-filter-toggle" for="gifPlay">
-        <span><strong>Play GIFs</strong><small>Animated pictures loop while this is on. Turned off, each one holds the frame it was on when you switched — a board of moving pictures is hard on a phone's battery.</small></span>
-        <input id="gifPlay" type="checkbox" role="switch">
-        <span class="note-filter-toggle__track" aria-hidden="true"></span>
-      </label>
-      <label class="note-filter-toggle" for="buriedPins">
-        <span><strong>Show pins of covered notes</strong><small>Notes buried under other notes keep their pin above the pile, so you can open them. Using one brings that note to the front for 21 seconds.</small></span>
-        <input id="buriedPins" type="checkbox" role="switch">
-        <span class="note-filter-toggle__track" aria-hidden="true"></span>
-      </label>
       <div id="noteSortStatus" class="inline-status" role="status" aria-live="polite"></div>
     </div>
   </dialog>
@@ -110,6 +100,19 @@
         <button type="submit" class="primary-action">Use it</button>
       </div>
       <div id="boardStyleStatus" class="inline-status" role="status" aria-live="polite"></div>
+      <section class="board-reading" aria-labelledby="boardReadingTitle">
+        <h3 id="boardReadingTitle">Notes on the board</h3>
+      <label class="note-filter-toggle" for="gifPlay">
+        <span><strong>Play GIFs</strong><small>Animated pictures loop while this is on. Turned off, each one holds the frame it was on when you switched — a board of moving pictures is hard on a phone's battery.</small></span>
+        <input id="gifPlay" type="checkbox" role="switch">
+        <span class="note-filter-toggle__track" aria-hidden="true"></span>
+      </label>
+      <label class="note-filter-toggle" for="buriedPins">
+        <span><strong>Show pins of covered notes</strong><small>Notes buried under other notes keep their pin above the pile, so you can open them. Using one brings that note to the front for 21 seconds.</small></span>
+        <input id="buriedPins" type="checkbox" role="switch">
+        <span class="note-filter-toggle__track" aria-hidden="true"></span>
+      </label>
+      </section>
 
       <section class="user-relays" aria-labelledby="userRelaysTitle">
         <h3 id="userRelaysTitle">Your relays</h3>
