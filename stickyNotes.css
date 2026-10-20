@@ -902,3 +902,9 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 /* The note's own age, beside the countdown it shares a row with. */
 .note-expiry-aged { margin-left: 8px; color: #9ea19f; font-size: .78rem; }
 .note-expiry-aged[hidden] { display: none; }
+
+/* A print's photograph is a positioned box with z-index 1, so being the note's last child is not enough:
+   the creases are told to lie over the picture, and the caption is lifted above the creases in turn. The
+   pin already sits higher than both, outside the note's own box. */
+.sticky-note--print .sticky-note__texture { z-index: 2; }
+.sticky-note--print .sticky-note__author { z-index: 3; }

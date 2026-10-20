@@ -4205,3 +4205,17 @@ test('the note menu says will be gone, and how much of its life is spent', async
   assert.ok(script.includes('startNoteExpiryCountdown(expiresAt, Number(record.event.created_at))'),
     'the row needs the birth time to work out its age');
 });
+
+test('a print is told to put the creases over its photograph', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  // The photograph is a positioned box at z-index 1, so being the note's last child is not enough: a plain
+  // note needs no z-index, a print needs one above the picture, and the caption needs one above the creases.
+  assert.ok(css.includes('.sticky-note__print { position: relative; z-index: 1;'),
+    'the picture still sits at z-index 1, which is why the print needs its own rule');
+  assert.ok(css.includes('.sticky-note--print .sticky-note__texture { z-index: 2; }'),
+    'the creases lie over the photograph');
+  assert.ok(css.includes('.sticky-note--print .sticky-note__author { z-index: 3; }'),
+    'the caption lies over the creases');
+});
