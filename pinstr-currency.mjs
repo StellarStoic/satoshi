@@ -435,35 +435,19 @@ async function openTonPanel() {
   startTonPoll(orderId);
 }
 
-const QR_SCRIPT = '/qrCodeGenerator_1_4_4.js';
+const QR_MODULE = '/pinstr-qr.mjs';
 
-// The library is a classic script and the board may not have loaded it yet when the panel opens, so it
-// is fetched up front and awaited rather than hoped for. Without this the panel came up with an empty
-// white square where the QR belongs.
 function ensureQrLibrary() {
-  if (typeof globalThis.qrcode === 'function') return Promise.resolve(true);
-  if (qrLoading) return qrLoading;
-  qrLoading = new Promise((resolve) => {
-    const existing = document.querySelector(`script[src="${QR_SCRIPT}"]`);
-    const done = () => resolve(typeof globalThis.qrcode === 'function');
-    if (existing && existing.dataset.qrReady === '1') return resolve(true);
-    const script = existing || document.createElement('script');
-    script.addEventListener('load', () => { script.dataset.qrReady = '1'; done(); }, { once: true });
-    script.addEventListener('error', () => resolve(false), { once: true });
-    if (!existing) {
-      script.src = QR_SCRIPT;
-      document.head.appendChild(script);
-    }
-    // A script that was already in the document has fired its load event; poll briefly as well.
-    let tries = 0;
-    const poll = setInterval(() => {
-      tries += 1;
-      if (typeof globalThis.qrcode === 'function' || tries > 20) {
-        clearInterval(poll);
-        if (typeof globalThis.qrcode === 'function') resolve(true);
-      }
-    }, 150);
-  });
+  // The board's classic script may or may not have executed, so the panel imports its own copy and does
+  // not depend on a global that might not exist yet. Rolling hashes are cheap; a missing QR is not.
+  if (!qrLoading) {
+    qrLoading = import(QR_MODULE)
+      .then((mod) => (typeof mod.default === 'function' ? mod.default : null))
+      .catch((err) => {
+        console.warn('[pinstr-currency] QR module failed to load', err);
+        return null;
+      });
+  }
   return qrLoading;
 }
 
@@ -471,9 +455,8 @@ async function drawQr(text) {
   const host = tonDialog.querySelector('[data-ton-qr]');
   if (!host) return;
   host.textContent = '';
-  const ready = await ensureQrLibrary();
-  const make = globalThis.qrcode;
-  if (!ready || typeof make !== 'function') {
+  const make = await ensureQrLibrary();
+  if (typeof make !== 'function') {
     console.warn('[pinstr-currency] QR library unavailable, showing the link instead');
     const link = document.createElement('code');
     link.style.cssText = 'font-size:.68rem;word-break:break-all;color:#111;background:none;';
