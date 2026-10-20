@@ -24,6 +24,8 @@ let tonPoll = null;
 let applyingCopy = false;
 // Set while the QR library is loading, so two panels cannot fetch it twice.
 let qrLoading = null;
+// Interval that re-asserts composer copy while TON is chosen.
+let copyTicker = null;
 
 if (ON_PINSTR && typeof document !== 'undefined') {
   // Loaded loudly on purpose: when a modal does not appear, the first question is whether the
@@ -138,6 +140,29 @@ function setStatus(text) {
 
 // The composer is the only place the rail is chosen. Until a reader picks one the pay and mining
 // buttons stay out of sight, so the composer reads as writing first and paying second.
+
+// Choosing a plan makes the board rewrite the pay button after our write lands, so a single re-apply on
+// mutation is a race we lose. While the composer is open in TON mode the copy is re-asserted on a short
+// ticker; every write is conditional, so it settles instead of looping.
+function keepComposerCopyInTon() {
+  const composer = document.getElementById('composerDialog');
+  const shouldRun = readChoice() === 'ton' && composer && composer.open;
+  if (shouldRun && !copyTicker) {
+    copyTicker = setInterval(() => {
+      const still = document.getElementById('composerDialog');
+      if (readChoice() !== 'ton' || !still || !still.open) {
+        clearInterval(copyTicker);
+        copyTicker = null;
+        return;
+      }
+      applyComposerCopySafely();
+    }, 400);
+  } else if (!shouldRun && copyTicker) {
+    clearInterval(copyTicker);
+    copyTicker = null;
+  }
+}
+
 function mountComposerCurrency() {
   const composer = document.getElementById('composerDialog');
   if (!composer || composer.querySelector('.pinstr-composer-currency')) return;
@@ -159,8 +184,10 @@ function mountComposerCurrency() {
     saveChoice(pick.getAttribute('data-pcc'));
     applyComposerCurrency();
     applyComposerCopy();
+    keepComposerCopyInTon();
   });
   applyComposerCurrency();
+  keepComposerCopyInTon();
 }
 
 function applyComposerCurrency() {
@@ -196,8 +223,10 @@ function applyComposerCopy() {
   for (const button of composer.querySelectorAll('.plan-button[data-plan]')) {
     const plan = button.getAttribute('data-plan');
     if (on) {
+      const wanted = `Pay ${TON_PLAN_COPY[plan] || ''} · ${plan}`;
+      if (button.innerHTML.trim() === wanted) continue;
       if (!button.dataset.pinstrOriginal) button.dataset.pinstrOriginal = button.innerHTML;
-      button.innerHTML = `Pay ${TON_PLAN_COPY[plan] || ''} · ${plan}`;
+      button.innerHTML = wanted;
     } else if (button.dataset.pinstrOriginal) {
       button.innerHTML = button.dataset.pinstrOriginal;
       delete button.dataset.pinstrOriginal;
@@ -209,7 +238,7 @@ function applyComposerCopy() {
     const label = pay.querySelector('span') || pay;
     if (on) {
       if (!label.dataset.pinstrOriginal) label.dataset.pinstrOriginal = label.textContent;
-      label.textContent = 'Pay';
+      if (label.textContent !== 'Pay') label.textContent = 'Pay';
     } else if (label.dataset.pinstrOriginal !== undefined) {
       label.textContent = label.dataset.pinstrOriginal;
       delete label.dataset.pinstrOriginal;
@@ -234,7 +263,7 @@ function applyComposerCopy() {
     const text = (state.textContent || '').trim();
     if (on && / sats?/.test(text)) {
       if (!state.dataset.pinstrOriginal) state.dataset.pinstrOriginal = state.innerHTML;
-      state.textContent = text
+      const tonText = text
         .replace(/10 sats? a week/gi, '1 TON a week')
         .replace(/411 sats? a year/gi, '3 TON a year')
         .replace(/10 sats?/gi, '1 TON')
@@ -249,7 +278,8 @@ function applyComposerCopy() {
     const text = (node.textContent || '').trim();
     if (on && /^Posting needs a subscription/.test(text)) {
       if (!node.dataset.pinstrOriginal) node.dataset.pinstrOriginal = node.innerHTML;
-      node.textContent = 'Posting in TON: 1 TON a week or 3 TON a year, plus the 0.01 TON network fee.';
+      const wanted = 'Posting in TON: 1 TON a week or 3 TON a year, plus the 0.01 TON network fee.';
+      if (node.textContent !== wanted) node.textContent = wanted;
     } else if (!on && node.dataset.pinstrOriginal !== undefined) {
       node.innerHTML = node.dataset.pinstrOriginal;
       delete node.dataset.pinstrOriginal;
