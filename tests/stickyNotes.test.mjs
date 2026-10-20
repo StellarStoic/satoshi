@@ -4139,3 +4139,52 @@ test('the board paints the wear on the note, and never on a print', async () => 
   assert.ok(css.includes('background-image: var(--wear-shade, none)'));
   assert.ok(css.includes('pointer-events: none'), 'the shade must not eat clicks');
 });
+
+test('a note creases up as its own life runs out', async () => {
+  const { noteAgeFraction, noteAgeTextureOpacity, noteTexturePlacement } =
+    await import('../stickyNotesModel.mjs');
+  const born = 1000000;
+  const dies = born + 86400 * 4;
+  const at = share => born + (dies - born) * share;
+  assert.equal(noteAgeFraction(born, dies, born), 0);
+  assert.equal(noteAgeFraction(born, dies, dies), 1);
+  assert.equal(noteAgeFraction(born, 0, born + 10), null, 'a note with no expiration has no age');
+  assert.equal(noteAgeFraction(born, born, born), null, 'a note that never lived has no age');
+  assert.equal(noteAgeTextureOpacity(noteAgeFraction(born, dies, at(0.1))), 0, 'fresh paper is unmarked');
+  const quarter = noteAgeTextureOpacity(noteAgeFraction(born, dies, at(0.25)));
+  const half = noteAgeTextureOpacity(noteAgeFraction(born, dies, at(0.5)));
+  assert.ok(quarter > 0.1 && quarter < 0.25, 'a quarter through, the creases are faint');
+  assert.ok(half > 0.5 && half < 0.65, 'half through, they are half there');
+  assert.equal(noteAgeTextureOpacity(noteAgeFraction(born, dies, at(0.75))), 1, 'three quarters is the whole paper');
+  assert.equal(noteAgeTextureOpacity(noteAgeFraction(born, dies, at(0.99))), 1, 'and it never goes past that');
+});
+
+test('every note wears the creases differently, and always the same way for itself', async () => {
+  const { noteTexturePlacement } = await import('../stickyNotesModel.mjs');
+  const ids = Array.from({ length: 400 }, (_, index) => 'note-' + index);
+  const seen = ids.map(id => noteTexturePlacement(id));
+  assert.deepEqual(seen[0], noteTexturePlacement(ids[0]), 'the same note always sits the same way');
+  const angles = seen.map(p => p.angle);
+  assert.ok(new Set(angles).size > 200, 'angles are spread, not repeated');
+  const tally = angles.reduce((all, angle) => ({...all, [angle]: (all[angle] || 0) + 1}), {});
+  assert.ok(Math.max(...Object.values(tally)) < 15, 'no single angle is worn by a crowd');
+  for (const p of seen) {
+    assert.ok(p.angle >= 0 && p.angle < 360);
+    assert.ok(p.scale >= 1 && p.scale < 1.3);
+    assert.ok(Math.abs(p.shiftX) <= 14 && Math.abs(p.shiftY) <= 14);
+  }
+});
+
+test('the crease picture is painted under the writing, never over it', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  assert.ok(script.includes('noteAgeTextureOpacity(noteAgeFraction(sticky.createdAt, sticky.expiration))'));
+  assert.ok(script.includes("texture.style.setProperty('--texture-opacity'"));
+  assert.ok(css.includes("url('/img/note-crumple.png')"));
+  assert.ok(css.includes('mix-blend-mode: multiply'), 'multiply keeps the note its own colour');
+  assert.ok(css.includes('overflow: hidden'), 'the rotated picture is clipped to the note');
+  assert.ok(css.includes('.sticky-note { isolation: isolate;'), 'the note is its own blending group');
+  assert.ok(css.includes('z-index: 0'), 'the texture sits under the text');
+});

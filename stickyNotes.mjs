@@ -78,7 +78,7 @@ import {
   stickyPowOffer,
   stickyPowSentence,
   stickyPowProgress,
-  stickyPowDifficulty, safeProfileLink, safeLightningAddress, pickUserStatus, noteWear,} from './stickyNotesModel.mjs';
+  stickyPowDifficulty, safeProfileLink, safeLightningAddress, pickUserStatus, noteWear, noteAgeFraction, noteAgeTextureOpacity, noteTexturePlacement,} from './stickyNotesModel.mjs';
 import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
@@ -3249,6 +3249,22 @@ function renderNote(sticky, event = null, temporary = false) {
   note.classList.toggle('sticky-note--print', Boolean(picture));
   if (sticky.id) note.dataset.eventId = sticky.id;
   note.dataset.createdAt = String(sticky.createdAt || 0);
+  // An old note looks handled. The picture is rotated and scaled per note inside a wrapper that clips it,
+  // and how visible it is follows how much of the note's own life has been spent.
+  const ageOpacity = noteAgeTextureOpacity(noteAgeFraction(sticky.createdAt, sticky.expiration));
+  if (ageOpacity > 0) {
+    const texture = document.createElement('div');
+    texture.className = 'sticky-note__texture';
+    texture.setAttribute('aria-hidden', 'true');
+    texture.dataset.born = String(sticky.createdAt || 0);
+    texture.dataset.dies = String(sticky.expiration || 0);
+    const placement = noteTexturePlacement(sticky.id);
+    texture.style.setProperty('--texture-angle', `${placement.angle}deg`);
+    texture.style.setProperty('--texture-scale', placement.scale.toFixed(3));
+    texture.style.setProperty('--texture-shift', `${placement.shiftX}px ${placement.shiftY}px`);
+    texture.style.setProperty('--texture-opacity', ageOpacity.toFixed(3));
+    note.append(texture);
+  }
   // Some paper has lifted at a corner. The wear comes from the note's id, so it is the same on every
   // redraw - and a print is a photograph, not paper, so it stays flat.
   const wear = picture ? null : noteWear(sticky.id);
@@ -7096,3 +7112,13 @@ function dropOrderFromPending(kind) {
   delete next.status;
   savePending(next);
 }
+
+
+// A board left open for hours ages its paper too: a minute is often enough to keep the creases honest.
+setInterval(() => {
+  const now = Math.floor(Date.now() / 1000);
+  elements.canvas.querySelectorAll('.sticky-note__texture').forEach(texture => {
+    const opacity = noteAgeTextureOpacity(noteAgeFraction(Number(texture.dataset.born), Number(texture.dataset.dies), now));
+    if (opacity > 0) texture.style.setProperty('--texture-opacity', opacity.toFixed(3));
+  });
+}, 60000);

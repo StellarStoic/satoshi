@@ -116,7 +116,7 @@
 @keyframes board-lamps-pulse { 0%, 100% { filter: brightness(1); } 45% { filter: brightness(1.85) saturate(1.25); } }
 @media (prefers-reduced-motion: reduce) { .board-frame__lamps.is-pulsing { animation: none; } }
 
-.sticky-note { --note: #f7dc63; --note-font-size: 17px; --note-letter-spacing: 0; position: absolute; width: 220px; aspect-ratio: 1; padding: 22px 18px 18px; overflow: hidden; color: #26231e; background: var(--note); box-shadow: 2px 5px 12px rgba(31, 16, 5, .3); font-family: 'Special Elite', 'Noto Sans', 'Courier New', monospace; font-size: var(--note-font-size); line-height: 1.42; letter-spacing: var(--note-letter-spacing); white-space: pre-wrap; overflow-wrap: anywhere; transform: translate(-50%, -50%) rotate(var(--rotation, 0deg)); }
+.sticky-note { isolation: isolate; --note: #f7dc63; --note-font-size: 17px; --note-letter-spacing: 0; position: absolute; width: 220px; aspect-ratio: 1; padding: 22px 18px 18px; overflow: hidden; color: #26231e; background: var(--note); box-shadow: 2px 5px 12px rgba(31, 16, 5, .3); font-family: 'Special Elite', 'Noto Sans', 'Courier New', monospace; font-size: var(--note-font-size); line-height: 1.42; letter-spacing: var(--note-letter-spacing); white-space: pre-wrap; overflow-wrap: anywhere; transform: translate(-50%, -50%) rotate(var(--rotation, 0deg)); }
 .sticky-note:not(.draft-note):not(.sticky-note--placing) { overflow: visible; }
 .sticky-note--dense { --note-letter-spacing: -.025em; padding: 1.42em 1em; }
 .sticky-note::before { content: ''; position: absolute; inset: 0; opacity: .16; background-image: url('/img/grain.png'); pointer-events: none; }
@@ -880,4 +880,20 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 }
 .sticky-note[data-wear] {
   box-shadow: 2px 5px 12px rgba(31,16,5,.3), 1px calc(var(--wear-lift, 1px) + 1px) calc(9px + var(--wear-lift, 1px) * 2) rgba(31,16,5,.12);
+}
+
+/* An old note looks handled: the paper is creased, and more so the closer it gets to its own disappearance.
+   The picture is rotated and scaled per note inside a wrapper that clips it, so no two notes wear the same
+   creases and a rotated square never leaves a corner of the note bare. Multiply keeps the note's colour. */
+.sticky-note__texture {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  opacity: var(--texture-opacity, 0); mix-blend-mode: multiply;
+  transition: opacity .5s ease;
+}
+.sticky-note__texture::before {
+  content: ''; position: absolute; inset: -32%;
+  background-image: url('/img/note-crumple.png');
+  background-size: cover;
+  background-position: var(--texture-shift, center);
+  transform: rotate(var(--texture-angle, 0deg)) scale(var(--texture-scale, 1));
 }

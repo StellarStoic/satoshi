@@ -2018,3 +2018,57 @@ export function noteWear(id) {
   const lift = 1 + ((hash >>> 12) % 3);
   return {corners, alpha, reach, lift, shade};
 }
+
+/** The hash both wear and texture placement are drawn from: stable per id, and never Math.random. */
+function noteHash(key) {
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/**
+ * How far through its own life a note is: 0 when it was pinned, 1 at the moment it disappears.
+ * A note with no expiration, or one whose clock runs backwards, has no age at all.
+ */
+export function noteAgeFraction(createdAt, expiration, now = Math.floor(Date.now() / 1000)) {
+  const born = Number(createdAt);
+  const dies = Number(expiration);
+  const at = Number(now);
+  if (!Number.isFinite(born) || !Number.isFinite(dies) || !Number.isFinite(at) || dies <= born) return null;
+  return Math.min(1, Math.max(0, (at - born) / (dies - born)));
+}
+
+/**
+ * How visible the creases are at that age.
+ *
+ * A fresh note is unmarked paper, so nothing shows for the first sixth of its life; from there the texture
+ * comes in with age and is at full by three quarters, which is what the board promises: 25% faint, 50%
+ * half, 75% the whole paper.
+ */
+export function noteAgeTextureOpacity(fraction) {
+  const value = Number(fraction);
+  if (!Number.isFinite(value) || value <= 0.15) return 0;
+  return Math.min(1, (value - 0.15) / 0.6);
+}
+
+/**
+ * Where the crease picture sits on this note: an angle, a scale and a small offset, all from the id.
+ *
+ * Rotating the picture is what stops every note wearing identical creases, and the drawing is scaled a
+ * little as well so the pattern does not line up between two notes anyway. The rotation is applied inside
+ * a clipping wrapper that is a third larger than the note, so no corner of the note can go bare.
+ */
+export function noteTexturePlacement(id) {
+  const key = String(id ?? '').trim();
+  if (!key) return {angle: 0, scale: 1, shiftX: 0, shiftY: 0};
+  const hash = noteHash(key);
+  return {
+    angle: (hash >>> 3) % 360,
+    scale: 1 + ((hash >>> 11) % 29) / 100,
+    shiftX: -14 + ((hash >>> 17) % 29),
+    shiftY: -14 + ((hash >>> 23) % 29),
+  };
+}
