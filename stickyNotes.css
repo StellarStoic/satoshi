@@ -8,8 +8,12 @@
 .sticky-top-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; background: rgba(18,19,19,.68); color: #f4f4f1; font: inherit; font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.2); backdrop-filter: blur(5px); cursor: pointer; }
 .sticky-top-button:hover, .sticky-top-button:focus-visible { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); outline: none; }
 .sticky-top-button:disabled { opacity:.6; cursor:default; }
-.note-sort-button { border:2px solid transparent; }
-.note-sort-button.has-active-filter { border-color:#7cfc00; box-shadow:0 0 10px rgba(124,252,0,.24); color:#b7ff79; }
+/* The sort button is the one top button whose ring changes colour - green while a filter is on - so it used to
+   reserve that ring's thickness with a 2px TRANSPARENT border. That made it the only button in the row with no
+   border at rest, reading as a missing control rather than a resting one. It carries the same border as its
+   neighbours now; the box is border-box, so the wider active ring insets the icon without moving anything. */
+.note-sort-button { border: 1px solid rgba(255,255,255,.24); }
+.note-sort-button.has-active-filter { border-width:2px; border-color:#7cfc00; box-shadow:0 0 10px rgba(124,252,0,.24); color:#b7ff79; }
 .sticky-page .site-help-trigger { border: 1px solid rgba(255,255,255,.24) !important; border-radius: 6px !important; background: rgba(18,19,19,.68) !important; box-shadow: 0 4px 14px rgba(0,0,0,.2) !important; color: #f4f4f1 !important; backdrop-filter: blur(5px); }
 .icon-text-button, .primary-action, .secondary-action, .pay-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; border: 1px solid #555; border-radius: 6px; padding: 9px 14px; color: #f6f5ef; background: #202223; font: inherit; cursor: pointer; }
 .primary-action, .pay-button { border-color: var(--accent, #f2a900); background: var(--accent, #f2a900); color: #111; font-weight: 700; }

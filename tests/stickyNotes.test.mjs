@@ -4415,3 +4415,28 @@ test('every socket on the rail says what it stands for', async () => {
   assert.ok(page.includes('id="lampDialogSummary"'), 'and a place for the one sentence');
   assert.ok(sheet.includes('.lamp-dialog__row--lit .lamp-dialog__dot'), 'an open level is marked, not only worded');
 });
+
+test('every top button wears the same resting border', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+
+  // The row is six buttons that must look like six buttons. One of them reserves room for a green ring while a
+  // filter is on, and it did that with a transparent border - so it alone had no border at rest.
+  assert.doesNotMatch(css, /\\.note-sort-button \\{[^}]*solid transparent/, 'the sort button does not hide its own outline');
+  const sort = css.slice(css.indexOf('.note-sort-button {'), css.indexOf('.note-sort-button {') + 120);
+  assert.match(sort, /border: 1px solid rgba\(255,255,255,\.24\)/,
+    'the sort button wears the same border as the five beside it');
+  const active = css.slice(css.indexOf('.note-sort-button.has-active-filter'));
+  assert.match(active.slice(0, 200), /border-width:2px/, 'and its green ring is still wider than the resting one');
+
+  // The box stays put either way: the row is border-box, 40 by 40, so the wider ring cannot move the neighbours.
+  assert.match(css, /box-sizing: border-box/, 'border-box is what makes the wider ring free');
+  const top = css.slice(css.indexOf('.sticky-top-button {'), css.indexOf('.sticky-top-button {') + 260);
+  assert.match(top, /width: 40px; height: 40px/);
+
+  // And the button the reader is looking for is really in the row.
+  assert.ok(page.includes('id="noteSort"'), 'the sort button exists');
+  assert.ok(page.includes('class="sticky-top-button note-sort-button"'), 'and is one of the top buttons');
+});
