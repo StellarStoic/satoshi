@@ -17,6 +17,8 @@ let tonDialog = null;
 let tonPoll = null;
 // Guards applyComposerCopy against re-entering itself through its own DOM writes.
 let applyingCopy = false;
+// Set while the QR library is loading, so two panels cannot fetch it twice.
+let qrLoading = null;
 
 if (ON_PINSTR && typeof document !== 'undefined') {
   // Loaded loudly on purpose: when a modal does not appear, the first question is whether the
@@ -41,6 +43,7 @@ function start() {
   // being written, so the choice lives inside the composer and nowhere else.
   mountComposerCurrency();
   installOrderRail();
+  ensureQrLibrary();
   installPayHook();
   document.addEventListener('pinstr-currency-changed', () => {
     applyCurrency();
@@ -432,22 +435,66 @@ async function openTonPanel() {
   startTonPoll(orderId);
 }
 
-function drawQr(text) {
+const QR_SCRIPT = '/qrCodeGenerator_1_4_4.js';
+
+// The library is a classic script and the board may not have loaded it yet when the panel opens, so it
+// is fetched up front and awaited rather than hoped for. Without this the panel came up with an empty
+// white square where the QR belongs.
+function ensureQrLibrary() {
+  if (typeof globalThis.qrcode === 'function') return Promise.resolve(true);
+  if (qrLoading) return qrLoading;
+  qrLoading = new Promise((resolve) => {
+    const existing = document.querySelector(`script[src="${QR_SCRIPT}"]`);
+    const done = () => resolve(typeof globalThis.qrcode === 'function');
+    if (existing && existing.dataset.qrReady === '1') return resolve(true);
+    const script = existing || document.createElement('script');
+    script.addEventListener('load', () => { script.dataset.qrReady = '1'; done(); }, { once: true });
+    script.addEventListener('error', () => resolve(false), { once: true });
+    if (!existing) {
+      script.src = QR_SCRIPT;
+      document.head.appendChild(script);
+    }
+    // A script that was already in the document has fired its load event; poll briefly as well.
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries += 1;
+      if (typeof globalThis.qrcode === 'function' || tries > 20) {
+        clearInterval(poll);
+        if (typeof globalThis.qrcode === 'function') resolve(true);
+      }
+    }, 150);
+  });
+  return qrLoading;
+}
+
+async function drawQr(text) {
   const host = tonDialog.querySelector('[data-ton-qr]');
+  if (!host) return;
   host.textContent = '';
-  if (typeof window.qrcode !== 'function') {
-    const script = document.createElement('script');
-    script.src = '/qrCodeGenerator_1_4_4.js';
-    script.onload = () => drawQr(text);
-    document.head.appendChild(script);
+  const ready = await ensureQrLibrary();
+  const make = globalThis.qrcode;
+  if (!ready || typeof make !== 'function') {
+    console.warn('[pinstr-currency] QR library unavailable, showing the link instead');
+    const link = document.createElement('code');
+    link.style.cssText = 'font-size:.68rem;word-break:break-all;color:#111;background:none;';
+    link.textContent = text;
+    host.appendChild(link);
     return;
   }
   try {
-    const qr = window.qrcode(0, 'M');
+    const qr = make(0, 'M');
     qr.addData(text);
     qr.make();
     host.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true });
-  } catch {
+    const svg = host.querySelector('svg');
+    if (svg) {
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.setAttribute('style', 'width:100%;height:auto;display:block');
+    }
+    console.info('[pinstr-currency] qr drawn', { bytes: host.innerHTML.length });
+  } catch (err) {
+    console.warn('[pinstr-currency] qr failed', err);
     host.textContent = 'QR could not be drawn — use the wallet link below.';
   }
 }
@@ -497,8 +544,8 @@ function injectStyles() {
 .ptd-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; background: rgba(18,19,19,.7); color: inherit; cursor: pointer; }
 .ptd-amount { margin: 0; font-size: 1.6rem; font-weight: 700; }
 .ptd-split { margin: 0; font-size: .78rem; color: rgba(244,244,241,.66); }
-.ptd-qr { display: grid; place-items: center; padding: 10px; background: #fff; border-radius: 8px; min-height: 150px; }
-.ptd-qr svg { width: 170px; height: 170px; display: block; }
+.ptd-qr { display: grid; place-items: center; padding: 10px; background: #fff; border-radius: 8px; min-height: 190px; }
+.ptd-qr svg { width: 100%; max-width: 200px; height: auto; display: block; }
 .ptd-field { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: .78rem; color: rgba(244,244,241,.66); }
 .ptd-field span { grid-column: 1 / -1; }
 .ptd-field input { min-width: 0; padding: 8px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; background: #0d0e0e; color: #f4f4f1; font: inherit; font-family: ui-monospace, monospace; font-size: .78rem; }
