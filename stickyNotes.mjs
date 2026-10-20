@@ -259,6 +259,9 @@ const elements = {
   boardPlate: document.getElementById('boardPlate'),
   boardPlateTop: document.getElementById('boardPlateTop'),
   boardLampsLeft: document.getElementById('boardLampsLeft'),
+  lampDialog: document.getElementById('lampDialog'),
+  lampDialogSummary: document.getElementById('lampDialogSummary'),
+  lampDialogRows: document.getElementById('lampDialogRows'),
   boardLampsRight: document.getElementById('boardLampsRight'),
   shareBoardDialog: document.getElementById('shareBoardDialog'),
   shareBoardLink: document.getElementById('shareBoardLink'),
@@ -2213,6 +2216,17 @@ function lampStrips() {
   return [elements.boardLampsLeft, elements.boardLampsRight].filter(Boolean);
 }
 
+// A role of button is a promise: both plates answer to a tap, a click and the keyboard, because a phone never
+// shows the hover titles the sockets carry.
+for (const strip of lampStrips()) {
+  strip.addEventListener('click', openLampLegend);
+  strip.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openLampLegend();
+  });
+}
+
 /**
  * Light the two lamp plates on the side rails. Every plate carries all six sockets a cell has levels
  * under it, always, and boardLampCount says how many of them burn - six at three characters, three at
@@ -2231,8 +2245,10 @@ function renderBoardLamps() {
     // the deepest cell is not that case: it keeps its plate, all six sockets dark.
     strip.hidden = !activeGeohashes.length;
     strip.title = summary;
-    strip.setAttribute('aria-label', summary);
-    strip.setAttribute('role', 'img');
+    // A phone never shows a title, so the plate is pressable everywhere and the same reading is one tap away.
+    strip.setAttribute('role', 'button');
+    strip.tabIndex = 0;
+    strip.setAttribute('aria-label', `${summary} Opens the list of levels.`);
     strip.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
       const lamp = document.createElement('span');
       lamp.className = boardLampLit(index, lit) ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
@@ -2242,6 +2258,48 @@ function renderBoardLamps() {
       return lamp;
     }));
   }
+  renderLampDialog();
+}
+
+/**
+ * The legend the sockets cannot give a phone: one row per level, with the socket, what that level is on this
+ * board, and whether it is open. It is rebuilt from the same boardLampInfo the titles come from, so a tap and a
+ * hover can never say different things.
+ */
+function renderLampDialog() {
+  const rows = elements.lampDialogRows;
+  if (!rows) return;
+  const summary = boardLampSummary(activeGeohashes);
+  if (elements.lampDialogSummary) elements.lampDialogSummary.textContent = summary;
+  const states = {open: 'open', own: 'this board', above: 'above', none: 'no board'};
+  rows.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
+    const info = boardLampInfo(index, activeGeohashes);
+    const row = document.createElement('li');
+    row.className = info.lit ? 'lamp-dialog__row lamp-dialog__row--lit' : 'lamp-dialog__row';
+    const dot = document.createElement('span');
+    dot.className = 'lamp-dialog__dot';
+    dot.setAttribute('aria-hidden', 'true');
+    // Two lines a row: the level and whether it is open, then what that level is on this board. One long line
+    // wraps into a paragraph on a phone, and a wrapped legend is harder to scan than a list.
+    const level = document.createElement('span');
+    level.className = 'lamp-dialog__level';
+    level.textContent = `Level ${info.level}`;
+    const text = document.createElement('span');
+    text.className = 'lamp-dialog__text';
+    text.textContent = info.detail;
+    const state = document.createElement('span');
+    state.className = 'lamp-dialog__state';
+    state.textContent = states[info.state] || '';
+    row.append(dot, level, state, text);
+    return row;
+  }));
+}
+
+function openLampLegend() {
+  // With no board open there is no depth to read, and the plate is not even shown, so there is nothing to say.
+  if (!activeGeohashes.length) return;
+  renderLampDialog();
+  showDialog(elements.lampDialog);
 }
 
 /** One flash of the lamps, in the place the reader's eye is already resting when the board changes. */

@@ -1724,14 +1724,16 @@ export function boardLampInfo(index, cells = []) {
   const lit = cell ? boardLampLit(step, boardLampCount(cell)) : false;
   const others = own.length > 1 ? ` (+${own.length - 1} more)` : '';
   let where;
-  if (!cell) where = 'no board open';
-  else if (level === cell.length) where = `${cell} is this board's own cell${others}`;
-  else if (level < cell.length) where = `${cell.slice(0, level)} is a board above this one${others}`;
+  let state;
+  if (!cell) { where = 'no board open'; state = 'none'; }
+  else if (level === cell.length) { where = `${cell} is this board's own cell${others}`; state = 'own'; }
+  else if (level < cell.length) { where = `${cell.slice(0, level)} is a board above this one${others}`; state = 'above'; }
   else {
     const deeper = level - cell.length;
     where = `${cell}… is ${deeper} letter${deeper === 1 ? '' : 's'} deeper${others}`;
+    state = 'open';
   }
-  return {index: step, level, lit, cell, title: `Level ${level} · ${where}`};
+  return {index: step, level, lit, cell, state, detail: where, title: `Level ${level} · ${where}`};
 }
 
 /**

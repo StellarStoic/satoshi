@@ -141,6 +141,15 @@
     </form>
   </dialog>
 
+  <dialog id="lampDialog" class="sticky-dialog lamp-dialog" aria-labelledby="lampDialogTitle">
+    <div class="dialog-inner">
+      <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <h2 id="lampDialogTitle">Board levels</h2>
+      <p class="lamp-dialog__summary" id="lampDialogSummary"></p>
+      <ul class="lamp-dialog__rows" id="lampDialogRows"></ul>
+    </div>
+  </dialog>
+
   <dialog id="boardDialog" class="sticky-dialog" aria-labelledby="boardDialogTitle">
     <form id="boardChooser" class="dialog-inner board-chooser">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>

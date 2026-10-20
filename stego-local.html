@@ -736,6 +736,9 @@ body {
 #toggle.on ~ #menu {
 	opacity: 1;
 	visibility: visible;
+	transform: translateY(0) scale(1);
+	pointer-events: auto;
+	transition-delay: 0s;
 	}
 
 	/* menu appearance*/
@@ -758,7 +761,10 @@ body {
 	/* just for this demo */
 	opacity: 0;
 	visibility: hidden;
-	transition: opacity .4s;
+	transform: translateY(-8px) scale(.985);
+	transform-origin: top left;
+	pointer-events: none;
+	transition: opacity 260ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 320ms;
 	z-index: 2000; /* Increase z-index to be on top of all content */
 	}
 #menu:after {
@@ -825,8 +831,11 @@ ul, li, li a {
     left: 0;
     min-width: 200px; /* Minimum width to prevent too narrow menus */
     max-height: 0; /* Start collapsed */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-7px);
     overflow: hidden; /* Hide overflow when collapsed */
-    transition: max-height 0.3s ease; /* Smooth expand/collapse */
+    transition: max-height 360ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease, transform 320ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 360ms;
     background: var(--surface-raised); /* Slightly different background */
     margin: 0;
     border-radius: 3px;
@@ -837,9 +846,38 @@ ul, li, li a {
 /* When submenu is active */
 .has-submenu.active .submenu {
     max-height: 500px; /* Adjust based on your content height */
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
     overflow-y: auto; /* Add scroll if content is too long */
     width: 300px;
+    transition-delay: 0s;
 
+}
+
+/* Focus the open category instead of leaving the entire main menu behind it. */
+#menu > ul > li {
+    max-height: 64px;
+    opacity: 1;
+    transform: translateX(0);
+    transition: max-height 320ms cubic-bezier(.22, 1, .36, 1), opacity 180ms ease, transform 300ms cubic-bezier(.22, 1, .36, 1);
+}
+#menu.submenu-view > ul > li {
+    max-height: 0;
+    opacity: 0;
+    transform: translateX(-8px);
+    overflow: hidden;
+    pointer-events: none;
+}
+#menu.submenu-view > ul > li.has-submenu.active {
+    max-height: calc(45dvh + 64px);
+    opacity: 1;
+    transform: translateX(0);
+    overflow: visible;
+    pointer-events: auto;
+}
+#menu.submenu-view > ul > li.has-submenu.active > a {
+    border-bottom: 1px solid var(--border);
 }
 
 /* Submenu items */
@@ -1841,38 +1879,49 @@ body.modal-open { overflow: hidden; }
 
 </style>
   <style data-local-source="/siteEffects.css">
-.site-tv-transition {
+.site-page-fade,
+.site-power-off {
     position: fixed;
     inset: 0;
     z-index: 2147483647;
     pointer-events: none;
     overflow: hidden;
+    contain: strict;
 }
-.site-tv-static, .site-tv-roll { position: absolute; }
-.site-tv-static {
-    inset: -8%;
+
+/* Internal navigation uses one quiet surface. The tiny final opacity keeps the
+   compositor layer alive, avoiding Chromium's one-frame layer teardown flash. */
+.site-page-fade {
     background: radial-gradient(circle at center, #0b0c0d 0%, #08090a 58%, #030404 100%);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: opacity;
 }
-.site-tv-roll {
-    display: none;
+.site-page-fade--leave {
+    opacity: 0;
+    transition: opacity 520ms cubic-bezier(.33, 1, .68, 1);
 }
-.site-tv-leave .site-tv-static { animation: site-center-fade-out 500ms cubic-bezier(.4, 0, .2, 1) both; }
-.site-tv-enter .site-tv-static { animation: site-center-fade-in 500ms cubic-bezier(.4, 0, .2, 1) both; }
-.site-tv-top, .site-tv-bottom, .site-tv-line { display: none; }
-.site-tv-off .site-tv-static, .site-tv-off .site-tv-roll { display: none; }
-.site-tv-off .site-tv-top, .site-tv-off .site-tv-bottom {
-    display: block;
+.site-page-fade--leave.is-active { opacity: 1; }
+.site-page-fade--enter {
+    opacity: 1;
+    transition: opacity 620ms cubic-bezier(.22, 1, .36, 1);
+}
+.site-page-fade--enter.is-active { opacity: .001; }
+
+/* External links retain the deliberate power-off gesture. These elements are
+   never created for navigation between satoshi.si pages. */
+.site-power-off__top,
+.site-power-off__bottom {
     position: absolute;
     left: 0;
     right: 0;
     height: 50%;
     background: #000;
-    animation: site-tv-collapse 180ms ease-in both;
+    animation: site-power-collapse 180ms ease-in both;
 }
-.site-tv-top { top: 0; transform-origin: top; }
-.site-tv-bottom { bottom: 0; transform-origin: bottom; }
-.site-tv-off .site-tv-line {
-    display: block;
+.site-power-off__top { top: 0; transform-origin: top; }
+.site-power-off__bottom { bottom: 0; transform-origin: bottom; }
+.site-power-off__line {
     position: absolute;
     top: calc(50% - 1px);
     left: 0;
@@ -1880,26 +1929,20 @@ body.modal-open { overflow: hidden; }
     height: 2px;
     background: #d6e0da;
     box-shadow: 0 0 12px 2px rgba(210, 225, 215, .4);
-    animation: site-tv-power-line 370ms ease-out both;
+    animation: site-power-line 370ms ease-out both;
 }
-@keyframes site-center-fade-out {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-@keyframes site-center-fade-in {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-@keyframes site-tv-collapse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-@keyframes site-tv-power-line {
+@keyframes site-power-collapse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes site-power-line {
     0%, 35% { opacity: 0; transform: scaleX(1); }
     50% { opacity: .8; transform: scaleX(1); }
     85% { opacity: .6; transform: scaleX(.015); }
     100% { opacity: 0; transform: scaleX(0); }
 }
+
 @media (prefers-reduced-motion: reduce) {
     body::before { animation: none; }
-    .site-tv-transition { display: none; }
+    .site-page-fade,
+    .site-power-off { display: none; }
 }
 
 </style>
@@ -17950,25 +17993,54 @@ document.getElementById("infoModal").addEventListener("click", function (event) 
 <script data-local-source="/siteEffects.js">
 (() => {
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    const storageKey = 'satoshi-channel-entry';
+    const storageKey = 'satoshi-soft-fade-entry-v1';
+    const retiredStorageKey = 'satoshi-channel-entry';
     let overlay;
     let navigating = false;
     let cleanupTimer;
+    let activationFrame;
+    let paintFrame;
+
+    function cancelPendingWork() {
+        clearTimeout(cleanupTimer);
+        cancelAnimationFrame(activationFrame);
+        cancelAnimationFrame(paintFrame);
+    }
 
     function clearEffect() {
-        clearTimeout(cleanupTimer);
+        cancelPendingWork();
         overlay?.remove();
         overlay = null;
     }
 
-    function showEffect(kind) {
+    function activateFade() {
+        activationFrame = requestAnimationFrame(() => {
+            paintFrame = requestAnimationFrame(() => overlay?.classList.add('is-active'));
+        });
+    }
+
+    function showFade(kind) {
+        cancelPendingWork();
+        if (!overlay?.classList.contains('site-page-fade')) {
+            overlay?.remove();
+            overlay = document.createElement('div');
+            overlay.setAttribute('aria-hidden', 'true');
+            document.body.append(overlay);
+        }
+        // Reuse the same compositor surface when a visitor continues navigating.
+        // Internal transitions never create any of the old TV/static child layers.
+        overlay.className = `site-page-fade site-page-fade--${kind}`;
+        activateFade();
+    }
+
+    function showPowerOff() {
         clearEffect();
         overlay = document.createElement('div');
-        overlay.className = `site-tv-transition site-tv-${kind}`;
+        overlay.className = 'site-power-off';
         overlay.setAttribute('aria-hidden', 'true');
-        for (const name of ['static', 'roll', 'top', 'bottom', 'line']) {
+        for (const name of ['top', 'bottom', 'line']) {
             const part = document.createElement('div');
-            part.className = `site-tv-${name}`;
+            part.className = `site-power-off__${name}`;
             overlay.append(part);
         }
         document.body.append(overlay);
@@ -17978,6 +18050,7 @@ document.getElementById("infoModal").addEventListener("click", function (event) 
         try {
             const pending = JSON.parse(sessionStorage.getItem(storageKey));
             sessionStorage.removeItem(storageKey);
+            sessionStorage.removeItem(retiredStorageKey);
             return pending && pending.url === location.href && Date.now() - pending.time < 15000;
         } catch {
             return false;
@@ -17985,13 +18058,10 @@ document.getElementById("infoModal").addEventListener("click", function (event) 
     }
 
     if (consumeEntry() && !reducedMotion.matches) {
-        showEffect('enter');
-        // Keep the completed transparent layer until the next navigation.
-        // Removing a full-viewport composited layer can flash for one frame in
-        // Chromium, even when its final computed opacity is already zero.
+        showFade('enter');
+        // The almost-transparent surface remains reusable for the next navigation.
     }
 
-    // A restored history entry must never retain the departing screen's overlay.
     addEventListener('pageshow', event => {
         if (event.persisted) clearEffect();
         navigating = false;
@@ -18014,13 +18084,15 @@ document.getElementById("infoModal").addEventListener("click", function (event) 
         if (navigating) return;
         navigating = true;
         const internal = url.origin === location.origin || ['satoshi.si', 'www.satoshi.si'].includes(url.hostname);
-        showEffect(internal ? 'leave' : 'off');
         if (internal) {
+            showFade('leave');
             try {
-                sessionStorage.setItem(storageKey, JSON.stringify({ url: url.href, time: Date.now() }));
+                sessionStorage.setItem(storageKey, JSON.stringify({url: url.href, time: Date.now()}));
             } catch {
                 // Navigation still works when browser storage is unavailable.
             }
+        } else {
+            showPowerOff();
         }
         setTimeout(() => {
             location.assign(url.href);
@@ -18028,7 +18100,7 @@ document.getElementById("infoModal").addEventListener("click", function (event) 
                 clearEffect();
                 navigating = false;
             }, 1500);
-        }, internal ? 500 : 380);
+        }, internal ? 570 : 380);
     });
 })();
 

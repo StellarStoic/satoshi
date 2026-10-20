@@ -4363,6 +4363,16 @@ test('every socket on the rail says what it stands for', async () => {
   assert.match(boardLampInfo(0, ['u267', 'u268']).title, /\(\+1 more\)$/);
   // Nothing at all is not a crash, and says so.
   assert.equal(boardLampInfo(0, []).title, 'Level 4 · no board open');
+  // The state each socket reports, which is what the legend prints beside the level.
+  assert.deepEqual(four.map(lamp => lamp.state), ['own', 'open', 'open', 'open', 'open', 'open']);
+  assert.equal(five[0].state, 'above');
+  assert.equal(five[1].state, 'own');
+  assert.equal(nine[5].state, 'own', 'the deepest board owns its level and opens nothing below it');
+  assert.equal(boardLampInfo(0, []).state, 'none');
+  // And the sentence's two halves travel apart, so a legend can lay them out instead of re-parsing a string.
+  assert.equal(four[1].detail, 'u267… is 1 letter deeper');
+  assert.equal(`${'Level ' + four[1].level} · ${four[1].detail}`, four[1].title);
+
   assert.equal(boardLampInfo(6, ['u267']), null);
   assert.equal(boardLampInfo(-1, ['u267']), null);
   assert.equal(boardLampInfo('x', ['u267']), null);
@@ -4380,7 +4390,28 @@ test('every socket on the rail says what it stands for', async () => {
   const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   const rails = script.slice(script.indexOf('function renderBoardLamps()'), script.indexOf('function pulseLamps()'));
   assert.ok(rails.includes('strip.title = summary;'), 'the plate explains itself once');
-  assert.ok(rails.includes("strip.setAttribute('role', 'img')"), 'and reads as one thing rather than six');
+  assert.ok(rails.includes("strip.setAttribute('role', 'button')"), 'the plate is pressable, not just readable');
+  assert.ok(rails.includes('strip.tabIndex = 0;'), 'and reachable from the keyboard');
   assert.ok(rails.includes('lamp.title = info.title;'), 'each socket explains its own level');
   assert.ok(rails.includes("lamp.setAttribute('aria-hidden', 'true')"), 'the sockets are not repeated to a screen reader');
+
+  // A tap has to give a phone the same reading the hover titles give a mouse, because a phone shows no title.
+  const legend = script.slice(script.indexOf('function renderLampDialog()'), script.indexOf('function openLampLegend()'));
+  assert.ok(legend.includes('const info = boardLampInfo(index, activeGeohashes);'),
+    'the legend and the titles come from one place, so they cannot disagree');
+  assert.ok(legend.includes("text.textContent = info.detail;"));
+  assert.ok(legend.includes("state.textContent = states[info.state] || '';"));
+  assert.match(script, /strip\.addEventListener\('click', openLampLegend\)/, 'a click opens the legend');
+  assert.match(script, /strip\.addEventListener\('keydown'/, 'and so does Enter or Space on a focused plate');
+  const open = script.slice(script.indexOf('function openLampLegend()'), script.indexOf('function openLampLegend()') + 400);
+  assert.ok(open.includes('if (!activeGeohashes.length) return;'), 'with no board there is nothing to explain');
+  assert.ok(open.includes('showDialog(elements.lampDialog);'), 'and it opens through the one hook every dialog uses');
+
+  // The dialog is really in the page, or none of the above can fire.
+  const page = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const sheet = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  assert.ok(page.includes('id="lampDialog"'), 'the legend has a dialog');
+  assert.ok(page.includes('id="lampDialogRows"'), 'with a list to fill');
+  assert.ok(page.includes('id="lampDialogSummary"'), 'and a place for the one sentence');
+  assert.ok(sheet.includes('.lamp-dialog__row--lit .lamp-dialog__dot'), 'an open level is marked, not only worded');
 });

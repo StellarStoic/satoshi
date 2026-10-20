@@ -3,6 +3,8 @@ const IMAGE = `${SITE}/android-chrome-512x512.png`;
 const SITE_NAME = 'Satoshi.si';
 const pages = {
   '/': ['Satoshi.si | Bitcoin Tools, Education and News', 'Explore practical Bitcoin tools, wallet education, BIP39 resources, price conversion, historical charts, Nostr services and Bitcoin news.'],
+  '/opreturn.html': ['OP_RETURN write: put a message on Bitcoin | Satoshi.si', 'Write a short public message into an OP_RETURN output. After confirmation, its transaction becomes part of Bitcoin history.'],
+  '/opreturnBoard.html': ['OP_RETURN read: messages written into Bitcoin | Satoshi.si', 'A filtered stream of readable OP_RETURN messages found on the Bitcoin blockchain, newest first.'],
   '/index.html': ['Satoshi.si | Bitcoin Tools, Education and News', 'Explore practical Bitcoin tools, wallet education, BIP39 resources, price conversion, historical charts, Nostr services and Bitcoin news.'],
   '/whitepaper.html': ['Bitcoin Whitepaper Translations | Satoshi.si', 'Read the original Bitcoin whitepaper and browse translations of Satoshi Nakamoto\'s peer-to-peer electronic cash proposal.'],
   '/selfCustody.html': ['Bitcoin Wallets and Self-Custody Guide | Satoshi.si', 'Compare Bitcoin wallets, signing devices and nodes while learning how self-custody protects your keys and bitcoin.'],
