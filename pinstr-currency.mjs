@@ -35,24 +35,17 @@ function start() {
   // Ask on arrival if nothing is chosen, and again on every sign-in: the choice is remembered but
   // re-confirmed, because a reader who came for a quick pin may not remember what they picked.
   console.info('[pinstr-currency] loaded', { choice: readChoice() || 'none yet' });
-  if (!readChoice()) setTimeout(() => openChooser({ firstTime: true }), 1200);
-  // A cached shell or a slow board can miss every timed trigger, so the first tap anywhere brings
-  // the question up once as well. Nobody should have to know a setting exists to be asked.
-  document.addEventListener('click', () => {
-    if (!readChoice()) openChooser({ firstTime: true });
-  }, { once: true, capture: true });
-  // The sign-in dialog is the moment the reader is being identified; ask right after it closes
-  // rather than talking over it.
-  const login = document.getElementById('loginDialog');
-  if (login) {
-    new MutationObserver(() => {
-      if (!login.open && !readChoice()) openChooser({ firstTime: true });
-    }).observe(login, { attributes: true, attributeFilter: ['open'] });
-  }
+  // Nothing is asked on arrival, on sign-in, or on a stray tap. Payment belongs where a note is
+  // being written, so the choice lives inside the composer and nowhere else.
+  mountComposerCurrency();
   // On every sign-in the question is asked again, choice or no choice: the stored answer decides
   // which rail is shown, not whether the reader gets to confirm it.
   document.addEventListener('satoshi-nostr-session', () => setTimeout(() => openChooser({ firstTime: true }), 600));
-  document.addEventListener('pinstr-currency-changed', () => { applyCurrency(); applyComposerCopy(); });
+  document.addEventListener('pinstr-currency-changed', () => {
+    applyCurrency();
+    applyComposerCurrency();
+    applyComposerCopy();
+  });
   applyCurrency();
   watchComposer();
   setTimeout(() => { watchComposer(); applyComposerCopy(); }, 1200);
@@ -132,6 +125,53 @@ function setStatus(text) {
 }
 
 
+
+// The composer is the only place the rail is chosen. Until a reader picks one the pay and mining
+// buttons stay out of sight, so the composer reads as writing first and paying second.
+function mountComposerCurrency() {
+  const composer = document.getElementById('composerDialog');
+  if (!composer || composer.querySelector('.pinstr-composer-currency')) return;
+  const plans = composer.querySelector('.plan-button');
+  const host = plans ? plans.parentNode : composer.querySelector('.dialog-inner');
+  if (!host) return;
+
+  const box = document.createElement('div');
+  box.className = 'pinstr-composer-currency';
+  box.innerHTML = `
+    <span class="pcc-label">Pay with</span>
+    <button type="button" class="pcc-option" data-pcc="bitcoin">Bitcoin · sats <small>save big</small></button>
+    <button type="button" class="pcc-option" data-pcc="ton">TON</button>`;
+  host.parentNode.insertBefore(box, host);
+
+  box.addEventListener('click', (event) => {
+    const pick = event.target.closest('[data-pcc]');
+    if (!pick) return;
+    saveChoice(pick.getAttribute('data-pcc'));
+    applyComposerCurrency();
+    applyComposerCopy();
+  });
+  applyComposerCurrency();
+}
+
+function applyComposerCurrency() {
+  const composer = document.getElementById('composerDialog');
+  if (!composer) return;
+  const choice = readChoice();
+  for (const button of composer.querySelectorAll('.pcc-option')) {
+    const on = button.getAttribute('data-pcc') === choice;
+    button.classList.toggle('is-active', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  // Pay and mine appear only after a choice: asking a writer to price a note they have not chosen a
+  // rail for is the same intrusion as asking on arrival.
+  for (const id of ['payForSticky', 'mineForSticky']) {
+    const node = document.getElementById(id);
+    if (!node) continue;
+    const hiddenByBoard = node.dataset.pinstrOwnHidden === '1' || (id === 'mineForSticky' && node.dataset.pinstrPowHidden === '1');
+    node.hidden = hiddenByBoard || !choice;
+  }
+}
+
 // The composer prices a note before any order exists: Week 10 sats, Year 411 sats, "Subscribe & pin",
 // "Free with POW", and a paragraph about discounts. All of that is the Bitcoin rail, so in TON mode
 // it is replaced with the TON ladder. Originals are kept and restored when the reader switches back,
@@ -155,14 +195,14 @@ function applyComposerCopy() {
   }
 
   const pay = document.getElementById('payForSticky');
-  const payLabel = pay && pay.querySelector('span');
-  if (payLabel) {
+  if (pay) {
+    const label = pay.querySelector('span') || pay;
     if (on) {
-      if (!payLabel.dataset.pinstrOriginal) payLabel.dataset.pinstrOriginal = payLabel.textContent;
-      payLabel.textContent = 'Pay';
-    } else if (payLabel.dataset.pinstrOriginal) {
-      payLabel.textContent = payLabel.dataset.pinstrOriginal;
-      delete payLabel.dataset.pinstrOriginal;
+      if (!label.dataset.pinstrOriginal) label.dataset.pinstrOriginal = label.textContent;
+      label.textContent = 'Pay';
+    } else if (label.dataset.pinstrOriginal !== undefined) {
+      label.textContent = label.dataset.pinstrOriginal;
+      delete label.dataset.pinstrOriginal;
     }
   }
 
@@ -175,14 +215,15 @@ function applyComposerCopy() {
     delete mine.dataset.pinstrOriginalHidden;
   }
 
-  for (const node of composer.querySelectorAll('p, span, small, div')) {
-    if (node.children.length) continue;
+  // The sats paragraph has a <strong> inside it, so a childless-node test skipped it and the
+  // discount copy stayed under a TON choice. Rewrite by walking text nodes instead.
+  for (const node of composer.querySelectorAll('p, div, span')) {
     const text = (node.textContent || '').trim();
     if (on && /^Posting needs a subscription/.test(text)) {
-      if (!node.dataset.pinstrOriginal) node.dataset.pinstrOriginal = node.textContent;
+      if (!node.dataset.pinstrOriginal) node.dataset.pinstrOriginal = node.innerHTML;
       node.textContent = 'Posting in TON: 1 TON a week or 3 TON a year, plus the 0.01 TON network fee.';
-    } else if (!on && node.dataset.pinstrOriginal) {
-      node.textContent = node.dataset.pinstrOriginal;
+    } else if (!on && node.dataset.pinstrOriginal !== undefined) {
+      node.innerHTML = node.dataset.pinstrOriginal;
       delete node.dataset.pinstrOriginal;
     }
   }
@@ -384,6 +425,11 @@ function injectStyles() {
 .ptd-switch { border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
 .pinstr-ton-dialog.is-paid .ptd-state { color: #8fe0a6; }
 .pinstr-ton-dialog.is-paid [data-ton-qr] { display: none; }
+.pinstr-composer-currency { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+.pcc-label { font-size: .76rem; color: rgba(244,244,241,.58); margin-right: 2px; }
+.pcc-option { padding: 6px 11px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; background: rgba(18,19,19,.7); color: inherit; font: inherit; font-size: .78rem; cursor: pointer; }
+.pcc-option small { opacity: .62; font-size: .92em; }
+.pcc-option.is-active { border-color: rgba(120,220,150,.75); background: rgba(120,220,150,.16); color: #d8f5df; }
 `;
   document.head.appendChild(style);
 }
