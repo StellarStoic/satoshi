@@ -1978,7 +1978,10 @@ test('one Amber button, with the hand-over in a dialog and a code for desktops',
   assert.match(script, /beginAmberLogin\(\{copy: true\}\)/, 'the button asks for the clipboard route');
   assert.doesNotMatch(script, /'amber-copy'/, 'the second login method is gone from the page as well');
   assert.match(script, /function showAmberCopyDialog\(\)[\s\S]{0,220}elements\.amberDialog\.showModal\(\)/);
-  assert.match(script, /function drawQrCode\(container, text\)[\s\S]{0,700}qr\.isDark\(row, column\)/,
+  // A fixed character window over the source is brittle: the function grew a quiet zone and pixel sizing since
+  // it was written. Slice the function's own body instead, so the assertion survives any prologue.
+  const qrBody = script.slice(script.indexOf('function drawQrCode(container, text)'));
+  assert.ok(qrBody.slice(0, qrBody.indexOf('\n}\n')).includes('qr.isDark(row, column)'),
     'the code is drawn module by module from the generator');
   assert.match(script, /elements\.nostrConnect\.addEventListener\('close'[\s\S]{0,180}nostrConnectRequest\?\.cancel\(\)/,
     'a code that is closed stops waiting');
@@ -4241,4 +4244,19 @@ test('the react-or-zap card keeps its contents off the border', async () => {
   assert.ok(css.includes('border-top: 1px solid var(--border)'), 'the two questions are told apart by a hairline');
   assert.ok(css.includes('white-space: nowrap'), 'an amount never breaks across two lines');
   assert.ok(css.includes('.note-gift-dialog .note-menu__close { position: absolute;'), 'the close button takes a corner, not a row');
+});
+
+test('a zap code is drawn in a quiet zone, at whole pixels, and never scaled', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  // Wallets refused the code this board drew: the module grid was the whole canvas, so the dark squares touched
+  // all four edges, and the stylesheet then scaled that canvas to a fixed width, resampling the modules.
+  assert.ok(script.includes('const quiet = 4;'), 'four light modules on every side, as the specification asks');
+  assert.ok(script.includes('(column + quiet) * cell'), 'the grid is drawn inside that margin');
+  assert.ok(!script.includes('const cell = 6;'), 'the old fixed module size is gone');
+  assert.ok(script.includes('canvas.style.width = `${side / ratio}px`'), 'the canvas is shown at the size it was drawn');
+  assert.ok(css.includes('.nostr-connect-qr__canvas { max-width: 100%; height: auto;'), 'the stylesheet does not scale a code');
+  assert.ok(!css.includes('.note-gift__qr canvas, .note-gift__qr img { width: min('), 'nor the card code');
 });

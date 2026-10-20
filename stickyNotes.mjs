@@ -630,25 +630,48 @@ function showAmberCopyDialog() {
   status(elements.amberCopyStatus, amberClipboardPending() ? 'Approve it in Amber, then come back to this page.' : '');
 }
 
-/** A QR code for a string, as whole squares on the white field a scanner needs. */
+/**
+ * A QR code for a string, drawn at whole device pixels and inside the quiet zone a scanner requires.
+ *
+ * Two things used to stop wallets reading it. The canvas was exactly the module grid, so the dark squares
+ * touched all four edges and there was no quiet zone at all; and the stylesheet then scaled that canvas down
+ * to a fixed width, which resampled it so some modules came out a pixel wider than their neighbours. Both are
+ * fatal to a camera, and neither is visible by looking at the code.
+ */
 function drawQrCode(container, text) {
   const qr = window.qrcode?.(0, 'M');
   if (!qr || !container) return false;
   qr.addData(text);
   qr.make();
   const size = qr.getModuleCount();
-  const cell = 6;
+  // The specification asks for four light modules on every side. Without them the three finder patterns sit
+  // against the frame, and a rounded corner cuts into them.
+  const quiet = 4;
+  // One module per whole device pixel, and a canvas shown at exactly the size it was drawn, so nothing is ever
+  // resampled. An invoice is a long string, so the module count is high and the module must stay an integer.
+  const ratio = Math.min(3, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+  const measured = container.clientWidth;
+  const room = Math.min(340, measured > 0 ? measured : 300);
+  // The module is a whole number of device pixels, and a whole number of CSS pixels too, so the canvas can be
+  // shown at exactly the size it was drawn: side / ratio is an integer because cell is a multiple of ratio.
+  // Never force a minimum here - a floor larger than the budget would overflow the dialog, and the stylesheet's
+  // max-width would scale it back down, which is the resampling this is all here to avoid.
+  const budget = Math.floor((room * ratio) / (size + quiet * 2));
+  const cell = Math.min(8 * ratio, Math.max(ratio, budget - (budget % ratio)));
+  const side = (size + quiet * 2) * cell;
   const canvas = document.createElement('canvas');
-  canvas.width = size * cell;
-  canvas.height = size * cell;
+  canvas.width = side;
+  canvas.height = side;
+  canvas.style.width = `${side / ratio}px`;
+  canvas.style.height = `${side / ratio}px`;
   canvas.className = 'nostr-connect-qr__canvas';
   const context = canvas.getContext('2d');
   context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillRect(0, 0, side, side);
   context.fillStyle = '#000000';
   for (let row = 0; row < size; row += 1) {
     for (let column = 0; column < size; column += 1) {
-      if (qr.isDark(row, column)) context.fillRect(column * cell, row * cell, cell, cell);
+      if (qr.isDark(row, column)) context.fillRect((column + quiet) * cell, (row + quiet) * cell, cell, cell);
     }
   }
   container.replaceChildren(canvas);

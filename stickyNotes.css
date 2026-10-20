@@ -206,7 +206,8 @@
 .note-gift__invoice { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--page-bg); }
 .note-gift__qr { display: grid; place-items: center; margin-bottom: 12px; }
 .note-gift__qr:empty { display: none; }
-.note-gift__qr canvas, .note-gift__qr img { width: min(200px, 56vw); height: auto; border-radius: 10px; image-rendering: pixelated; }
+/* No width here, for the same reason; the radius only ever shaves the white quiet zone. */
+.note-gift__qr canvas, .note-gift__qr img { display: block; max-width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
 .note-gift__invoice code {
   display: block;
   max-height: 64px;
@@ -286,7 +287,8 @@
    The steps and the paragraph this dialog used to carry are gone; the wording rides the line. */
 .amber-paste { width: 100%; justify-content: center; }
 .nostr-connect-qr { display: flex; justify-content: center; padding: 12px; margin: 4px 0 12px; background: #ffffff; border-radius: 8px; }
-.nostr-connect-qr__canvas { width: min(300px, 66vw); height: auto; image-rendering: pixelated; }
+/* The canvas sets its own size in whole device pixels; scaling it here would resample the modules. */
+.nostr-connect-qr__canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
 .nostr-connect-open { width: 100%; justify-content: center; margin-bottom: 10px; }
 /* `hidden` is only the UA's display:none, so it loses to the display these buttons set: the desktop
    must not show a hand-off button, and a desktop must not be offered the phone's pairing route. */
