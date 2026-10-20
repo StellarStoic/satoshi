@@ -353,8 +353,12 @@
 .area-scale strong { color:var(--accent,#f2a900); font-size:.95rem; }
 .area-scale span { color:#bfc1bf; font-size:.78rem; }
 .area-scale:disabled { opacity:.55; cursor:progress; }
-.area-scale:focus-visible, .area-lock:focus-within { outline:none; }
-.area-lock { margin:14px 0 0; }
+/* The keep-this-place row wears the settings toggle it now shares its markup with: the hairline and the
+   padding come from .note-filter-toggle, so only the breathing room above it is set here. The unlock button
+   sits under the row at the row's own width, since it is the other half of the same decision. */
+.area-lock { margin:18px 0 0; }
+.area-lock strong { display: block; }
+.area-lock + #unlockButton { width: 100%; justify-content: center; margin-top: 10px; }
 .saved-places { border-top:1px solid var(--line,#2a2f38); background:var(--panel,#12161c); }
 .saved-places > summary { display:flex; gap:8px; align-items:center; padding:10px 16px; cursor:pointer; font-weight:600; }
 .saved-places__list { display:grid; gap:6px; margin:0; padding:0 16px 10px; list-style:none; max-height:32vh; overflow:auto; }
