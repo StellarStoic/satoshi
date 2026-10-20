@@ -836,3 +836,7 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
    under a heading, above the relays. */
 .board-reading { display:grid; gap:0; margin:14px 0 4px; }
 .board-reading > h3 { margin:0 0 2px; font-size:.95rem; }
+
+/* While a place is kept, the remember switch is set aside rather than silently outvoted. */
+.board-memory-toggle.is-inert { opacity:.5; cursor:not-allowed; }
+.board-memory-hint { margin:6px 0 0; font-size:.75rem; line-height:1.35; color:#9ea19f; }

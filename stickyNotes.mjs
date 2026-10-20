@@ -170,6 +170,9 @@ const elements = {
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
   rememberBoard: document.getElementById('rememberStickyBoard'),
+  rememberBoardRow: document.getElementById('rememberBoardRow'),
+  rememberBoardCaption: document.getElementById('rememberBoardCaption'),
+  rememberBoardHint: document.getElementById('rememberBoardHint'),
   buriedPins: document.getElementById('buriedPins'), gifPlay: document.getElementById('gifPlay'),
   openGeohashMap: document.getElementById('openGeohashMap'), geohashMapDialog: document.getElementById('geohashMapDialog'),
   closeGeohashMap: document.getElementById('closeGeohashMap'), geohashMap: document.getElementById('geohashMap'),
@@ -5842,6 +5845,7 @@ elements.openBoard.addEventListener('click', () => {
   elements.boardGeohash.value = activeGeohashes.join(',');
   elements.boardDepth.value = String(boardDepth);
   elements.rememberBoard.checked = rememberBoard;
+  renderLockControls();
   status(elements.boardChooserStatus, '');
   showDialog(elements.boardDialog);
   requestAnimationFrame(() => elements.boardGeohash.focus());
@@ -6082,6 +6086,14 @@ function renderLockControls() {
     ? `Kept: ${boardCellsLabel(lockedCells)} — ${areaSizeLabel(lockedCells[0].length)} across. `
       + 'The board opens here on every visit.'
     : 'Tick to keep this place and open it on every visit.';
+  // A kept place answers the same question the remember switch asks, and it answers first, so the
+  // switch is shown as what it is while a place is kept: set aside rather than broken.
+  if (elements.rememberBoardRow) {
+    elements.rememberBoardRow.classList.toggle('is-inert', locked);
+    elements.rememberBoard.disabled = locked;
+    elements.rememberBoardRow.setAttribute('aria-disabled', String(locked));
+  }
+  if (elements.rememberBoardHint) elements.rememberBoardHint.hidden = !locked;
 }
 
 function lockThisPlace(cells, precision) {

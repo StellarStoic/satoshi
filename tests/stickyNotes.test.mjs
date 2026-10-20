@@ -3991,3 +3991,20 @@ test('the GIF and buried-pin switches belong to Board style, not sort and filter
   assert.ok(script.includes('elements.gifPlay.checked = gifPlay;'), 'the panel reads the stored switch state');
   assert.ok(script.includes('elements.buriedPins.checked = showBuriedPins;'), 'both switches are restored');
 });
+
+
+test('a kept place sets the remember switch aside instead of outvoting it', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const html = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="rememberBoardRow"'));
+  assert.ok(html.includes('id="rememberBoardHint" class="board-memory-hint" hidden'));
+  assert.ok(html.includes('aria-describedby="rememberBoardHint"'));
+  assert.ok(script.includes("elements.rememberBoard.disabled = locked;"), 'the switch must be disabled, not just dimmed');
+  assert.ok(script.includes("classList.toggle('is-inert', locked)"));
+  assert.ok(script.includes('elements.rememberBoardHint.hidden = !locked;'));
+  const seed = script.indexOf('  elements.rememberBoard.checked = rememberBoard;');
+  assert.ok(seed !== -1, 'the chooser still seeds the switch');
+  assert.ok(script.indexOf('renderLockControls();', seed) !== -1, 'the chooser refreshes the row before it shows');
+});
