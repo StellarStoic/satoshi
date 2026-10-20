@@ -973,7 +973,12 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
       baseSats: quote.baseSats,
       discount: quote.discount,
       paymentMethod: covered ? 'subscription' : (powFree ? 'pow' : PAYMENT_METHOD),
-      status: covered || freeTier || powFree ? 'paid' : 'awaiting_invoice',
+      // A TON order is paid by a transfer that carries the order id, so it must never be handed a
+      // BTCPay invoice: no bolt11, no ark address, nothing for the reader to pay twice.
+      status: covered || freeTier || powFree
+      ? 'paid'
+      : (String(input.rail || '').toUpperCase() === 'TON' ? 'awaiting_payment' : 'awaiting_invoice'),
+      rail: String(input.rail || '').toUpperCase() === 'TON' ? 'TON' : undefined,
       invoiceId: null,
       payment: covered ? { method: 'subscription', sats: 0 } : null,   // {arkAddress, paymentLink}
       createdAt: now,
