@@ -38,9 +38,6 @@ function start() {
   // Nothing is asked on arrival, on sign-in, or on a stray tap. Payment belongs where a note is
   // being written, so the choice lives inside the composer and nowhere else.
   mountComposerCurrency();
-  // On every sign-in the question is asked again, choice or no choice: the stored answer decides
-  // which rail is shown, not whether the reader gets to confirm it.
-  document.addEventListener('satoshi-nostr-session', () => setTimeout(() => openChooser({ firstTime: true }), 600));
   document.addEventListener('pinstr-currency-changed', () => {
     applyCurrency();
     applyComposerCurrency();
