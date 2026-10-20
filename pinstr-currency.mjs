@@ -14,6 +14,11 @@ const POLL_MS = 4000;
 // anything it assigns to must already be initialised or the module dies in the temporal dead zone.
 let chooser = null;
 let tonDialog = null;
+let tonOrderId = '';
+// An order is shown once. The board closes dialogs as it works, and re-opening on every appearance
+// turned a closed panel into a loop of empty ones.
+let tonShownFor = '';
+let tonDismissedFor = '';
 let tonPoll = null;
 // Guards applyComposerCopy against re-entering itself through its own DOM writes.
 let applyingCopy = false;
@@ -331,6 +336,11 @@ function installPayHook() {
 
 
 function mountTonPanel() {
+  const existing = document.querySelector('.pinstr-ton-dialog');
+  if (existing) {
+    tonDialog = existing;
+    return;
+  }
   tonDialog = document.createElement('dialog');
   tonDialog.className = 'pinstr-ton-dialog';
   tonDialog.innerHTML = `
@@ -348,7 +358,12 @@ function mountTonPanel() {
       <p class="ptd-hint">Sats are cheaper: a pin is 69 sats on the Bitcoin rail. <button type="button" class="ptd-switch" data-ton-switch>Switch to Bitcoin</button></p>
     </div>`;
   tonDialog.addEventListener('click', async (event) => {
-    if (event.target.closest('[data-ton-close]')) { stopTonPoll(); tonDialog.close(); return; }
+    if (event.target.closest('[data-ton-close]')) {
+      stopTonPoll();
+      tonDismissedFor = tonOrderId;
+      tonDialog.close();
+      return;
+    }
     if (event.target.closest('[data-ton-switch]')) {
       saveChoice('bitcoin');
       stopTonPoll();
@@ -407,6 +422,22 @@ function currentOrderId() {
 async function openTonPanel() {
   const orderId = currentOrderId();
   if (!orderId) return;
+  // The board reopens its own invoice dialog while it waits for rails, and each appearance used to
+  // drag this panel up again with fresh numbers - which is why it kept popping with the QR flashing.
+  if (orderId === tonDismissedFor) return;
+  if (orderId === tonShownFor) {
+    // Already presented for this order: keep the board's dialog out of the way without re-rendering.
+    const paymentDialog = document.getElementById('paymentDialog');
+    if (paymentDialog && paymentDialog.open) paymentDialog.close();
+    return;
+  }
+  tonShownFor = orderId;
+  if (tonDialog.open && orderId === tonOrderId) {
+    const paymentDialog = document.getElementById('paymentDialog');
+    if (paymentDialog && paymentDialog.open) paymentDialog.close();
+    return;
+  }
+  tonOrderId = orderId;
   const payment = document.getElementById('paymentDialog');
   if (payment && payment.open) payment.close();
   tonDialog.querySelector('[data-ton-state]').textContent = 'Preparing the TON amount…';
@@ -454,31 +485,37 @@ function ensureQrLibrary() {
 async function drawQr(text) {
   const host = tonDialog.querySelector('[data-ton-qr]');
   if (!host) return;
-  host.textContent = '';
+  // Clearing first is what showed an empty box over the real QR: the clear happened, the draw waited.
+  // The new code is built off-document and swapped in when it is actually ready.
+  const frame = document.createElement('div');
+  frame.style.cssText = 'display:grid;place-items:center;width:100%';
   const make = await ensureQrLibrary();
   if (typeof make !== 'function') {
     console.warn('[pinstr-currency] QR library unavailable, showing the link instead');
     const link = document.createElement('code');
     link.style.cssText = 'font-size:.68rem;word-break:break-all;color:#111;background:none;';
     link.textContent = text;
-    host.appendChild(link);
+    frame.appendChild(link);
+    host.replaceChildren(frame);
     return;
   }
   try {
     const qr = make(0, 'M');
     qr.addData(text);
     qr.make();
-    host.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true });
-    const svg = host.querySelector('svg');
+    frame.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true });
+    const svg = frame.querySelector('svg');
     if (svg) {
       svg.removeAttribute('width');
       svg.removeAttribute('height');
       svg.setAttribute('style', 'width:100%;height:auto;display:block');
     }
-    console.info('[pinstr-currency] qr drawn', { bytes: host.innerHTML.length });
+    host.replaceChildren(frame);
+    console.info('[pinstr-currency] qr drawn', { bytes: frame.innerHTML.length });
   } catch (err) {
     console.warn('[pinstr-currency] qr failed', err);
-    host.textContent = 'QR could not be drawn — use the wallet link below.';
+    frame.textContent = 'QR could not be drawn — use the wallet link below.';
+    host.replaceChildren(frame);
   }
 }
 
