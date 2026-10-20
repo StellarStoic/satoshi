@@ -182,6 +182,7 @@ const elements = {
   boardChooserStatus: document.getElementById('boardChooserStatus'),
   shareArea: document.getElementById('shareArea'), areaDialog: document.getElementById('areaDialog'),
   areaStatus: document.getElementById('areaStatus'),
+  placeLockStatus: document.getElementById('placeLockStatus'),
   lockToggle: document.getElementById('lockToggle'), unlockButton: document.getElementById('unlockButton'),
   lockCaption: document.getElementById('lockCaption'),
   savedPlacesList: document.getElementById('savedPlacesList'),
@@ -2617,6 +2618,8 @@ function openBoardStyle() {
   if (elements.boardPatternCss) elements.boardPatternCss.value = boardPatternCssChoice;
   sayBoardStyle('');
   showBoardStyleVersion();
+  renderLockControls();
+  status(elements.placeLockStatus, '');
   showDialog(elements.boardStyleDialog);
   renderUserRelays();
   checkUserRelays();
@@ -6092,7 +6095,8 @@ function lockThisPlace(cells, precision) {
   renderLockControls();
   const label = `${boardCellsLabel(lockedCells)} (${areaSizeLabel(precision)} across)`;
   status(elements.areaStatus, `Kept ${label} — the board opens here on every visit.`);
-  status(elements.boardChooserStatus, `Kept ${label}. Unlock it from "Show notes around me".`);
+  status(elements.placeLockStatus, `Kept ${label} — the board opens here on every visit.`);
+  status(elements.boardChooserStatus, `Kept ${label}. Unlock it in Board style.`);
 }
 
 function unlockThisPlace() {
@@ -6100,6 +6104,7 @@ function unlockThisPlace() {
   localStorage.removeItem(LOCKED_PLACE_KEY);
   renderLockControls();
   status(elements.areaStatus, 'Unlocked — the board will not open a place of its own.');
+  status(elements.placeLockStatus, 'Unlocked — the board will not open a place of its own.');
   status(elements.boardChooserStatus, 'No place is kept any more. The board opens the one you choose.');
 }
 
@@ -6111,6 +6116,16 @@ function openAreaDialog() {
 
 elements.shareArea.addEventListener('click', openAreaDialog);
 elements.unlockButton.addEventListener('click', () => { unlockThisPlace(); });
+elements.lockToggle.addEventListener('change', () => {
+  if (!elements.lockToggle.checked) { unlockThisPlace(); return; }
+  const cells = (activeGeohashes || []).filter(Boolean).map(String);
+  if (!cells.length) {
+    elements.lockToggle.checked = false;
+    status(elements.placeLockStatus, 'Open a board first, then tick this to keep it.', true);
+    return;
+  }
+  lockThisPlace(cells, cells[0].length);
+});
 elements.savePlaceButton.addEventListener('click', () => { saveCurrentPlace(); });
 elements.savedPlaceName.addEventListener('keydown', event => {
   if (event.key !== 'Enter') return;
