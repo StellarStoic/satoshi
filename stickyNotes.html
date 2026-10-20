@@ -167,14 +167,10 @@
           <p><strong>Exact</strong> shows this geohash only. Each deeper level also includes notes from more precise geohashes inside it. For example, one level on <code>u24</code> includes child boards such as <code>u24j</code>.</p>
         </details>
       </div>
+      <!-- The rows are built for the cell being typed (renderDepthOptions): a cell of n letters has 9 - n levels
+           under it, so a fixed list would offer depths an eight- or nine-letter board cannot honour. -->
       <select id="boardDepth">
         <option value="0">Exact board only</option>
-        <option value="1">1 level deeper</option>
-        <option value="2">2 levels deeper</option>
-        <option value="3">3 levels deeper</option>
-        <option value="4">4 levels deeper</option>
-        <option value="5">5 levels deeper</option>
-        <option value="6">All child boards</option>
       </select>
       <label class="board-memory-toggle" id="rememberBoardRow" for="rememberStickyBoard"><span id="rememberBoardCaption">Open the last board on my next visit</span><input id="rememberStickyBoard" type="checkbox" role="switch" aria-describedby="rememberBoardHint"><span class="board-memory-toggle__track" aria-hidden="true"></span></label>
       <p id="rememberBoardHint" class="board-memory-hint" hidden>A kept place already decides this. Unlock it in “Show notes around me”.</p>

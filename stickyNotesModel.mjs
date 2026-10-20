@@ -1696,24 +1696,33 @@ export function boardLampCount(cell) {
 
 /**
  * Whether the socket at `index` burns, in the order the plate is built: index 0 is the socket at the
- * head of the plate and the last index is the one at its foot. A board's open levels are the ones
- * nearest to the board itself, so they light from the foot up: the last `lit` sockets of a plate
- * burn. Both rails build their plate in this same order, so the two carry the same reading rather
- * than one being the other's mirror.
+ * head of the plate and the last index is the one at its foot. Both rails build their plate in this
+ * same order, so the two carry the same reading rather than one being the other's mirror.
  */
 export function boardLampLit(index, lit) {
   return index >= BOARD_LAMP_SOCKETS - lit;
 }
 
 /**
- * What one socket on a rail stands for, said in words a reader can use on hover.
- *
- * The plate's first socket is the first level under the shallowest board, so socket `n` stands for cells of
- * GEOHASH_MIN_LENGTH + 1 + n letters. A board already owns one level - its own cell length - and everything
- * deeper is what a note pinned down there can still reach from this board, which is why the plate lights from
- * its foot upwards and why the sockets above the board's own level stay dark.
+ * The deepest a board of these cells can reach: a cell of `n` letters has 9 - n levels under it, so a board eight
+ * letters long offers one level and a nine-letter board offers none. The shallowest cell decides, because the board
+ * can only be as deep as the cell that has the most room left below it.
  */
-export function boardLampInfo(index, cells = []) {
+export function boardDepthCeiling(cells = []) {
+  const lengths = geohashCells(cells).map(cell => cell.length).filter(Boolean);
+  if (!lengths.length) return GEOHASH_MAX_BOARD_DEPTH;
+  return Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, GEOHASH_MAX_LENGTH - Math.min(...lengths)));
+}
+
+/**
+ * What one socket on a rail stands for, and whether the notes of that level are showing.
+ *
+ * The plate is the reader's own setting made visible, not a fact about the cell: the socket at the board's own
+ * length is green because this board's notes always show, a deeper socket is green only while the chosen depth
+ * reaches it, and every other socket is red - a note down there is hidden behind the board's filter. Sockets above
+ * the board are red too: a board above this one is not what this board is showing.
+ */
+export function boardLampInfo(index, cells = [], depth = 0) {
   const step = Number(index);
   if (!Number.isInteger(step) || step < 0 || step >= BOARD_LAMP_SOCKETS) return null;
   const level = GEOHASH_MIN_LENGTH + 1 + step;
@@ -1721,32 +1730,37 @@ export function boardLampInfo(index, cells = []) {
   // would refuse is not a reason to tell a reader there is no board.
   const own = geohashCells(cells);
   const cell = own[0] || '';
-  const lit = cell ? boardLampLit(step, boardLampCount(cell)) : false;
+  const reached = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(depth, 10) || 0));
   const others = own.length > 1 ? ` (+${own.length - 1} more)` : '';
-  let where;
+  let detail;
   let state;
-  if (!cell) { where = 'no board open'; state = 'none'; }
-  else if (level === cell.length) { where = `${cell} is this board's own cell${others}`; state = 'own'; }
-  else if (level < cell.length) { where = `${cell.slice(0, level)} is a board above this one${others}`; state = 'above'; }
+  if (!cell) { detail = 'no board open'; state = 'none'; }
+  else if (level === cell.length) { detail = `${cell} is this board's own cell${others}`; state = 'own'; }
+  else if (level < cell.length) { detail = `${cell.slice(0, level)} is a board above this one${others}`; state = 'above'; }
   else {
     const deeper = level - cell.length;
-    where = `${cell}… is ${deeper} letter${deeper === 1 ? '' : 's'} deeper${others}`;
-    state = 'open';
+    detail = `${cell}… is ${deeper} letter${deeper === 1 ? '' : 's'} deeper${others}`;
+    state = deeper <= reached ? 'shown' : 'hidden';
   }
-  return {index: step, level, lit, cell, state, detail: where, title: `Level ${level} · ${where}`};
+  const lit = state === 'own' || state === 'shown';
+  const reading = state === 'none' ? '' : lit ? ' — shown' : ' — hidden';
+  return {index: step, level, lit, hidden: Boolean(cell) && !lit, state, cell, detail, title: `Level ${level} · ${detail}${reading}`};
 }
 
 /**
- * The one sentence the whole plate stands for: how many levels are still open below this board, and what that
- * means for a reader. It names no cell of its own, because a board can be several cells and the count is the
- * same for all of them.
+ * The one sentence the whole plate stands for: how many levels are showing notes, and what the two colours mean.
+ * The colours are the legend, so they are named here rather than discovered by hovering six sockets.
  */
-export function boardLampSummary(cells = []) {
+export function boardLampSummary(cells = [], depth = 0) {
   const own = geohashCells(cells);
-  const cell = own[0] || '';
-  if (!cell) return 'Levels open below this board: no board open.';
-  const lit = boardLampCount(cell);
-  return `Levels open below this board: ${lit} of ${BOARD_LAMP_SOCKETS}. A note pinned in a deeper cell still shows here.`;
+  if (!own.length) return 'Green = notes from this level show here. Red = notes in this level are hidden.';
+  let shown = 0;
+  for (let index = 0; index < BOARD_LAMP_SOCKETS; index += 1) {
+    const lamp = boardLampInfo(index, own, depth);
+    if (lamp && lamp.lit) shown += 1;
+  }
+  return `${shown} of ${BOARD_LAMP_SOCKETS} levels show notes here. Green = notes from this level show here. `
+    + 'Red = notes in this level are hidden.';
 }
 
 /**

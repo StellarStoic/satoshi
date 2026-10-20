@@ -118,6 +118,9 @@
 /* A socket in the plate. Unlit is a socket with nothing left to open below it: dark, recessed into the
    brass, and still drawn, so the plate reads as a gauge that has run down rather than one that is gone. */
 .board-frame__lamp { flex: none; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #6b4a24 0%, #472d13 52%, #241605 100%); box-shadow: inset 0 1px 2px rgba(20, 10, 2, .7), inset 0 0 0 1px rgba(52, 30, 10, .55), 0 1px rgba(255, 246, 214, .3); }
+/* A socket whose notes this board is hiding: the reader chose a depth that stops above it, so the gauge has to
+   say so instead of leaving the socket dark and letting a lit one imply the whole cell is covered. */
+.board-frame__lamp--hidden { background: radial-gradient(circle at 38% 30%, #ffd8d2 0%, #f2746a 32%, #c33329 66%, #6d1713 100%); box-shadow: 0 0 7px rgba(214, 60, 47, .5), inset 0 1px 2px rgba(0, 0, 0, .45); }
 .board-frame__lamp--lit { background: radial-gradient(circle at 38% 30%, #eafff2 0%, #93efb4 32%, #62c986 66%, #2f7d4c 100%); box-shadow: 0 0 5px rgba(98, 201, 134, .85), inset 0 1px rgba(255, 255, 255, .7), inset 0 -1px rgba(20, 60, 34, .55); }
 /* A board with no cell at all has no depth to read, so there is no plate to show either. A board cut to
    the deepest cell is not that case: its plate stays on the rail with all six sockets dark. */
@@ -1056,6 +1059,10 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .lamp-dialog__text { color: var(--text-muted, #9aa2a2); }
 .lamp-dialog__state { color: var(--text-muted, #9aa2a2); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
 .lamp-dialog__row--lit .lamp-dialog__state { color: var(--accent, #f2a900); }
+.lamp-dialog__row--hidden .lamp-dialog__dot {
+  background: radial-gradient(circle at 38% 30%, #ffd8d2 0%, #f2746a 32%, #c33329 66%, #6d1713 100%);
+  box-shadow: 0 0 6px rgba(214, 60, 47, .5); }
+.lamp-dialog__row--hidden .lamp-dialog__state { color: #f2746a; }
 /* The plates are controls now, so they take a pointer and a focus ring like one. */
 .board-frame__lamps { cursor: pointer; }
 .board-frame__lamps:focus-visible { outline: 2px solid var(--focus, #ffd15c); outline-offset: 3px; }

@@ -64,7 +64,7 @@ import {
   boardTextureLabel,
   boardTextureTile,
   boardPlateFontSize,
-  boardLampCount,
+  boardDepthCeiling,
   boardLampLit,
   boardLampInfo,
   boardLampSummary,
@@ -2155,7 +2155,8 @@ function noteBelongsToBoard(sticky) {
 
 function updateBoardControl() {
   renderBoardEmptyHint();
-  const reach = boardDepth === 0 ? 'exact only' : boardDepth === GEOHASH_MAX_BOARD_DEPTH ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
+  const ceiling = boardDepthCeiling(activeGeohashes);
+  const reach = boardDepth === 0 ? 'exact only' : boardDepth >= ceiling ? 'all child boards' : `${boardDepth} level${boardDepth === 1 ? '' : 's'} deeper`;
   const label = activeGeohash ? `Board: ${boardCellsLabel()} (${reach})` : 'Choose a geohash board';
   elements.openBoard.setAttribute('aria-label', label);
   elements.openBoard.title = label;
@@ -2215,18 +2216,18 @@ for (const strip of lampStrips()) {
 }
 
 /**
- * Light the two lamp plates on the side rails. Every plate carries all six sockets a cell has levels
- * under it, always, and boardLampCount says how many of them burn - six at three characters, three at
- * six, none at nine. boardLampLit then says which of the six: the levels left under the board are the
+ * Light the two lamp plates on the side rails. Every plate carries all six sockets a cell can have levels
+ * under it, always; the lights are the reader's own depth setting drawn. Green is a level whose notes this
+ * board is showing - its own cell, and every deeper level the chosen depth reaches - and red is a level whose
+ * notes the setting hides, including the boards above this one. boardLampLit then says which of the six: the levels left under the board are the
  * ones nearest to it, so the plate fills from its foot up. Both rails are built in that same order, so
  * the two plates read alike rather than mirrored: a gauge for the levels still open below the board,
  * and nothing more - no per-note or selection state.
  */
 function renderBoardLamps() {
-  const lit = boardLampCount(activeGeohash);
   // The plate is a gauge, so it is one thing to a screen reader and a row of sockets to a mouse: the strip
   // carries the sentence, each socket carries its own level and the cell that level is on this board.
-  const summary = boardLampSummary(activeGeohashes);
+  const summary = boardLampSummary(activeGeohashes, boardDepth);
   for (const strip of lampStrips()) {
     // No cell at all is no board, so there is no depth to read and no plate to show. A board cut to
     // the deepest cell is not that case: it keeps its plate, all six sockets dark.
@@ -2238,8 +2239,11 @@ function renderBoardLamps() {
     strip.setAttribute('aria-label', `${summary} Opens the list of levels.`);
     strip.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
       const lamp = document.createElement('span');
-      lamp.className = boardLampLit(index, lit) ? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';
-      const info = boardLampInfo(index, activeGeohashes);
+      const info = boardLampInfo(index, activeGeohashes, boardDepth);
+      // Green is a level whose notes this board is showing, red one whose notes the depth setting hides.
+      lamp.className = info?.lit
+        ? 'board-frame__lamp board-frame__lamp--lit'
+        : `board-frame__lamp${info?.hidden ? ' board-frame__lamp--hidden' : ''}`;
       if (info) lamp.title = info.title;
       lamp.setAttribute('aria-hidden', 'true');
       return lamp;
@@ -2256,13 +2260,15 @@ function renderBoardLamps() {
 function renderLampDialog() {
   const rows = elements.lampDialogRows;
   if (!rows) return;
-  const summary = boardLampSummary(activeGeohashes);
+  const summary = boardLampSummary(activeGeohashes, boardDepth);
   if (elements.lampDialogSummary) elements.lampDialogSummary.textContent = summary;
-  const states = {open: 'open', own: 'this board', above: 'above', none: 'no board'};
+  const states = {shown: 'shown', own: 'shown', hidden: 'hidden', above: 'hidden', none: 'no board'};
   rows.replaceChildren(...Array.from({length: BOARD_LAMP_SOCKETS}, (unused, index) => {
-    const info = boardLampInfo(index, activeGeohashes);
+    const info = boardLampInfo(index, activeGeohashes, boardDepth);
     const row = document.createElement('li');
-    row.className = info.lit ? 'lamp-dialog__row lamp-dialog__row--lit' : 'lamp-dialog__row';
+    row.className = info.lit
+      ? 'lamp-dialog__row lamp-dialog__row--lit'
+      : `lamp-dialog__row${info.hidden ? ' lamp-dialog__row--hidden' : ''}`;
     const dot = document.createElement('span');
     dot.className = 'lamp-dialog__dot';
     dot.setAttribute('aria-hidden', 'true');
@@ -6235,7 +6241,8 @@ elements.useGeohashSelection.addEventListener('click', () => {
 elements.clearGeohashSelection.addEventListener('click', () => setMapCells([]));
 elements.openBoard.addEventListener('click', () => {
   elements.boardGeohash.value = activeGeohashes.join(',');
-  elements.boardDepth.value = String(boardDepth);
+  renderDepthOptions(activeGeohashes);
+  elements.boardDepth.value = String(Math.min(boardDepth, boardDepthCeiling(activeGeohashes)));
   elements.rememberBoard.checked = rememberBoard;
   renderLockControls();
   status(elements.boardChooserStatus, '');
@@ -6254,14 +6261,68 @@ elements.boardChooser.addEventListener('submit', event => {
         : issue, true);
     return;
   }
+  boardDepth = Math.min(boardDepth, boardDepthCeiling(cells));
+  renderDepthOptions(cells);
   selectBoard(cells);
 });
+/**
+ * The levels a cell can actually offer, as menu rows.
+ *
+ * A cell of n letters has 9 - n levels under it, so offering "5 levels deeper" on an eight-letter board promises four
+ * levels that do not exist. The rows are built from the cell on screen instead of being a fixed list.
+ */
+function boardDepthOptions(cells) {
+  const ceiling = boardDepthCeiling(cells);
+  const options = [{value: 0, label: 'Exact board only'}];
+  for (let level = 1; level < ceiling; level += 1) {
+    options.push({value: level, label: `${level} level${level === 1 ? '' : 's'} deeper`});
+  }
+  if (ceiling >= 1) {
+    options.push({value: ceiling, label: ceiling === 1 ? 'All child boards (1 level)' : 'All child boards'});
+  }
+  return options;
+}
+
+/**
+ * Rebuild the depth menu for the cells in the board field and clamp the choice to what they allow, so the control can
+ * never show a depth the board refuses to honour.
+ */
+function renderDepthOptions(cells = geohashCellsFrom(elements.boardGeohash?.value || activeGeohashes)) {
+  const select = elements.boardDepth;
+  if (!select) return boardDepth;
+  const ceiling = boardDepthCeiling(cells);
+  select.replaceChildren(...boardDepthOptions(cells).map(option => {
+    const element = document.createElement('option');
+    element.value = String(option.value);
+    element.textContent = option.label;
+    return element;
+  }));
+  const wanted = Math.max(0, Math.min(boardDepth, ceiling));
+  select.value = String(wanted);
+  if (wanted !== boardDepth) {
+    boardDepth = wanted;
+    try {
+      localStorage.setItem(BOARD_DEPTH_KEY, String(wanted));
+    } catch {
+      // A browser refusing storage still gets the clamped depth; it just will not remember it.
+    }
+    updateBoardControl();
+    if (activeGeohash) renderBoardLamps();
+  }
+  return wanted;
+}
+
 elements.boardDepth.addEventListener('change', () => {
-  boardDepth = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(elements.boardDepth.value, 10) || 0));
+  const steps = Math.max(0, Math.min(GEOHASH_MAX_BOARD_DEPTH, Number.parseInt(elements.boardDepth.value, 10) || 0));
+  boardDepth = Math.min(steps, boardDepthCeiling(geohashCellsFrom(elements.boardGeohash?.value || activeGeohashes)));
   localStorage.setItem(BOARD_DEPTH_KEY, String(boardDepth));
   updateBoardControl();
+  // The plate is the setting drawn: a depth change has to repaint it, board open or not.
+  renderBoardLamps();
   if (activeGeohash) selectBoard([...activeGeohashes], false);
 });
+// The menu follows the cell being typed, so choosing a deeper cell cannot leave "5 levels deeper" behind.
+elements.boardGeohash.addEventListener('input', () => renderDepthOptions(geohashCellsFrom(elements.boardGeohash.value)));
 elements.rememberBoard.addEventListener('change', () => {
   rememberBoard = elements.rememberBoard.checked;
   localStorage.setItem(BOARD_REMEMBER_KEY, String(rememberBoard));
@@ -6819,7 +6880,8 @@ applyBoardChrome();
 // from the link, the kept place or the remembered board, and that resolution does not pass
 // through selectBoard, so the size is worked out from what it settled on here as well.
 applyBoardSize();
-elements.boardDepth.value = String(boardDepth);
+renderDepthOptions(activeGeohashes);
+elements.boardDepth.value = String(Math.min(boardDepth, boardDepthCeiling(activeGeohashes)));
 elements.rememberBoard.checked = rememberBoard;
 updateBoardControl();
 installBoardNavigation();

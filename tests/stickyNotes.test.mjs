@@ -391,28 +391,39 @@ test('geohash depth includes only the selected number of child levels', () => {
   assert.equal(geohashMatchesBoard('u24jed', 'u24je', 11, true), false);
 });
 
-test('the reader’s board dropdown offers every level 0..6, and nothing past them', async () => {
-  const [html, script] = await Promise.all([
+test('the reader’s board dropdown offers only the levels the cell actually has', async () => {
+  const [html, script, model] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    import('../stickyNotesModel.mjs'),
   ]);
-  // The reader's dropdown is the one place a reader says how many levels of notes to see, and it
-  // offers every level 0..6 and nothing past them: the eleven it used to offer was never a number of
-  // levels a cell has, so it is gone from the markup and from the ceiling behind it.
+  const { boardDepthCeiling } = model;
+
+  // A cell of n letters has 9 - n levels under it. The menu used to be a fixed list of 0..6, so an eight-letter
+  // board offered "5 levels deeper" - four levels that do not exist - and the board then filtered by a depth it
+  // could never reach.
+  assert.deepEqual(
+    [[3, 6], [4, 5], [6, 3], [8, 1], [9, 0]].map(([length, expected]) => [length, boardDepthCeiling(['u'.repeat(length)])]),
+    [[3, 6], [4, 5], [6, 3], [8, 1], [9, 0]],
+  );
+  assert.equal(boardDepthCeiling(['u267', 'u267tn']), 5, 'the shallowest cell decides how deep the board can look');
+  assert.equal(boardDepthCeiling([]), GEOHASH_MAX_BOARD_DEPTH, 'with no cell there is nothing to cut the list to');
+
+  // The menu is built for the cell, not written into the markup.
   const select = html.match(/<select id="boardDepth">([\s\S]*?)<\/select>/)[1];
-  assert.deepEqual([...select.matchAll(/<option value="(\d+)">([^<]+)<\/option>/g)].map(match => [match[1], match[2]]), [
-    ['0', 'Exact board only'], ['1', '1 level deeper'], ['2', '2 levels deeper'],
-    ['3', '3 levels deeper'], ['4', '4 levels deeper'], ['5', '5 levels deeper'],
-    ['6', 'All child boards'],
-  ]);
-  assert.doesNotMatch(html, /value="11"/);
-  assert.doesNotMatch(script, /Math\.min\(11/, 'the old eleven-level clamp is gone');
-  // The stored preference and the picked value both go through the same ceiling, so an eleven an
-  // older board saved comes back as the deepest level there is instead of a value no option offers.
-  assert.match(script, /boardDepth = Math\.max\(0, Math\.min\(GEOHASH_MAX_BOARD_DEPTH, Number\.parseInt\(localStorage\.getItem\(BOARD_DEPTH_KEY\), 10\) \|\| 0\)\)/);
-  assert.match(script, /boardDepth = Math\.max\(0, Math\.min\(GEOHASH_MAX_BOARD_DEPTH, Number\.parseInt\(elements\.boardDepth\.value, 10\) \|\| 0\)\)/);
+  assert.doesNotMatch(select, /<option value="[1-6]">/, 'no fixed list of levels is baked into the page');
+  assert.match(script, /function boardDepthOptions\(cells\)/, 'the rows are computed from the cells');
+  assert.match(script, /options\.push\(\{value: ceiling, label: ceiling === 1 \? 'All child boards \(1 level\)' : 'All child boards'\}\)/,
+    'the last row is the ceiling, whatever it is');
+  assert.match(script, /function renderDepthOptions\(/, 'and a pass rebuilds them');
+  assert.match(script, /elements\.boardGeohash\.addEventListener\('input', \(\) => renderDepthOptions\(/,
+    'the menu follows the cell being typed');
+  // The pick itself is clamped to that ceiling, so the control can never sit on a level the board refuses.
+  assert.match(script, /boardDepth = Math\.min\(steps, boardDepthCeiling\(geohashCellsFrom\(/);
+  assert.match(script, /boardDepth = Math\.min\(boardDepth, boardDepthCeiling\(cells\)\)/,
+    'and opening a board clamps the stored depth to that board');
   // and the top of the range is the word the dropdown uses for it, rather than a rung that is not there.
-  assert.match(script, /boardDepth === GEOHASH_MAX_BOARD_DEPTH \? 'all child boards'/);
+  assert.match(script, /boardDepth >= ceiling \? 'all child boards'/);
   // Six is the whole range and not an arbitrary cap: a note is at most nine characters and a board
   // at least three, so no board is ever more than six levels from a note and the ceiling cuts nothing
   // that a reader could have asked for.
@@ -2119,13 +2130,13 @@ test('a brass plate on each side rail carries all six sockets, and the depth lig
   assert.match(css, /\.board-frame__lamps--right \{ right: calc\(var\(--board-frame, 26px\) \/ 2\); translate: 50% -50%; \}/,
     'the right plate is the left one mirrored, not shifted back with it');
 
-  // The same six sockets are built on every board, and boardLampLit says which of them burn.
-  assert.match(script, /const lit = boardLampCount\(activeGeohash\);/);
+  // The same six sockets are built on every board, and each one is lit by what the reader's depth shows there.
+  assert.match(script, /const info = boardLampInfo\(index, activeGeohashes, boardDepth\);/);
   assert.match(script, /Array\.from\(\{length: BOARD_LAMP_SOCKETS\}/,
     'the plate is cut to all six sockets whatever the board');
   assert.match(script,
-    /lamp\.className = boardLampLit\(index, lit\) \? 'board-frame__lamp board-frame__lamp--lit' : 'board-frame__lamp';/,
-    'both rails light their sockets by the one rule, in the order they build them');
+    /lamp\.className = info\?\.lit\s*\n?\s*\? 'board-frame__lamp board-frame__lamp--lit'\s*\n?\s*: `board-frame__lamp\$\{info\?\.hidden \? ' board-frame__lamp--hidden' : ''\}`;/
+    , 'a shown level is green and a hidden one is red');
   assert.match(model, /export function boardLampLit\(index, lit\) \{/,
     'and which end of the plate burns is stated once, in the model');
   // The unlit socket is a real, drawn socket rather than a level struck off the plate.
@@ -4343,87 +4354,90 @@ test('an empty board shows where to press, and the chooser waits to be asked for
     'and closing the chooser lets it come back');
 });
 
-test('every socket on the rail says what it stands for', async () => {
-  const { boardLampInfo, boardLampSummary, boardLampCount, BOARD_LAMP_SOCKETS } =
+test('every socket on the rail says what it stands for, and whether its notes show', async () => {
+  const { boardLampInfo, boardLampSummary, boardLampCount, boardDepthCeiling, BOARD_LAMP_SOCKETS } =
     await import('../stickyNotesModel.mjs');
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
 
   assert.equal(BOARD_LAMP_SOCKETS, 6);
 
-  // A four-letter board: the first socket is its own level and stays dark, the five below it are open.
-  const four = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267']));
-  assert.deepEqual(four.map(lamp => lamp.level), [4, 5, 6, 7, 8, 9]);
-  assert.deepEqual(four.map(lamp => lamp.lit), [false, true, true, true, true, true]);
-  assert.equal(four[0].title, "Level 4 · u267 is this board's own cell");
-  assert.equal(four[1].title, 'Level 5 · u267… is 1 letter deeper');
-  assert.equal(four[5].title, 'Level 9 · u267… is 5 letters deeper', 'and the deepest says how deep');
-  assert.equal(boardLampCount('u267'), 5);
+  // The plate is the choice drawn. On u267, exact: its own cell shows and every deeper level is hidden.
+  const exact = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 0));
+  assert.deepEqual(exact.map(lamp => lamp.level), [4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(exact.map(lamp => lamp.state), ['own', 'hidden', 'hidden', 'hidden', 'hidden', 'hidden']);
+  assert.deepEqual(exact.map(lamp => lamp.lit), [true, false, false, false, false, false]);
+  assert.equal(exact[0].title, "Level 4 · u267 is this board's own cell — shown");
+  assert.equal(exact[1].title, 'Level 5 · u267… is 1 letter deeper — hidden');
 
-  // A five-letter board opens one level fewer, and the socket for a shorter board names that shorter cell.
-  const five = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['eznv2']));
-  assert.deepEqual(five.map(lamp => lamp.lit), [false, false, true, true, true, true]);
-  assert.equal(five[0].title, 'Level 4 · eznv is a board above this one');
-  assert.equal(five[1].title, "Level 5 · eznv2 is this board's own cell");
+  // One level deeper adds one green, two add two: the greens are the levels the setting reaches.
+  const one = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 1));
+  assert.deepEqual(one.map(lamp => lamp.lit), [true, true, false, false, false, false]);
+  const two = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 2));
+  assert.deepEqual(two.map(lamp => lamp.lit), [true, true, true, false, false, false]);
+  const all = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 5));
+  assert.deepEqual(all.map(lamp => lamp.lit), [true, true, true, true, true, true]);
 
-  // The deepest board opens nothing at all, and every socket still explains itself rather than going quiet.
-  const nine = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u2678kx9z']));
-  assert.deepEqual(nine.map(lamp => lamp.lit), [false, false, false, false, false, false]);
-  assert.equal(nine[5].title, "Level 9 · u2678kx9z is this board's own cell");
+  // A depth past what the cell has is the same plate as the deepest level it does have.
+  assert.deepEqual(
+    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267'], 6)).map(lamp => lamp.lit),
+    all.map(lamp => lamp.lit),
+  );
 
-  // A board of several cells names the first and counts the rest.
-  assert.match(boardLampInfo(0, ['u267', 'u268']).title, /\(\+1 more\)$/);
+  // An eight-letter board owns one level and has one below it, which is all the reader can be offered.
+  assert.equal(boardDepthCeiling(['u267tnw1']), 1);
+  const deepExact = Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267tnw1'], 0));
+  assert.deepEqual(deepExact.map(lamp => lamp.state), ['above', 'above', 'above', 'above', 'own', 'hidden']);
+  assert.equal(deepExact[3].title, 'Level 7 · u267tnw is a board above this one — hidden');
+  assert.deepEqual(
+    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u267tnw1'], 1)).map(lamp => lamp.lit),
+    [false, false, false, false, true, true],
+  );
+
+  // A nine-letter board has nothing under it at all: its own socket is the only green there can be.
+  assert.equal(boardDepthCeiling(['u2678kx9z']), 0);
+  assert.deepEqual(
+    Array.from({ length: 6 }, (unused, index) => boardLampInfo(index, ['u2678kx9z'], 0)).map(lamp => lamp.lit),
+    [false, false, false, false, false, true],
+  );
+
   // Nothing at all is not a crash, and says so.
-  assert.equal(boardLampInfo(0, []).title, 'Level 4 · no board open');
-  // The state each socket reports, which is what the legend prints beside the level.
-  assert.deepEqual(four.map(lamp => lamp.state), ['own', 'open', 'open', 'open', 'open', 'open']);
-  assert.equal(five[0].state, 'above');
-  assert.equal(five[1].state, 'own');
-  assert.equal(nine[5].state, 'own', 'the deepest board owns its level and opens nothing below it');
-  assert.equal(boardLampInfo(0, []).state, 'none');
-  // And the sentence's two halves travel apart, so a legend can lay them out instead of re-parsing a string.
-  assert.equal(four[1].detail, 'u267… is 1 letter deeper');
-  assert.equal(`${'Level ' + four[1].level} · ${four[1].detail}`, four[1].title);
+  assert.equal(boardLampInfo(0, [], 0).title, 'Level 4 · no board open');
+  assert.equal(boardLampInfo(6, ['u267'], 0), null);
+  assert.equal(boardLampInfo(-1, ['u267'], 0), null);
+  assert.equal(boardLampInfo('x', ['u267'], 0), null);
+  // A board of several cells names the first and counts the rest.
+  assert.match(boardLampInfo(0, ['u267', 'u268'], 0).title, /\(\+1 more\)/);
 
-  assert.equal(boardLampInfo(6, ['u267']), null);
-  assert.equal(boardLampInfo(-1, ['u267']), null);
-  assert.equal(boardLampInfo('x', ['u267']), null);
+  // The sentence the plate stands for names both colours, which is D's own explainer.
+  const summary = boardLampSummary(['u267'], 2);
+  assert.match(summary, /^3 of 6 levels show notes here\./);
+  assert.ok(summary.includes('Green = notes from this level show here. Red = notes in this level are hidden.'));
+  assert.equal(boardLampSummary([], 0), 'Green = notes from this level show here. Red = notes in this level are hidden.');
 
-  // The sentence the whole plate stands for.
-  assert.equal(boardLampSummary(['u267']),
-    'Levels open below this board: 5 of 6. A note pinned in a deeper cell still shows here.');
-  assert.equal(boardLampSummary(['u2678kx9z']),
-    'Levels open below this board: 0 of 6. A note pinned in a deeper cell still shows here.');
-  assert.equal(boardLampSummary([]), 'Levels open below this board: no board open.');
+  // boardLampCount still answers the arithmetic question: how many levels lie under a cell.
+  assert.equal(boardLampCount('u267'), 5);
+  assert.equal(boardLampCount('u267tnw1'), 1);
 
-  // And the plate carries it: one sentence on the strip, one line per socket on hover.
-  const { readFileSync } = await import('node:fs');
-  const { URL } = await import('node:url');
+  // And the plate carries it: one sentence on the strip, one line per socket, red for a hidden level.
   const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const sheet = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
   const rails = script.slice(script.indexOf('function renderBoardLamps()'), script.indexOf('function pulseLamps()'));
   assert.ok(rails.includes('strip.title = summary;'), 'the plate explains itself once');
-  assert.ok(rails.includes("strip.setAttribute('role', 'button')"), 'the plate is pressable, not just readable');
-  assert.ok(rails.includes('strip.tabIndex = 0;'), 'and reachable from the keyboard');
+  assert.ok(rails.includes("strip.setAttribute('role', 'button')"), 'and is pressable, not only readable');
   assert.ok(rails.includes('lamp.title = info.title;'), 'each socket explains its own level');
   assert.ok(rails.includes("lamp.setAttribute('aria-hidden', 'true')"), 'the sockets are not repeated to a screen reader');
+  assert.ok(sheet.includes('.board-frame__lamp--hidden'), 'a hidden level is red on the plate');
+  assert.ok(sheet.includes('.lamp-dialog__row--hidden .lamp-dialog__dot'), 'and red in the legend');
 
-  // A tap has to give a phone the same reading the hover titles give a mouse, because a phone shows no title.
+  // The legend reads the same states, so a hover and a tap cannot disagree.
   const legend = script.slice(script.indexOf('function renderLampDialog()'), script.indexOf('function openLampLegend()'));
-  assert.ok(legend.includes('const info = boardLampInfo(index, activeGeohashes);'),
-    'the legend and the titles come from one place, so they cannot disagree');
-  assert.ok(legend.includes("text.textContent = info.detail;"));
-  assert.ok(legend.includes("state.textContent = states[info.state] || '';"));
-  assert.match(script, /strip\.addEventListener\('click', openLampLegend\)/, 'a click opens the legend');
-  assert.match(script, /strip\.addEventListener\('keydown'/, 'and so does Enter or Space on a focused plate');
-  const open = script.slice(script.indexOf('function openLampLegend()'), script.indexOf('function openLampLegend()') + 400);
-  assert.ok(open.includes('if (!activeGeohashes.length) return;'), 'with no board there is nothing to explain');
-  assert.ok(open.includes('showDialog(elements.lampDialog);'), 'and it opens through the one hook every dialog uses');
-
-  // The dialog is really in the page, or none of the above can fire.
+  assert.ok(legend.includes('const info = boardLampInfo(index, activeGeohashes, boardDepth);'));
+  assert.ok(legend.includes("const states = {shown: 'shown', own: 'shown', hidden: 'hidden', above: 'hidden', none: 'no board'};"));
+  assert.ok(legend.includes('lamp-dialog__row--hidden'));
   const page = readFileSync(new URL('../stickyNotes.html', import.meta.url), 'utf8');
-  const sheet = readFileSync(new URL('../stickyNotes.css', import.meta.url), 'utf8');
   assert.ok(page.includes('id="lampDialog"'), 'the legend has a dialog');
   assert.ok(page.includes('id="lampDialogRows"'), 'with a list to fill');
-  assert.ok(page.includes('id="lampDialogSummary"'), 'and a place for the one sentence');
-  assert.ok(sheet.includes('.lamp-dialog__row--lit .lamp-dialog__dot'), 'an open level is marked, not only worded');
 });
 
 test('every top button wears the same resting border', async () => {
