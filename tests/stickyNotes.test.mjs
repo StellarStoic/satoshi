@@ -4035,7 +4035,7 @@ test('the account dialog carries a subscription box that states the facts', asyn
                     'accountSubscriptionLeft', 'accountSubscriptionNone']) {
     assert.ok(dialog.includes(`id="${id}"`), `${id} must be in the account dialog`);
   }
-  assert.ok(script.includes("active ? 'Active' : (resolved ? 'Not active' : 'Checking…')"),
+  assert.ok(script.includes("(free ? free.label : (resolved ? 'Not active' : 'Checking…'))"),
     'a box that has not heard from the desk must not claim there is no subscription');
   assert.ok(script.includes("session.method === 'anonymous'"), 'a throwaway key holds no subscription');
   assert.ok(script.includes('timeLeftLabel(left)'), 'the box counts down');
@@ -4234,4 +4234,33 @@ test('a zap code is drawn in a quiet zone, at whole pixels, and never scaled', a
   assert.ok(script.includes('canvas.style.width = `${side / ratio}px`'), 'the canvas is shown at the size it was drawn');
   assert.ok(css.includes('.nostr-connect-qr__canvas { max-width: 100%; height: auto;'), 'the stylesheet does not scale a code');
   assert.ok(!css.includes('.note-gift__qr canvas, .note-gift__qr img { width: min('), 'nor the card code');
+});
+
+test('a free-tier name is covered for life, not missing a subscription', async () => {
+  const { subscriptionFreeOffer } = await import('../stickyNotesModel.mjs');
+
+  // A three-letter name pays nothing, in the desk's own answer: prices.free comes from the reader's quote.
+  const three = subscriptionFreeOffer({free: true, memberNameLength: 3, weekSats: 0, yearSats: 0});
+  assert.equal(three.label, 'Free for life');
+  assert.match(three.sentence, /3-letter name is free for life/);
+  assert.match(three.sentence, /nothing to pay/, 'the reader is told they owe nothing');
+  assert.match(three.sentence, /nothing to renew/, 'and that there is no renewal to wait for');
+
+  // A four-letter name is a member at half price, not free, so it keeps the ordinary card.
+  assert.equal(subscriptionFreeOffer({free: false, memberNameLength: 4, weekSats: 5, yearSats: 205}), null);
+  // Nothing to go on is not a free tier.
+  assert.equal(subscriptionFreeOffer({}), null);
+  assert.equal(subscriptionFreeOffer(undefined), null);
+  assert.equal(subscriptionFreeOffer({free: 'yes'}), null, 'only the desk\u2019s own true counts');
+  // A free answer without a name length still says what matters.
+  assert.match(subscriptionFreeOffer({free: true}).sentence, /^Free for life/);
+
+  // And the card uses it instead of reporting an inactive subscription.
+  const { readFileSync } = await import('node:fs');
+  const { URL } = await import('node:url');
+  const script = readFileSync(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.ok(script.includes('subscriptionFreeOffer(state.prices)'), 'the card asks the model');
+  assert.ok(script.includes("free ? free.label : (resolved ? 'Not active'"),
+    'a free name is never called Not active');
+  assert.ok(script.includes('elements.accountSubscriptionNone.textContent = free.sentence'));
 });

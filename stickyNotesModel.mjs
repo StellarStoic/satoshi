@@ -835,6 +835,25 @@ export function stickyTierPrice(plan, offPercent) {
 }
 
 /** The tier a name of this length is in, or null when there is no name. */
+/**
+ * How a free-tier name is described, or null when the reader's own price is not zero.
+ *
+ * A three-letter name never pays and never renews, and the account dialog used to say nothing about it: the
+ * card read "Not active", which is true of a subscription and false of the plan the reader is actually on. The
+ * desk decides this - `prices.free` comes from the reader's own quote, so the page never guesses a tier.
+ */
+export function subscriptionFreeOffer(prices = {}) {
+  if (!prices || prices.free !== true) return null;
+  const nameLength = Number.isInteger(prices.memberNameLength) ? prices.memberNameLength : null;
+  return {
+    label: 'Free for life',
+    nameLength,
+    sentence: nameLength
+      ? `Your ${nameLength}-letter name is free for life: nothing to pay, and nothing to renew.`
+      : 'Free for life: nothing to pay, and nothing to renew.',
+  };
+}
+
 export function stickyMemberTier(nameLength) {
   if (!Number.isInteger(nameLength) || nameLength < 1) return null;
   return STICKY_MEMBER_TIERS.find(t => t.maxNameLength === null || nameLength <= t.maxNameLength)

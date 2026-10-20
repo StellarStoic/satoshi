@@ -83,7 +83,7 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
- isGiftAction, noteStackOrder} from './stickyNotesModel.mjs';
+ isGiftAction, noteStackOrder, subscriptionFreeOffer} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
@@ -1600,9 +1600,17 @@ function renderAccountSubscription(session) {
   const state = subscription;
   const resolved = subscriptionResolved && Boolean(state);
   const active = resolved && state.active === true;
-  elements.accountSubscriptionState.textContent = active ? 'Active' : (resolved ? 'Not active' : 'Checking…');
-  elements.accountSubscriptionState.classList.toggle('is-active', active);
+  // A free-tier name holds no subscription to report, and saying "Not active" about one was misleading: the
+  // reader is covered for life and simply never pays. The desk's own quote decides it, never a guess here.
+  const free = resolved && !active ? subscriptionFreeOffer(state.prices) : null;
+  elements.accountSubscriptionState.textContent = active ? 'Active' : (free ? free.label : (resolved ? 'Not active' : 'Checking…'));
+  elements.accountSubscriptionState.classList.toggle('is-active', active || Boolean(free));
   elements.accountSubscriptionRows.hidden = !active;
+  if (free) {
+    elements.accountSubscriptionNone.hidden = false;
+    elements.accountSubscriptionNone.textContent = free.sentence;
+    return;
+  }
   elements.accountSubscriptionNone.hidden = !resolved || active;
   if (!active) {
     elements.accountSubscriptionNone.textContent = resolved
