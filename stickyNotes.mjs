@@ -741,6 +741,18 @@ async function showNostrConnectDialog() {
   await attempt();
 }
 
+/**
+ * Put focus inside the board chooser without raising a phone keyboard.
+ *
+ * The board field used to take focus whenever the chooser opened, which summoned the on-screen keyboard over a
+ * dialog the reader may have opened only to look at the depth, the remembered place or the map button. The dialog
+ * itself takes focus instead: the keyboard stays down, focus still lands inside the dialog for Escape and a screen
+ * reader, and the field is one tap away when they do want to type.
+ */
+function focusBoardDialog() {
+  requestAnimationFrame(() => elements.boardDialog.focus({preventScroll: true}));
+}
+
 function showDialog(dialog) {
   // A clipboard request already in flight is the one thing the plain list of ways in cannot finish
   // on its own: the answer is sitting on the clipboard, so that step is what the reader is shown.
@@ -5409,7 +5421,7 @@ function openComposer() {
   if (!activeGeohash) {
     status(elements.boardChooserStatus, 'Choose a geohash before writing a note.');
     showDialog(elements.boardDialog);
-    requestAnimationFrame(() => elements.boardGeohash.focus());
+    focusBoardDialog();
     return;
   }
   const session = getNostrSession();
@@ -6203,7 +6215,7 @@ elements.boardStyleForm.addEventListener('submit', event => {
 // that is where a board is picked, and the map is one button further in for a reader who wants it.
 elements.boardEmptyHint.addEventListener('click', () => {
   showDialog(elements.boardDialog);
-  requestAnimationFrame(() => elements.boardGeohash.focus());
+  focusBoardDialog();
 });
 elements.openGeohashMap.addEventListener('click', () => {
   openGeohashMap().catch(error => {
@@ -6234,7 +6246,7 @@ elements.geohashMapDialog.addEventListener('close', () => {
   // marker go together, so the next open starts clean rather than showing a stale pin.
   clearPlaceSearch();
   showDialog(elements.boardDialog);
-  requestAnimationFrame(() => elements.boardGeohash.focus());
+  focusBoardDialog();
 });
 elements.useGeohashSelection.addEventListener('click', () => {
   if (!geohashMapCells.length) return;
@@ -6250,7 +6262,7 @@ elements.openBoard.addEventListener('click', () => {
   renderLockControls();
   status(elements.boardChooserStatus, '');
   showDialog(elements.boardDialog);
-  requestAnimationFrame(() => elements.boardGeohash.focus());
+  focusBoardDialog();
 });
 elements.boardChooser.addEventListener('submit', event => {
   event.preventDefault();

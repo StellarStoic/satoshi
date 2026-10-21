@@ -4328,7 +4328,7 @@ test('an empty board shows where to press, and the chooser waits to be asked for
   // back when the reader closes the chooser without picking a board, because the empty board is where they land.
   const wiring = script.slice(script.indexOf("elements.boardEmptyHint.addEventListener('click'"));
   assert.ok(wiring.slice(0, 400).includes('showDialog(elements.boardDialog)'), 'the press opens the board chooser');
-  assert.ok(wiring.slice(0, 400).includes('elements.boardGeohash.focus()'), 'with the board field ready to type in');
+  assert.ok(wiring.slice(0, 400).includes('focusBoardDialog()'), 'and focus inside it, without raising a keyboard');
   assert.doesNotMatch(script, /BOARD_HINT_KEY|localStorage\.setItem\([^)]*hint/i,
     'nothing is remembered about the clue, so it cannot be spent');
   assert.doesNotMatch(script, /settleBoardEmptyHint/, 'and there is no state that could hide it for good');
@@ -4526,4 +4526,13 @@ test('the settings dialog opens without raising a keyboard, and its text field m
     'the pattern link takes the shared field surface the relay field takes');
   assert.match(css, /\.board-texture-field input \{ min-height: 38px; padding: 6px 8px; border: 1px solid #4b4d4d; border-radius: 6px; font-size: \.8rem; \}/,
     'and the same box, border included');
+
+  // The board chooser follows the same rule: it opened by focusing the geohash field, so a phone raised a keyboard
+  // over a dialog that also carries the depth, the remembered place and the map button. Every path that opens it
+  // now hands focus to the dialog itself, which is what keeps the keyboard down without leaving focus outside.
+  assert.doesNotMatch(script, /elements\.boardGeohash\.focus\(\)/, 'the chooser no longer focuses its field');
+  assert.equal((script.match(/focusBoardDialog\(\);/g) || []).length, 4,
+    'all four open paths - the clue, the plate, the composer with no board, and the map closing - go through it');
+  assert.match(script, /function focusBoardDialog\(\) \{\n  requestAnimationFrame\(\(\) => elements\.boardDialog\.focus\(\{preventScroll: true\}\)\);\n\}/,
+    'and it is one helper, so a fifth path cannot reintroduce the keyboard');
 });
