@@ -2974,7 +2974,10 @@ function openBoardStyle() {
   showDialog(elements.boardStyleDialog);
   renderUserRelays();
   checkUserRelays();
-  requestAnimationFrame(() => elements.boardTextureUrl.focus());
+  // Not the pattern link: focusing a text field as a dialog opens raises the on-screen keyboard before the reader
+  // has asked to type, which is the whole screen given to a field they may not want. The dialog itself takes focus,
+  // so the keyboard stays down and a screen reader still lands inside the dialog.
+  requestAnimationFrame(() => elements.boardStyleDialog.focus({preventScroll: true}));
 }
 
 /** Paint the board with `url` ('' means the catalogue's own) and remember the choice here. */

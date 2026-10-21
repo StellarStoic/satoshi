@@ -4504,3 +4504,26 @@ test('a stand-in pin is the real thing, not a picture of one', async () => {
   assert.ok(layerPins.includes('raiseNote(record.sticky.id);'), 'and lifts it over the pile');
   assert.ok(layerPins.includes('openNoteMenu(record.sticky.id, pin);'), 'showing that note, not the one in front');
 });
+
+test('the settings dialog opens without raising a keyboard, and its text field matches the relay one', async () => {
+  const [script, css] = await Promise.all([
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+  ]);
+
+  // Opening Settings must not focus a text field: on a phone that raises the on-screen keyboard over a dialog the
+  // reader only meant to look at. The dialog itself takes focus, so the keyboard stays down and focus still lands
+  // inside it. Pinned because it reads like a harmless convenience until a phone reports it.
+  assert.doesNotMatch(script, /elements\.boardTextureUrl\.focus\(\)/, 'the pattern link is not focused on open');
+  assert.match(script, /requestAnimationFrame\(\(\) => elements\.boardStyleDialog\.focus\(\{preventScroll: true\}\)\)/);
+  const opener = script.slice(script.indexOf('function openBoardStyle()'), script.indexOf('function applyBoardTexture'));
+  assert.ok(opener.includes('boardStyleDialog.focus'), 'the dialog holds focus while it opens');
+  assert.ok(!opener.includes('boardTextureUrl.focus'), 'and no field in it does');
+
+  // The pattern link is a dialog text field like the relay one: same dark surface and the same 1 px box. Without a
+  // border of its own it kept the browser's default 2 px, which is what made it the odd one out.
+  assert.match(css, /\.user-relays__field input,\n\.board-texture-field input,\n/,
+    'the pattern link takes the shared field surface the relay field takes');
+  assert.match(css, /\.board-texture-field input \{ min-height: 38px; padding: 6px 8px; border: 1px solid #4b4d4d; border-radius: 6px; font-size: \.8rem; \}/,
+    'and the same box, border included');
+});
