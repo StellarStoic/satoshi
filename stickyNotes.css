@@ -1072,5 +1072,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 
 /* The one link out of Settings: a reader who wants to know what this is before pinning anything. */
 .board-style-about { margin: 18px 0 2px; color: var(--text-muted); font-size: .78rem; text-align: center; }
+/* The chooser's copy sits in a column of left-aligned explanation, so this one follows it rather than centring;
+   it comes after the base rule because both are one class deep and the later one wins. */
+.board-style-about--lead { margin: -2px 0 16px; text-align: left; }
 .board-style-about a { color: var(--text-muted); text-underline-offset: 3px; }
 .board-style-about a:hover, .board-style-about a:focus-visible { color: var(--text); }

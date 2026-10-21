@@ -4607,7 +4607,9 @@ test('the written page explains the board, and the board links to it', async () 
   assert.ok(read('sitemap.xml').includes('<loc>https://satoshi.si/about.html</loc>'), 'the sitemap lists it');
 
   // Reachable from the board itself, or nobody reads it: the Settings dialog carries the one link out.
-  assert.match(read('stickyNotes.html'), /<a href="\/about\.html">What Pinstr is<\/a>/);
+  const board = read('stickyNotes.html');
+  assert.match(board, /<a href="\/about\.html">What Pinstr is<\/a>/, 'Settings links out');
+  assert.match(board, /<a href="\/about\.html">New here\? What Pinstr is<\/a>/, 'and so does the chooser');
   const seo = read('seo.mjs');
   assert.ok(seo.includes("'/about.html': ["), 'seo.mjs knows the page, so its runtime title and canonical exist');
   const about = seo.indexOf("'/about.html': [");
