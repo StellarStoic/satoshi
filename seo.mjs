@@ -28,6 +28,7 @@ const pages = {
   '/nip05store.html': ['NIP-05 Name Store | Satoshi.si', 'Claim a NIP-05 name like yourname@satoshi.si. Pay in sats over Lightning, on-chain or Ark, and use the same key to publish to the satoshi.si nostr relay.'],
   '/nostrKeys.html': ['Nostr Keys: Convert, Generate and Mine | Satoshi.si', 'Convert, generate and mine Nostr npub and nsec keys locally in your browser, with a downloadable offline HTML copy and configurable CPU mining.'],
   '/stickyNotes.html': ['Pinstr: Geohash Nostr Boards | Satoshi.si', 'Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.'],
+  '/about.html': ['About Pinstr: geohash boards and short-lived notes', 'Pinstr is a cork board for short-lived public digital notes. Each board is a geohash, from a country-sized cell to a doorway. Notes expire, boards nest, and no account is needed.'],
   '/lottery.html': ['Bitcoin Lightning Lottery | Satoshi.si', 'Play a Bitcoin Lightning lottery with results derived transparently from Bitcoin block hashes.'],
   '/lotteryStats.html': ['Bitcoin Lottery Results and Statistics | Satoshi.si', 'Review Bitcoin Lightning lottery results, recent draws, prize pools and supporting statistics.'],
   '/ticketVerifier.html': ['Bitcoin Lottery Ticket Verifier | Satoshi.si', 'Verify a Bitcoin Lightning lottery ticket against the published draw and Bitcoin block-derived winning number.'],

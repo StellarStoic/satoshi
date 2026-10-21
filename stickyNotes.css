@@ -1069,3 +1069,8 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 /* The plates are controls now, so they take a pointer and a focus ring like one. */
 .board-frame__lamps { cursor: pointer; }
 .board-frame__lamps:focus-visible { outline: 2px solid var(--focus, #ffd15c); outline-offset: 3px; }
+
+/* The one link out of Settings: a reader who wants to know what this is before pinning anything. */
+.board-style-about { margin: 18px 0 2px; color: var(--text-muted); font-size: .78rem; text-align: center; }
+.board-style-about a { color: var(--text-muted); text-underline-offset: 3px; }
+.board-style-about a:hover, .board-style-about a:focus-visible { color: var(--text); }

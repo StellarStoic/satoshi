@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101112">
+<title>About Pinstr: geohash boards and short-lived notes</title>
+<meta name="description" content="Pinstr is a cork board for short-lived public digital notes. Each board is a geohash, from a country-sized cell to a doorway. Notes expire, boards nest, and no account is needed.">
+<link rel="canonical" href="https://satoshi.si/about.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="About Pinstr: geohash boards and short-lived notes">
+<meta property="og:description" content="Pinstr is a cork board for short-lived public digital notes. Each board is a geohash, from a country-sized cell to a doorway. Notes expire, boards nest, and no account is needed.">
+<meta property="og:url" content="https://satoshi.si/about.html">
+<meta property="og:image" content="https://satoshi.si/img/pinstr-card.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Pinned notes on a cork board">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About Pinstr">
+<meta name="twitter:description" content="Short-lived notes pinned to geohash boards. Notes expire, boards nest, no account needed.">
+<meta name="twitter:image" content="https://satoshi.si/img/pinstr-card.jpg">
+<link rel="icon" href="/img/pinstr-favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  /* The palette comes from /theme.css; these are short names for it. */
+  :root { --bg: var(--page-bg); --line: var(--border); --ink: var(--text); --dim: var(--text-muted); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--page-bg); color: var(--text);
+    font-family: var(--site-font); font-size: 15px; line-height: 1.68;
+  }
+  .page { width: min(680px, calc(100% - 36px)); margin: 0 auto; padding: 40px 0 72px; }
+  .masthead { display: flex; align-items: center; gap: 10px; margin: 0 0 34px; }
+  .masthead img { width: 26px; height: 26px; display: block; }
+  .masthead span { color: var(--text-muted); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+  .masthead a.open {
+    margin-left: auto; color: var(--text); text-decoration: none; font-size: .8rem;
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; white-space: nowrap;
+  }
+  .masthead a.open:hover, .masthead a.open:focus-visible { border-color: var(--text); }
+  h1 { margin: 0 0 26px; font-size: clamp(1.55rem, 4.6vw, 2.15rem); font-weight: 500; line-height: 1.15; }
+  h2 { margin: 34px 0 8px; font-size: 1.02rem; font-weight: 600; color: var(--text); }
+  p { margin: 0 0 14px; color: var(--text-muted); }
+  p strong { color: var(--text); font-weight: 600; }
+  /* A link has to look like one: pointed at the sentence's own words, underlined in the site's gold. */
+  a { color: var(--text); text-decoration: underline; text-decoration-color: var(--focus); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover, a:focus-visible { color: var(--focus); }
+  code { background: rgba(255,255,255,.07); border-radius: 4px; padding: 1px 5px; font-size: .86em; }
+  .lede { color: var(--text); font-size: 1.02rem; }
+  .foot { margin: 42px 0 0; padding: 22px 0 0; border-top: 1px solid var(--border); }
+  .foot p { font-size: .84rem; }
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="masthead">
+    <img src="/img/pinstr-favicon.svg" alt="" width="26" height="26">
+    <span>Pinstr</span>
+    <a class="open" href="/stickyNotes.html">Open the board</a>
+  </div>
+
+  <h1>About Pinstr</h1>
+
+  <p class="lede">Pinstr is a cork board for short-lived public digital notes. Each board is a <a href="https://en.wikipedia.org/wiki/Geohash" rel="noopener">geohash</a> - a short geohash code gor a patch of the map, from three letter (a country sized cell) to nine (a doorway). You open a board, sign a note with your <a href="https://en.wikipedia.org/wiki/Nostr" rel="noopener">Nostr</a> key, and pin it there.</p>
+
+  <h2>Notes expiration</h2>
+  <p>Every note carries an expiry (1d, 1w, 1m, 6m, 1y) the board shows what is left of it, and the paper creases as it ages: clean paper when new, worn and marked when getting closer to expiry. When it expires, the note is gone from every board, not archived, not moved to a second page. Nothing here is built to last which is the point</p>
+
+  <h2>Boards nest</h2>
+  <p>Boards nest by precision, so a note can reach a neighbourhood from a town. Open a board and the brass plates on the rails tell you what you are seeing: a light for each level below you, green where your chosen depth includes those notes, red where it hides them. Setting the depth to exact shows only this cell, each step further widens it.</p>
+
+  <h2>No account</h2>
+  <p>There's no signups. You either bring a nostr key, pair a remote signer by amber, or come in trough telegram which gives you a real Nostr identity which you can tjen export to other nostr client if you plan to explore nostr more which I definitely encourage. Anonymous posting is allowed but comes with a price to prevent spam.</p>
+
+  <h2>Public by nature</h2>
+  <p>A pinned note is public. Notes can be seen on other nostr clients and relays outside <code>wss://nostr.satoshi.si</code> could store it to so it's very important not to post anything you would not say out laud in the streets.</p>
+
+  <h2>A hobby project</h2>
+  <p>pinstr is A hobby project, suported by the users who subscribe to it probably the cheapest subscription on the internet thanks to micro payments which are possible with Bitcoin. That's why this website will always support only Bitcoin so please do not request other payment rails because they are not worth my time. But if you need help with getting started with Bitcoin feel free to reach out. I'll be happy to guide you to the right resources.</p>
+
+  <div class="foot">
+    <p><a href="/stickyNotes.html">Open the board</a> and pin something while you are here. Notes are signed by you, not by this site.</p>
+  </div>
+</main>
+</body>
+</html>

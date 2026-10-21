@@ -4585,3 +4585,31 @@ test('the board page carries its own unfurl card in the static head', async () =
   // The tool that draws it stays beside the other build tools, out of the served page set.
   assert.equal(typeof model.boardShareUrl, 'function');
 });
+
+test('the written page explains the board, and the board links to it', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const read = name => readFileSync(fileURLToPath(new URL(`../${name}`, import.meta.url)), 'utf8');
+  const page = read('about.html');
+
+  // One claim per heading: what it is, that notes expire, that boards nest, no account, public by nature.
+  assert.equal((page.match(/<h1[\s>]/g) || []).length, 1, 'one h1, the page title');
+  assert.match(page, /geohash<\/a> - a short geohash code/);
+  assert.match(page, /https:\/\/en\.wikipedia\.org\/wiki\/Geohash/);
+  assert.match(page, /https:\/\/en\.wikipedia\.org\/wiki\/Nostr/);
+  assert.match(page, /not archived, not moved to a second page/);
+  assert.match(page, /only Bitcoin/);
+
+  // A written page has to be findable: self-canonical, a card for the paste, and a line in the sitemap.
+  assert.match(page, /<link rel="canonical" href="https:\/\/satoshi\.si\/about\.html">/);
+  assert.match(page, /<meta property="og:image" content="https:\/\/satoshi\.si\/img\/pinstr-card\.jpg">/);
+  assert.match(page, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.ok(read('sitemap.xml').includes('<loc>https://satoshi.si/about.html</loc>'), 'the sitemap lists it');
+
+  // Reachable from the board itself, or nobody reads it: the Settings dialog carries the one link out.
+  assert.match(read('stickyNotes.html'), /<a href="\/about\.html">What Pinstr is<\/a>/);
+  const seo = read('seo.mjs');
+  assert.ok(seo.includes("'/about.html': ["), 'seo.mjs knows the page, so its runtime title and canonical exist');
+  const about = seo.indexOf("'/about.html': [");
+  assert.ok(about > seo.indexOf("'/index.html': ["), 'added after the adjacent pair, which must stay adjacent');
+});
