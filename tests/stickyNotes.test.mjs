@@ -4594,7 +4594,7 @@ test('the written page explains the board, and the board links to it', async () 
 
   // One claim per heading: what it is, that notes expire, that boards nest, no account, public by nature.
   assert.equal((page.match(/<h1[\s>]/g) || []).length, 1, 'one h1, the page title');
-  assert.match(page, /geohash<\/a> - a short geohash code/);
+  assert.match(page, /geohash<\/a>: a short code for a patch of the map, from three letters/);
   assert.match(page, /https:\/\/en\.wikipedia\.org\/wiki\/Geohash/);
   assert.match(page, /https:\/\/en\.wikipedia\.org\/wiki\/Nostr/);
   assert.match(page, /not archived, not moved to a second page/);
