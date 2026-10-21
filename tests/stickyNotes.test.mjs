@@ -4536,3 +4536,52 @@ test('the settings dialog opens without raising a keyboard, and its text field m
   assert.match(script, /function focusBoardDialog\(\) \{\n  requestAnimationFrame\(\(\) => elements\.boardDialog\.focus\(\{preventScroll: true\}\)\);\n\}/,
     'and it is one helper, so a fifth path cannot reintroduce the keyboard');
 });
+
+test('the board page carries its own unfurl card in the static head', async () => {
+  const [html, model] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    import('../stickyNotesModel.mjs'),
+  ]);
+  const { readFileSync } = await import('node:fs');
+
+  // Nothing that pastes a link runs the page, so a card injected by seo.mjs at runtime is a card nobody sees in a
+  // chat. These are in the served HTML, which is what an unfurler reads.
+  for (const tag of [
+    '<meta property="og:type" content="website">',
+    '<meta property="og:site_name" content="Satoshi.si">',
+    '<meta property="og:title" content="Pinstr: Geohash Nostr Boards | Satoshi.si">',
+    '<meta property="og:description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.">',
+    '<meta property="og:url" content="https://satoshi.si/stickyNotes.html">',
+    '<meta property="og:image" content="https://satoshi.si/img/pinstr-card.jpg">',
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    '<meta name="twitter:card" content="summary_large_image">',
+    '<meta name="twitter:image" content="https://satoshi.si/img/pinstr-card.jpg">',
+  ]) {
+    assert.ok(html.includes(tag), `the head carries ${tag}`);
+  }
+  // The canonical is this page, on this host: a canonical pointing at another domain asks to be dropped from the index.
+  assert.ok(html.includes('<link rel="canonical" href="https://satoshi.si/stickyNotes.html">'));
+  assert.equal((html.match(/rel="canonical"/g) || []).length, 1, 'and there is exactly one of them');
+
+  // The card itself is a real 1200x630 JPEG beside the board's other pictures, not a name the head hopes for.
+  const card = readFileSync(new URL('../img/pinstr-card.jpg', import.meta.url));
+  assert.deepEqual([...card.subarray(0, 3)], [0xff, 0xd8, 0xff], 'the card is a JPEG');
+  let offset = 2;
+  let size = null;
+  while (offset < card.length - 1) {
+    if (card[offset] !== 0xff) { offset += 1; continue; }
+    const marker = card[offset + 1];
+    const length = card.readUInt16BE(offset + 2);
+    // SOF0/SOF2 carry the frame's height and width.
+    if ([0xc0, 0xc2].includes(marker)) {
+      size = [card.readUInt16BE(offset + 7), card.readUInt16BE(offset + 5)];
+      break;
+    }
+    offset += 2 + length;
+  }
+  assert.deepEqual(size, [1200, 630], 'and its pixels are the size the head advertises');
+  assert.ok(card.length > 60_000 && card.length < 400_000, `its weight suits a chat preview, found ${card.length} bytes`);
+  // The tool that draws it stays beside the other build tools, out of the served page set.
+  assert.equal(typeof model.boardShareUrl, 'function');
+});

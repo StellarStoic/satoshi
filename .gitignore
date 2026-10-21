@@ -1,5 +1,7 @@
 /tools/*
 !/tools/build-stego-local.mjs
+# The share card's source page: the picture a pasted Pinstr link unfurls with is drawn here.
+!/tools/share-card.html
 !/tools/bip39/
 !/tools/history/
 !/tools/news/

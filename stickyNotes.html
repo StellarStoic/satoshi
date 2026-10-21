@@ -6,6 +6,22 @@
   <meta name="theme-color" content="#101112">
   <meta name="description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.">
   <link rel="canonical" href="https://satoshi.si/stickyNotes.html">
+  <!-- A link to the board has to unfurl: every chat that pastes it reads these, and none of them run the
+       page's JavaScript, so the card lives in the static head rather than being injected later by seo.mjs.
+       The mirror at pinstr.si rewrites this block's URLs and names in one row (pinstr-site-sync). -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Satoshi.si">
+  <meta property="og:title" content="Pinstr: Geohash Nostr Boards | Satoshi.si">
+  <meta property="og:description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.">
+  <meta property="og:url" content="https://satoshi.si/stickyNotes.html">
+  <meta property="og:image" content="https://satoshi.si/img/pinstr-card.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Pinned notes on a cork board">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pinstr: Geohash Nostr Boards | Satoshi.si">
+  <meta name="twitter:description" content="Pinstr lets you sign and pin temporary Nostr notes to public geohash boards.">
+  <meta name="twitter:image" content="https://satoshi.si/img/pinstr-card.jpg">
   <title>Pinstr: Geohash Nostr Boards | Satoshi.si</title>
   <link rel="icon" href="/img/pinstr-favicon.svg" type="image/svg+xml">
   <link rel="icon" type="image/png" sizes="32x32" href="/img/pinstr-favicon-32.png">
