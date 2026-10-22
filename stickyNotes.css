@@ -148,6 +148,9 @@
 .note-menu__paid i { color: #c7c9c8; font-size: .95rem; }
 .note-menu__paid[data-payment="bitcoin"] i { color: #f7931a; }
 .note-menu__paid[data-payment="pow"] i { color: #e5484d; }
+/* A note that declares an agent posted it. Same row as the payment mark, in the colour the set
+   gives that icon, because it is the same kind of statement: how this note came to be. */
+.note-menu__agent i { color: #98d9d5; }
 .note-menu__paid[data-payment="cash"] i { color: #2fbf71; }
 
 /* React or zap: what the signature opens. Everything in here is a choice, so it is built as rows

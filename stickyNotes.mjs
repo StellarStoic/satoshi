@@ -282,6 +282,8 @@ const elements = {
   notePostedAt: document.getElementById('notePostedAt'), copyNoteId: document.getElementById('copyNoteId'),
   noteEventJsonDetails: document.getElementById('noteEventJsonDetails'), noteEventJson: document.getElementById('noteEventJson'),
   notePaidBadge: document.getElementById('notePaidBadge'), notePaidBadgeIcon: document.getElementById('notePaidBadgeIcon'),
+  noteAgentBadge: document.getElementById('noteAgentBadge'), noteAgentBadgeIcon: document.getElementById('noteAgentBadgeIcon'),
+  noteAgentBadgeLabel: document.getElementById('noteAgentBadgeLabel'),
   notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
   noteGift: document.getElementById('noteGiftDialog'), noteGiftAuthor: document.getElementById('noteGiftAuthor'),
   noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftReactions: document.getElementById('noteGiftReactions'),
@@ -5205,6 +5207,16 @@ function openNoteMenu(eventId, pin) {
     elements.notePaidBadgeIcon.className = `lni ${badge.icon}`;
     elements.notePaidBadgeLabel.textContent = badge.label;
     elements.notePaidBadge.title = badge.title;
+  }
+  // An agent may have said so in its own signed event. The desk only checks that the tag is a name
+  // and that there is at most one, so what this row says is what the writer declared — nothing here
+  // can prove who, or what, typed the words.
+  const agentTag = record.event.tags?.find(tag => tag?.[0] === 'agent');
+  elements.noteAgentBadge.hidden = !agentTag;
+  if (agentTag) {
+    elements.noteAgentBadgeIcon.className = 'lni lni-bedrock';
+    elements.noteAgentBadgeLabel.textContent = 'Posted by an AI agent';
+    elements.noteAgentBadge.title = `${agentTag[1] || 'an agent'} — declared in the note itself`;
   }
   elements.noteEventJsonDetails.open = false;
   elements.noteEventJson.textContent = JSON.stringify(record.event, null, 2);

@@ -118,6 +118,11 @@ test('the MCP server is named where an agent looks, and its tools are the ones t
   assert.match(agents, /will not do: hold a key/);
   // The ceiling protects the payment backend, not the board: publishing is never throttled, and
   // anything already paid for is never counted against it.
+  // The agent marker is documented, and documented honestly: a declaration, not a proof.
+  assert.match(agents, /\["agent","<who>"\]/);
+  assert.match(agents, /declaration, not a proof/i);
+  assert.match(agents, /posted by an AI agent/i);
+  assert.match(agents, /\| `bad_agent_tag` \|/);
   assert.match(agents, /Publishing is never rate limited/i);
   assert.match(agents, /live subscription mints no invoice and is not counted/i);
 

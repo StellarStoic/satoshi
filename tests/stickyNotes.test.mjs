@@ -3400,6 +3400,18 @@ test('the note details say how the note was paid for, and can copy its own JSON'
   assert.doesNotMatch(css, /\.note-menu__paid i \{[^}]*var\(--accent/,
     'payment provenance colors never follow the selected theme');
   assert.match(page, /await navigator\.clipboard\.writeText\(json\)/, 'it copies the event it built');
+
+  // A note may declare that an agent posted it. The row is the writer's own claim, so it says
+  // where the claim came from; the icon is the one the vendored set already carries for it.
+  assert.match(html, /id="noteAgentBadge"[^>]*hidden/, 'no declaration, no row');
+  assert.match(html, /id="noteAgentBadgeLabel">Posted by an AI agent</);
+  assert.match(page, /const agentTag = record\.event\.tags\?\.find\(tag => tag\?\.\[0\] === 'agent'\)/);
+  assert.match(page, /elements\.noteAgentBadge\.hidden = !agentTag/);
+  assert.match(page, /elements\.noteAgentBadgeIcon\.className = 'lni lni-bedrock'/);
+  assert.match(page, /declared in the note itself/, 'the row admits it is a declaration');
+  assert.match(css, /\.note-menu__agent i \{ color: #98d9d5; \}/);
+  const iconSet = await readFile(new URL('../vendor/lineicons/lineicons.css', import.meta.url), 'utf8');
+  assert.match(iconSet, /\.lni\.lni-bedrock:before/, 'the icon the row asks for exists in the vendored set');
   assert.match(page, /elements\.copyNoteJson\.addEventListener\('click', copySelectedNoteJson\)/);
   // And the mark has left the note's own paper: no class, no rule.
   assert.doesNotMatch(css, /sticky-note__paid/);
