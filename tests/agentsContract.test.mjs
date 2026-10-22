@@ -116,7 +116,10 @@ test('the MCP server is named where an agent looks, and its tools are the ones t
   }
   // The one promise that keeps the server safe to expose: it never holds what it could sign with.
   assert.match(agents, /will not do: hold a key/);
-  assert.match(agents, /rate limited per address/i);
+  // The ceiling protects the payment backend, not the board: publishing is never throttled, and
+  // anything already paid for is never counted against it.
+  assert.match(agents, /Publishing is never rate limited/i);
+  assert.match(agents, /live subscription mints no invoice and is not counted/i);
 
   const llms = read('llms.txt');
   assert.match(llms, /https:\/\/pinstr\.si\/mcp/);

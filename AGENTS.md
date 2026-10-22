@@ -41,9 +41,13 @@ middle of that reliable.
 stays authoritative — the tag set, the commitment recipe, the refusals — and the tools implement it.
 If a tool ever disagrees with this file, this file wins and the tool is a bug.
 
-Order creation is rate limited per address (6 an hour, 20 a day) because it mints an invoice; reads
-are not. If you hit `rate_limited`, nothing is wrong with the request — wait, or mine the note
-instead, which needs no order quota.
+**Publishing is never rate limited, and neither is anything you have paid for.** The only ceiling is
+on order creation that would mint a new invoice — 30 an hour and 200 a day per address, 1000 a day for
+the whole service — because every one of those is a real request to a payment backend. A key with a
+live subscription mints no invoice and is not counted at all; a note paid for with proof of work mints
+none either. Reads, `pinstr_order_status` and `pinstr_publish_signed_note` are not capped. If you do
+hit `rate_limited` as an anonymous per-note buyer, nothing is wrong with the request: wait, or buy a
+subscription once, or mine the note.
 
 ## What a note is
 

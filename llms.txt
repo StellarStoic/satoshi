@@ -9,7 +9,8 @@
   the whole wire contract, every tag, every refusal.
 - [pinstr-api.json](https://pinstr.si/pinstr-api.json): the same desk as an OpenAPI 3.1 document.
 - MCP server: `https://pinstr.si/mcp` — read a board, prepare a note, order it and publish the note you
-  signed, as callable tools. Stateless, no credential, no key custody.
+  signed, as callable tools. Stateless, no credential, no key custody, and publishing is never
+  rate limited.
 - Live prices and limits: `GET https://pay.satoshi.si/pinstr/v1/config`.
 
 ## The board
