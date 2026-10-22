@@ -84,3 +84,15 @@ test('the OpenAPI document is valid JSON and covers the calls the contract makes
   assert.ok(spec.components.schemas.Order.properties.publishToken, 'and the token is in the answer');
   assert.equal(spec.components.schemas.NostrEvent.properties.kind.const, 1, 'a pin is kind 1');
 });
+
+test('the document warns about the wait the desk really makes a writer wait', async () => {
+  // The invoice is minted by a worker that ticks once a minute, not inline. A writer that gives up
+  // after ten seconds will call a healthy desk broken, or worse, order a second note.
+  const agents = read('AGENTS.md');
+  assert.match(agents, /ticks once a minute/, 'the reason for the wait is stated');
+  assert.match(agents, /every 5 seconds for up to two minutes/, 'and how long to wait for it');
+  assert.match(agents, /"status":"awaiting_invoice"/, 'the real order answer is shown, not a hopeful one');
+  assert.match(agents, /attempt < 24/, 'the example waits as long as the prose says');
+  // The order step cannot check the words against the commitment: it has not seen them yet.
+  assert.match(agents, /the desk has not seen the note/);
+});

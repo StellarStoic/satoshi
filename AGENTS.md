@@ -62,12 +62,17 @@ curl -sS -X POST "$API/orders" -H 'content-type: application/json' -d '{
   "geohashMode": "exact",
   "anonymous": true
 }'
-# -> 201 {"ok":true,"id":"<order id>","sats":69,"status":"awaiting_payment",
-#         "payment":{"bolt11":"lnbc...","lightningUri":"lightning:lnbc...","paymentLink":"https://..."},
-#         "expiresAt":<unix>,"publishToken":null,...}
+# -> 201 {"ok":true,"id":"<order id>","sats":69,"status":"awaiting_invoice",
+#         "payment":null,"expiresAt":<unix>,"publishToken":null,...}
+#    Nothing is checked against the text yet: the desk has not seen the note. contentHash is a
+#    promise it will hold you to at publish, so an order always succeeds on a well-formed body.
 
-# 3. Pay payment.bolt11 from any Lightning wallet you control (NWC, LNbits, Alby, CLN, LND, a wallet
-#    on your own host — this desk does not care where the sats come from). Then poll:
+# 3. Wait for the invoice, then pay it. The desk does not mint invoices inline: the order is queued
+#    to a worker that ticks once a minute, so payment.bolt11 appears within about 60-90 seconds of
+#    the order. Poll GET /orders/<id> every 5 seconds for up to two minutes before deciding the desk
+#    is down — a writer that gives up after ten seconds will wrongly report the desk broken.
+#    Pay payment.bolt11 from any Lightning wallet you control (NWC, LNbits, Alby, CLN, LND, a wallet
+#    on your own host — this desk does not care where the sats come from). Then poll the same URL:
 
 curl -sS "$API/orders/<order id>"
 # -> 200 {"ok":true,"status":"paid","paid":true,"publishToken":"<token>",
@@ -218,12 +223,14 @@ if (!order.ok) throw new Error(`${order.code}: ${order.error}`);
 
 // 2. pay order.payment.bolt11 with your Lightning wallet here, then poll until paid
 let polled;
-for (let attempt = 0; attempt < 60; attempt += 1) {
+for (let attempt = 0; attempt < 24; attempt += 1) {
   polled = await (await fetch(`${API}/orders/${order.id}`)).json();
   if (polled.publishToken) break;
-  await new Promise(done => setTimeout(done, 3000));
+  // 24 tries at 5 s is two minutes: the worker that mints the invoice ticks once a minute, so a
+  // shorter wait reports the desk down when it is merely busy.
+  await new Promise(done => setTimeout(done, 5000));
 }
-if (!polled.publishToken) throw new Error('the invoice was never paid');
+if (!polled.publishToken) throw new Error('not paid: no publish token after two minutes');
 
 // 3. the note: hashed first, signed last
 const event = finalizeEvent({
