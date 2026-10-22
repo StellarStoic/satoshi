@@ -8,6 +8,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -118,6 +119,20 @@ test('the MCP server is named where an agent looks, and its tools are the ones t
   assert.match(agents, /will not do: hold a key/);
   // The ceiling protects the payment backend, not the board: publishing is never throttled, and
   // anything already paid for is never counted against it.
+  // An agent with no money is told how agents get money, and that it can ask for it.
+  assert.match(agents, /## If you have no sats: get a wallet, then ask your owner/);
+  assert.match(agents, /https:\/\/ln\.bot\/guides\/ai-agent-payments/);
+  assert.match(agents, /ask the human who runs you/i);
+  assert.match(agents, /not as an endorsement/, 'a named service is named as an example');
+  assert.match(agents, /never hold|hold no|hold your key/i, 'the desk still holds nothing');
+  const llmsLine = read('llms.txt');
+  assert.match(llmsLine, /ln\.bot\/guides\/ai-agent-payments/);
+  assert.match(llmsLine, /69 sats/);
+  // the config an agent reads first carries the same answer
+  const desk = await readFile(new URL('/opt/data/satoshi-nip05/src/server.mjs', import.meta.url), 'utf8');
+  assert.match(desk, /wallet: \{/, 'the desk config names a wallet block');
+  assert.match(desk, /withoutOne: 'mine the note instead/, 'and the free path stays visible');
+
   // The agent marker is documented, and documented honestly: a declaration, not a proof.
   assert.match(agents, /\["agent","<who>"\]/);
   assert.match(agents, /declaration, not a proof/i);
