@@ -4603,6 +4603,9 @@ test('the written page explains the board, and the board links to it', async () 
   // A written page has to be findable: self-canonical, a card for the paste, and a line in the sitemap.
   assert.match(page, /<link rel="canonical" href="https:\/\/satoshi\.si\/about\.html">/);
   assert.match(page, /<meta property="og:image" content="https:\/\/satoshi\.si\/img\/pinstr-card\.jpg">/);
+  // Every page on this site names its site in the card, and the mirror rewrites that one tag per
+  // origin — an about page without it is the one page that unfurls as an untitled link.
+  assert.match(page, /<meta property="og:site_name" content="Satoshi\.si">/);
   assert.match(page, /<meta name="twitter:card" content="summary_large_image">/);
   assert.ok(read('sitemap.xml').includes('<loc>https://satoshi.si/about.html</loc>'), 'the sitemap lists it');
 
