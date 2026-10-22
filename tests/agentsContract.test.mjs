@@ -96,3 +96,35 @@ test('the document warns about the wait the desk really makes a writer wait', as
   // The order step cannot check the words against the commitment: it has not seen them yet.
   assert.match(agents, /the desk has not seen the note/);
 });
+
+test('the MCP server is named where an agent looks, and its tools are the ones that exist', async () => {
+  // The tools live in a Python service on the VPS, so the contract cannot import them; instead both
+  // sides name the same eight tools and the service's own suite asserts its list. Two anchors, one
+  // list: a tool added on the server without a mention here is caught by review, and a mention of a
+  // tool that does not exist is caught by tools/list disagreeing with this document.
+  const agents = read('AGENTS.md');
+  assert.match(agents, /## Tools instead of HTTP: MCP/);
+  assert.match(agents, /https:\/\/pinstr\.si\/mcp/);
+  assert.match(agents, /stateless/i);
+  for (const tool of ['pinstr_config', 'pinstr_list_boards', 'pinstr_board_notes', 'pinstr_quote',
+    'pinstr_prepare_note', 'pinstr_order_note', 'pinstr_order_status',
+    'pinstr_publish_signed_note']) {
+    assert.ok(agents.includes('`' + tool + '`'), `the document names the ${tool} tool`);
+  }
+  for (const uri of ['pinstr://AGENTS.md', 'pinstr://pinstr-api.json', 'pinstr://llms.txt']) {
+    assert.ok(agents.includes(uri), `the document names the ${uri} resource`);
+  }
+  // The one promise that keeps the server safe to expose: it never holds what it could sign with.
+  assert.match(agents, /will not do: hold a key/);
+  assert.match(agents, /rate limited per address/i);
+
+  const llms = read('llms.txt');
+  assert.match(llms, /https:\/\/pinstr\.si\/mcp/);
+
+  const spec = JSON.parse(read('pinstr-api.json'));
+  assert.equal(spec['x-mcp'].url, 'https://pinstr.si/mcp');
+  assert.equal(spec['x-mcp'].tools.length, 8, 'the spec lists eight tools');
+  for (const tool of spec['x-mcp'].tools) {
+    assert.ok(agents.includes('`' + tool + '`'), `${tool} in the spec and in the contract`);
+  }
+});

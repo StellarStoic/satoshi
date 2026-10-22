@@ -5,28 +5,63 @@
     "version": "1.0.0",
     "summary": "Order, pay for and publish a note on the Pinstr geohash board.",
     "description": "The desk sells two things: a pin (one note on a geohash board, 69 sats anonymously or covered by a subscription, or free if you mine its event id to 29 leading zero bits) and a subscription. Notes are public Nostr kind-1 events that expire. Read https://pinstr.si/AGENTS.md before spending sats: the note must hash to what was paid for and carry an exact set of tags, and a rejected event is not refunded.",
-    "contact": { "name": "Pinstr", "url": "https://pinstr.si/AGENTS.md" },
-    "license": { "name": "MIT", "identifier": "MIT" }
+    "contact": {
+      "name": "Pinstr",
+      "url": "https://pinstr.si/AGENTS.md"
+    },
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
   },
   "servers": [
-    { "url": "https://pay.satoshi.si/pinstr/v1", "description": "the desk" }
+    {
+      "url": "https://pay.satoshi.si/pinstr/v1",
+      "description": "the desk"
+    }
   ],
   "tags": [
-    { "name": "read", "description": "public reads, no payment" },
-    { "name": "buy", "description": "ordering and publishing a note" }
+    {
+      "name": "read",
+      "description": "public reads, no payment"
+    },
+    {
+      "name": "buy",
+      "description": "ordering and publishing a note"
+    }
   ],
   "paths": {
     "/health": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "Is the desk alive",
         "operationId": "health",
-        "responses": { "200": { "description": "alive", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/config": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "Prices, proof-of-work difficulty, subscription tiers and the agent pointers",
         "description": "Read this instead of hardcoding anything. The `agent` object carries the documentation URL, this specification, the ordered flow, the relays and the rules.",
         "operationId": "config",
@@ -38,25 +73,59 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "anonymousSats": { "type": "integer", "example": 69 },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "anonymousSats": {
+                      "type": "integer",
+                      "example": 69
+                    },
                     "pow": {
                       "type": "object",
                       "properties": {
-                        "bits": { "type": "integer", "example": 29 },
-                        "tag": { "type": "string", "example": "nonce" },
-                        "claim": { "type": "string" }
+                        "bits": {
+                          "type": "integer",
+                          "example": 29
+                        },
+                        "tag": {
+                          "type": "string",
+                          "example": "nonce"
+                        },
+                        "claim": {
+                          "type": "string"
+                        }
                       }
                     },
-                    "subscription": { "type": "object", "additionalProperties": true },
+                    "subscription": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
                     "agent": {
                       "type": "object",
                       "properties": {
-                        "docs": { "type": "string", "format": "uri" },
-                        "spec": { "type": "string", "format": "uri" },
-                        "flow": { "type": "array", "items": { "type": "string" } },
-                        "relays": { "type": "array", "items": { "type": "string" } },
-                        "signWith": { "type": "string" }
+                        "docs": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "spec": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "flow": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "relays": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "signWith": {
+                          "type": "string"
+                        }
                       }
                     }
                   }
@@ -69,31 +138,76 @@
     },
     "/quote": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "What a pin would cost for this key",
         "operationId": "quote",
         "parameters": [
-          { "name": "pubkey", "in": "query", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "description": "x-only Nostr public key, 64 lowercase hex" }
+          {
+            "name": "pubkey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "description": "x-only Nostr public key, 64 lowercase hex"
+          }
         ],
         "responses": {
-          "200": { "description": "the price, and why", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }
+          "200": {
+            "description": "the price, and why",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
         }
       }
     },
     "/subscription": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "The subscription a key holds, if any",
         "operationId": "subscription",
         "parameters": [
-          { "name": "pubkey", "in": "query", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+          {
+            "name": "pubkey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
         ],
-        "responses": { "200": { "description": "the view", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } } }
+        "responses": {
+          "200": {
+            "description": "the view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/orders": {
       "post": {
-        "tags": ["buy"],
+        "tags": [
+          "buy"
+        ],
         "summary": "Order a pin or a subscription",
         "description": "A pin must commit to the note before it is paid for: contentHash is sha256 hex of \"v1\\n\" + color + \"\\n\" + font + \"\\n\" + the normalised text. The invoice is usually attached within a second; if it is not, poll GET /orders/{id}.",
         "operationId": "createOrder",
@@ -101,40 +215,109 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/OrderRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/OrderRequest"
+              }
             }
           }
         },
         "responses": {
-          "201": { "description": "the order, with a Lightning invoice when one is due", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
-          "400": { "description": "the request was refused", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "409": { "description": "this note is already live from this key — nothing to pay", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "201": {
+            "description": "the order, with a Lightning invoice when one is due",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "the request was refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "this note is already live from this key — nothing to pay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/orders/{id}": {
       "get": {
-        "tags": ["buy"],
+        "tags": [
+          "buy"
+        ],
         "summary": "Poll an order; the publish token appears when it is paid",
         "operationId": "getOrder",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "the order", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } },
-          "404": { "description": "unknown order", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "the order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "unknown order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/orders/{id}/publish": {
       "post": {
-        "tags": ["buy"],
+        "tags": [
+          "buy"
+        ],
         "summary": "Publish the signed note this order paid for",
         "description": "The event must be signed by the pubkey that paid, must hash to the contentHash that was bought, and must carry the full tag set (see AGENTS.md). The desk validates it and hands it to the relay.",
         "operationId": "publishNote",
-        "security": [{ "publishToken": [] }],
+        "security": [
+          {
+            "publishToken": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -142,37 +325,117 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["event"],
-                "properties": { "event": { "$ref": "#/components/schemas/NostrEvent" } }
+                "required": [
+                  "event"
+                ],
+                "properties": {
+                  "event": {
+                    "$ref": "#/components/schemas/NostrEvent"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "published", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "status": { "type": "string" }, "publishedEventId": { "type": "string" }, "action": { "type": "string" } } } } } },
-          "400": { "description": "the event was refused; `reason` names the rule", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "the publish token is missing, wrong, used or older than 15 minutes", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "409": { "description": "this anonymous identity already has a note live", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "200": {
+            "description": "published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "publishedEventId": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "the event was refused; `reason` names the rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "the publish token is missing, wrong, used or older than 15 minutes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "this anonymous identity already has a note live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/boards/{cells}": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "The page a shared board link lands on",
         "operationId": "boardPage",
         "parameters": [
-          { "name": "cells", "in": "path", "required": true, "schema": { "type": "string", "example": "u267" }, "description": "one geohash cell, or up to nine comma-separated touching cells of the same length" }
+          {
+            "name": "cells",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "u267"
+            },
+            "description": "one geohash cell, or up to nine comma-separated touching cells of the same length"
+          }
         ],
         "responses": {
-          "200": { "description": "an HTML page with the board's unfurl card", "content": { "text/html": { "schema": { "type": "string" } } } },
-          "404": { "description": "not a board" }
+          "200": {
+            "description": "an HTML page with the board's unfurl card",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not a board"
+          }
         }
       }
     },
     "/board-index": {
       "get": {
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "summary": "Boards that carry a live pin, newest first",
         "operationId": "boardIndex",
         "responses": {
@@ -183,14 +446,22 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
+                    "ok": {
+                      "type": "boolean"
+                    },
                     "boards": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "cells": { "type": "string", "example": "u267" },
-                          "lastPin": { "type": "integer", "description": "unix seconds of the newest live pin on it" }
+                          "cells": {
+                            "type": "string",
+                            "example": "u267"
+                          },
+                          "lastPin": {
+                            "type": "integer",
+                            "description": "unix seconds of the newest live pin on it"
+                          }
                         }
                       }
                     }
@@ -214,81 +485,336 @@
     "schemas": {
       "OrderRequest": {
         "type": "object",
-        "required": ["action", "pubkey"],
+        "required": [
+          "action",
+          "pubkey"
+        ],
         "properties": {
-          "action": { "type": "string", "enum": ["pin", "subscribe"] },
-          "pubkey": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "x-only Nostr public key that will sign the note" },
-          "contentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "sha256 of \"v1\\n\" + color + \"\\n\" + font + \"\\n\" + normalised text — required for a pin" },
-          "geohash": { "type": "string", "description": "the cell the note is written on, 3–9 characters from the geohash alphabet" },
-          "geohashes": { "type": "array", "items": { "type": "string" }, "maxItems": 9, "description": "a clump: up to nine touching cells of the same length" },
-          "geohashMode": { "type": "string", "enum": ["exact", "prefix", "0", "1", "2", "3", "4", "5", "6"], "default": "exact", "description": "how far above its own cells the note may surface" },
-          "anonymous": { "type": "boolean", "default": false, "description": "buy under a throwaway identity; one note per throwaway key, and no subscription or mining" },
-          "pow": { "type": "boolean", "default": false, "description": "mine the note instead of paying for it" },
-          "powName": { "type": "string", "description": "name@domain, required when pow is true, on any domain" },
-          "pictureHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "sha256 of the picture file, when the note carries one; only used by the pay-once rule" },
-          "plan": { "type": "string", "enum": ["week", "year"], "description": "for action=subscribe" }
+          "action": {
+            "type": "string",
+            "enum": [
+              "pin",
+              "subscribe"
+            ]
+          },
+          "pubkey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "x-only Nostr public key that will sign the note"
+          },
+          "contentHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "sha256 of \"v1\\n\" + color + \"\\n\" + font + \"\\n\" + normalised text — required for a pin"
+          },
+          "geohash": {
+            "type": "string",
+            "description": "the cell the note is written on, 3–9 characters from the geohash alphabet"
+          },
+          "geohashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 9,
+            "description": "a clump: up to nine touching cells of the same length"
+          },
+          "geohashMode": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "prefix",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ],
+            "default": "exact",
+            "description": "how far above its own cells the note may surface"
+          },
+          "anonymous": {
+            "type": "boolean",
+            "default": false,
+            "description": "buy under a throwaway identity; one note per throwaway key, and no subscription or mining"
+          },
+          "pow": {
+            "type": "boolean",
+            "default": false,
+            "description": "mine the note instead of paying for it"
+          },
+          "powName": {
+            "type": "string",
+            "description": "name@domain, required when pow is true, on any domain"
+          },
+          "pictureHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "sha256 of the picture file, when the note carries one; only used by the pay-once rule"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "week",
+              "year"
+            ],
+            "description": "for action=subscribe"
+          }
         }
       },
       "Order": {
         "type": "object",
         "properties": {
-          "ok": { "type": "boolean" },
-          "id": { "type": "string" },
-          "action": { "type": "string", "enum": ["pin", "subscribe"] },
-          "status": { "type": "string", "enum": ["awaiting_invoice", "awaiting_payment", "paid", "published"] },
-          "sats": { "type": "integer" },
-          "geohash": { "type": ["string", "null"] },
-          "geohashes": { "type": ["array", "null"], "items": { "type": "string" } },
-          "anonymous": { "type": "boolean" },
-          "covered": { "type": "boolean", "description": "a subscription already paid for this note" },
-          "freeTier": { "type": "boolean", "description": "the name's tier makes this plan free" },
-          "powFree": { "type": "boolean" },
-          "powBits": { "type": ["integer", "null"] },
-          "paidBadge": { "type": ["string", "null"], "enum": ["pow", "bitcoin", "cash", null] },
-          "paymentMethod": { "type": "string" },
-          "expiresAt": { "type": "integer", "description": "when the unpaid order is pruned" },
-          "payment": {
-            "type": ["object", "null"],
-            "properties": {
-              "arkAddress": { "type": ["string", "null"] },
-              "bolt11": { "type": ["string", "null"], "description": "the Lightning invoice to pay" },
-              "lightningUri": { "type": ["string", "null"] },
-              "paymentLink": { "type": ["string", "null"] },
-              "methods": { "type": "array", "items": { "type": "string" } },
-              "invoiceId": { "type": ["string", "null"] }
+          "ok": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "pin",
+              "subscribe"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_invoice",
+              "awaiting_payment",
+              "paid",
+              "published"
+            ]
+          },
+          "sats": {
+            "type": "integer"
+          },
+          "geohash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geohashes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
             }
           },
-          "commitment": { "type": "object", "properties": { "contentHash": { "type": "string" } } },
-          "paid": { "type": "boolean" },
-          "publishToken": { "type": ["string", "null"], "description": "present once paid; good for 15 minutes" },
-          "publishTokenExpiresAt": { "type": ["integer", "null"] },
-          "publishedEventId": { "type": ["string", "null"] }
+          "anonymous": {
+            "type": "boolean"
+          },
+          "covered": {
+            "type": "boolean",
+            "description": "a subscription already paid for this note"
+          },
+          "freeTier": {
+            "type": "boolean",
+            "description": "the name's tier makes this plan free"
+          },
+          "powFree": {
+            "type": "boolean"
+          },
+          "powBits": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "paidBadge": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pow",
+              "bitcoin",
+              "cash",
+              null
+            ]
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "when the unpaid order is pruned"
+          },
+          "payment": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "arkAddress": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "bolt11": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "the Lightning invoice to pay"
+              },
+              "lightningUri": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "paymentLink": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "methods": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "invoiceId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "commitment": {
+            "type": "object",
+            "properties": {
+              "contentHash": {
+                "type": "string"
+              }
+            }
+          },
+          "paid": {
+            "type": "boolean"
+          },
+          "publishToken": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "present once paid; good for 15 minutes"
+          },
+          "publishTokenExpiresAt": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "publishedEventId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       },
       "NostrEvent": {
         "type": "object",
-        "required": ["id", "pubkey", "created_at", "kind", "tags", "content", "sig"],
+        "required": [
+          "id",
+          "pubkey",
+          "created_at",
+          "kind",
+          "tags",
+          "content",
+          "sig"
+        ],
         "description": "A NIP-01 event. kind must be 1 for a pin, and the tags must be the set AGENTS.md lists.",
         "properties": {
-          "id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "pubkey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "created_at": { "type": "integer" },
-          "kind": { "type": "integer", "const": 1 },
-          "tags": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } },
-          "content": { "type": "string", "maxLength": 501 },
-          "sig": { "type": "string", "pattern": "^[0-9a-f]{128}$" }
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "pubkey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "integer",
+            "const": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 501
+          },
+          "sig": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{128}$"
+          }
         }
       },
       "Error": {
         "type": "object",
-        "required": ["ok"],
+        "required": [
+          "ok"
+        ],
         "properties": {
-          "ok": { "type": "boolean", "const": false },
-          "code": { "type": "string", "description": "which rule refused, e.g. fingerprint_mismatch, bad_expiration, insufficient_pow" },
-          "reason": { "type": "string" },
-          "error": { "type": "string", "description": "a sentence written to be read by whoever sent the request" }
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "code": {
+            "type": "string",
+            "description": "which rule refused, e.g. fingerprint_mismatch, bad_expiration, insufficient_pow"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "description": "a sentence written to be read by whoever sent the request"
+          }
         }
       }
     }
+  },
+  "x-mcp": {
+    "url": "https://pinstr.si/mcp",
+    "transport": "streamable-http",
+    "stateful": false,
+    "authentication": "none — a Pinstr identity is a key the caller holds, not an account here",
+    "tools": [
+      "pinstr_config",
+      "pinstr_list_boards",
+      "pinstr_board_notes",
+      "pinstr_quote",
+      "pinstr_prepare_note",
+      "pinstr_order_note",
+      "pinstr_order_status",
+      "pinstr_publish_signed_note"
+    ],
+    "resources": [
+      "pinstr://AGENTS.md",
+      "pinstr://pinstr-api.json",
+      "pinstr://llms.txt"
+    ],
+    "note": "The same desk as callable tools, for hosts that speak MCP. It holds no key and no wallet: it prepares the bytes to sign and accepts the signed note back."
   }
 }
