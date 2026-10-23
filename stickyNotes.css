@@ -464,6 +464,9 @@
 .note-event-json { grid-column:1 / -1; min-width:0; border-top:1px solid #3d4040; padding-top:8px; }.note-event-json summary { color:#bfc1bf; font-size:.78rem; cursor:pointer; user-select:none; }.note-event-json[open] summary { color:var(--accent,#f2a900); }.note-event-json pre { max-height:38dvh; margin:9px 0 0; overflow:auto; border:1px solid #3d4040; border-radius:5px; padding:10px; background:#0d0e0f; white-space:pre; overscroll-behavior:contain; }.note-event-json pre code { color:#d9dbd8; font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace !important; font-size:.75rem; line-height:1.5; text-overflow:clip; white-space:pre; }
 .placement-controls { position: fixed; left: 50%; bottom: calc(54px + env(safe-area-inset-bottom)); z-index: 2250; display: flex; align-items: center; gap: 7px; translate: -50% 0; padding: 7px; border: 1px solid #4c4e4d; border-radius: 7px; background: rgba(20,21,21,.94); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
 .placement-controls[hidden] { display: none; }
+.placement-controls button:not(.primary-action) { min-width:38px; min-height:38px; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:7px 9px; border:1px solid #555; border-radius:5px; background:#252728; color:#f1f2ef; font:inherit; cursor:pointer; }
+.placement-controls button:not(.primary-action):hover, .placement-controls button:not(.primary-action):focus-visible { border-color:var(--accent,#f2a900); color:var(--accent,#f2a900); outline:none; }
+#placeStickyWorld span { font-size:.75rem; font-weight:800; }
 .discard-bin { position: fixed; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom)); z-index: 2260; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px dashed #ce4c46; border-radius: 999px; background: rgba(43,20,19,.94); color: #ff8079; font: inherit; font-size: .82rem; cursor: pointer; translate: -50% 0; box-shadow: 0 10px 26px rgba(0,0,0,.42); transition: transform .12s ease, background .12s ease, border-color .12s ease, color .12s ease; }
 .discard-bin[hidden] { display: none; }
 .discard-bin.is-armed { border-style: solid; border-color: #ff5c53; background: #7a201b; color: #fff; transform: scale(1.07); }
@@ -490,12 +493,6 @@
 @media (max-width: 480px) {
   .sticky-top-actions { right:max(12px,env(safe-area-inset-right)); gap:7px; }
   .sticky-top-button { width:40px; height:40px; font-size:22px; }
-}
-
-@media (max-width: 360px) {
-  .sticky-top-actions { gap:4px; }
-  .sticky-top-button, .sticky-help-slot { width:38px; height:38px; flex-basis:38px; }
-  .sticky-top-actions .site-help-trigger { width:38px !important; height:38px !important; min-width:38px !important; min-height:38px !important; }
 }
 
 /* Subscription state and the plan picker inside the composer */
@@ -1080,3 +1077,18 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .board-style-about--lead { margin: -2px 0 16px; text-align: left; }
 .board-style-about a { color: var(--text-muted); text-underline-offset: 3px; }
 .board-style-about a:hover, .board-style-about a:focus-visible { color: var(--text); }
+
+/* Eight equal controls still share one line with the menu on small phones. */
+@media (max-width: 420px) {
+  .sticky-top-actions { gap:4px; }
+  .sticky-top-button, .sticky-help-slot { width:36px; height:38px; flex-basis:36px; }
+  .sticky-top-actions .site-help-trigger { width:36px !important; height:38px !important; min-width:36px !important; min-height:38px !important; }
+}
+@media (max-width: 360px) {
+  .sticky-top-actions { gap:3px; }
+  .sticky-top-button, .sticky-help-slot { width:32px; flex-basis:32px; }
+  .sticky-top-actions .site-help-trigger { width:32px !important; min-width:32px !important; }
+}
+@media (max-width: 330px) {
+  .sticky-page #toggle { left:max(2px, env(safe-area-inset-left)); }
+}

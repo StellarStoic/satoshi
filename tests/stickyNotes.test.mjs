@@ -126,6 +126,19 @@ test('Pinstr notes accept up to 501 characters', () => {
   assert.equal(STICKY_MAX_CHARACTERS, 501);
 });
 
+test('the 3D plus opens the existing composer and a settled draft returns to the world', async () => {
+  const [world, board] = await Promise.all([
+    readFile(new URL('../pinstrWorld.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(world, /id="writeWorldNote"[^>]+compose=world/);
+  assert.match(board, /const worldComposerRequested = new URL\(location\.href\)\.searchParams\.get\('compose'\) === 'world'/);
+  assert.match(board, /\.\.\.\(worldComposerRequested \? \{worldAfterPayment:true\} : \{\}\)/);
+  const continuation = board.slice(board.indexOf('function continuePaidPlacement()'), board.indexOf('function beginPlacement()'));
+  assert.match(continuation, /delete next\.worldAfterPayment/);
+  assert.match(continuation, /location\.href = placementWorldHref/);
+});
+
 test('Pinstr cleans up to three one-word hashtags and always carries its reserved topic', () => {
   assert.equal(STICKY_TOPIC, 'pinstr');
   assert.equal(STICKY_HASHTAG_MAX, 3);
@@ -794,8 +807,8 @@ test('board chrome stays compact over the board', async () => {
   assert.match(html, /id="stickySettings"[\s\S]{0,180}lni-gear-1/);
   assert.doesNotMatch(html, /id="stickySettings"[^>]*disabled/, 'the gear is the settings control now');
   assert.match(html, /id="nostrAccount"[\s\S]{0,180}lni-user-4/);
-  assert.match(html, /class="sticky-help-slot"[\s\S]{0,180}id="stickySettings"[\s\S]{0,180}lni-gear-1[\s\S]{0,180}id="noteSort"[\s\S]{0,180}lni-asana[\s\S]{0,180}id="openStickyBoard"[\s\S]{0,180}lni-map-marker-1[\s\S]{0,180}id="shareArea"[\s\S]{0,180}lni-cerebras[\s\S]{0,180}id="nostrAccount"[\s\S]{0,180}lni-user-4[\s\S]{0,180}id="newSticky"[\s\S]{0,180}lni-plus/,
-    'top controls follow the requested question, gear, sort, map, nearby, account, plus order');
+  assert.match(html, /class="sticky-help-slot"[\s\S]{0,180}id="stickySettings"[\s\S]{0,180}lni-gear-1[\s\S]{0,180}id="noteSort"[\s\S]{0,180}lni-asana[\s\S]{0,180}id="openStickyBoard"[\s\S]{0,180}lni-map-marker-1[\s\S]{0,180}id="openPinstrWorld"[\s\S]{0,180}lni-box-closed[\s\S]{0,180}id="shareArea"[\s\S]{0,180}lni-cerebras[\s\S]{0,180}id="nostrAccount"[\s\S]{0,180}lni-user-4[\s\S]{0,180}id="newSticky"[\s\S]{0,180}lni-plus/,
+    'top controls follow the requested question, gear, sort, map, 3D, nearby, account, plus order');
   assert.match(html, /id="newSticky"[\s\S]{0,180}lni-plus/);
   assert.doesNotMatch(html, /id="noteFilterStatus"/);
   assert.match(html, /id="noteSort"[^>]+aria-pressed="false"/);
@@ -4543,8 +4556,8 @@ test('the settings dialog opens without raising a keyboard, and its text field m
   // over a dialog that also carries the depth, the remembered place and the map button. Every path that opens it
   // now hands focus to the dialog itself, which is what keeps the keyboard down without leaving focus outside.
   assert.doesNotMatch(script, /elements\.boardGeohash\.focus\(\)/, 'the chooser no longer focuses its field');
-  assert.equal((script.match(/focusBoardDialog\(\);/g) || []).length, 4,
-    'all four open paths - the clue, the plate, the composer with no board, and the map closing - go through it');
+  assert.equal((script.match(/focusBoardDialog\(\);/g) || []).length, 5,
+    'all five open paths - including AR without a board - keep the keyboard down');
   assert.match(script, /function focusBoardDialog\(\) \{\n  requestAnimationFrame\(\(\) => elements\.boardDialog\.focus\(\{preventScroll: true\}\)\);\n\}/,
     'and it is one helper, so a fifth path cannot reintroduce the keyboard');
 });

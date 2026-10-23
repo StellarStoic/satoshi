@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Walk through public Pinstr Nostr boards as connected 3D worlds.">
+  <meta name="robots" content="noindex,follow">
+  <title>Pinstr 3D | Satoshi.si</title>
+  <link rel="icon" href="/img/pinstr-favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/stickyNotes.css">
+  <link rel="stylesheet" href="/pinstrWorld.css">
+  <script src="/pwa.js" defer></script>
+  <script type="importmap">
+    {"imports":{"three":"/vendor/three/three.module.min.js"}}
+  </script>
+</head>
+<body class="pinstr-world-page">
+  <main id="pinstrWorld" class="pinstr-world">
+    <canvas id="worldCanvas" aria-label="Pinstr 3D boards"></canvas>
+    <div id="worldPictureLayer" class="world-picture-layer" aria-hidden="true"></div>
+
+    <a id="backToBoard" class="world-icon-button world-back" href="/stickyNotes.html" aria-label="Return to corkboard" title="Return to corkboard"><i class="lni lni-arrow-left" aria-hidden="true"></i></a>
+    <a id="writeWorldNote" class="world-icon-button world-write" href="/stickyNotes.html?compose=world" aria-label="Write a note for this board" title="Write a note"><i class="lni lni-plus" aria-hidden="true"></i></a>
+
+    <header class="world-heading">
+      <span>Pinstr 3D</span>
+      <strong id="worldGeohash">Opening board</strong>
+    </header>
+
+    <div id="worldStatus" class="world-status" role="status" aria-live="polite">Opening this world...</div>
+
+    <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Pinstr note details">
+      <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <span>Event ID</span><code id="noteEventId"></code>
+      <button type="button" id="copyNoteId" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy ID</span></button>
+      <div id="noteAgentBadge" class="note-menu__paid note-menu__agent" hidden title=""><i id="noteAgentBadgeIcon" class="lni" aria-hidden="true"></i><span id="noteAgentBadgeLabel">Posted by an AI agent</span></div>
+      <div id="notePaidBadge" class="note-menu__paid" hidden><i id="notePaidBadgeIcon" class="lni" aria-hidden="true"></i><span id="notePaidBadgeLabel"></span></div>
+      <span>Posted</span><time id="notePostedAt"></time>
+      <span id="noteExpiresLabel" hidden>Will be gone</span><div id="noteExpirationValue" class="note-menu__expiration" hidden><time id="noteExpiresAt"></time><span id="noteExpiryCountdown" class="note-expiry-countdown" aria-live="off"></span><span id="noteExpiryAged" class="note-expiry-aged" aria-live="off"></span></div>
+      <div id="noteMenuStatus" class="inline-status" role="status" aria-live="polite"></div>
+      <details id="noteEventJsonDetails" class="note-event-json">
+        <summary>Show JSON</summary>
+        <pre><code id="noteEventJson"></code></pre>
+        <button type="button" id="copyNoteJson" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy JSON</span></button>
+      </details>
+    </div>
+
+    <div id="worldPlacement" class="world-placement" hidden>
+      <span>Hold the pin for 500 ms, then move the note</span>
+      <div>
+        <a id="cancelWorldPlacement" class="world-icon-button" href="/stickyNotes.html" aria-label="Cancel placement" title="Cancel"><i class="lni lni-xmark" aria-hidden="true"></i></a>
+        <button type="button" id="finishWorldPlacement" class="world-primary"><i class="lni lni-map-marker-1" aria-hidden="true"></i><span>Sign &amp; pin note</span></button>
+      </div>
+    </div>
+
+    <div class="world-controls-shell">
+      <button type="button" id="worldControlsToggle" class="world-controls-toggle" aria-label="3D controls" title="3D controls" aria-expanded="false" aria-controls="worldControls"><i class="lni lni-menu-meatballs-1" aria-hidden="true"></i></button>
+      <div id="worldControls" class="world-controls" hidden>
+        <div><kbd>Drag</kbd><span>Look around</span></div>
+        <div><kbd>Wheel / pinch</kbd><span>Zoom</span></div>
+        <div><kbd>W A S D</kbd><span>Move</span></div>
+        <div><kbd>Q / E</kbd><span>Previous / next world</span></div>
+        <div><kbd>R</kbd><span>Reset view</span></div>
+      </div>
+    </div>
+
+    <div id="worldFlight" class="world-flight" aria-hidden="true"></div>
+  </main>
+
+  <script src="/stego/vendor/nostr-tools.bundle.js"></script>
+  <script type="module" src="/pinstrWorld.mjs"></script>
+</body>
+</html>

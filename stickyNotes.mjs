@@ -121,6 +121,7 @@ import {
   lastAmberHandOver,
   noteAmberHandOverOutcome,} from './nostrSession.mjs';
 import {payServiceUrl} from './paymentService.mjs';
+import {placementWorldHref, worldHref} from './pinstrWorldModel.mjs';
 
 const API = document.querySelector('meta[name="pinstr-api"]')?.content || payServiceUrl('pinstr');
 const RELAY = 'wss://nostr.satoshi.si';
@@ -168,7 +169,7 @@ const elements = {
   followsOnlyRow: document.getElementById('followsOnlyRow'), noteSortStatus: document.getElementById('noteSortStatus'),
   mentionMenu: document.getElementById('mentionMenu'), mentionOptions: document.getElementById('mentionOptions'),
   mentionMenuStatus: document.getElementById('mentionMenuStatus'),
-  openBoard: document.getElementById('openStickyBoard'), boardDialog: document.getElementById('boardDialog'),
+  openBoard: document.getElementById('openStickyBoard'), openWorld: document.getElementById('openPinstrWorld'), boardDialog: document.getElementById('boardDialog'),
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
   rememberBoard: document.getElementById('rememberStickyBoard'),
@@ -233,6 +234,7 @@ const elements = {
   noteImageLimit: document.getElementById('noteImageLimit'), noteImageGradeList: document.getElementById('noteImageGradeList'),
   noteImagePreview: document.getElementById('noteImagePreview'), noteImagePreviewLabel: document.getElementById('noteImagePreviewLabel'),
   paymentStatus: document.getElementById('paymentStatus'), placementControls: document.getElementById('placementControls'),
+  placeWorld: document.getElementById('placeStickyWorld'),
   discardBin: document.getElementById('discardBin'), discardDialog: document.getElementById('discardDialog'),
   discardWarning: document.getElementById('discardWarning'), discardConfirm: document.getElementById('discardNoteConfirm'),
   linkDialog: document.getElementById('linkDialog'), linkDialogUrl: document.getElementById('linkDialogUrl'),
@@ -424,6 +426,7 @@ let geohashPlaceTimer = 0;
 let geohashPlaceMarker = null;
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
+const worldComposerRequested = new URL(location.href).searchParams.get('compose') === 'world';
 // Card mode: the same page, wearing nothing but the board, so the desk can screenshot it into the
 // picture a shared board link unfurls with.
 const cardMode = new URL(location.href).searchParams.has('card');
@@ -4168,6 +4171,7 @@ async function startPayment() {
     const notePending = {action: 'pin', content, color: selectedColor, font: selectedFont, liveliness, mentions, hashtags,
       geohash: activeGeohash, geohashes: [...activeGeohashes], exactGeohash, contentHash,
       pubkey: session.pubkey, anonymous: session.method === 'anonymous',
+      ...(worldComposerRequested ? {worldAfterPayment:true} : {}),
       // A picture note points at what the desk stored. The address rides in the draft with
       // everything else, so a reload between paying and pinning does not lose it; a written
       // note carries none. The grade is kept here too, for the composer's own memory only —
@@ -4255,7 +4259,7 @@ async function startPayment() {
         ? 'Place the note on the board — it will be mined when you pin it.'
         : 'Included in your subscription. Place the note on the board.');
       elements.boardStatus.hidden = false;
-      beginPlacement();
+      continuePaidPlacement();
       return;
     }
     miningRequested = false;   // this attempt is being paid for in sats, not in work
@@ -4340,7 +4344,7 @@ async function pollPayment() {
       savePending({...pending, status: 'paid', publishToken: order.publishToken,
         paidBadge: order.paidBadge || pending.paidBadge || ''});
       if (elements.composer.open) elements.composer.close();
-      beginPlacement();
+      continuePaidPlacement();
       return;
     }
     if (['expired', 'invalid', 'cancelled'].includes(String(order.status || '').toLowerCase())) throw new Error('The invoice expired. Start again when you are ready.');
@@ -4462,11 +4466,22 @@ function syncPlacementWithSession() {
   // desk stored for it. Waiting on words alone meant a paid picture note never came back to
   // the board after a reload, and could not be placed at all.
   if (pending?.action === 'pin' && pending?.status === 'paid' && (pending?.content || pending?.image) && pendingBelongsToSession()) {
-    beginPlacement();
+    continuePaidPlacement();
     return true;
   }
   withdrawPlacement();
   return false;
+}
+
+function continuePaidPlacement() {
+  if (pending?.worldAfterPayment && Array.isArray(pending.geohashes) && pending.geohashes.length) {
+    const next = {...pending};
+    delete next.worldAfterPayment;
+    savePending(next);
+    location.href = placementWorldHref(next.geohashes, boardDepth);
+    return;
+  }
+  beginPlacement();
 }
 
 function beginPlacement() {
@@ -5422,7 +5437,9 @@ async function handleLogin(method) {
     status(elements.loginStatus, '');
     elements.login.close();
     if (pending?.status === 'paid') {
-      beginPlacement();
+      continuePaidPlacement();
+    } else if (worldComposerRequested) {
+      openComposer();
     } else {
       showLoginConfirmation(getNostrSession());
     }
@@ -6276,6 +6293,15 @@ elements.openBoard.addEventListener('click', () => {
   showDialog(elements.boardDialog);
   focusBoardDialog();
 });
+elements.openWorld.addEventListener('click', () => {
+  if (!activeGeohashes.length) {
+    status(elements.boardChooserStatus, 'Choose a geohash before opening the 3D world.', true);
+    showDialog(elements.boardDialog);
+    focusBoardDialog();
+    return;
+  }
+  location.href = worldHref(activeGeohashes, boardDepth);
+});
 elements.boardChooser.addEventListener('submit', event => {
   event.preventDefault();
   const value = elements.boardGeohash.value.trim().toLowerCase();
@@ -6784,6 +6810,10 @@ elements.pin.addEventListener('click', () => {
   if (mining) { mining.abort(); return; }
   publishPinnedNote();
 });
+elements.placeWorld.addEventListener('click', () => {
+  if (pending?.action !== 'pin' || pending?.status !== 'paid') return;
+  location.href = placementWorldHref(activeGeohashes, boardDepth);
+});
 elements.discardBin.addEventListener('click', () => openDiscardDialog());
 elements.discardConfirm.addEventListener('click', () => discardPendingNote());
 elements.discardCancel.addEventListener('click', () => keepDiscardedNote());
@@ -6808,6 +6838,9 @@ function handleNostrSessionChange() {
   if (session && elements.login.open) elements.login.close();
   // Signing out withdraws the unpinned note; signing in returns it.
   syncPlacementWithSession();
+  if (session && worldComposerRequested && pending?.status !== 'paid' && !elements.composer.open) {
+    requestAnimationFrame(openComposer);
+  }
   if (isStrandedPinDraft() && pendingBelongsToSession()) {
     status(elements.boardStatus, 'Your saved note is ready. Tap + when you want to continue.');
     elements.boardStatus.hidden = false;
@@ -7354,6 +7387,8 @@ if (!resumedSigning && pending?.status === 'waiting') {
 } else if (!resumedSigning && pending?.status === 'paid') {
   syncPlacementWithSession();
   if (unusableReturn) notice(unusableReturn);
+} else if (!resumedSigning && worldComposerRequested) {
+  requestAnimationFrame(openComposer);
 }
 
 

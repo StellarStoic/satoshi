@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v438';   // v431: the written page reads as written - spelling and stops fixed, the voice left alone
+const CACHE = 'satoshi-static-v453';   // v453: show lifetime-based paper ageing on 3D notes and photos
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',
@@ -11,8 +11,9 @@ const CORE = [
     '/vendor/bark/bark_ffi_wasm.js', '/vendor/bark/bark_ffi_wasm_bg.wasm',
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
     '/opreturn.html', '/opreturnBoard.html', '/opreturnModel.mjs', '/opreturnCard.mjs', '/opreturnPayment.mjs', '/burgerMenu.js',
-    '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs',
- '/noteGifts.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/board-cork.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
+    '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/pinstrWorld.html', '/pinstrWorld.css', '/pinstrWorld.mjs', '/pinstrWorldModel.mjs',
+ '/noteGifts.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/board-cork.png', '/img/note-crumple.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
+    '/vendor/three/three.module.min.js', '/vendor/three/three.core.min.js', '/vendor/three/OrbitControls.js',
     '/vendor/maplibre/maplibre-gl.js', '/vendor/maplibre/maplibre-gl.css',
     '/vendor/lineicons/lineicons.css', '/vendor/lineicons/lineicons-free.woff2',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',

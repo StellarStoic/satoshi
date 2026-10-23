@@ -13,11 +13,12 @@ test('AI context has no unresolved runtime placeholder', () => {
 test('AI context maps every documented page to one URL', () => {
   assert.ok(parsed.introduction.includes('Synthetic Satoshi'));
   assert.ok(parsed.rules.includes('Protect secrets'));
-  assert.equal(parsed.pages.size, 34);
+  assert.equal(parsed.pages.size, 35);
   assert.equal(parsed.pages.get('/converter.html')?.name, 'Converter');
   assert.equal(parsed.pages.get('/nip05store.html')?.name, 'NIP-05 name store');
   assert.equal(parsed.pages.get('/bitcoinTxCost.html')?.name, 'Bitcoin and Ark Transaction Cost');
   assert.equal(parsed.pages.get('/stickyNotes.html')?.name, 'Pinstr');
+  assert.equal(parsed.pages.get('/pinstrWorld.html')?.name, 'Pinstr 3D');
   assert.equal(parsed.pages.get('/nostrKeys.html')?.name, 'Nostr Keys');
   assert.equal(parsed.pages.get('/opreturn.html')?.name, 'OP_RETURN write');
   assert.equal(parsed.pages.get('/opreturnBoard.html')?.name, 'OP_RETURN read');

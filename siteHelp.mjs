@@ -198,6 +198,30 @@ export const PAGE_HELP = Object.freeze({
             },
         ]
     },
+    '/pinstrWorld.html': {
+        title: 'About Pinstr 3D',
+        description: 'Explore a public Pinstr board as a 3D world, with connected boards visible in the distance.',
+        sections: [
+            {
+                label: 'In plain words',
+                paragraphs: [
+                    'You begin at the centre of the same square, framed board used in the 2D view. Public notes are spread around and above you, facing inward with varied tilts, and some lie flat on the cork. The notes stay where they are while you turn or move. Picture notes show their image directly on the paper. Tap a pin for the same event details used by the 2D board. Hold the pin for half a second, then move left or right to orbit that note around you and move up or down to change its height. It faces you while you place it.',
+                    'If the board includes deeper geohashes, their platforms appear in the distance. Select a platform, or use Q and E, to fly between them. The board name at the top always shows where you are.',
+                    'Tap + to write through the familiar Pinstr composer. After login and payment, the draft returns here so you can place it before the final Nostr signature. No camera or location permission is needed.',
+                    'The small control below the world lists the mouse and keyboard controls. Use the mouse wheel or a two-finger pinch to zoom without leaving your standing position.'
+                ]
+            },
+            {
+                label: 'Technical',
+                paragraphs: [
+                    'The scene uses Three.js and the same verified, unexpired kind 1 Pinstr events as the corkboard. Each platform reproduces the 2D board as a tiled square surface with wooden rails; the saved image texture is reused, with cork as the fallback. Stable pseudo-random values derived locally from each event id choose its angle, distance, height, tilt, and whether it lies on the board. Floating notes face the platform centre and remain fixed in world space, so they do not follow the camera. A note returns to the same starting place without publishing 3D coordinates.',
+                    'The selected geohash is the starting platform. The depth value controls how many additional characters may identify a child platform. Notes discovered through matching geohash tags create those platforms; unrelated boards are never mixed into the scene.',
+                    'Only pin meshes receive note-selection and note-drag gestures. A tap opens the shared 2D-style event panel with payment and agent badges, posting and expiry times, copyable event id, live age, and expandable signed JSON; a 500 ms hold arms movement. Horizontal pointer displacement controls continuous angular movement around the camera position, while vertical displacement controls height. During placement the paper is oriented toward the camera. Moving a published note is temporary and helps uncover overlaps. The same lifetime curve as the 2D board fades a multiply-blended crease texture over both paper and picture content, using one of eight stable orientations derived from the event id and refreshing once a minute. Picture events project all four corners of their image from the paper plane into the screen, so the image stays flat on the note and follows its perspective without requiring WebGL access to the cross-origin image. Camera rays test the image centre and four inner corners against the 3D paper meshes, hiding it when another note is closer or when its back faces the viewer. A newly paid draft is translated back into the ordinary normalized Pinstr board placement before it is signed and published.',
+                    'Platform travel interpolates the camera and its target with a deterministic acceleration curve, a small forward overshoot, and a short settling movement. The renderer contains no camera stream, geolocation request, street-imagery request, or device-orientation listener.'
+                ]
+            }
+        ]
+    },
     '/offers.html': {
         title: 'About the P2P order book',
         description: 'Compare public peer-to-peer Bitcoin buy and sell offers from several markets in one place, then continue on the original platform.'
@@ -357,6 +381,7 @@ const TOP_RIGHT_COMPANIONS = Object.freeze({
     '/isBip39.html': {selector: '#openWordlistSettings', group: true, icon: true},
     '/wallet.html': {selector: '#openWalletSettings', group: true, icon: true},
     '/MoscowTime.html': {selector: '#openMoscowSettings', group: true, icon: true},
+    '/pinstrWorld.html': {selector: '#writeWorldNote', group: true, icon: true},
     '/stickyNotes.html': {selector: '.sticky-help-slot', mount: true}
 });
 
