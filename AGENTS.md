@@ -22,6 +22,8 @@ credential: there is no account to authorize, because a Pinstr identity is a key
 | Tool | What it gives you |
 | --- | --- |
 | `pinstr_config` | live price, proof-of-work difficulty, subscription tiers, the note rules |
+| `pinstr_place` | a place a person would name — "the Eiffel Tower", "Lake Bled" — turned into the cell to pin on, from an index this service carries |
+| `pinstr_geohash` | coordinates to a cell, or a cell back to its centre and the boards above it |
 | `pinstr_list_boards` | boards carrying a live note, newest pin first, with their links |
 | `pinstr_board_notes` | the live notes on a cell or clump, read from the relay |
 | `pinstr_quote` | what one pin costs for your key, and why |
@@ -31,6 +33,16 @@ credential: there is no account to authorize, because a Pinstr identity is a key
 | `pinstr_publish_signed_note` | hand the desk the note **you** signed |
 
 Resources: `pinstr://AGENTS.md` (this file), `pinstr://pinstr-api.json`, `pinstr://llms.txt`.
+
+### Turning a place into a cell
+
+"Pin an orange heart on the Eiffel Tower" has a mechanical answer: `pinstr_place` returns
+`u09tunquc` for it, with `u09tunqu` and `u09tunq` above it — pin at the cell, pass `geohash_mode` `2`,
+and the note is drawn on the tower's own board and named on the two wider boards so a reader who opened
+Paris still finds it. The index holds every town above five thousand people and a few hundred named
+structures, and it is a file: the service cannot ask a geocoder anything, so a name it does not know is
+answered with `pinstr_geohash` instead — give it the latitude and longitude from your own tools and it
+returns the same cell arithmetic the board uses.
 
 What the server will not do: hold a key, sign anything, or hold a wallet. A note it signed would be a
 note it authored, and the board's identity story is that the key that paid is the key that signs. So
