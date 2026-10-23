@@ -51,6 +51,16 @@
   .lede { color: var(--text); font-size: 1.02rem; }
   .foot { margin: 42px 0 0; padding: 22px 0 0; border-top: 1px solid var(--border); }
   .foot p { font-size: .84rem; }
+  /* Prices: one row per situation, the price in the second column so the eye can run down it.
+     Nothing decorative - a rule between rows and the number in the site's own gold. */
+  .costs { width: 100%; border-collapse: collapse; margin: 16px 0 14px; font-size: .92rem; }
+  .costs caption { caption-side: bottom; text-align: left; padding: 10px 0 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; }
+  .costs th, .costs td { text-align: left; padding: 9px 10px 9px 0; vertical-align: top; border-top: 1px solid var(--border); }
+  .costs thead th { border-top: 0; padding-top: 0; color: var(--text-muted); font-size: .74rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .costs tbody th { font-weight: 500; color: var(--text); width: 44%; }
+  .costs td { color: var(--text-muted); }
+  .costs strong { color: var(--focus); font-weight: 600; }
+  .costs .free { color: var(--focus); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -73,6 +83,25 @@
 
   <h2>No account</h2>
   <p>There are no signups. You either bring a Nostr key, pair a remote signer like Amber, or come in through Telegram, which gives you a real Nostr identity that you can then export to other Nostr clients if you plan to explore Nostr more, which I definitely encourage. Anonymous posting is allowed, but it comes with a price to prevent spam.</p>
+
+  <h2>What it costs</h2>
+  <p>Pinning is paid for in sats over the Lightning network, and nothing else. One price covers a whole note: a note that straddles several cells costs the same as one that fits inside a single cell, and the expiry you choose — a day or a year — does not change it.</p>
+  <table class="costs">
+    <caption>Prices in sats, worked out by the board when the order is made, never by the page. A subscribed key pins as many notes as it likes while the subscription runs.</caption>
+    <thead>
+      <tr><th scope="col">Who is pinning</th><th scope="col">Price</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">A subscribed key</th><td><strong>10 sats a week</strong> or <strong>411 sats a year</strong> — a year is 52 weeks with 21% off</td></tr>
+      <tr><th scope="row">With a 5+ character satoshi.si name</th><td>7 sats a week, 308 a year — 25% off the list price</td></tr>
+      <tr><th scope="row">With a 4-character satoshi.si name</th><td>5 sats a week, 205 a year — half the list price</td></tr>
+      <tr><th scope="row">With a 3-character satoshi.si name</th><td><span class="free">free</span> — the subscription costs nothing at all</td></tr>
+      <tr><th scope="row">An anonymous note</th><td><strong>69 sats per note</strong>, from a throwaway key that may pin one</td></tr>
+      <tr><th scope="row">A key with a NIP-05 name on any domain</th><td><span class="free">free</span>, paid in work instead: <strong>29 bits</strong> of proof of work on the note's own id</td></tr>
+    </tbody>
+  </table>
+  <p>The name is what decides a member's price, and the names are priced the same way round: on satoshi.si a 3-character name costs 50,000 sats, a 4-character one 21,000, and anything from 5 to 30 characters 5,000. The shorter the name, the less you pay every week — so a short name is worth the sats if you intend to keep pinning. Names of one or two characters are not sold.</p>
+  <p>Proof of work is the free way in for anyone with a Nostr identity: instead of sats, the note's id must start with enough zero bits, which costs electricity rather than money. It needs a NIP-05 name to claim, and the board checks the work itself — a note that claims work it does not have is refused like any other bad order.</p>
 
   <h2>Public by nature</h2>
   <p>A pinned note is public. Notes can be seen on other Nostr clients, and relays outside <code>wss://nostr.satoshi.si</code> could store them too, so it's very important not to post anything you would not say out loud in the streets.</p>
