@@ -33,10 +33,6 @@ const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
-const HEAT_SOURCE = 'btc-place-heat';
-const HEAT_FILL_LAYER = 'btc-place-heat-fill';
-const HEAT_LINE_LAYER = 'btc-place-heat-line';
-const HEAT_LABEL_LAYER = 'btc-place-heat-label';
 const MARKER_ZOOM = 9;
 const elements = {
   form:document.getElementById('btcMapSearch'), query:document.getElementById('btcMapQuery'),
@@ -65,6 +61,7 @@ let heatPlaces = null;
 let heatCells = [];
 let heatVisibleCount = 0;
 let heatController = null;
+let heatMarkers = [];
 
 function readBtcMapAuth() {
   try {
@@ -297,11 +294,16 @@ function setPlaceLayersVisible(visible) {
   });
 }
 
-function setHeatLayersVisible(visible) {
-  const visibility = visible ? 'visible' : 'none';
-  [HEAT_FILL_LAYER, HEAT_LINE_LAYER, HEAT_LABEL_LAYER].forEach(id => {
-    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visibility);
-  });
+function clearHeatMarkers() {
+  heatMarkers.forEach(marker => marker.remove());
+  heatMarkers = [];
+}
+
+function heatColor(count) {
+  if (count >= 120) return '#d8443f';
+  if (count >= 35) return '#f07800';
+  if (count >= 8) return '#f2a900';
+  return '#f6c54d';
 }
 
 function heatSummary() {
@@ -311,8 +313,7 @@ function heatSummary() {
 }
 
 function drawHeatMap() {
-  const source = map.getSource(HEAT_SOURCE);
-  if (!source || !heatPlaces) return;
+  if (!heatPlaces) return;
   const places = map.getZoom() < 5 ? heatPlaces : heatPlaces.filter(place => {
     const lat = Number(place?.lat);
     const lon = Number(place?.lon);
@@ -320,7 +321,34 @@ function drawHeatMap() {
   });
   heatVisibleCount = places.length;
   heatCells = btcMapHeatFeatures(places, map.getZoom());
-  source.setData({type:'FeatureCollection', features:heatCells});
+  clearHeatMarkers();
+  heatMarkers = heatCells.map(feature => {
+    const count = Number(feature.properties.count || 0);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btc-map-hex';
+    button.style.setProperty('--hex-color', heatColor(count));
+    button.setAttribute('aria-label', `${count.toLocaleString()} mapped Bitcoin place${count === 1 ? '' : 's'} in this region. Zoom in.`);
+    button.title = button.getAttribute('aria-label');
+    const label = document.createElement('span');
+    label.textContent = count.toLocaleString();
+    button.append(label);
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      map.easeTo({
+        center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
+        zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
+        duration:650,
+      });
+    });
+    button.addEventListener('pointerenter', () => {
+      setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
+    });
+    button.addEventListener('pointerleave', heatSummary);
+    return new window.maplibregl.Marker({element:button, anchor:'center'})
+      .setLngLat([Number(feature.properties.centerLon), Number(feature.properties.centerLat)])
+      .addTo(map);
+  });
   if (heatMode) heatSummary();
 }
 
@@ -337,11 +365,10 @@ async function enterHeatMode() {
     }
     if (!heatMode) return;
     drawHeatMap();
-    setHeatLayersVisible(true);
   } catch (error) {
     if (error.name !== 'AbortError') {
       heatMode = false;
-      setHeatLayersVisible(false);
+      clearHeatMarkers();
       setPlaceLayersVisible(true);
       setStatus('The place-density map could not be loaded. Try again shortly.', 4200);
       if (map.getZoom() >= 5) await loadViewportPlaces();
@@ -356,7 +383,7 @@ async function syncMapMode() {
     return;
   }
   heatMode = false;
-  setHeatLayersVisible(false);
+  clearHeatMarkers();
   setPlaceLayersVisible(true);
   await loadViewportPlaces();
 }
@@ -369,22 +396,6 @@ function installPlaceLayers() {
       'circle-color':'#f2a900', 'circle-radius':['step',['get','point_count'],17,20,21,100,27],
       'circle-stroke-color':'#17140d', 'circle-stroke-width':2,
     },
-  });
-  map.addSource(HEAT_SOURCE, {type:'geojson', data:EMPTY_COLLECTION});
-  map.addLayer({
-    id:HEAT_FILL_LAYER, type:'fill', source:HEAT_SOURCE, layout:{visibility:'none'},
-    paint:{
-      'fill-color':['interpolate', ['linear'], ['get','count'], 1, '#f6c54d', 8, '#f2a900', 35, '#f07800', 120, '#d8443f'],
-      'fill-opacity':.7,
-    },
-  });
-  map.addLayer({
-    id:HEAT_LINE_LAYER, type:'line', source:HEAT_SOURCE, layout:{visibility:'none'},
-    paint:{'line-color':'#fff1c5', 'line-width':1.1, 'line-opacity':.9},
-  });
-  map.addLayer({
-    id:HEAT_LABEL_LAYER, type:'symbol', source:HEAT_SOURCE, layout:{visibility:'none', 'text-field':['get','label'], 'text-size':12, 'text-allow-overlap':true},
-    paint:{'text-color':'#18130b', 'text-halo-color':'rgba(255,255,255,.68)', 'text-halo-width':1},
   });
   map.addLayer({
     id:'place-cluster-count', type:'symbol', source:'btc-places', filter:['has','point_count'],
@@ -414,24 +425,6 @@ function installPlaceLayers() {
   map.on('click', 'place-points', event => {
     const feature = event.features?.[0];
     if (feature?.properties?.id) showPlace(feature.properties.id, feature.geometry.coordinates);
-  });
-  map.on('click', HEAT_FILL_LAYER, event => {
-    const feature = event.features?.[0];
-    if (!feature) return;
-    map.easeTo({
-      center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
-      zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
-      duration:650,
-    });
-  });
-  map.on('mousemove', HEAT_FILL_LAYER, event => {
-    map.getCanvas().style.cursor = 'pointer';
-    const count = Number(event.features?.[0]?.properties?.count || 0);
-    if (count) setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
-  });
-  map.on('mouseleave', HEAT_FILL_LAYER, () => {
-    map.getCanvas().style.cursor = '';
-    heatSummary();
   });
 }
 

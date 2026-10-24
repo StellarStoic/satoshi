@@ -114,7 +114,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /function focusSearchResults\(results\)/);
   assert.match(page, /btcMapHeatFeatures\(places, map\.getZoom\(\)\)/);
   assert.match(page, /map\.getBounds\(\)\.contains/);
-  assert.match(page, /HEAT_FILL_LAYER/);
+  assert.match(page, /new window\.maplibregl\.Marker/);
+  assert.match(page, /className = 'btc-map-hex'/);
   assert.match(page, /const MARKER_ZOOM = 9/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
   assert.match(page, /setTimeout\(syncMapMode, 180\)/);
@@ -124,6 +125,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(css, /\.btc-map-search\.is-open/);
   assert.match(css, /\.btc-map-search-toggle/);
   assert.doesNotMatch(css, /\.btc-map-heat-toggle/);
+  assert.match(css, /\.btc-map-hex \{/);
+  assert.match(css, /clip-path:polygon/);
   assert.match(page, /btcMapAuthTemplate/);
   assert.match(page, /BTC_MAP_SAVED_URL/);
   assert.match(page, /sessionStorage\.setItem\(TOKEN_KEY/);
