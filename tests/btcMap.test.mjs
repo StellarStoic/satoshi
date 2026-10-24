@@ -125,6 +125,9 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /map\.getBounds\(\)\.contains/);
   assert.match(page, /classList\.add\('btc-map-heat-overlay'\)/);
   assert.match(page, /map\.project\(coordinate\)/);
+  assert.match(page, /function positionHeatOverlay\(\)/);
+  assert.match(page, /function heatFeatureAtPoint\(point\)/);
+  assert.match(page, /classList\.toggle\('is-hidden', hidden\)/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
   assert.match(page, /const MARKER_ZOOM = 9/);
   assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
@@ -139,6 +142,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.doesNotMatch(css, /\.btc-map-heat-toggle/);
   assert.match(css, /\.btc-map-heat-cell polygon/);
   assert.match(css, /fill-opacity:\.46/);
+  assert.match(css, /\.btc-map-heat-cell \{ pointer-events:none; \}/);
+  assert.match(css, /\.btc-map-heat-overlay\.is-hidden \{ display:none; \}/);
   assert.match(page, /btcMapAuthTemplate/);
   assert.match(page, /BTC_MAP_SAVED_URL/);
   assert.match(page, /sessionStorage\.setItem\(TOKEN_KEY/);

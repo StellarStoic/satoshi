@@ -64,6 +64,7 @@ let heatCells = [];
 let heatVisibleCount = 0;
 let heatController = null;
 let heatOverlay = null;
+let heatHoverCell = '';
 
 function readBtcMapAuth() {
   try {
@@ -312,53 +313,72 @@ function ensureHeatOverlay() {
   return heatOverlay;
 }
 
+function hideHeatOverlay(hidden) {
+  if (!heatOverlay) return;
+  heatOverlay.classList.toggle('is-hidden', hidden);
+  heatOverlay.setAttribute('aria-hidden', String(hidden));
+}
+
+function positionHeatOverlay() {
+  if (!heatOverlay || heatOverlay.classList.contains('is-hidden')) return;
+  for (const group of heatOverlay.children) {
+    const feature = group.heatFeature;
+    if (!feature) continue;
+    const points = feature.geometry.coordinates[0].map(coordinate => map.project(coordinate));
+    if (points.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) continue;
+    group.querySelector('polygon')?.setAttribute('points', points.map(point => `${point.x},${point.y}`).join(' '));
+    const center = map.project([Number(feature.properties.centerLon), Number(feature.properties.centerLat)]);
+    const label = group.querySelector('text');
+    label?.setAttribute('x', center.x);
+    label?.setAttribute('y', center.y);
+  }
+}
+
 function renderHeatOverlay() {
   if (!heatMode || !heatCells.length) return;
   const overlay = ensureHeatOverlay();
-  overlay.hidden = false;
+  hideHeatOverlay(false);
   overlay.replaceChildren();
   for (const feature of heatCells) {
     const count = Number(feature.properties.count || 0);
-    const points = feature.geometry.coordinates[0]
-      .map(coordinate => map.project(coordinate))
-      .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
-    if (points.length < 4) continue;
     const group = document.createElementNS(SVG_NS, 'g');
     group.classList.add('btc-map-heat-cell');
-    group.setAttribute('role', 'button');
-    group.setAttribute('tabindex', '0');
-    group.setAttribute('aria-label', `${count.toLocaleString()} mapped Bitcoin place${count === 1 ? '' : 's'} in this region. Zoom in.`);
+    group.heatFeature = feature;
     const polygon = document.createElementNS(SVG_NS, 'polygon');
-    polygon.setAttribute('points', points.map(point => `${point.x},${point.y}`).join(' '));
     polygon.setAttribute('fill', heatColor(count));
-    const center = map.project([Number(feature.properties.centerLon), Number(feature.properties.centerLat)]);
     const label = document.createElementNS(SVG_NS, 'text');
-    label.setAttribute('x', center.x);
-    label.setAttribute('y', center.y);
     label.textContent = count.toLocaleString();
-    const zoomIn = () => map.easeTo({
-      center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
-      zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
-      duration:650,
-    });
-    group.addEventListener('click', zoomIn);
-    group.addEventListener('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      zoomIn();
-    });
-    group.addEventListener('pointerenter', () => {
-      setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
-    });
-    group.addEventListener('pointerleave', heatSummary);
     group.append(polygon, label);
     overlay.append(group);
   }
+  positionHeatOverlay();
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const left = polygon[index];
+    const right = polygon[previous];
+    if ((left.y > point.y) === (right.y > point.y)) continue;
+    const boundary = ((right.x - left.x) * (point.y - left.y)) / (right.y - left.y) + left.x;
+    if (point.x < boundary) inside = !inside;
+  }
+  return inside;
+}
+
+function heatFeatureAtPoint(point) {
+  if (!heatMode || map.getZoom() < HEAT_MIN_ZOOM || map.getZoom() >= MARKER_ZOOM) return null;
+  return heatCells.find(feature => pointInPolygon(
+    point,
+    feature.geometry.coordinates[0].map(coordinate => map.project(coordinate)),
+  )) || null;
 }
 
 function setHeatLayersVisible(visible) {
   if (!visible) {
-    if (heatOverlay) heatOverlay.hidden = true;
+    hideHeatOverlay(true);
+    heatHoverCell = '';
+    map.getCanvas().style.cursor = '';
     return;
   }
   renderHeatOverlay();
@@ -772,8 +792,29 @@ map.on('moveend', () => {
   moveTimer = setTimeout(syncMapMode, 180);
 });
 map.on('move', () => {
-  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) renderHeatOverlay();
-  else if (heatOverlay) heatOverlay.hidden = true;
+  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) positionHeatOverlay();
+  else hideHeatOverlay(true);
+});
+map.on('click', event => {
+  const feature = heatFeatureAtPoint(event.point);
+  if (!feature) return;
+  map.easeTo({
+    center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
+    zoom:Math.min(MARKER_ZOOM, map.getZoom() + 2.5),
+    duration:650,
+  });
+});
+map.on('mousemove', event => {
+  if (!heatMode) return;
+  const feature = heatFeatureAtPoint(event.point);
+  const key = feature ? `${feature.properties.centerLon}:${feature.properties.centerLat}` : '';
+  if (key === heatHoverCell) return;
+  heatHoverCell = key;
+  map.getCanvas().style.cursor = feature ? 'pointer' : '';
+  if (feature) {
+    const count = Number(feature.properties.count || 0);
+    setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
+  } else if (heatMode) heatSummary();
 });
 map.on('error', event => {
   if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');
