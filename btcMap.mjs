@@ -35,7 +35,6 @@ const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
 const HEAT_MIN_ZOOM = 4;
 const MARKER_ZOOM = 9;
-const SVG_NS = 'http://www.w3.org/2000/svg';
 const elements = {
   form:document.getElementById('btcMapSearch'), query:document.getElementById('btcMapQuery'),
   searchToggle:document.getElementById('btcMapSearchToggle'),
@@ -64,6 +63,7 @@ let heatCells = [];
 let heatVisibleCount = 0;
 let heatController = null;
 let heatOverlay = null;
+let heatFrame = 0;
 
 function readBtcMapAuth() {
   try {
@@ -305,7 +305,7 @@ function heatColor(count) {
 
 function ensureHeatOverlay() {
   if (heatOverlay) return heatOverlay;
-  heatOverlay = document.createElementNS(SVG_NS, 'svg');
+  heatOverlay = document.createElement('canvas');
   heatOverlay.classList.add('btc-map-heat-overlay');
   heatOverlay.setAttribute('aria-label', 'Bitcoin place density');
   map.getContainer().append(heatOverlay);
@@ -318,39 +318,61 @@ function hideHeatOverlay(hidden) {
   heatOverlay.setAttribute('aria-hidden', String(hidden));
 }
 
-function positionHeatOverlay() {
-  if (!heatOverlay || heatOverlay.classList.contains('is-hidden')) return;
-  for (const group of heatOverlay.children) {
-    const feature = group.heatFeature;
-    if (!feature) continue;
+function paintHeatOverlay() {
+  heatFrame = 0;
+  if (!heatOverlay || heatOverlay.classList.contains('is-hidden') || !heatMode) return;
+  const width = map.getContainer().clientWidth;
+  const height = map.getContainer().clientHeight;
+  const density = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  const pixelWidth = Math.round(width * density);
+  const pixelHeight = Math.round(height * density);
+  if (heatOverlay.width !== pixelWidth || heatOverlay.height !== pixelHeight) {
+    heatOverlay.width = pixelWidth;
+    heatOverlay.height = pixelHeight;
+  }
+  const context = heatOverlay.getContext('2d');
+  context.setTransform(density, 0, 0, density, 0, 0);
+  context.clearRect(0, 0, width, height);
+  context.lineJoin = 'round';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '700 12px "Roboto Mono", monospace';
+  for (const feature of heatCells) {
     const points = feature.geometry.coordinates[0].map(coordinate => map.project(coordinate));
     if (points.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) continue;
-    group.querySelector('polygon')?.setAttribute('points', points.map(point => `${point.x},${point.y}`).join(' '));
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (const point of points.slice(1)) context.lineTo(point.x, point.y);
+    context.closePath();
+    context.globalAlpha = .46;
+    context.fillStyle = heatColor(Number(feature.properties.count || 0));
+    context.fill();
+    context.globalAlpha = .7;
+    context.strokeStyle = '#fff1c5';
+    context.lineWidth = 1.1;
+    context.stroke();
     const center = map.project([Number(feature.properties.centerLon), Number(feature.properties.centerLat)]);
-    const label = group.querySelector('text');
-    label?.setAttribute('x', center.x);
-    label?.setAttribute('y', center.y);
+    context.globalAlpha = 1;
+    context.lineWidth = 2.4;
+    context.strokeStyle = 'rgba(255,255,255,.72)';
+    context.fillStyle = '#18130b';
+    const label = Number(feature.properties.count || 0).toLocaleString();
+    context.strokeText(label, center.x, center.y);
+    context.fillText(label, center.x, center.y);
   }
+  context.globalAlpha = 1;
+}
+
+function scheduleHeatOverlay() {
+  if (heatFrame || !heatOverlay || heatOverlay.classList.contains('is-hidden')) return;
+  heatFrame = requestAnimationFrame(paintHeatOverlay);
 }
 
 function renderHeatOverlay() {
   if (!heatMode || !heatCells.length) return;
-  const overlay = ensureHeatOverlay();
+  ensureHeatOverlay();
   hideHeatOverlay(false);
-  overlay.replaceChildren();
-  for (const feature of heatCells) {
-    const count = Number(feature.properties.count || 0);
-    const group = document.createElementNS(SVG_NS, 'g');
-    group.classList.add('btc-map-heat-cell');
-    group.heatFeature = feature;
-    const polygon = document.createElementNS(SVG_NS, 'polygon');
-    polygon.setAttribute('fill', heatColor(count));
-    const label = document.createElementNS(SVG_NS, 'text');
-    label.textContent = count.toLocaleString();
-    group.append(polygon, label);
-    overlay.append(group);
-  }
-  positionHeatOverlay();
+  scheduleHeatOverlay();
 }
 
 function pointInPolygon(point, polygon) {
@@ -789,7 +811,10 @@ map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(syncMapMode, 180);
 });
-map.on('movestart', () => hideHeatOverlay(true));
+map.on('move', () => {
+  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) scheduleHeatOverlay();
+  else hideHeatOverlay(true);
+});
 map.on('click', event => {
   const feature = heatFeatureAtPoint(event.point);
   if (!feature) return;
