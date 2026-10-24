@@ -172,6 +172,11 @@ const elements = {
   openBoard: document.getElementById('openStickyBoard'), openWorld: document.getElementById('openPinstrWorld'), boardDialog: document.getElementById('boardDialog'),
   boardChooser: document.getElementById('boardChooser'), boardGeohash: document.getElementById('boardGeohash'),
   boardDepth: document.getElementById('boardDepth'), shareBoard: document.getElementById('shareStickyBoard'),
+  openBoardActivityMap: document.getElementById('openBoardActivityMap'),
+  boardActivityDialog: document.getElementById('boardActivityDialog'),
+  closeBoardActivityMap: document.getElementById('closeBoardActivityMap'),
+  boardActivityMap: document.getElementById('boardActivityMap'),
+  boardActivityStatus: document.getElementById('boardActivityStatus'),
   rememberBoard: document.getElementById('rememberStickyBoard'),
   rememberBoardRow: document.getElementById('rememberBoardRow'),
   rememberBoardCaption: document.getElementById('rememberBoardCaption'),
@@ -288,7 +293,8 @@ const elements = {
   noteAgentBadgeLabel: document.getElementById('noteAgentBadgeLabel'),
   notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
   noteGift: document.getElementById('noteGiftDialog'), noteGiftAuthor: document.getElementById('noteGiftAuthor'),
-  noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftReactions: document.getElementById('noteGiftReactions'),
+  noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftLogin: document.getElementById('noteGiftLogin'),
+  noteGiftReactions: document.getElementById('noteGiftReactions'),
   userRelayList: document.getElementById('userRelayList'), userRelayCount: document.getElementById('userRelayCount'),
   userRelayInput: document.getElementById('userRelayInput'), userRelayStatus: document.getElementById('userRelayStatus'),
   addUserRelay: document.getElementById('addUserRelay'), checkUserRelays: document.getElementById('checkUserRelays'),
@@ -412,10 +418,18 @@ const MAP_SEARCH_MARKER_LAYER = 'geohash-place-marker';
 const MAP_SEARCH_DEBOUNCE_MS = 300;
 const MAP_SEARCH_TIMEOUT_MS = 8000;
 const MAP_MISSING_TEXT = 'The map could not load. You can still enter a geohash manually.';
+const ACTIVITY_SOURCE_ID = 'pinstr-activity';
+const ACTIVITY_FILL_LAYER = 'pinstr-activity-fill';
+const ACTIVITY_LINE_LAYER = 'pinstr-activity-line';
+const ACTIVITY_LABEL_LAYER = 'pinstr-activity-label';
 let mapLibraryPromise = null;
 let mapTroubleSaid = false;
 
 let geohashMap = null;
+let boardActivityMap = null;
+let boardActivityNotes = [];
+let boardActivityLoaded = false;
+let boardActivityFetchedAt = 0;
 let geohashMapCells = [];
 // Set while the picker applies its opening view: that jump fires `zoomend` as well, and it is
 // not the reader zooming, so it must never be read as a grid change.
@@ -427,6 +441,7 @@ let geohashPlaceMarker = null;
 let geohashGridFrame = 0;
 const linkedCells = geohashCellsFrom(new URL(location.href).searchParams.get('g'));
 const worldComposerRequested = new URL(location.href).searchParams.get('compose') === 'world';
+const loginRequested = new URL(location.href).searchParams.get('login') === '1';
 // Card mode: the same page, wearing nothing but the board, so the desk can screenshot it into the
 // picture a shared board link unfurls with.
 const cardMode = new URL(location.href).searchParams.has('card');
@@ -842,6 +857,206 @@ function loadMapLibrary() {
   return mapLibraryPromise;
 }
 
+function activityMercator(lng, lat) {
+  const latitude = Math.max(-85, Math.min(85, Number(lat) || 0)) * Math.PI / 180;
+  return {
+    x: (Number(lng) + 180) / 360,
+    y: .5 - Math.log(Math.tan(Math.PI / 4 + latitude / 2)) / (2 * Math.PI),
+  };
+}
+
+function activityLngLat(x, y) {
+  return [x * 360 - 180, (2 * Math.atan(Math.exp((.5 - y) * 2 * Math.PI)) - Math.PI / 2) * 180 / Math.PI];
+}
+
+function roundActivityHex(q, r) {
+  let x = q;
+  let z = r;
+  let y = -x - z;
+  let rx = Math.round(x);
+  let ry = Math.round(y);
+  let rz = Math.round(z);
+  const dx = Math.abs(rx - x);
+  const dy = Math.abs(ry - y);
+  const dz = Math.abs(rz - z);
+  if (dx > dy && dx > dz) rx = -ry - rz;
+  else if (dy > dz) ry = -rx - rz;
+  else rz = -rx - ry;
+  return {q:rx, r:rz};
+}
+
+function activityHexSize(zoom) {
+  return Math.max(.00000012, .022 / (2 ** Math.max(0, Number(zoom) - 2)));
+}
+
+function activityHexFeatures(notes, zoom) {
+  const size = activityHexSize(zoom);
+  const bins = new Map();
+  for (const note of notes) {
+    const bounds = geohashBounds(note.geohash);
+    const point = activityMercator(bounds.center.lng, bounds.center.lat);
+    const cell = roundActivityHex(
+      ((Math.sqrt(3) / 3) * point.x - point.y / 3) / size,
+      (2 * point.y / 3) / size,
+    );
+    const key = `${cell.q}:${cell.r}`;
+    const bin = bins.get(key) || {q:cell.q, r:cell.r, count:0, boards:new Map()};
+    bin.count += 1;
+    bin.boards.set(note.geohash, (bin.boards.get(note.geohash) || 0) + 1);
+    bins.set(key, bin);
+  }
+  return [...bins.values()].map(bin => {
+    const center = {
+      x:size * Math.sqrt(3) * (bin.q + bin.r / 2),
+      y:size * 1.5 * bin.r,
+    };
+    const ring = [];
+    for (let index = 0; index < 6; index += 1) {
+      const angle = (60 * index - 30) * Math.PI / 180;
+      ring.push(activityLngLat(center.x + size * Math.cos(angle), center.y + size * Math.sin(angle)));
+    }
+    ring.push(ring[0]);
+    const board = [...bin.boards].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || '';
+    const [centerLng, centerLat] = activityLngLat(center.x, center.y);
+    return {type:'Feature', properties:{count:bin.count, board, boardCount:bin.boards.size,
+      centerLng, centerLat, label:String(bin.count)}, geometry:{type:'Polygon', coordinates:[ring]}};
+  });
+}
+
+function drawBoardActivity() {
+  const source = boardActivityMap?.getSource(ACTIVITY_SOURCE_ID);
+  if (!source) return;
+  const features = activityHexFeatures(boardActivityNotes, boardActivityMap.getZoom());
+  source.setData({type:'FeatureCollection', features});
+  if (!boardActivityNotes.length && boardActivityLoaded) {
+    status(elements.boardActivityStatus, 'No live public notes were found.');
+  } else if (boardActivityLoaded) {
+    status(elements.boardActivityStatus, `${boardActivityNotes.length} live note${boardActivityNotes.length === 1 ? '' : 's'} across ${features.length} region${features.length === 1 ? '' : 's'}. Tap a cluster to zoom in.`);
+  }
+}
+
+function readBoardActivity() {
+  return new Promise(resolve => {
+    const notes = new Map();
+    let socket;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { socket?.close(); } catch {}
+      resolve([...notes.values()]);
+    };
+    const timer = setTimeout(finish, 9000);
+    try { socket = new WebSocket(RELAY); } catch { finish(); return; }
+    const subscription = `pinstr-activity-${Date.now()}`;
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription,
+      {kinds:[1], '#t':[STICKY_TOPIC], limit:1000}])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE' && data[1] === subscription) { finish(); return; }
+      const event = data[2];
+      if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools?.verifyEvent(event)) return;
+      const note = parseStickyEvent(event);
+      if (note && !isStickyExpired(note)) notes.set(note.id, note);
+    });
+    socket.addEventListener('error', finish);
+    socket.addEventListener('close', finish);
+  });
+}
+
+async function initialiseBoardActivityMap() {
+  if (boardActivityMap) return boardActivityMap;
+  const library = await loadMapLibrary();
+  if (!library) return null;
+  boardActivityMap = new library.Map({
+    container:elements.boardActivityMap,
+    style:MAP_STYLE_URL,
+    center:[0, 20], zoom:2, minZoom:1.5, maxZoom:20,
+    renderWorldCopies:false,
+    dragRotate:false, pitchWithRotate:false, touchPitch:false,
+    attributionControl:{compact:true, customAttribution:'Map <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a>'
+      + ' · &copy; <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>'
+      + ' · &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'},
+  });
+  boardActivityMap.addControl(new library.NavigationControl({showCompass:false}), 'top-right');
+  boardActivityMap.on('load', () => {
+    boardActivityMap.addSource(ACTIVITY_SOURCE_ID, {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+    boardActivityMap.addLayer({id:ACTIVITY_FILL_LAYER, type:'fill', source:ACTIVITY_SOURCE_ID, paint:{
+      'fill-color':['interpolate', ['linear'], ['get', 'count'], 1, '#f6c54d', 4, '#f2a900', 12, '#f07800', 30, '#d8443f'],
+      'fill-opacity':.68,
+    }});
+    boardActivityMap.addLayer({id:ACTIVITY_LINE_LAYER, type:'line', source:ACTIVITY_SOURCE_ID,
+      paint:{'line-color':'#fff1c5', 'line-width':1.3, 'line-opacity':.9}});
+    boardActivityMap.addLayer({id:ACTIVITY_LABEL_LAYER, type:'symbol', source:ACTIVITY_SOURCE_ID,
+      layout:{'text-field':['get', 'label'], 'text-font':MAP_FONT, 'text-size':12, 'text-allow-overlap':true},
+      paint:{'text-color':'#18130b', 'text-halo-color':'rgba(255,255,255,.65)', 'text-halo-width':1}});
+    drawBoardActivity();
+  });
+  boardActivityMap.on('zoomend', drawBoardActivity);
+  boardActivityMap.on('click', ACTIVITY_FILL_LAYER, event => {
+    const feature = event.features?.[0];
+    const board = String(feature?.properties?.board || '');
+    if (!board) return;
+    const boardCount = Number(feature.properties.boardCount || 0);
+    if (boardCount > 1 && boardActivityMap.getZoom() < boardActivityMap.getMaxZoom()) {
+      boardActivityMap.easeTo({
+        center:[Number(feature.properties.centerLng), Number(feature.properties.centerLat)],
+        zoom:Math.min(boardActivityMap.getMaxZoom(), boardActivityMap.getZoom() + 2.5),
+        duration:650,
+      });
+      status(elements.boardActivityStatus, `${feature.properties.count} live notes across ${boardCount} boards. Zooming in…`);
+      return;
+    }
+    elements.boardGeohash.value = board;
+    renderDepthOptions([board]);
+    elements.boardDepth.value = '0';
+    status(elements.boardChooserStatus, `Selected ${board}, the busiest board in that region.`);
+    elements.boardActivityDialog.close();
+  });
+  boardActivityMap.on('mousemove', ACTIVITY_FILL_LAYER, event => {
+    boardActivityMap.getCanvas().style.cursor = 'pointer';
+    const feature = event.features?.[0];
+    if (feature) {
+      const count = Number(feature.properties.count);
+      const boards = Number(feature.properties.boardCount);
+      status(elements.boardActivityStatus, boards > 1
+        ? `${count} live notes across ${boards} boards · tap to zoom in`
+        : `${count} live note${count === 1 ? '' : 's'} on ${feature.properties.board} · tap to choose`);
+    }
+  });
+  boardActivityMap.on('mouseleave', ACTIVITY_FILL_LAYER, () => {
+    boardActivityMap.getCanvas().style.cursor = '';
+    drawBoardActivity();
+  });
+  return boardActivityMap;
+}
+
+async function openBoardActivityMap() {
+  elements.boardDialog.close();
+  showDialog(elements.boardActivityDialog);
+  status(elements.boardActivityStatus, 'Reading public notes…');
+  const hasLayout = await waitForMapLayout(elements.boardActivityMap);
+  if (!hasLayout || !elements.boardActivityDialog.open) {
+    status(elements.boardActivityStatus, 'The activity map could not fit this screen.', true);
+    return;
+  }
+  const map = await initialiseBoardActivityMap();
+  if (!map) {
+    elements.boardActivityMap.replaceChildren(document.createTextNode('The activity map could not load.'));
+    status(elements.boardActivityStatus, 'The activity map is unavailable right now.', true);
+    return;
+  }
+  map.resize();
+  if (!boardActivityLoaded || Date.now() - boardActivityFetchedAt > 120000) {
+    boardActivityNotes = await readBoardActivity();
+    boardActivityLoaded = true;
+    boardActivityFetchedAt = Date.now();
+  }
+  drawBoardActivity();
+}
+
 function sayMapTrouble(message) {
   if (mapTroubleSaid) return;
   mapTroubleSaid = true;
@@ -1118,7 +1333,7 @@ function nextPaint() {
   return new Promise(resolve => requestAnimationFrame(resolve));
 }
 
-async function waitForGeohashMapLayout() {
+async function waitForMapLayout(container) {
   // A modal becomes `open` before the browser has necessarily laid it out.
   // MapLibre cannot calculate its camera matrices from a zero-sized container.
   // requestAnimationFrame is the cheapest way to wait for a paint, but a tab that is not
@@ -1127,12 +1342,16 @@ async function waitForGeohashMapLayout() {
   // after a fixed budget instead of waiting without end.
   const deadline = Date.now() + MAP_LAYOUT_WAIT_MS;
   do {
-    const bounds = elements.geohashMap.getBoundingClientRect();
+    const bounds = container.getBoundingClientRect();
     if (bounds.width > 0 && bounds.height > 0) return true;
     await Promise.race([nextPaint(), new Promise(resolve => setTimeout(resolve, MAP_LAYOUT_POLL_MS))]);
   } while (Date.now() < deadline);
-  const bounds = elements.geohashMap.getBoundingClientRect();
+  const bounds = container.getBoundingClientRect();
   return bounds.width > 0 && bounds.height > 0;
+}
+
+function waitForGeohashMapLayout() {
+  return waitForMapLayout(elements.geohashMap);
 }
 
 async function initialiseGeohashMap() {
@@ -5157,10 +5376,11 @@ async function openNoteGiftDialog(eventId, opener = null) {
   }));
   elements.noteGiftZap.disabled = true;
   elements.noteGiftCustom.disabled = !session;
+  elements.noteGiftLogin.hidden = Boolean(session);
 
   if (!elements.noteGift.open) elements.noteGift.showModal();
   if (!session) {
-    setGiftStatus('Log in first: both of these are signed by you.');
+    setGiftStatus('Log in to react or zap. Nostr signs the action as you.');
     elements.noteGiftZapTarget.textContent = '';
     return;
   }
@@ -5188,6 +5408,11 @@ function wireNoteGiftDialog() {
   if (giftWired) return;
   giftWired = true;
   elements.closeNoteGift.addEventListener('click', () => elements.noteGift.close());
+  elements.noteGiftLogin.addEventListener('click', () => {
+    elements.noteGift.close();
+    refreshLoginDialog();
+    showDialog(elements.login);
+  });
   elements.noteGiftZap.addEventListener('click', () => {
     const typed = Number(elements.noteGiftCustom.value);
     sendGiftZap(Number.isFinite(typed) && typed > 0 ? typed : giftAmountSats);
@@ -6251,6 +6476,17 @@ elements.openGeohashMap.addEventListener('click', () => {
     console.error('Could not open the geohash map:', error);
     sayMapTrouble('The map could not open — the geohash can still be typed by hand.');
   });
+});
+elements.openBoardActivityMap.addEventListener('click', () => {
+  openBoardActivityMap().catch(error => {
+    console.error('Could not open the board activity map:', error);
+    status(elements.boardActivityStatus, 'The activity map is unavailable right now.', true);
+  });
+});
+elements.closeBoardActivityMap.addEventListener('click', () => elements.boardActivityDialog.close());
+elements.boardActivityDialog.addEventListener('close', () => {
+  showDialog(elements.boardDialog);
+  focusBoardDialog();
 });
 elements.placeSearch.addEventListener('input', schedulePlaceSearch);
 elements.placeSearch.addEventListener('keydown', event => {
@@ -7389,6 +7625,12 @@ if (!resumedSigning && pending?.status === 'waiting') {
   if (unusableReturn) notice(unusableReturn);
 } else if (!resumedSigning && worldComposerRequested) {
   requestAnimationFrame(openComposer);
+}
+if (loginRequested && !getNostrSession()) {
+  requestAnimationFrame(() => {
+    refreshLoginDialog();
+    showDialog(elements.login);
+  });
 }
 
 

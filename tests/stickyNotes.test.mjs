@@ -3441,7 +3441,7 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   // The dialog is a real dialog with a row of reactions and a zap row that can show an invoice.
   const dialog = html.match(/<dialog id="noteGiftDialog"[\s\S]*?<\/dialog>/);
   assert.ok(dialog, 'the dialog exists');
-  for (const id of ['noteGiftAuthor', 'noteGiftStatus', 'noteGiftReactions', 'noteGiftAmounts', 'noteGiftZap',
+  for (const id of ['noteGiftAuthor', 'noteGiftStatus', 'noteGiftLogin', 'noteGiftReactions', 'noteGiftAmounts', 'noteGiftZap',
     'noteGiftInvoice', 'noteGiftQr', 'noteGiftInvoiceText', 'copyNoteGiftInvoice']) {
     assert.match(dialog[0], new RegExp(`id="${id}"`), `${id} is in the dialog`);
   }
@@ -3452,6 +3452,9 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.match(page, /openNoteGiftDialog\(sticky\.id, author\)/);
   assert.match(page, /\.board-plate, \.sticky-note__author'\)/, 'the board ignores a drag begun on the signature');
   assert.match(page, /wireNoteGiftDialog\(\);/, 'its controls are wired');
+  assert.match(page, /elements\.noteGiftLogin\.addEventListener\('click'/,
+    'the signed-out message opens the existing login dialog directly');
+  assert.match(page, /setGiftStatus\('Log in to react or zap\. Nostr signs the action as you\.'\)/);
   // A signature that comes back from a signer goes to the gift flow, not to the note flow's arm - named
   // once in the model, so the boot path and the live page cannot disagree about which actions are gifts.
   assert.match(page, /amber\.context\?\.action\)\)/, 'the boot arm asks the shared rule');
@@ -3466,6 +3469,35 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.doesNotMatch(page, /kind: 7,/, 'nor is the reaction');
   assert.match(css, /\.note-gift__reactions button \{/);
   assert.match(css, /\.note-gift__qr/);
+});
+
+test('the board chooser explores live Pinstr activity as selectable hexagonal regions', async () => {
+  const [html, css, page] = await Promise.all([
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  const chooser = html.match(/<dialog id="boardDialog"[\s\S]*?<\/dialog>/)?.[0] || '';
+  assert.match(chooser, /id="openBoardActivityMap"/);
+  assert.match(chooser, /Explore active boards/);
+  assert.match(html, /id="boardActivityDialog"/);
+  assert.match(html, /id="boardActivityMap"[^>]+Map of public Pinstr note activity/);
+  assert.match(css, /\.board-activity-legend i \{[^}]*clip-path:polygon/);
+  assert.match(page, /\{kinds:\[1\], '#t':\[STICKY_TOPIC\], limit:1000\}/,
+    'the map asks only for public Pinstr notes');
+  assert.match(page, /window\.NostrTools\?\.verifyEvent\(event\)/);
+  assert.match(page, /note && !isStickyExpired\(note\)/);
+  assert.match(page, /geometry:\{type:'Polygon', coordinates:\[ring\]\}/,
+    'activity regions are real six-sided map polygons');
+  assert.match(page, /for \(let index = 0; index < 6; index \+= 1\)/);
+  assert.match(page, /maxZoom:20/, 'the activity map can resolve boards down to building scale');
+  assert.match(page, /boardCount:bin\.boards\.size/);
+  assert.match(page, /boardActivityMap\.on\('click', ACTIVITY_FILL_LAYER/);
+  assert.match(page, /if \(boardCount > 1[\s\S]{0,500}boardActivityMap\.easeTo\(/,
+    'a hexagon containing multiple exact boards drills into smaller regions first');
+  assert.match(page, /boardActivityMap\.getZoom\(\) \+ 2\.5/);
+  assert.match(page, /elements\.boardGeohash\.value = board/,
+    'a single-board region can hand its exact board back to the chooser');
 });
 
 test('no signature is mistaken for a note\u2019s when it is a gift\u2019s', () => {
@@ -4556,8 +4588,8 @@ test('the settings dialog opens without raising a keyboard, and its text field m
   // over a dialog that also carries the depth, the remembered place and the map button. Every path that opens it
   // now hands focus to the dialog itself, which is what keeps the keyboard down without leaving focus outside.
   assert.doesNotMatch(script, /elements\.boardGeohash\.focus\(\)/, 'the chooser no longer focuses its field');
-  assert.equal((script.match(/focusBoardDialog\(\);/g) || []).length, 5,
-    'all five open paths - including AR without a board - keep the keyboard down');
+  assert.equal((script.match(/focusBoardDialog\(\);/g) || []).length, 6,
+    'all six open paths - including the activity map and AR without a board - keep the keyboard down');
   assert.match(script, /function focusBoardDialog\(\) \{\n  requestAnimationFrame\(\(\) => elements\.boardDialog\.focus\(\{preventScroll: true\}\)\);\n\}/,
     'and it is one helper, so a fifth path cannot reintroduce the keyboard');
 });

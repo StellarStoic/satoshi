@@ -1,8 +1,11 @@
 import {
   GEOHASH_MAX_BOARD_DEPTH,
   boardDepthCeiling,
+  geohashNeighbours,
   normaliseGeohashes,
 } from './stickyNotesModel.mjs';
+
+const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
 
 export function readWorldBoard(search = '', storageValue = '', storedDepth = 0) {
   const params = new URLSearchParams(String(search).replace(/^\?/, ''));
@@ -85,19 +88,56 @@ export function worldPlatformPosition(index = 0) {
   return Object.freeze({x:Math.cos(angle) * radius, y:(slot % 3 - 1) * 1.6, z:Math.sin(angle) * radius});
 }
 
-/** Stable positions around the viewer, including a smaller set laid flat on the board. */
-export function worldNotePosition(id = '', index = 0) {
+export function worldBoardRelation(origin = '', destination = '') {
+  const [from] = normaliseGeohashes(origin);
+  const [to] = normaliseGeohashes(destination);
+  if (!from || !to || from === to) return '';
+  if (from.startsWith(to) && to.length < from.length) return 'parent';
+  if (to.startsWith(from) && to.length > from.length) return 'child';
+  if (from.length === to.length && geohashNeighbours(from).includes(to)) return 'sibling';
+  return '';
+}
+
+export function worldNearbyCells(origin = '') {
+  const [cell] = normaliseGeohashes(origin);
+  if (!cell) return [];
+  const parents = Array.from({length:Math.max(0, cell.length - 3)}, (_, index) => cell.slice(0, index + 3));
+  const children = cell.length < 9 ? [...GEOHASH_ALPHABET].map(character => `${cell}${character}`) : [];
+  return [...new Set([...parents, ...geohashNeighbours(cell), ...children])];
+}
+
+export function worldPortalPosition(origin = '', destination = '') {
+  const relation = worldBoardRelation(origin, destination);
+  if (!relation) return null;
+  const distance = Math.abs(String(destination).length - String(origin).length);
+  const angle = worldRandom(`${origin}:${destination}`, 7) * Math.PI * 2;
+  const radius = relation === 'sibling' ? 13.5 : 10.5 + Math.min(3, distance) * 1.4;
+  const y = relation === 'parent'
+    ? 4.8 + distance * 1.5
+    : relation === 'child'
+      ? -3.8 - Math.min(3, distance) * 1.45
+      : 1.6 + (worldRandom(`${destination}:${origin}`, 8) - .5) * 2.2;
+  return Object.freeze({x:Math.cos(angle) * radius, y, z:Math.sin(angle) * radius, relation});
+}
+
+/** Stable positions around the viewer, expanding outward and upward as a board becomes denser. */
+export function worldNotePosition(id = '', index = 0, total = 1) {
   const seed = `${id}:${index}`;
+  const count = Math.max(1, Math.floor(Number(total) || 1));
+  const density = Math.min(1, Math.sqrt((count - 1) / 999));
   const angle = worldRandom(seed, 0) * Math.PI * 2;
-  const floor = worldRandom(seed, 1) < .22;
-  const radius = (floor ? 1.3 : 2.15) + worldRandom(seed, 2) * (floor ? 3.35 : 2.55);
+  const floor = worldRandom(seed, 1) < .22 * (1 - density * .75);
+  const radius = floor
+    ? 1.65 + density * .25 + worldRandom(seed, 2) * (3 - density * .25)
+    : 2.15 + density * 2.35 + worldRandom(seed, 2) * (2.55 + density * 3.95);
   return Object.freeze({
     x:Math.cos(angle) * radius,
-    y:floor ? .04 : .72 + worldRandom(seed, 3) * 3.75,
+    y:floor ? .04 : .72 + density * .8 + worldRandom(seed, 3) * (3.75 + density * 5),
     z:Math.sin(angle) * radius,
     roll:(worldRandom(seed, 4) - .5) * (floor ? 1.4 : .48),
     pitch:floor ? 0 : (worldRandom(seed, 5) - .5) * .18,
     floor,
+    density,
   });
 }
 

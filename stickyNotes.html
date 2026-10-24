@@ -176,6 +176,7 @@
     <form id="boardChooser" class="dialog-inner board-chooser">
       <button type="button" class="dialog-close" data-close-dialog aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <h2 id="boardDialogTitle">Choose a board</h2>
+      <button type="button" id="openBoardActivityMap" class="board-activity-link"><i class="lni lni-map-marker-5" aria-hidden="true"></i><span>Explore active boards</span></button>
       <p>Enter the geohash shared by your group or workplace: 3 to 9 characters. A longer code covers a smaller area, and 9 is precise enough for a building. A place that straddles two or three cells can be written as a list, <code>u0qj7z0y,u0qj7z0z</code>, as long as those cells touch.</p>
       <p class="board-style-about board-style-about--lead"><a href="/about.html">New here? What Pinstr is</a></p>
       <label for="boardGeohash">Geohash</label>
@@ -203,6 +204,20 @@
       </div>
       <div id="boardChooserStatus" class="inline-status" role="status" aria-live="polite"></div>
     </form>
+  </dialog>
+
+  <dialog id="boardActivityDialog" class="geohash-map-dialog board-activity-dialog" aria-labelledby="boardActivityTitle">
+    <div class="geohash-map-shell board-activity-shell">
+      <header class="geohash-map-header">
+        <div><h2 id="boardActivityTitle">Active Pinstr boards</h2><p>Darker hexagons contain more live notes. Tap a cluster to zoom in; tap a single-board hexagon to choose it.</p></div>
+        <button type="button" id="closeBoardActivityMap" class="dialog-close" aria-label="Close activity map"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      </header>
+      <div id="boardActivityMap" class="geohash-map board-activity-map" aria-label="Map of public Pinstr note activity"></div>
+      <footer class="geohash-map-selection board-activity-footer">
+        <span class="board-activity-legend" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div id="boardActivityStatus" class="inline-status geohash-map-selection__status" role="status" aria-live="polite">Reading public notes…</div>
+      </footer>
+    </div>
   </dialog>
 
 
@@ -282,6 +297,7 @@
     <h2 id="noteGiftTitle">React or zap this note</h2>
     <p id="noteGiftAuthor" class="note-gift__author"></p>
     <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
+    <button type="button" id="noteGiftLogin" class="secondary-action note-gift__login" hidden><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in to Nostr</span></button>
     <div class="note-gift__block">
       <h3>React</h3>
       <div id="noteGiftReactions" class="note-gift__reactions" role="group" aria-label="Pick a reaction"></div>

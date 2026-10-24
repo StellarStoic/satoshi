@@ -8,10 +8,10 @@ body { font-family:var(--site-font, "Roboto Mono", monospace); }
 .world-picture-layer { position:fixed; z-index:2; inset:0; overflow:hidden; pointer-events:none; }
 .world-picture { position:absolute; top:0; left:0; display:block; overflow:hidden; padding:0; border:0; background:#d7d4ca; transform-origin:0 0; filter:drop-shadow(0 2px 2px rgba(0,0,0,.16)); pointer-events:none; }
 .world-picture[hidden] { display:none; }
-.world-picture__image, .world-picture__age { position:absolute; inset:0; display:block; width:100%; height:100%; pointer-events:none; }
-.world-picture__image { object-fit:contain; }
-.world-picture__age { object-fit:cover; }
-.world-picture__age { opacity:0; mix-blend-mode:multiply; transition:opacity .5s ease; }
+.world-picture__image, .world-picture__age { position:absolute; display:block; pointer-events:none; }
+.world-picture__image { inset:0; width:100%; height:100%; }
+.world-picture__image { object-fit:cover; }
+.world-picture__age { inset:-24%; width:148%; height:148%; object-fit:cover; opacity:0; mix-blend-mode:multiply; transform:rotate(var(--age-angle, 0deg)); transition:opacity .5s ease; }
 .world-icon-button { width:44px; height:44px; display:grid; place-items:center; padding:0; border:1px solid rgba(255,255,255,.34); border-radius:50%; background:rgba(12,13,14,.76); color:#fff; box-shadow:0 5px 20px rgba(0,0,0,.34); text-decoration:none; backdrop-filter:blur(12px); cursor:pointer; }
 .world-icon-button:hover, .world-icon-button:focus-visible { border-color:#f2a900; color:#f2a900; outline:2px solid transparent; }
 .world-icon-button i { font-size:1.25rem; }
@@ -19,9 +19,8 @@ body { font-family:var(--site-font, "Roboto Mono", monospace); }
 .world-back { left:15px; }
 .world-write { right:15px; }
 .world-write { border:0; border-radius:0; background:transparent; box-shadow:none; }
-.world-heading { position:fixed; z-index:7; top:calc(15px + env(safe-area-inset-top)); left:50%; translate:-50% 0; display:grid; justify-items:center; gap:2px; max-width:calc(100vw - 140px); pointer-events:none; text-align:center; text-shadow:0 2px 12px #000; }
-.world-heading span { color:#f2a900; font-size:.75rem; font-weight:850; text-transform:uppercase; }
-.world-heading strong { max-width:min(58vw, 34rem); overflow:hidden; color:#fff; font-size:.94rem; text-overflow:ellipsis; white-space:nowrap; }
+.world-heading { position:fixed; z-index:7; top:calc(15px + env(safe-area-inset-top)); left:50%; translate:-50% 0; display:grid; justify-items:center; max-width:calc(100vw - 140px); pointer-events:none; text-align:center; text-shadow:0 2px 12px #000; }
+.world-heading strong { max-width:min(58vw, 34rem); overflow:hidden; color:#fff; opacity:.5; font-size:.94rem; text-overflow:ellipsis; white-space:nowrap; }
 .world-status { position:fixed; z-index:6; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); translate:-50% 0; width:max-content; max-width:min(86vw, 38rem); padding:8px 12px; border:1px solid rgba(255,255,255,.2); border-radius:6px; background:rgba(15,16,17,.8); color:#fff; font-size:.78rem; text-align:center; backdrop-filter:blur(10px); }
 .world-status[hidden] { display:none; }
 .pinstr-world .note-menu { z-index:2400; }
@@ -31,15 +30,19 @@ body { font-family:var(--site-font, "Roboto Mono", monospace); }
 .world-placement > div { display:flex; align-items:center; gap:9px; }
 .world-primary { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 17px; border:1px solid #ffbd24; border-radius:6px; background:#f2a900; color:#17130a; font:inherit; font-weight:850; cursor:pointer; }
 .world-primary:hover, .world-primary:focus-visible { background:#ffbd24; outline:2px solid #fff; outline-offset:2px; }
-.world-controls-shell { position:fixed; z-index:9; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); translate:-50% 0; display:grid; justify-items:center; gap:8px; }
-body.is-placing .world-controls-shell { left:15px; translate:0 0; }
+.world-controls-shell { position:relative; display:grid; justify-items:start; gap:8px; margin-top:14px; }
+.world-controls-shell[hidden] { display:none; }
 .world-controls-toggle { width:28px; height:38px; display:grid; place-items:center; padding:0; border:1px solid rgba(255,255,255,.25); border-radius:14px; background:rgba(12,13,14,.7); color:#d7d9d6; cursor:pointer; backdrop-filter:blur(10px); }
 .world-controls-toggle i { rotate:90deg; }
 .world-controls-toggle:hover, .world-controls-toggle:focus-visible, .world-controls-toggle[aria-expanded="true"] { border-color:#f2a900; color:#f2a900; outline:0; }
-.world-controls { position:absolute; bottom:46px; left:50%; translate:-50% 0; display:grid; gap:7px; width:220px; padding:12px; border:1px solid rgba(255,255,255,.22); border-radius:7px; background:rgba(12,13,14,.93); box-shadow:0 12px 34px rgba(0,0,0,.45); backdrop-filter:blur(14px); }
+.world-controls { position:static; display:grid; gap:7px; width:min(100%, 260px); padding:12px; border:1px solid var(--border, rgba(255,255,255,.22)); border-radius:7px; background:var(--surface-raised, rgba(12,13,14,.93)); box-shadow:0 8px 24px rgba(0,0,0,.28); }
 .world-controls[hidden] { display:none; }
 .world-controls > div { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#d8dad7; font-size:.75rem; }
 .world-controls kbd { min-width:68px; padding:3px 6px; border:1px solid #555; border-radius:4px; background:#242626; color:#fff; font:inherit; font-size:.75rem; text-align:center; }
+.world-mode-button { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:40px; margin-top:3px; padding:7px 10px; border:1px solid var(--border, #555); border-radius:6px; background:var(--surface, #202223); color:var(--text, #f4f4f1); font:inherit; font-size:.76rem; cursor:pointer; }
+.world-mode-button:hover, .world-mode-button:focus-visible, .world-mode-button[aria-pressed="true"] { border-color:var(--accent, #f2a900); color:var(--accent, #f2a900); outline:0; }
+.world-mode-button[hidden] { display:none; }
+body.is-xr .world-picture-layer { display:none; }
 .world-flight { position:fixed; z-index:5; inset:-18%; opacity:0; pointer-events:none; background:repeating-radial-gradient(ellipse at center, transparent 0 7%, rgba(242,169,0,.08) 7.3%, transparent 7.7% 13%); filter:blur(8px); scale:.7; transition:opacity .12s linear; }
 .world-flight.is-flying { opacity:1; animation:world-flight .9s cubic-bezier(.5,0,.15,1) both; }
 @keyframes world-flight { 0% { opacity:0; scale:.72; } 38% { opacity:.8; scale:1.5; } 78% { opacity:.28; scale:2.25; } 100% { opacity:0; scale:2.42; } }
@@ -50,6 +53,5 @@ body.is-placing .world-controls-shell { left:15px; translate:0 0; }
   .world-heading { top:calc(11px + env(safe-area-inset-top)); max-width:calc(100vw - 120px); }
   .world-heading strong { max-width:58vw; font-size:.82rem; }
   .world-status { bottom:calc(58px + env(safe-area-inset-bottom)); }
-  body.is-placing .world-controls-shell { left:10px; }
 }
 @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }

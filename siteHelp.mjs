@@ -55,10 +55,14 @@ export const PAGE_HELP = Object.freeze({
         sections: [
             {
                 label: 'In plain words',
+                embeddedControlId: 'worldControlsShell',
                 paragraphs: [
                     'Pinstr notes are small public messages, signed with your Nostr identity or a random anonymous one,'
                     + ' and placed on a shared board. Choose where the note will be visible, and choose how long it'
                     + ' lives. Perfect for small areas and groups pinning notes to each other.',
+                    'Open Choose a board and use Explore active boards to see where public Pinstr notes are active.'
+                    + ' Each hexagon groups nearby boards; a darker one has more live notes. Tap a cluster to zoom into'
+                    + ' smaller hexagons. Once a hexagon holds one exact board, tap it to choose that board.',
                     'You can name people in a note: type @ and pick from the names that come up. Anyone with a NIP-05'
                     + ' name can be tagged — on any domain, not only satoshi.si. The note carries the person\u2019s public'
                     + ' key and the board draws their name in its place. Open the sort button to show only notes that'
@@ -161,6 +165,12 @@ export const PAGE_HELP = Object.freeze({
                     + ' on the wider boards, ["i","geo:<cell>"] for the cell it was written on, and ["k","geo"] — unless you'
                     + ' mark it exact-only, when only the cells themselves are named and the note appears on those boards'
                     + ' alone. This is organisation, not privacy: a published note is public.',
+                    'The activity map asks the relay for up to 1,000 current ["t","pinstr"] events, verifies their'
+                    + ' signatures, drops expired or malformed notes, and groups each remaining geohash centre into a'
+                    + ' zoom-dependent hexagonal bin. The count controls the hexagon colour. A tap on a bin containing'
+                    + ' several exact geohashes zooms the map by 2.5 levels and recomputes smaller bins; only a bin with'
+                    + ' one exact geohash selects a board. The map can continue to zoom to level 20 and never asks where'
+                    + ' the reader is.',
                     'Around me asks the browser where you are, and then asks how much ground to cover: a building,'
                     + ' a neighbourhood, a city, a state or a country, which are geohash depths 8, 7, 5, 4 and 3 — about 19 m,'
                     + ' 153 m, 4.9 km, 20 km'
@@ -205,19 +215,20 @@ export const PAGE_HELP = Object.freeze({
             {
                 label: 'In plain words',
                 paragraphs: [
-                    'You begin at the centre of the same square, framed board used in the 2D view. Public notes are spread around and above you, facing inward with varied tilts, and some lie flat on the cork. The notes stay where they are while you turn or move. Picture notes show their image directly on the paper. Tap a pin for the same event details used by the 2D board. Hold the pin for half a second, then move left or right to orbit that note around you and move up or down to change its height. It faces you while you place it.',
-                    'If the board includes deeper geohashes, their platforms appear in the distance. Select a platform, or use Q and E, to fly between them. The board name at the top always shows where you are.',
+                    'You begin at the centre of an open 3D space. Public notes are spread around and above you, facing inward with varied tilts, and some lie flat on the invisible board plane. A thin square outline and the geohash written along all four edges show the board boundary without blocking the view. The notes stay where they are while you turn or move. Picture notes show their image directly on their chosen paper colour. Tap a pin for the same event details used by the 2D board. Hold the pin for half a second and the note follows your pointer directly while facing you.',
+                    'Nearby boards that contain live notes appear as portals. Green goes to a broader parent area, red goes to a more precise child area, and purple goes to a neighbouring area at the same level. Tap a portal to open that board. Because the platform has no solid ground, red portals below it remain visible.',
                     'Tap + to write through the familiar Pinstr composer. After login and payment, the draft returns here so you can place it before the final Nostr signature. No camera or location permission is needed.',
-                    'The small control below the world lists the mouse and keyboard controls. Use the mouse wheel or a two-finger pinch to zoom without leaving your standing position.'
+                    'Use the control below for the mouse and keyboard guide. The mouse wheel or a two-finger pinch zooms without leaving your standing position.',
+                    'On a phone that provides motion sensors, Look with phone asks for orientation permission and then lets turning the phone turn your view. It does not read your location or open the camera. On equipment whose browser supports immersive WebXR, View in AR places a room-sized version of the board into the device\'s passthrough view. These controls stay hidden when the browser cannot provide them.'
                 ]
             },
             {
                 label: 'Technical',
                 paragraphs: [
-                    'The scene uses Three.js and the same verified, unexpired kind 1 Pinstr events as the corkboard. Each platform reproduces the 2D board as a tiled square surface with wooden rails; the saved image texture is reused, with cork as the fallback. Stable pseudo-random values derived locally from each event id choose its angle, distance, height, tilt, and whether it lies on the board. Floating notes face the platform centre and remain fixed in world space, so they do not follow the camera. A note returns to the same starting place without publishing 3D coordinates.',
-                    'The selected geohash is the starting platform. The depth value controls how many additional characters may identify a child platform. Notes discovered through matching geohash tags create those platforms; unrelated boards are never mixed into the scene.',
-                    'Only pin meshes receive note-selection and note-drag gestures. A tap opens the shared 2D-style event panel with payment and agent badges, posting and expiry times, copyable event id, live age, and expandable signed JSON; a 500 ms hold arms movement. Horizontal pointer displacement controls continuous angular movement around the camera position, while vertical displacement controls height. During placement the paper is oriented toward the camera. Moving a published note is temporary and helps uncover overlaps. The same lifetime curve as the 2D board fades a multiply-blended crease texture over both paper and picture content, using one of eight stable orientations derived from the event id and refreshing once a minute. Picture events project all four corners of their image from the paper plane into the screen, so the image stays flat on the note and follows its perspective without requiring WebGL access to the cross-origin image. Camera rays test the image centre and four inner corners against the 3D paper meshes, hiding it when another note is closer or when its back faces the viewer. A newly paid draft is translated back into the ordinary normalized Pinstr board placement before it is signed and published.',
-                    'Platform travel interpolates the camera and its target with a deterministic acceleration curve, a small forward overshoot, and a short settling movement. The renderer contains no camera stream, geolocation request, street-imagery request, or device-orientation listener.'
+                    'The scene uses Three.js and the same verified, unexpired kind 1 Pinstr events as the board. A platform renders only an orange one-pixel box outline and four transparent edge labels. Its ground is an invisible ray-casting plane, preserving board selection and flat-note placement without drawing a surface or rails. Stable pseudo-random values derived locally from each event id choose its angle, distance, height, tilt, and whether it lies on that plane. Placement also uses the number of notes on that platform: sparse boards stay nearby without entering the standing area, while dense boards expand farther and higher and put a smaller share on the floor. Events are sorted by id before layout so the same set produces the same arrangement regardless of relay arrival order. Floating notes face the platform centre and remain fixed in world space, so they do not follow the camera. No 3D coordinates are published.',
+                    'The selected geohash is the starting platform. A separate relay subscription checks its valid parent geohashes down to three characters, its eight same-precision neighbours, and its 32 direct child geohashes. Only verified, unexpired Pinstr events create portals. Green parent portals are placed above the platform, red child portals below it, and purple sibling portals around its sides. The outline-only platform keeps lower portals visible while retaining spatial orientation.',
+                    'A pin opens the shared 2D-style event panel and a 500 ms hold arms movement. The signature is a separate target: the page resolves the author\'s latest Nostr profile across the same relays as the board, draws the resulting name or NIP-05 label onto the paper, and opens the same React or zap dialog when it is pressed. Reactions are NIP-25 events and zaps use the author\'s NIP-57/LNURL details; both use the Nostr identity already signed in across satoshi.si. Dragging projects the pointer ray to the pin\'s starting camera distance, offsets the paper so the held pin remains under the pointer, and orients the paper toward the camera. There is no speed or acceleration based on pointer distance. Moving a published note is temporary and helps uncover overlaps. Paper colour, grain, deterministic corner wear, font, fitted ink, author mark, and the lifetime-based crease layer are composited into one canvas texture, matching the 2D paper without a separate white WebGL surface. The crease placement still comes from the event id and refreshes once a minute. Picture events project all four corners of their image from the paper plane into the screen, so the image stays flat on the note and follows its perspective without requiring WebGL access to the cross-origin image. Camera rays test the image centre and four inner corners against the 3D paper meshes, hiding it when another note is closer or when its back faces the viewer. A newly paid draft is translated back into the ordinary normalized Pinstr board placement before it is signed and published.',
+                    'Platform travel interpolates the camera and its target with a deterministic acceleration curve, a small forward overshoot, and a short settling movement. Phone-look is permission-gated and converts alpha, beta, gamma, and the current screen orientation into a camera quaternion; its first valid reading is calibrated to the existing camera direction. It never asks for geolocation. WebXR support is tested with isSessionSupported("immersive-ar"), so its control exists only on compatible browsers. Starting it requires a user press, requests an immersive-ar session with optional local-floor and DOM-overlay features, makes the renderer transparent, removes scene fog, and scales the platform field to 22 percent for room use. A controller trigger or hand-select ray can open a pin or signature. Ending the session restores the ordinary camera, scale, background, fog, and controls.'
                 ]
             }
         ]
@@ -490,6 +501,12 @@ function createHelpBody(help) {
         panel.setAttribute('aria-labelledby', tab.id);
         panel.hidden = index !== 0;
         section.paragraphs.forEach(text => panel.append(helpParagraph(text)));
+        const embeddedControl = section.embeddedControlId
+            ? document.getElementById(section.embeddedControlId) : null;
+        if (embeddedControl) {
+            embeddedControl.hidden = false;
+            panel.append(embeddedControl);
+        }
 
         tabs.push(tab);
         panels.push(panel);

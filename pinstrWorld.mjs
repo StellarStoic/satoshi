@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/three/OrbitControls.js';
+import {createWorldGiftDialog} from './pinstrWorldGifts.mjs';
 import {
   STICKY_TOPIC,
   geohashMatchesBoard,
   isStickyExpired,
   parseStickyEvent,
   pinColourFor,
-  boardTextureUrl,
-  DEFAULT_BOARD_TEXTURE_URL,
   stickyExpiryCountdown,
   stickyPaymentBadge,
+  noteWear,
   noteAgeFraction,
   noteAgeTextureOpacity,
   noteTexturePlacement,
@@ -20,8 +20,11 @@ import {
   readWorldBoard,
   worldCellForNote,
   worldComposerHref,
+  worldBoardRelation,
   worldFlightProgress,
+  worldNearbyCells,
   worldNotePosition,
+  worldPortalPosition,
   worldPlatformPosition,
 } from './pinstrWorldModel.mjs';
 
@@ -30,10 +33,12 @@ const PENDING_KEY = 'satoshi:sticky:pending:v1';
 const BOARD_CELLS_KEY = 'satoshi:sticky:geohash-cells:v1';
 const BOARD_KEY = 'satoshi:sticky:geohash:v1';
 const BOARD_DEPTH_KEY = 'satoshi:sticky:geohash-depth:v1';
-const BOARD_TEXTURE_KEY = 'satoshi:sticky:board-texture:v1';
 const PIN_HOLD_MS = 500;
 const PIN_MOVE_SLOP_PX = 8;
-const NOTE_COLORS = Object.freeze({yellow:'#f1d76b', pink:'#ed8baa', blue:'#76b9dc', green:'#83c995', orange:'#efaa58'});
+const WORLD_ZOOM_MIN = .45;
+const WORLD_ZOOM_MAX = 6;
+// Keep these identical to the --note colours used by the 2D board.
+const NOTE_COLORS = Object.freeze({yellow:'#f7dc63', pink:'#f3a7c4', blue:'#91d2eb', green:'#acd986', orange:'#f4b266'});
 const PIN_COLORS = Object.freeze({red:'#c73935', blue:'#2975c7', yellow:'#e3be28', green:'#2d9a55', white:'#eeeeea', purple:'#8752b5', magenta:'#ca3b91', black:'#171717'});
 const FONT_FAMILIES = Object.freeze({typewriter:'Special Elite', handwritten:'Caveat', comfortaa:'Comfortaa'});
 
@@ -54,6 +59,7 @@ const elements = {
   placement:document.getElementById('worldPlacement'),
   cancelPlacement:document.getElementById('cancelWorldPlacement'), finishPlacement:document.getElementById('finishWorldPlacement'),
   controlsToggle:document.getElementById('worldControlsToggle'), controls:document.getElementById('worldControls'),
+  compass:document.getElementById('worldCompass'), ar:document.getElementById('worldAr'),
   flight:document.getElementById('worldFlight'),
 };
 
@@ -75,11 +81,12 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0d0f0f, 0.018);
 const camera = new THREE.PerspectiveCamera(58, innerWidth / Math.max(1, innerHeight), 0.05, 260);
 camera.position.set(0, 1.65, .05);
-const renderer = new THREE.WebGLRenderer({canvas:elements.canvas, antialias:true, powerPreference:'high-performance'});
+const renderer = new THREE.WebGLRenderer({canvas:elements.canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x0d0f0f, 1);
+renderer.xr.enabled = true;
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enableDamping = true;
@@ -100,25 +107,6 @@ const rimLight = new THREE.PointLight(0x75bde0, 18, 35);
 rimLight.position.set(8, 7, -8);
 scene.add(rimLight);
 
-const boardSurfaceMaterial = new THREE.MeshStandardMaterial({color:0xb27b42, roughness:.96, metalness:0});
-const woodMaterial = new THREE.MeshStandardMaterial({color:0x81522e, roughness:.82, metalness:.04});
-const woodEdgeMaterial = new THREE.MeshStandardMaterial({color:0x4d2c16, roughness:.9, metalness:0});
-const textureLoader = new THREE.TextureLoader();
-function applyBoardTexture(source, mayFallback = true) {
-  textureLoader.load(source, texture => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3.42, 3.42);
-    texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-    boardSurfaceMaterial.map = texture;
-    boardSurfaceMaterial.color.set(0xffffff);
-    boardSurfaceMaterial.needsUpdate = true;
-  }, undefined, () => {
-    if (mayFallback && source !== DEFAULT_BOARD_TEXTURE_URL) applyBoardTexture(DEFAULT_BOARD_TEXTURE_URL, false);
-  });
-}
-applyBoardTexture(boardTextureUrl(localStorage.getItem(BOARD_TEXTURE_KEY)) || DEFAULT_BOARD_TEXTURE_URL);
-
 const starPositions = [];
 for (let index = 0; index < 650; index += 1) {
   const angle = index * 2.399963;
@@ -134,16 +122,26 @@ const pointer = new THREE.Vector2();
 const platforms = new Map();
 const platformOrder = [];
 const platformMeshes = [];
+const portalMeshes = [];
+const portals = new Map();
 const notes = new Map();
 const noteGroups = [];
 const paperMeshes = [];
 const pinMeshes = [];
 const pictureOverlays = [];
-const ageSurfaces = [];
-let ageTextureVariants = [];
+const noteSurfaces = [];
+const paperGrainImage = new Image();
+const paperCreaseImage = new Image();
+const authorLabels = new Map();
+const authorProfileQueue = new Set();
+const authorProfilesLoading = new Set();
+let authorProfileTimer = 0;
 let activeCell = board.cells[0] || '';
 let boardSocket = null;
 let reconnectTimer = 0;
+let nearbySocket = null;
+let nearbyReconnectTimer = 0;
+let nearbyConnectionVersion = 0;
 let flight = null;
 let pointerStart = null;
 let pinPress = null;
@@ -153,10 +151,129 @@ let selectedNote = null;
 let noteExpiryTimer = 0;
 const zoomPointers = new Map();
 let pinchZoom = null;
+let compassActive = false;
+let compassCalibration = null;
+let compassReceived = false;
+let compassHasAbsoluteReading = false;
+let xrSession = null;
+const normalFog = scene.fog;
+const orientationEuler = new THREE.Euler();
+const orientationDevice = new THREE.Quaternion();
+const orientationScreen = new THREE.Quaternion();
+const orientationCorrection = new THREE.Quaternion(-Math.sqrt(.5), 0, 0, Math.sqrt(.5));
+const orientationUp = new THREE.Vector3(0, 0, 1);
+const xrSelectMatrix = new THREE.Matrix4();
+const xrController = renderer.xr.getController(0);
+scene.add(xrController);
 
 function setWorldZoom(value) {
-  camera.zoom = Math.max(.65, Math.min(2.5, Number(value) || 1));
+  camera.zoom = Math.max(WORLD_ZOOM_MIN, Math.min(WORLD_ZOOM_MAX, Number(value) || 1));
   camera.updateProjectionMatrix();
+}
+
+function deviceQuaternion(event) {
+  if (![event.alpha, event.beta, event.gamma].every(Number.isFinite)) return null;
+  const radians = THREE.MathUtils.DEG2RAD;
+  const screenAngle = Number(screen.orientation?.angle ?? window.orientation ?? 0) * radians;
+  orientationEuler.set(event.beta * radians, event.alpha * radians, -event.gamma * radians, 'YXZ');
+  orientationDevice.setFromEuler(orientationEuler);
+  orientationDevice.multiply(orientationCorrection);
+  orientationDevice.multiply(orientationScreen.setFromAxisAngle(orientationUp, -screenAngle));
+  return orientationDevice;
+}
+
+function handleDeviceOrientation(event) {
+  if (!compassActive || xrSession) return;
+  const isAbsolute = event.type === 'deviceorientationabsolute' || event.absolute === true;
+  if (compassHasAbsoluteReading && !isAbsolute) return;
+  const device = deviceQuaternion(event);
+  if (!device) return;
+  if (isAbsolute) compassHasAbsoluteReading = true;
+  if (!compassCalibration) compassCalibration = camera.quaternion.clone().multiply(device.clone().invert());
+  camera.quaternion.copy(compassCalibration).multiply(device);
+  compassReceived = true;
+}
+
+function stopCompass(message = '') {
+  compassActive = false;
+  compassCalibration = null;
+  compassHasAbsoluteReading = false;
+  elements.compass.setAttribute('aria-pressed', 'false');
+  elements.compass.querySelector('span').textContent = 'Look with phone';
+  const direction = new THREE.Vector3();
+  camera.getWorldDirection(direction);
+  orbit.target.copy(camera.position).addScaledVector(direction, .05);
+  orbit.enabled = !flight && !xrSession;
+  if (message) setStatus(message, 3500);
+}
+
+async function toggleCompass() {
+  if (compassActive) { stopCompass('Phone looking is off.'); return; }
+  try {
+    if (typeof window.DeviceOrientationEvent?.requestPermission === 'function') {
+      const permission = await window.DeviceOrientationEvent.requestPermission();
+      if (permission !== 'granted') throw new Error('Motion access was not allowed.');
+    }
+    compassActive = true;
+    compassReceived = false;
+    compassHasAbsoluteReading = false;
+    compassCalibration = null;
+    orbit.enabled = false;
+    elements.compass.setAttribute('aria-pressed', 'true');
+    elements.compass.querySelector('span').textContent = 'Stop phone look';
+    setStatus('Move your phone to look around.', 3500);
+    setTimeout(() => {
+      if (compassActive && !compassReceived) stopCompass('This browser did not provide orientation data.');
+    }, 3000);
+  } catch (error) {
+    stopCompass(error.message || 'Phone orientation is unavailable.');
+  }
+}
+
+function finishArSession() {
+  xrSession = null;
+  document.body.classList.remove('is-xr');
+  scene.scale.setScalar(1);
+  scene.fog = normalFog;
+  renderer.setClearColor(0x0d0f0f, 1);
+  elements.ar.setAttribute('aria-pressed', 'false');
+  elements.ar.querySelector('span').textContent = 'View in AR';
+  resetView();
+  setStatus('Returned to the 3D board.', 2500);
+}
+
+async function toggleAr() {
+  if (xrSession) { await xrSession.end(); return; }
+  try {
+    stopCompass();
+    renderer.xr.setReferenceSpaceType('local-floor');
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      optionalFeatures:['local-floor', 'dom-overlay'],
+      domOverlay:{root:document.body},
+    });
+    xrSession = session;
+    session.addEventListener('end', finishArSession, {once:true});
+    document.body.classList.add('is-xr');
+    scene.scale.setScalar(.22);
+    scene.fog = null;
+    renderer.setClearColor(0x000000, 0);
+    orbit.enabled = false;
+    elements.ar.setAttribute('aria-pressed', 'true');
+    elements.ar.querySelector('span').textContent = 'Exit AR';
+    elements.ar.closest('dialog')?.close();
+    await renderer.xr.setSession(session);
+  } catch (error) {
+    if (xrSession) try { await xrSession.end(); } catch {}
+    finishArSession();
+    setStatus(error?.name === 'NotAllowedError' ? 'AR permission was not allowed.' : 'AR could not start on this device.', 4500);
+  }
+}
+
+async function detectWorldModes() {
+  elements.compass.hidden = !('DeviceOrientationEvent' in window);
+  if (!navigator.xr?.isSessionSupported) return;
+  try { elements.ar.hidden = !await navigator.xr.isSessionSupported('immersive-ar'); }
+  catch { elements.ar.hidden = true; }
 }
 
 function pointerDistance(points) {
@@ -176,28 +293,93 @@ function setStatus(message = '', timeout = 0) {
   }, timeout);
 }
 
-function wrapLines(context, text, maxWidth, maxLines) {
-  const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+function wrapLines(context, text, maxWidth) {
   const lines = [];
-  let line = '';
-  for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (context.measureText(next).width <= maxWidth || !line) line = next;
-    else { lines.push(line); line = word; }
-    if (lines.length >= maxLines) break;
-  }
-  if (line && lines.length < maxLines) lines.push(line);
-  if (lines.length === maxLines && lines.join(' ').length < words.join(' ').length) {
-    lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, -1)}...`;
+  for (const paragraph of String(text || '').replace(/\r/g, '').split('\n')) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    let line = '';
+    for (const sourceWord of words) {
+      const chunks = [];
+      let chunk = '';
+      for (const character of sourceWord) {
+        if (chunk && context.measureText(chunk + character).width > maxWidth) {
+          chunks.push(chunk);
+          chunk = character;
+        } else chunk += character;
+      }
+      if (chunk) chunks.push(chunk);
+      chunks.forEach((word, index) => {
+        const next = line && index === 0 ? `${line} ${word}` : (line ? `${line}${word}` : word);
+        if (context.measureText(next).width <= maxWidth) line = next;
+        else { if (line) lines.push(line); line = word; }
+      });
+    }
+    if (line) lines.push(line);
+    if (!words.length) lines.push('');
   }
   return lines;
 }
 
-function noteTexture(note) {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 512;
-  const context = canvas.getContext('2d');
-  context.fillStyle = note.image ? '#f5f3eb' : (NOTE_COLORS[note.color] || NOTE_COLORS.yellow);
+function fittedNoteText(context, note) {
+  const content = String(note.content || 'Your note');
+  const family = FONT_FAMILIES[note.font] || FONT_FAMILIES.typewriter;
+  let size = note.font === 'handwritten' ? 51 : 40;
+  let lines = [];
+  while (size >= 23) {
+    context.font = `${size}px "${family}", sans-serif`;
+    lines = wrapLines(context, content, 428);
+    if (lines.length * size * 1.42 <= 390 && lines.every(line => context.measureText(line).width <= 434)) break;
+    if (size === 23) break;
+    size -= 2;
+  }
+  return {size, lines, lineHeight:size * 1.42};
+}
+
+function drawPaperWear(context, note) {
+  const wear = noteWear(note.id);
+  if (!wear) return;
+  const corners = {tl:[0, 0], tr:[512, 0], bl:[0, 512], br:[512, 512]};
+  wear.corners.forEach((corner, index) => {
+    const [x, y] = corners[corner];
+    const reach = wear.reach[index] * (512 / 220);
+    const shade = context.createRadialGradient(x, y, 0, x, y, reach);
+    shade.addColorStop(0, `rgba(31,16,5,${wear.alpha})`);
+    shade.addColorStop(.52, `rgba(31,16,5,${wear.alpha * .4})`);
+    shade.addColorStop(1, 'rgba(31,16,5,0)');
+    context.fillStyle = shade;
+    context.fillRect(0, 0, 512, 512);
+  });
+}
+
+function drawPaperTexture(context, record, now) {
+  if (paperGrainImage.complete && paperGrainImage.naturalWidth) {
+    const pattern = context.createPattern(paperGrainImage, 'repeat');
+    context.save();
+    context.globalAlpha = .16;
+    context.fillStyle = pattern;
+    context.fillRect(0, 0, 512, 512);
+    context.restore();
+  }
+  const opacity = noteAgeTextureOpacity(noteAgeFraction(record.born, record.dies, now));
+  if (opacity > 0 && paperCreaseImage.complete && paperCreaseImage.naturalWidth) {
+    const placement = noteTexturePlacement(record.note.id);
+    const scale = placement.scale * 1.5;
+    context.save();
+    context.globalAlpha = opacity;
+    context.globalCompositeOperation = 'multiply';
+    context.translate(256 + placement.shiftX * 2.33, 256 + placement.shiftY * 2.33);
+    context.rotate(placement.angle * Math.PI / 180);
+    context.scale(scale, scale);
+    context.drawImage(paperCreaseImage, -256, -256, 512, 512);
+    context.restore();
+  }
+  return opacity;
+}
+
+function renderNoteSurface(record, now = Math.floor(Date.now() / 1000)) {
+  const {context, note} = record;
+  context.clearRect(0, 0, 512, 512);
+  context.fillStyle = NOTE_COLORS[note.color] || NOTE_COLORS.yellow;
   context.fillRect(0, 0, 512, 512);
   const shade = context.createLinearGradient(0, 0, 512, 512);
   shade.addColorStop(0, 'rgba(255,255,255,.23)');
@@ -205,33 +387,47 @@ function noteTexture(note) {
   shade.addColorStop(1, 'rgba(60,35,0,.16)');
   context.fillStyle = shade;
   context.fillRect(0, 0, 512, 512);
-  context.fillStyle = '#171612';
+  drawPaperWear(context, note);
+  const ageOpacity = drawPaperTexture(context, record, now);
+  if (record.pictureAge) record.pictureAge.style.opacity = ageOpacity.toFixed(3);
+  context.fillStyle = '#26231e';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   if (note.image) {
     context.fillStyle = '#d7d4ca';
     context.fillRect(42, 42, 428, 374);
   } else {
-    const content = note.content || 'Your note';
-    const size = content.length > 300 ? 25 : content.length > 150 ? 31 : content.length > 70 ? 39 : 48;
-    context.font = `${size}px "${FONT_FAMILIES[note.font] || 'Noto Sans'}", sans-serif`;
-    const lines = wrapLines(context, content, 430, Math.max(4, Math.floor(345 / (size * 1.28))));
-    const lineHeight = size * 1.28;
+    const {size, lines, lineHeight} = fittedNoteText(context, note);
+    context.font = `${size}px "${FONT_FAMILIES[note.font] || FONT_FAMILIES.typewriter}", sans-serif`;
     const start = 226 - ((lines.length - 1) * lineHeight) / 2;
-    lines.forEach((line, index) => context.fillText(line, 256, start + index * lineHeight, 440));
+    lines.forEach((line, index) => context.fillText(line, 256, start + index * lineHeight, 434));
   }
-  context.fillStyle = 'rgba(31,29,25,.64)';
+  context.fillStyle = 'rgba(38,35,30,.64)';
   context.textAlign = 'right';
   context.font = '22px "Roboto Mono", monospace';
   context.fillText(noteAuthor(note), 480, 474, 330);
+  record.texture.needsUpdate = true;
+}
+
+function noteTexture(note) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const context = canvas.getContext('2d');
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  const record = {canvas, context, texture, note, pictureAge:null,
+    born:Number(note.createdAt || 0), dies:Number(note.expiration || 0)};
+  noteSurfaces.push(record);
+  renderNoteSurface(record);
+  texture.userData.surface = record;
   return texture;
 }
 
 function noteAuthor(note) {
   if (note?.anonymous) return '~anonymous';
+  const known = authorLabels.get(note?.pubkey);
+  if (known) return known;
   try {
     const npub = window.NostrTools.nip19.npubEncode(note?.pubkey || '');
     return `~${npub.slice(0, 9)}...${npub.slice(-5)}`;
@@ -241,54 +437,108 @@ function noteAuthor(note) {
   }
 }
 
-function updateAgeSurface(record, now = Math.floor(Date.now() / 1000)) {
-  const opacity = noteAgeTextureOpacity(noteAgeFraction(record.born, record.dies, now));
-  record.material.opacity = opacity;
-  if (record.pictureAge) record.pictureAge.style.opacity = opacity.toFixed(3);
-}
-
-function applyAgeTexture(record) {
-  if (!ageTextureVariants.length) return;
-  record.material.map = ageTextureVariants[record.variant % ageTextureVariants.length];
-  record.material.needsUpdate = true;
-}
-
-function attachAgeSurface(group, note, width, pictureAge = null) {
-  const placement = noteTexturePlacement(note.id);
-  const material = new THREE.MeshBasicMaterial({
-    color:0xffffff,
-    transparent:true,
-    opacity:0,
-    depthWrite:false,
-    side:THREE.DoubleSide,
-    blending:THREE.MultiplyBlending,
+function readAuthorProfiles(relay, pubkeys) {
+  return new Promise(resolve => {
+    const profiles = new Map();
+    let socket;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { socket?.close(); } catch {}
+      resolve(profiles);
+    };
+    const timer = setTimeout(finish, 3500);
+    try { socket = new WebSocket(relay); } catch { finish(); return; }
+    const subscription = `pinstr-world-authors-${Date.now()}-${Math.random()}`;
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription,
+      {authors:pubkeys, kinds:[0], limit:Math.min(1000, pubkeys.length * 2)}])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE' && data[1] === subscription) { finish(); return; }
+      const event = data[2];
+      if (data[0] !== 'EVENT' || data[1] !== subscription || !pubkeys.includes(event?.pubkey)
+          || !window.NostrTools?.verifyEvent(event)) return;
+      const current = profiles.get(event.pubkey);
+      if (!current || event.created_at > current.created_at) profiles.set(event.pubkey, event);
+    });
+    socket.addEventListener('error', finish);
+    socket.addEventListener('close', finish);
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width), material);
-  mesh.position.z = .009;
-  group.add(mesh);
-  const record = {
-    material,
-    pictureAge,
-    born:Number(note.createdAt || 0),
-    dies:Number(note.expiration || 0),
-    variant:Math.floor((((placement.angle % 360) + 360) % 360) / 45),
-  };
-  ageSurfaces.push(record);
-  applyAgeTexture(record);
-  updateAgeSurface(record);
 }
 
-textureLoader.load('/img/note-crumple.png', texture => {
-  texture.colorSpace = THREE.SRGBColorSpace;
-  ageTextureVariants = Array.from({length:8}, (_, index) => {
-    const variant = texture.clone();
-    variant.center.set(.5, .5);
-    variant.rotation = index * Math.PI / 4;
-    variant.needsUpdate = true;
-    return variant;
-  });
-  ageSurfaces.forEach(applyAgeTexture);
+function authorLabelFromProfile(event, pubkey) {
+  if (event) {
+    try {
+      const profile = JSON.parse(event.content || '{}');
+      const identity = String(profile.name || profile.display_name || profile.displayName || profile.nip05 || '')
+        .trim().replace(/\s+/g, ' ');
+      if (identity) return `~${identity.slice(0, 80)}`;
+    } catch {}
+  }
+  try {
+    const npub = window.NostrTools.nip19.npubEncode(pubkey);
+    return `~${npub.slice(0, 9)}...${npub.slice(-5)}`;
+  } catch { return `~${String(pubkey || '').slice(0, 8)}...${String(pubkey || '').slice(-5)}`; }
+}
+
+function redrawAuthor(pubkey) {
+  noteSurfaces.filter(record => record.note.pubkey === pubkey)
+    .forEach(record => renderNoteSurface(record));
+}
+
+async function flushAuthorProfiles() {
+  authorProfileTimer = 0;
+  const pubkeys = [...authorProfileQueue].filter(pubkey => !authorProfilesLoading.has(pubkey));
+  authorProfileQueue.clear();
+  if (!pubkeys.length) return;
+  pubkeys.forEach(pubkey => authorProfilesLoading.add(pubkey));
+  try {
+    const results = await Promise.allSettled([
+      readAuthorProfiles(RELAY, pubkeys),
+      readAuthorProfiles('wss://relay.damus.io', pubkeys),
+      readAuthorProfiles('wss://nos.lol', pubkeys),
+      readAuthorProfiles('wss://relay.ditto.pub', pubkeys),
+    ]);
+    const newest = new Map();
+    results.filter(result => result.status === 'fulfilled').forEach(result => result.value.forEach((event, pubkey) => {
+      if (!newest.has(pubkey) || event.created_at > newest.get(pubkey).created_at) newest.set(pubkey, event);
+    }));
+    pubkeys.forEach(pubkey => {
+      authorLabels.set(pubkey, authorLabelFromProfile(newest.get(pubkey), pubkey));
+      redrawAuthor(pubkey);
+    });
+  } finally { pubkeys.forEach(pubkey => authorProfilesLoading.delete(pubkey)); }
+}
+
+function requestAuthorProfile(note) {
+  const pubkey = String(note?.pubkey || '');
+  if (note?.anonymous || !/^[0-9a-f]{64}$/.test(pubkey) || authorLabels.has(pubkey)
+      || authorProfilesLoading.has(pubkey)) return;
+  authorProfileQueue.add(pubkey);
+  clearTimeout(authorProfileTimer);
+  authorProfileTimer = setTimeout(flushAuthorProfiles, 90);
+}
+
+const openWorldGiftDialog = createWorldGiftDialog({
+  relay:RELAY,
+  noteFor:eventId => notes.get(eventId),
+  authorFor:note => noteAuthor(note),
+  loginHref:(() => {
+    const url = new URL(boardUrl, location.origin);
+    url.searchParams.set('login', '1');
+    return `${url.pathname}?${url.searchParams}`;
+  })(),
 });
+
+function redrawNoteSurfaces() { noteSurfaces.forEach(record => renderNoteSurface(record)); }
+paperGrainImage.addEventListener('load', redrawNoteSurfaces);
+paperCreaseImage.addEventListener('load', redrawNoteSurfaces);
+paperGrainImage.src = '/img/grain.png';
+paperCreaseImage.src = '/img/note-crumple.png';
+document.fonts?.ready?.then(redrawNoteSurfaces);
 
 function attachPicture(group, paper, note, width) {
   if (!note.image) return null;
@@ -423,22 +673,43 @@ function updatePictureOverlays() {
 
 function labelTexture(text) {
   const canvas = document.createElement('canvas');
-  canvas.width = 768;
+  canvas.width = 1024;
   canvas.height = 128;
   const context = canvas.getContext('2d');
-  context.fillStyle = 'rgba(12,13,14,.82)';
-  context.fillRect(0, 18, 768, 92);
-  context.strokeStyle = '#f2a900';
-  context.lineWidth = 3;
-  context.strokeRect(2, 20, 764, 88);
-  context.fillStyle = '#ffffff';
-  context.font = '700 42px "Roboto Mono", monospace';
+  context.font = '300 54px "Roboto Mono", monospace';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(text, 384, 64, 720);
+  context.fillStyle = 'rgba(242,169,0,.82)';
+  context.fillText(text, 512, 64, 940);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   return texture;
+}
+
+function addBoardEngravings(group, cell) {
+  const geometry = new THREE.PlaneGeometry(4.5, .28);
+  const material = new THREE.MeshBasicMaterial({
+    map:labelTexture(cell),
+    transparent:true,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+  });
+  const engravings = [
+    // Each wire label sits on an inside edge and faces the board centre.
+    {x:0, z:-5.184, turn:0},
+    {x:0, z:5.184, turn:Math.PI},
+    {x:-5.264, z:0, turn:Math.PI / 2},
+    {x:5.264, z:0, turn:-Math.PI / 2},
+  ];
+  return engravings.map(engraving => {
+    const label = new THREE.Mesh(geometry, material);
+    label.position.set(engraving.x, .03, engraving.z);
+    label.rotation.set(0, engraving.turn, 0);
+    label.renderOrder = 2;
+    group.add(label);
+    return label;
+  });
 }
 
 function ensurePlatform(cell) {
@@ -448,38 +719,22 @@ function ensurePlatform(cell) {
   const position = worldPlatformPosition(index);
   const group = new THREE.Group();
   group.position.set(position.x, position.y, position.z);
-  // The platform is the same square board as the 2D desk: a tiled board surface inside wooden rails.
-  const backing = new THREE.Mesh(new THREE.BoxGeometry(10.9, .28, 10.9), woodEdgeMaterial);
-  backing.position.y = -.22;
-  group.add(backing);
-  const base = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 10.4), boardSurfaceMaterial);
+  // Keep an invisible hit plane so an outline-only board remains selectable.
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 10.4), new THREE.MeshBasicMaterial({
+    transparent:true, opacity:0, depthWrite:false,
+  }));
   base.rotation.x = -Math.PI / 2;
   base.position.y = -.065;
   base.userData.cell = cell;
   group.add(base);
-  const railLong = new THREE.BoxGeometry(11.3, .4, .38);
-  const railShort = new THREE.BoxGeometry(.38, .4, 10.55);
-  for (const z of [-5.38, 5.38]) {
-    const rail = new THREE.Mesh(railLong, woodMaterial);
-    rail.position.set(0, .03, z);
-    group.add(rail);
-  }
-  for (const x of [-5.46, 5.46]) {
-    const rail = new THREE.Mesh(railShort, woodMaterial);
-    rail.position.set(x, .03, 0);
-    group.add(rail);
-  }
+  const engravings = addBoardEngravings(group, cell);
   const outline = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(11.36, .46, 11.36)),
     new THREE.LineBasicMaterial({color:0xf2a900, transparent:true, opacity:index ? .24 : .66}),
   );
   outline.position.y = -.03;
   group.add(outline);
-  const label = new THREE.Sprite(new THREE.SpriteMaterial({map:labelTexture(cell), transparent:true, depthWrite:false}));
-  label.scale.set(4.8, .8, 1);
-  label.position.set(0, .35, -4.55);
-  group.add(label);
-  group.userData = {cell, index, base, outline};
+  group.userData = {cell, index, base, outline, engravings};
   scene.add(group);
   platforms.set(cell, group);
   platformOrder.push(cell);
@@ -487,37 +742,119 @@ function ensurePlatform(cell) {
   return group;
 }
 
+function portalLabelTexture(cell, count, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 160;
+  const context = canvas.getContext('2d');
+  context.fillStyle = 'rgba(8,10,10,.78)';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = color;
+  context.lineWidth = 8;
+  context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+  context.fillStyle = '#fff';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.font = '700 54px "Roboto Mono", monospace';
+  context.fillText(cell, canvas.width / 2, 61, 700);
+  context.fillStyle = color;
+  context.font = '600 31px "Roboto Mono", monospace';
+  context.fillText(`${count} live note${count === 1 ? '' : 's'}`, canvas.width / 2, 119, 700);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function clearPortals() {
+  for (const portal of portals.values()) {
+    scene.remove(portal);
+    portal.traverse(object => {
+      object.geometry?.dispose?.();
+      if (Array.isArray(object.material)) object.material.forEach(material => material.dispose?.());
+      else object.material?.dispose?.();
+      object.material?.map?.dispose?.();
+    });
+  }
+  portals.clear();
+  portalMeshes.length = 0;
+}
+
+function renderPortals(activity, origin = activeCell) {
+  clearPortals();
+  const centre = platforms.get(origin)?.position || new THREE.Vector3();
+  const colors = {parent:'#43d17b', child:'#ff5151', sibling:'#bf78ff'};
+  [...activity.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([cell, ids]) => {
+    const placement = worldPortalPosition(origin, cell);
+    if (!placement || !ids.size) return;
+    const color = colors[placement.relation];
+    const group = new THREE.Group();
+    group.position.set(centre.x + placement.x, centre.y + placement.y, centre.z + placement.z);
+    group.lookAt(centre.x, centre.y + 1.65, centre.z);
+    const glow = new THREE.Mesh(new THREE.RingGeometry(.72, 1.05, 48), new THREE.MeshBasicMaterial({
+      color, transparent:true, opacity:.24, side:THREE.DoubleSide, depthWrite:false,
+    }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.82, .94, 48), new THREE.MeshBasicMaterial({
+      color, transparent:true, opacity:.9, side:THREE.DoubleSide, depthWrite:false,
+    }));
+    const hit = new THREE.Mesh(new THREE.CircleGeometry(1.08, 32), new THREE.MeshBasicMaterial({
+      transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false,
+    }));
+    hit.userData = {cell, relation:placement.relation};
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(2.7, .56), new THREE.MeshBasicMaterial({
+      map:portalLabelTexture(cell, ids.size, color), transparent:true, side:THREE.DoubleSide, depthWrite:false,
+    }));
+    label.position.y = -1.42;
+    group.add(glow, ring, hit, label);
+    scene.add(group);
+    portals.set(cell, group);
+    portalMeshes.push(hit);
+  });
+}
+
 function buildNote(note, {draft = false} = {}) {
   const group = new THREE.Group();
   const width = 1.28;
+  const surfaceTexture = noteTexture(note);
   const paper = new THREE.Mesh(
     new THREE.PlaneGeometry(width, width),
-    new THREE.MeshStandardMaterial({map:noteTexture(note), side:THREE.DoubleSide, roughness:.9, metalness:0,
+    new THREE.MeshBasicMaterial({map:surfaceTexture, side:THREE.DoubleSide,
       transparent:draft, opacity:draft ? .9 : 1}),
   );
   group.add(paper);
   paper.userData = {note, group};
   paperMeshes.push(paper);
   const pictureAge = attachPicture(group, paper, note, width);
-  attachAgeSurface(group, note, width, pictureAge);
+  const surface = surfaceTexture.userData.surface;
+  surface.pictureAge = pictureAge;
+  if (pictureAge) {
+    pictureAge.style.setProperty('--age-angle', `${noteTexturePlacement(note.id).angle}deg`);
+    renderNoteSurface(surface);
+  }
   const pin = new THREE.Mesh(
-    new THREE.SphereGeometry(.095, 18, 12),
+    new THREE.SphereGeometry(.06, 16, 10),
     new THREE.MeshStandardMaterial({color:PIN_COLORS[pinColourFor(note.id || pending?.contentHash)] || PIN_COLORS.red,
       roughness:.28, metalness:.2}),
   );
-  pin.position.set(0, width * .43, .055);
+  pin.position.set(0, width * .47, .055);
   pin.userData = {note, group};
   group.add(pin);
-  group.userData = {note, pin, draft};
-  pinMeshes.push(pin);
+  const pinTarget = new THREE.Mesh(
+    new THREE.SphereGeometry(.12, 12, 8),
+    new THREE.MeshBasicMaterial({transparent:true, opacity:0, depthWrite:false}),
+  );
+  pinTarget.position.copy(pin.position);
+  pinTarget.userData = {note, group};
+  group.add(pinTarget);
+  group.userData = {note, pin, pinTarget, draft};
+  pinMeshes.push(pinTarget);
   noteGroups.push(group);
   scene.add(group);
   return group;
 }
 
-function placeNoteGroup(group, cell, index = 0) {
+function placeNoteGroup(group, cell, index = 0, total = 1) {
   const platform = ensurePlatform(cell);
-  const local = worldNotePosition(group.userData.note.id || pending?.contentHash || 'draft', index);
+  const local = worldNotePosition(group.userData.note.id || pending?.contentHash || 'draft', index, total);
   group.position.set(platform.position.x + local.x, platform.position.y + local.y, platform.position.z + local.z);
   if (local.floor) {
     group.rotation.set(-Math.PI / 2, 0, local.roll);
@@ -532,6 +869,13 @@ function placeNoteGroup(group, cell, index = 0) {
   group.userData.floor = local.floor;
 }
 
+function layoutCellNotes(cell) {
+  const groups = noteGroups
+    .filter(group => !group.userData.draft && group.userData.cell === cell)
+    .sort((left, right) => String(left.userData.note.id).localeCompare(String(right.userData.note.id)));
+  groups.forEach((group, index) => placeNoteGroup(group, cell, index, groups.length));
+}
+
 function addNote(note, event = null) {
   if (!note?.id || notes.has(note.id)) return;
   const cell = worldCellForNote(note, board.cells, board.depth);
@@ -539,14 +883,17 @@ function addNote(note, event = null) {
   const detailed = {...note, event};
   notes.set(note.id, detailed);
   const group = buildNote(detailed);
-  placeNoteGroup(group, cell, notes.size - 1);
+  requestAuthorProfile(detailed);
+  placeNoteGroup(group, cell);
+  layoutCellNotes(cell);
 }
 
 function createDraft() {
   if (!canPlace || draftGroup) return;
   const draft = {...pending, id:pending.contentHash || `draft-${Date.now()}`};
   draftGroup = buildNote(draft, {draft:true});
-  placeNoteGroup(draftGroup, activeCell, noteGroups.length + 3);
+  const neighbours = noteGroups.filter(group => !group.userData.draft && group.userData.cell === activeCell).length;
+  placeNoteGroup(draftGroup, activeCell, neighbours, neighbours + 1);
   draftGroup.position.z += .45;
   setStatus('Hold the pin for half a second, then move the note.', 5000);
 }
@@ -655,9 +1002,37 @@ function pinAt(clientX, clientY) {
   return raycaster.intersectObjects(pinMeshes, false)[0]?.object || null;
 }
 
+function signatureFromHit(hit) {
+  if (!hit?.uv || hit.uv.x < .27 || hit.uv.y > .16) return null;
+  return hit.object.userData.note || null;
+}
+
+function signatureAt(clientX, clientY) {
+  updatePointer(clientX, clientY);
+  return signatureFromHit(raycaster.intersectObjects(paperMeshes, false)[0]);
+}
+
+function selectInAr() {
+  if (!xrSession) return;
+  xrSelectMatrix.identity().extractRotation(xrController.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(xrController.matrixWorld);
+  raycaster.ray.direction.set(0, 0, -1).applyMatrix4(xrSelectMatrix);
+  const portal = raycaster.intersectObjects(portalMeshes, false)[0]?.object?.userData;
+  if (portal?.cell) { location.assign(worldHref([portal.cell], board.depth)); return; }
+  const pin = raycaster.intersectObjects(pinMeshes, false)[0]?.object;
+  if (pin) { showNote(pin.userData.note, {x:innerWidth / 2, y:innerHeight / 2}); return; }
+  const signature = signatureFromHit(raycaster.intersectObjects(paperMeshes, false)[0]);
+  if (signature) openWorldGiftDialog(signature.id);
+}
+
 function platformAt(clientX, clientY) {
   updatePointer(clientX, clientY);
   return raycaster.intersectObjects(platformMeshes, false)[0]?.object?.userData?.cell || '';
+}
+
+function portalAt(clientX, clientY) {
+  updatePointer(clientX, clientY);
+  return raycaster.intersectObjects(portalMeshes, false)[0]?.object?.userData || null;
 }
 
 function setActiveCell(cell) {
@@ -668,6 +1043,7 @@ function setActiveCell(cell) {
   elements.geohash.textContent = cell || 'No board selected';
   elements.back.href = boardHref(cell ? [cell] : board.cells);
   elements.write.href = worldComposerHref(cell ? [cell] : board.cells);
+  connectNearbyBoards(cell);
 }
 
 function resetView() {
@@ -737,14 +1113,19 @@ function faceDraggedNote(group) {
   group.rotateZ(group.userData.boardRotation || 0);
 }
 
-function updateDraggedNote(now) {
+const draggedTarget = new THREE.Vector3();
+const draggedPinOffset = new THREE.Vector3();
+function moveDraggedNote(clientX, clientY) {
   if (!dragged) return;
-  const elapsed = Math.min(.05, Math.max(0, (now - dragged.lastFrame) / 1000));
-  dragged.lastFrame = now;
-  dragged.angle += dragged.turn * elapsed * 1.9;
-  dragged.group.position.x = dragged.centre.x + Math.cos(dragged.angle) * dragged.radius;
-  dragged.group.position.z = dragged.centre.z + Math.sin(dragged.angle) * dragged.radius;
+  updatePointer(clientX, clientY);
+  draggedTarget.copy(camera.position).addScaledVector(raycaster.ray.direction, dragged.distance);
+  dragged.group.position.copy(draggedTarget);
   faceDraggedNote(dragged.group);
+  draggedPinOffset.copy(dragged.grabLocal).applyQuaternion(dragged.group.quaternion);
+  dragged.group.position.sub(draggedPinOffset);
+  faceDraggedNote(dragged.group);
+  draggedPinOffset.copy(dragged.grabLocal).applyQuaternion(dragged.group.quaternion);
+  dragged.group.position.copy(draggedTarget).sub(draggedPinOffset);
 }
 
 function neighbouringWorld(step) {
@@ -770,12 +1151,12 @@ function finishPlacement() {
 
 function connectBoard() {
   clearTimeout(reconnectTimer);
-  if (!board.cells.length) { setStatus('Choose a geohash on the corkboard first.'); return; }
+  if (!board.cells.length) { setStatus('Choose a geohash on the board first.'); return; }
   const subscription = `pinstr-world-${Date.now()}`;
   const socket = new WebSocket(RELAY);
   boardSocket = socket;
   socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {
-    kinds:[1], '#t':[STICKY_TOPIC], '#g':board.cells, limit:500,
+    kinds:[1], '#t':[STICKY_TOPIC], '#g':board.cells, limit:1000,
   }])));
   socket.addEventListener('message', message => {
     try {
@@ -795,6 +1176,59 @@ function connectBoard() {
   socket.addEventListener('close', () => {
     if (boardSocket === socket) boardSocket = null;
     if (!document.hidden) reconnectTimer = setTimeout(connectBoard, 5000);
+  }, {once:true});
+}
+
+function nearbyPortalCell(noteCell, origin, siblings) {
+  const relation = worldBoardRelation(origin, noteCell);
+  if (relation) return noteCell;
+  return siblings.find(cell => noteCell.startsWith(cell)) || '';
+}
+
+function connectNearbyBoards(cell = activeCell) {
+  clearTimeout(nearbyReconnectTimer);
+  nearbyReconnectTimer = 0;
+  nearbyConnectionVersion += 1;
+  const version = nearbyConnectionVersion;
+  try { nearbySocket?.close(); } catch {}
+  nearbySocket = null;
+  clearPortals();
+  if (!cell) return;
+  const related = worldNearbyCells(cell);
+  const siblings = related.filter(destination => worldBoardRelation(cell, destination) === 'sibling');
+  const requested = [...new Set([cell, ...related])];
+  const activity = new Map();
+  let socket;
+  try { socket = new WebSocket(RELAY); } catch { return; }
+  nearbySocket = socket;
+  const subscription = `pinstr-world-portals-${Date.now()}-${version}`;
+  socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {
+    kinds:[1], '#t':[STICKY_TOPIC], '#g':requested, limit:1000,
+  }])));
+  socket.addEventListener('message', message => {
+    if (version !== nearbyConnectionVersion || cell !== activeCell) return;
+    let data;
+    try { data = JSON.parse(message.data); } catch { return; }
+    if (data[0] === 'EOSE' && data[1] === subscription) {
+      renderPortals(activity, cell);
+      return;
+    }
+    const event = data[2];
+    if (data[0] !== 'EVENT' || data[1] !== subscription || !window.NostrTools?.verifyEvent(event)) return;
+    const note = parseStickyEvent(event);
+    if (!note || isStickyExpired(note)) return;
+    for (const noteCell of note.geohashes || [note.geohash]) {
+      const destination = nearbyPortalCell(noteCell, cell, siblings);
+      if (!destination || destination === cell) continue;
+      const ids = activity.get(destination) || new Set();
+      ids.add(note.id);
+      activity.set(destination, ids);
+    }
+  });
+  socket.addEventListener('close', () => {
+    if (version !== nearbyConnectionVersion) return;
+    if (nearbySocket === socket) nearbySocket = null;
+    if (!document.hidden) nearbyReconnectTimer = setTimeout(() => connectNearbyBoards(cell), 7000);
   }, {once:true});
 }
 
@@ -818,6 +1252,12 @@ elements.canvas.addEventListener('pointerdown', event => {
     }
   }
   if (event.button > 0 || flight) return;
+  const signature = signatureAt(event.clientX, event.clientY);
+  if (signature) {
+    event.preventDefault();
+    openWorldGiftDialog(signature.id);
+    return;
+  }
   pointerStart = {x:event.clientX, y:event.clientY};
   const pin = pinAt(event.clientX, event.clientY);
   if (!pin) return;
@@ -834,27 +1274,17 @@ elements.canvas.addEventListener('pointerdown', event => {
   };
   press.timer = setTimeout(() => {
     if (pinPress !== press) return;
+    press.pin.getWorldPosition(draggedTarget);
     dragged = {
       ...press,
-      centre:new THREE.Vector3(camera.position.x, press.group.userData.home.y, camera.position.z),
-      radius:Math.max(1.25, Math.hypot(
-        press.group.position.x - camera.position.x,
-        press.group.position.z - camera.position.z,
-      )),
-      angle:Math.atan2(
-        press.group.position.z - camera.position.z,
-        press.group.position.x - camera.position.x,
-      ),
-      startY:Math.max(press.group.userData.home.y + .65, press.group.position.y),
-      turn:0,
-      lastFrame:performance.now(),
+      distance:Math.max(1.25, camera.position.distanceTo(draggedTarget)),
+      grabLocal:press.pin.position.clone(),
       moved:false,
     };
     pinPress = null;
-    dragged.group.position.y = dragged.startY;
     dragged.group.userData.floor = false;
-    faceDraggedNote(dragged.group);
-    setStatus('Move left or right to orbit the note. Return to the starting point to stop.', 2600);
+    moveDraggedNote(press.x, press.y);
+    setStatus('The note now follows your pointer.', 1800);
   }, PIN_HOLD_MS);
   pinPress = press;
 });
@@ -878,13 +1308,7 @@ elements.canvas.addEventListener('pointermove', event => {
     return;
   }
   if (!dragged || dragged.id !== event.pointerId) return;
-  const distance = Math.max(2, camera.position.distanceTo(dragged.group.position));
-  const scale = distance * .00145;
-  const home = dragged.group.userData.home;
-  dragged.turn = Math.max(-1, Math.min(1,
-    (event.clientX - dragged.x) / Math.max(80, innerWidth * .22)));
-  dragged.group.position.y = Math.max(home.y + .6, Math.min(home.y + 4.8,
-    dragged.startY - (event.clientY - dragged.y) * scale));
+  moveDraggedNote(event.clientX, event.clientY);
   dragged.moved ||= Math.hypot(event.clientX - dragged.x, event.clientY - dragged.y) > 6;
 });
 
@@ -911,6 +1335,12 @@ function releasePointer(event) {
     return;
   }
   if (pointerStart && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) <= 7) {
+    const portal = portalAt(event.clientX, event.clientY);
+    if (portal?.cell) {
+      location.assign(worldHref([portal.cell], board.depth));
+      pointerStart = null;
+      return;
+    }
     const cell = platformAt(event.clientX, event.clientY);
     if (cell) flyToWorld(cell);
   }
@@ -937,6 +1367,11 @@ elements.controlsToggle.addEventListener('click', () => {
   elements.controls.hidden = !opening;
   elements.controlsToggle.setAttribute('aria-expanded', String(opening));
 });
+elements.compass.addEventListener('click', toggleCompass);
+elements.ar.addEventListener('click', toggleAr);
+xrController.addEventListener('select', selectInAr);
+window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+window.addEventListener('deviceorientation', handleDeviceOrientation, true);
 document.addEventListener('pointerdown', event => {
   if (!elements.noteMenu.hidden && !event.target.closest('#noteMenu')) closeNoteMenu();
   if (elements.controls.hidden || event.target.closest('#worldControls, #worldControlsToggle')) return;
@@ -974,14 +1409,20 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight, false);
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
 });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !boardSocket) connectBoard(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (!boardSocket) connectBoard();
+  if (!nearbySocket) connectNearbyBoards(activeCell);
+});
 setInterval(() => {
   const now = Math.floor(Date.now() / 1000);
-  ageSurfaces.forEach(record => updateAgeSurface(record, now));
+  noteSurfaces.forEach(record => renderNoteSurface(record, now));
 }, 60000);
 window.addEventListener('beforeunload', () => {
   clearTimeout(reconnectTimer);
+  clearTimeout(nearbyReconnectTimer);
   try { boardSocket?.close(); } catch {}
+  try { nearbySocket?.close(); } catch {}
 });
 
 for (const cell of board.cells) ensurePlatform(cell);
@@ -991,8 +1432,8 @@ createDraft();
 connectBoard();
 renderer.setAnimationLoop(now => {
   stepFlight(now);
-  updateDraggedNote(now);
-  if (!flight) orbit.update();
+  if (!flight && !compassActive && !xrSession) orbit.update();
   renderer.render(scene, camera);
-  updatePictureOverlays();
+  if (!xrSession) updatePictureOverlays();
 });
+detectWorldModes();

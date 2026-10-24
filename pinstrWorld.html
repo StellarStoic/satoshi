@@ -23,16 +23,14 @@
     <canvas id="worldCanvas" aria-label="Pinstr 3D boards"></canvas>
     <div id="worldPictureLayer" class="world-picture-layer" aria-hidden="true"></div>
 
-    <a id="backToBoard" class="world-icon-button world-back" href="/stickyNotes.html" aria-label="Return to corkboard" title="Return to corkboard"><i class="lni lni-arrow-left" aria-hidden="true"></i></a>
+    <a id="backToBoard" class="world-icon-button world-back" href="/stickyNotes.html" aria-label="Return to board" title="Return to board"><i class="lni lni-arrow-left" aria-hidden="true"></i></a>
     <a id="writeWorldNote" class="world-icon-button world-write" href="/stickyNotes.html?compose=world" aria-label="Write a note for this board" title="Write a note"><i class="lni lni-plus" aria-hidden="true"></i></a>
 
     <header class="world-heading">
-      <span>Pinstr 3D</span>
       <strong id="worldGeohash">Opening board</strong>
     </header>
 
     <div id="worldStatus" class="world-status" role="status" aria-live="polite">Opening this world...</div>
-
     <div id="noteMenu" class="note-menu" hidden role="dialog" aria-label="Pinstr note details">
       <button type="button" id="closeNoteMenu" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
       <span>Event ID</span><code id="noteEventId"></code>
@@ -57,7 +55,7 @@
       </div>
     </div>
 
-    <div class="world-controls-shell">
+    <div id="worldControlsShell" class="world-controls-shell" hidden>
       <button type="button" id="worldControlsToggle" class="world-controls-toggle" aria-label="3D controls" title="3D controls" aria-expanded="false" aria-controls="worldControls"><i class="lni lni-menu-meatballs-1" aria-hidden="true"></i></button>
       <div id="worldControls" class="world-controls" hidden>
         <div><kbd>Drag</kbd><span>Look around</span></div>
@@ -65,13 +63,32 @@
         <div><kbd>W A S D</kbd><span>Move</span></div>
         <div><kbd>Q / E</kbd><span>Previous / next world</span></div>
         <div><kbd>R</kbd><span>Reset view</span></div>
+        <button type="button" id="worldCompass" class="world-mode-button" hidden aria-pressed="false"><i class="lni lni-compass-drafting-2" aria-hidden="true"></i><span>Look with phone</span></button>
+        <button type="button" id="worldAr" class="world-mode-button" hidden aria-pressed="false"><i class="lni lni-eye" aria-hidden="true"></i><span>View in AR</span></button>
       </div>
     </div>
 
     <div id="worldFlight" class="world-flight" aria-hidden="true"></div>
   </main>
 
+  <dialog id="noteGiftDialog" class="sticky-dialog note-gift-dialog" aria-labelledby="noteGiftTitle">
+    <button type="button" id="closeNoteGift" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    <h2 id="noteGiftTitle">React or zap this note</h2>
+    <p id="noteGiftAuthor" class="note-gift__author"></p>
+    <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
+    <a id="noteGiftLogin" class="secondary-action note-gift__login" href="/stickyNotes.html?login=1" hidden><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in to Nostr</span></a>
+    <div class="note-gift__block"><h3>React</h3><div id="noteGiftReactions" class="note-gift__reactions" role="group" aria-label="Pick a reaction"></div></div>
+    <div class="note-gift__block">
+      <h3>Zap</h3><p id="noteGiftZapTarget" class="note-gift__hint"></p>
+      <div id="noteGiftAmounts" class="note-gift__amounts" role="group" aria-label="Zap amount"></div>
+      <div class="note-gift__custom"><input id="noteGiftCustom" type="number" min="1" step="1" inputmode="numeric" placeholder="sats" aria-label="Custom amount in sats"><button type="button" id="noteGiftZap" class="secondary-action"><span>Zap</span></button></div>
+      <div id="noteGiftInvoice" class="note-gift__invoice" hidden><div id="noteGiftQr" class="note-gift__qr" aria-hidden="true"></div><p id="noteGiftInvoiceHint" class="note-gift__hint"></p><code id="noteGiftInvoiceText"></code><button type="button" id="copyNoteGiftInvoice" class="secondary-action"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Copy invoice</span></button></div>
+    </div>
+  </dialog>
+
+  <script src="/qrCodeGenerator_1_4_4.js" defer></script>
   <script src="/stego/vendor/nostr-tools.bundle.js"></script>
+  <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
   <script type="module" src="/pinstrWorld.mjs"></script>
 </body>
 </html>
