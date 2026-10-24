@@ -64,7 +64,6 @@ let heatCells = [];
 let heatVisibleCount = 0;
 let heatController = null;
 let heatOverlay = null;
-let heatHoverCell = '';
 
 function readBtcMapAuth() {
   try {
@@ -377,7 +376,6 @@ function heatFeatureAtPoint(point) {
 function setHeatLayersVisible(visible) {
   if (!visible) {
     hideHeatOverlay(true);
-    heatHoverCell = '';
     map.getCanvas().style.cursor = '';
     return;
   }
@@ -791,10 +789,7 @@ map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(syncMapMode, 180);
 });
-map.on('move', () => {
-  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) positionHeatOverlay();
-  else hideHeatOverlay(true);
-});
+map.on('movestart', () => hideHeatOverlay(true));
 map.on('click', event => {
   const feature = heatFeatureAtPoint(event.point);
   if (!feature) return;
@@ -803,18 +798,6 @@ map.on('click', event => {
     zoom:Math.min(MARKER_ZOOM, map.getZoom() + 2.5),
     duration:650,
   });
-});
-map.on('mousemove', event => {
-  if (!heatMode) return;
-  const feature = heatFeatureAtPoint(event.point);
-  const key = feature ? `${feature.properties.centerLon}:${feature.properties.centerLat}` : '';
-  if (key === heatHoverCell) return;
-  heatHoverCell = key;
-  map.getCanvas().style.cursor = feature ? 'pointer' : '';
-  if (feature) {
-    const count = Number(feature.properties.count || 0);
-    setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
-  } else if (heatMode) heatSummary();
 });
 map.on('error', event => {
   if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');

@@ -23,8 +23,9 @@ body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companio
 body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companion--icon) .lni { font-size:18px !important; }
 body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companion--icon):hover,
 body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companion--icon):focus-visible { color:var(--accent,#f2a900) !important; }
-.btc-map-heat-overlay { position:absolute; z-index:1; inset:0; width:100%; height:100%; overflow:hidden; pointer-events:none; }
+.btc-map-heat-overlay { position:absolute; z-index:1; inset:0; width:100%; height:100%; overflow:hidden; pointer-events:none !important; }
 .btc-map-heat-overlay.is-hidden { display:none; }
+.btc-map-heat-overlay * { pointer-events:none !important; }
 .btc-map-heat-cell { pointer-events:none; }
 .btc-map-heat-cell polygon { fill-opacity:.46; stroke:#fff1c5; stroke-width:1.1; stroke-opacity:.7; vector-effect:non-scaling-stroke; transition:fill-opacity 140ms ease; }
 .btc-map-heat-cell text { fill:#18130b; stroke:rgba(255,255,255,.72); stroke-width:2.4px; paint-order:stroke fill; text-anchor:middle; dominant-baseline:central; font:700 12px var(--site-font,"Roboto Mono",monospace); pointer-events:none; }
