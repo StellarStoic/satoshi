@@ -61,6 +61,15 @@ test('place heat map groups coordinates into closed hexagons', () => {
     === JSON.stringify(feature.geometry.coordinates[0][6])));
 });
 
+test('place heat map clips date-line cells to valid GeoJSON longitudes', () => {
+  const features = btcMapHeatFeatures([{id:'nz', lat:-42.8, lon:178.4}], 2.2);
+  assert.equal(features.length, 1);
+  for (const [longitude, latitude] of features[0].geometry.coordinates[0]) {
+    assert.ok(longitude >= -180 && longitude <= 180);
+    assert.ok(latitude >= -90 && latitude <= 90);
+  }
+});
+
 test('place collections discard invalid coordinates and keep safe marker data', () => {
   const collection = placeCollection([
     {id:7,lat:46,lon:14,name:'Sats Cafe',verified_at:'2026-01-01',boosted_until:'2999-01-01'},
@@ -114,8 +123,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /function focusSearchResults\(results\)/);
   assert.match(page, /btcMapHeatFeatures\(places, map\.getZoom\(\)\)/);
   assert.match(page, /map\.getBounds\(\)\.contains/);
-  assert.match(page, /new window\.maplibregl\.Marker/);
-  assert.match(page, /className = 'btc-map-hex'/);
+  assert.match(page, /classList\.add\('btc-map-heat-overlay'\)/);
+  assert.match(page, /map\.project\(coordinate\)/);
   assert.match(page, /const MARKER_ZOOM = 9/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
   assert.match(page, /setTimeout\(syncMapMode, 180\)/);
@@ -125,8 +134,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(css, /\.btc-map-search\.is-open/);
   assert.match(css, /\.btc-map-search-toggle/);
   assert.doesNotMatch(css, /\.btc-map-heat-toggle/);
-  assert.match(css, /\.btc-map-hex \{/);
-  assert.match(css, /clip-path:polygon/);
+  assert.match(css, /\.btc-map-heat-cell polygon/);
+  assert.match(css, /fill-opacity:\.46/);
   assert.match(page, /btcMapAuthTemplate/);
   assert.match(page, /BTC_MAP_SAVED_URL/);
   assert.match(page, /sessionStorage\.setItem\(TOKEN_KEY/);

@@ -28,7 +28,8 @@ function heatMercator(lon, lat) {
 }
 
 function heatLngLat(x, y) {
-  return [x * 360 - 180, (2 * Math.atan(Math.exp((.5 - y) * 2 * Math.PI)) - Math.PI / 2) * 180 / Math.PI];
+  const longitude = Math.max(-179.999999, Math.min(179.999999, x * 360 - 180));
+  return [longitude, (2 * Math.atan(Math.exp((.5 - y) * 2 * Math.PI)) - Math.PI / 2) * 180 / Math.PI];
 }
 
 function roundHeatHex(q, r) {

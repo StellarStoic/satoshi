@@ -34,6 +34,7 @@ const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
 const MARKER_ZOOM = 9;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const elements = {
   form:document.getElementById('btcMapSearch'), query:document.getElementById('btcMapQuery'),
   searchToggle:document.getElementById('btcMapSearchToggle'),
@@ -61,7 +62,7 @@ let heatPlaces = null;
 let heatCells = [];
 let heatVisibleCount = 0;
 let heatController = null;
-let heatMarkers = [];
+let heatOverlay = null;
 
 function readBtcMapAuth() {
   try {
@@ -294,16 +295,72 @@ function setPlaceLayersVisible(visible) {
   });
 }
 
-function clearHeatMarkers() {
-  heatMarkers.forEach(marker => marker.remove());
-  heatMarkers = [];
-}
-
 function heatColor(count) {
   if (count >= 120) return '#d8443f';
   if (count >= 35) return '#f07800';
   if (count >= 8) return '#f2a900';
   return '#f6c54d';
+}
+
+function ensureHeatOverlay() {
+  if (heatOverlay) return heatOverlay;
+  heatOverlay = document.createElementNS(SVG_NS, 'svg');
+  heatOverlay.classList.add('btc-map-heat-overlay');
+  heatOverlay.setAttribute('aria-label', 'Bitcoin place density');
+  map.getContainer().append(heatOverlay);
+  return heatOverlay;
+}
+
+function renderHeatOverlay() {
+  if (!heatMode || !heatCells.length) return;
+  const overlay = ensureHeatOverlay();
+  overlay.hidden = false;
+  overlay.replaceChildren();
+  for (const feature of heatCells) {
+    const count = Number(feature.properties.count || 0);
+    const points = feature.geometry.coordinates[0]
+      .map(coordinate => map.project(coordinate))
+      .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (points.length < 4) continue;
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.classList.add('btc-map-heat-cell');
+    group.setAttribute('role', 'button');
+    group.setAttribute('tabindex', '0');
+    group.setAttribute('aria-label', `${count.toLocaleString()} mapped Bitcoin place${count === 1 ? '' : 's'} in this region. Zoom in.`);
+    const polygon = document.createElementNS(SVG_NS, 'polygon');
+    polygon.setAttribute('points', points.map(point => `${point.x},${point.y}`).join(' '));
+    polygon.setAttribute('fill', heatColor(count));
+    const center = map.project([Number(feature.properties.centerLon), Number(feature.properties.centerLat)]);
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', center.x);
+    label.setAttribute('y', center.y);
+    label.textContent = count.toLocaleString();
+    const zoomIn = () => map.easeTo({
+      center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
+      zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
+      duration:650,
+    });
+    group.addEventListener('click', zoomIn);
+    group.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      zoomIn();
+    });
+    group.addEventListener('pointerenter', () => {
+      setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
+    });
+    group.addEventListener('pointerleave', heatSummary);
+    group.append(polygon, label);
+    overlay.append(group);
+  }
+}
+
+function setHeatLayersVisible(visible) {
+  if (!visible) {
+    if (heatOverlay) heatOverlay.hidden = true;
+    return;
+  }
+  renderHeatOverlay();
 }
 
 function heatSummary() {
@@ -321,34 +378,7 @@ function drawHeatMap() {
   });
   heatVisibleCount = places.length;
   heatCells = btcMapHeatFeatures(places, map.getZoom());
-  clearHeatMarkers();
-  heatMarkers = heatCells.map(feature => {
-    const count = Number(feature.properties.count || 0);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btc-map-hex';
-    button.style.setProperty('--hex-color', heatColor(count));
-    button.setAttribute('aria-label', `${count.toLocaleString()} mapped Bitcoin place${count === 1 ? '' : 's'} in this region. Zoom in.`);
-    button.title = button.getAttribute('aria-label');
-    const label = document.createElement('span');
-    label.textContent = count.toLocaleString();
-    button.append(label);
-    button.addEventListener('click', event => {
-      event.stopPropagation();
-      map.easeTo({
-        center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
-        zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
-        duration:650,
-      });
-    });
-    button.addEventListener('pointerenter', () => {
-      setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
-    });
-    button.addEventListener('pointerleave', heatSummary);
-    return new window.maplibregl.Marker({element:button, anchor:'center'})
-      .setLngLat([Number(feature.properties.centerLon), Number(feature.properties.centerLat)])
-      .addTo(map);
-  });
+  renderHeatOverlay();
   if (heatMode) heatSummary();
 }
 
@@ -365,10 +395,11 @@ async function enterHeatMode() {
     }
     if (!heatMode) return;
     drawHeatMap();
+    setHeatLayersVisible(true);
   } catch (error) {
     if (error.name !== 'AbortError') {
       heatMode = false;
-      clearHeatMarkers();
+      setHeatLayersVisible(false);
       setPlaceLayersVisible(true);
       setStatus('The place-density map could not be loaded. Try again shortly.', 4200);
       if (map.getZoom() >= 5) await loadViewportPlaces();
@@ -383,7 +414,7 @@ async function syncMapMode() {
     return;
   }
   heatMode = false;
-  clearHeatMarkers();
+  setHeatLayersVisible(false);
   setPlaceLayersVisible(true);
   await loadViewportPlaces();
 }
@@ -731,6 +762,9 @@ map.on('moveend', () => {
   rememberView();
   clearTimeout(moveTimer);
   moveTimer = setTimeout(syncMapMode, 180);
+});
+map.on('move', () => {
+  if (heatMode) renderHeatOverlay();
 });
 map.on('error', event => {
   if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');
