@@ -1,10 +1,12 @@
 import {
   btcMapCommentsUrl,
   btcMapAuthTemplate,
+  btcMapHeatFeatures,
   btcMapPlaceUrl,
   btcMapPlacesUrl,
   btcMapSearchUrl,
   BTC_MAP_AUTH_URL,
+  BTC_MAP_HEAT_PLACES_URL,
   BTC_MAP_SAVED_URL,
   nip98Authorization,
   osmPlaceUrl,
@@ -31,8 +33,14 @@ const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
+const HEAT_SOURCE = 'btc-place-heat';
+const HEAT_FILL_LAYER = 'btc-place-heat-fill';
+const HEAT_LINE_LAYER = 'btc-place-heat-line';
+const HEAT_LABEL_LAYER = 'btc-place-heat-label';
+const MARKER_ZOOM = 9;
 const elements = {
   form:document.getElementById('btcMapSearch'), query:document.getElementById('btcMapQuery'),
+  searchToggle:document.getElementById('btcMapSearchToggle'),
   clear:document.getElementById('clearBtcMapSearch'), locate:document.getElementById('btcMapLocate'),
   results:document.getElementById('btcMapResults'), resultList:document.getElementById('btcMapResultList'),
   resultCount:document.getElementById('btcMapResultCount'), details:document.getElementById('btcMapDetails'),
@@ -52,6 +60,11 @@ let lastViewportRequest = '';
 let savedPlaceIds = new Set();
 let savedPlaces = [];
 let currentPlace = null;
+let heatMode = false;
+let heatPlaces = null;
+let heatCells = [];
+let heatVisibleCount = 0;
+let heatController = null;
 
 function readBtcMapAuth() {
   try {
@@ -277,6 +290,77 @@ function sourceReady() {
   return Boolean(map.getSource('btc-places'));
 }
 
+function setPlaceLayersVisible(visible) {
+  const visibility = visible ? 'visible' : 'none';
+  ['place-clusters', 'place-cluster-count', 'place-points'].forEach(id => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visibility);
+  });
+}
+
+function setHeatLayersVisible(visible) {
+  const visibility = visible ? 'visible' : 'none';
+  [HEAT_FILL_LAYER, HEAT_LINE_LAYER, HEAT_LABEL_LAYER].forEach(id => {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visibility);
+  });
+}
+
+function heatSummary() {
+  if (!heatPlaces) return;
+  const scope = map.getZoom() >= 5 ? 'on screen' : 'worldwide';
+  setStatus(`${heatVisibleCount.toLocaleString()} mapped Bitcoin places across ${heatCells.length.toLocaleString()} regions ${scope}. Select a hexagon to zoom in.`);
+}
+
+function drawHeatMap() {
+  const source = map.getSource(HEAT_SOURCE);
+  if (!source || !heatPlaces) return;
+  const places = map.getZoom() < 5 ? heatPlaces : heatPlaces.filter(place => {
+    const lat = Number(place?.lat);
+    const lon = Number(place?.lon);
+    return Number.isFinite(lat) && Number.isFinite(lon) && map.getBounds().contains([lon, lat]);
+  });
+  heatVisibleCount = places.length;
+  heatCells = btcMapHeatFeatures(places, map.getZoom());
+  source.setData({type:'FeatureCollection', features:heatCells});
+  if (heatMode) heatSummary();
+}
+
+async function enterHeatMode() {
+  heatMode = true;
+  setPlaceLayersVisible(false);
+  if (!heatPlaces) setStatus('Building the global place-density map…');
+  try {
+    if (!heatPlaces) {
+      heatController?.abort();
+      heatController = new AbortController();
+      const places = await getJson(BTC_MAP_HEAT_PLACES_URL, heatController);
+      heatPlaces = Array.isArray(places) ? places : [];
+    }
+    if (!heatMode) return;
+    drawHeatMap();
+    setHeatLayersVisible(true);
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      heatMode = false;
+      setHeatLayersVisible(false);
+      setPlaceLayersVisible(true);
+      setStatus('The place-density map could not be loaded. Try again shortly.', 4200);
+      if (map.getZoom() >= 5) await loadViewportPlaces();
+    }
+  }
+}
+
+async function syncMapMode() {
+  if (!sourceReady()) return;
+  if (map.getZoom() < MARKER_ZOOM) {
+    await enterHeatMode();
+    return;
+  }
+  heatMode = false;
+  setHeatLayersVisible(false);
+  setPlaceLayersVisible(true);
+  await loadViewportPlaces();
+}
+
 function installPlaceLayers() {
   map.addSource('btc-places', {type:'geojson', data:EMPTY_COLLECTION, cluster:true, clusterRadius:48, clusterMaxZoom:15});
   map.addLayer({
@@ -285,6 +369,22 @@ function installPlaceLayers() {
       'circle-color':'#f2a900', 'circle-radius':['step',['get','point_count'],17,20,21,100,27],
       'circle-stroke-color':'#17140d', 'circle-stroke-width':2,
     },
+  });
+  map.addSource(HEAT_SOURCE, {type:'geojson', data:EMPTY_COLLECTION});
+  map.addLayer({
+    id:HEAT_FILL_LAYER, type:'fill', source:HEAT_SOURCE, layout:{visibility:'none'},
+    paint:{
+      'fill-color':['interpolate', ['linear'], ['get','count'], 1, '#f6c54d', 8, '#f2a900', 35, '#f07800', 120, '#d8443f'],
+      'fill-opacity':.7,
+    },
+  });
+  map.addLayer({
+    id:HEAT_LINE_LAYER, type:'line', source:HEAT_SOURCE, layout:{visibility:'none'},
+    paint:{'line-color':'#fff1c5', 'line-width':1.1, 'line-opacity':.9},
+  });
+  map.addLayer({
+    id:HEAT_LABEL_LAYER, type:'symbol', source:HEAT_SOURCE, layout:{visibility:'none', 'text-field':['get','label'], 'text-size':12, 'text-allow-overlap':true},
+    paint:{'text-color':'#18130b', 'text-halo-color':'rgba(255,255,255,.68)', 'text-halo-width':1},
   });
   map.addLayer({
     id:'place-cluster-count', type:'symbol', source:'btc-places', filter:['has','point_count'],
@@ -315,10 +415,29 @@ function installPlaceLayers() {
     const feature = event.features?.[0];
     if (feature?.properties?.id) showPlace(feature.properties.id, feature.geometry.coordinates);
   });
+  map.on('click', HEAT_FILL_LAYER, event => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    map.easeTo({
+      center:[Number(feature.properties.centerLon), Number(feature.properties.centerLat)],
+      zoom:Math.min(map.getMaxZoom(), map.getZoom() + 2.5),
+      duration:650,
+    });
+  });
+  map.on('mousemove', HEAT_FILL_LAYER, event => {
+    map.getCanvas().style.cursor = 'pointer';
+    const count = Number(event.features?.[0]?.properties?.count || 0);
+    if (count) setStatus(`${count.toLocaleString()} mapped place${count === 1 ? '' : 's'} in this region. Select to zoom in.`);
+  });
+  map.on('mouseleave', HEAT_FILL_LAYER, () => {
+    map.getCanvas().style.cursor = '';
+    heatSummary();
+  });
 }
 
 async function loadViewportPlaces() {
   if (!sourceReady()) return;
+  if (heatMode) return;
   const zoom = map.getZoom();
   if (zoom < 5) {
     map.getSource('btc-places').setData(EMPTY_COLLECTION);
@@ -380,6 +499,27 @@ function formatEventTime(value) {
   return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : 'Upcoming Bitcoin event';
 }
 
+function setSearchOpen(open) {
+  elements.form.classList.toggle('is-open', open);
+  elements.form.toggleAttribute('inert', !open);
+  elements.form.setAttribute('aria-hidden', String(!open));
+  elements.searchToggle.setAttribute('aria-expanded', String(open));
+  if (open) requestAnimationFrame(() => elements.query.focus());
+}
+
+function focusSearchResults(results) {
+  const target = results.find(result => (Array.isArray(result?.bbox) && result.bbox.length === 4
+      && result.bbox.every(value => Number.isFinite(Number(value))))
+    || (Number.isFinite(Number(result?.lat)) && Number.isFinite(Number(result?.lon))));
+  if (!target) return;
+  if (Array.isArray(target.bbox) && target.bbox.length === 4) {
+    const [west, south, east, north] = target.bbox.map(Number);
+    map.fitBounds([[west, south], [east, north]], {padding:70, maxZoom:14, essential:true});
+    return;
+  }
+  map.flyTo({center:[Number(target.lon), Number(target.lat)], zoom:15, essential:true});
+}
+
 async function search(query) {
   const value = String(query).trim();
   if (value.length < 3) { setStatus('Type at least three characters.'); return; }
@@ -394,13 +534,15 @@ async function search(query) {
     elements.resultList.replaceChildren(...results.map(resultButton));
     elements.resultCount.textContent = `${payload?.total_count ?? results.length} found`;
     elements.results.hidden = false;
-    setStatus(results.length ? `Showing the closest ${results.length} matches.` : 'No BTC Map matches found.', 3500);
+    focusSearchResults(results);
+    setStatus(results.length ? `Showing the best ${results.length} matches.` : 'No BTC Map matches found.', 3500);
   } catch (error) {
     if (error.name !== 'AbortError') setStatus('Search is unavailable right now.');
   }
 }
 
 function selectSearchResult(result) {
+  elements.results.hidden = true;
   if (result.type === 'area') {
     if (Array.isArray(result.bbox) && result.bbox.length === 4) map.fitBounds([[result.bbox[0],result.bbox[1]],[result.bbox[2],result.bbox[3]]], {padding:70,maxZoom:13});
     else setStatus('This community does not publish a map boundary.');
@@ -534,6 +676,9 @@ function showEvent(event) {
 }
 
 elements.form.addEventListener('submit', event => { event.preventDefault(); search(elements.query.value); });
+elements.searchToggle.addEventListener('click', () => {
+  setSearchOpen(!elements.form.classList.contains('is-open'));
+});
 elements.clear.addEventListener('click', () => {
   elements.query.value = '';
   elements.clear.hidden = true;
@@ -562,6 +707,19 @@ elements.disconnect.addEventListener('click', () => {
   setAccountStatus('Disconnected from BTC Map. Your Nostr sign-in is unchanged.');
 });
 window.addEventListener('satoshi-nostr-session', refreshAccountUi);
+document.addEventListener('pointerdown', event => {
+  const path = event.composedPath();
+  if (elements.form.classList.contains('is-open')
+      && !path.includes(elements.form) && !path.includes(elements.searchToggle)) {
+    setSearchOpen(false);
+  }
+  if (!elements.results.hidden && !path.includes(elements.results)) elements.results.hidden = true;
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  setSearchOpen(false);
+  elements.results.hidden = true;
+});
 elements.locate.addEventListener('click', () => {
   if (!navigator.geolocation) { setStatus('Location is not available in this browser.'); return; }
   setStatus('Waiting for your location…');
@@ -573,12 +731,13 @@ elements.locate.addEventListener('click', () => {
 
 map.on('load', () => {
   installPlaceLayers();
-  loadViewportPlaces();
+  setPlaceLayersVisible(map.getZoom() >= MARKER_ZOOM);
+  syncMapMode();
 });
 map.on('moveend', () => {
   rememberView();
   clearTimeout(moveTimer);
-  moveTimer = setTimeout(loadViewportPlaces, 260);
+  moveTimer = setTimeout(syncMapMode, 180);
 });
 map.on('error', event => {
   if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');

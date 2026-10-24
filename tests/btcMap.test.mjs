@@ -3,10 +3,12 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {
   btcMapAuthTemplate,
+  btcMapHeatFeatures,
   btcMapPlaceUrl,
   btcMapPlacesUrl,
   btcMapSearchUrl,
   BTC_MAP_AUTH_URL,
+  BTC_MAP_HEAT_PLACES_URL,
   BTC_MAP_SAVED_URL,
   haversineKm,
   nip98Authorization,
@@ -44,6 +46,21 @@ test('viewport radius is geographic and capped', () => {
   assert.equal(viewportRadiusKm({lat:0,lon:0},{lat:50,lon:50}), 300);
 });
 
+test('place heat map groups coordinates into closed hexagons', () => {
+  assert.equal(BTC_MAP_HEAT_PLACES_URL, 'https://api.btcmap.org/v4/places?fields=id%2Clat%2Clon');
+  const features = btcMapHeatFeatures([
+    {lat:46.05, lon:14.5},
+    {lat:46.05, lon:14.5},
+    {lat:40.7, lon:-74},
+    {lat:'bad', lon:14},
+  ], 5);
+  assert.equal(features.reduce((sum, feature) => sum + feature.properties.count, 0), 3);
+  assert.ok(features.some(feature => feature.properties.count === 2));
+  assert.ok(features.every(feature => feature.geometry.coordinates[0].length === 7));
+  assert.ok(features.every(feature => JSON.stringify(feature.geometry.coordinates[0][0])
+    === JSON.stringify(feature.geometry.coordinates[0][6])));
+});
+
 test('place collections discard invalid coordinates and keep safe marker data', () => {
   const collection = placeCollection([
     {id:7,lat:46,lon:14,name:'Sats Cafe',verified_at:'2026-01-01',boosted_until:'2999-01-01'},
@@ -77,6 +94,9 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(html, /id="toggle"/);
   assert.match(html, /<nav id="menu"[^>]*><ul><\/ul><\/nav>/);
   assert.match(html, /id="btcMapLocate"/);
+  assert.match(html, /id="btcMapSearchToggle"/);
+  assert.doesNotMatch(html, /id="btcMapHeatToggle"/);
+  assert.match(html, /id="btcMapSearch"[^>]*aria-hidden="true"[^>]*inert/);
   assert.match(html, /id="btcMapAccount"/);
   assert.match(html, /id="btcMapAccountDialog"/);
   assert.match(html, /class="footer" data-live-footer/);
@@ -91,6 +111,19 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /cluster:true/);
   assert.match(page, /getClusterExpansionZoom/);
   assert.match(page, /navigator\.geolocation\.getCurrentPosition/);
+  assert.match(page, /function focusSearchResults\(results\)/);
+  assert.match(page, /btcMapHeatFeatures\(places, map\.getZoom\(\)\)/);
+  assert.match(page, /map\.getBounds\(\)\.contains/);
+  assert.match(page, /HEAT_FILL_LAYER/);
+  assert.match(page, /const MARKER_ZOOM = 9/);
+  assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
+  assert.match(page, /setTimeout\(syncMapMode, 180\)/);
+  assert.match(page, /focusSearchResults\(results\)/);
+  assert.match(page, /document\.addEventListener\('pointerdown'/);
+  assert.match(page, /!path\.includes\(elements\.results\)/);
+  assert.match(css, /\.btc-map-search\.is-open/);
+  assert.match(css, /\.btc-map-search-toggle/);
+  assert.doesNotMatch(css, /\.btc-map-heat-toggle/);
   assert.match(page, /btcMapAuthTemplate/);
   assert.match(page, /BTC_MAP_SAVED_URL/);
   assert.match(page, /sessionStorage\.setItem\(TOKEN_KEY/);

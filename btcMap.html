@@ -26,7 +26,7 @@
     <div id="btcMap" class="btc-map" aria-label="Map of places that accept Bitcoin"></div>
     <h1>BTC map</h1>
 
-    <form id="btcMapSearch" class="btc-map-search" role="search">
+    <form id="btcMapSearch" class="btc-map-search" role="search" aria-hidden="true" inert>
       <label class="btc-map-search__field" for="btcMapQuery">
         <i class="lni lni-search-1" aria-hidden="true"></i>
         <input id="btcMapQuery" type="search" minlength="3" maxlength="100" autocomplete="off" spellcheck="false" placeholder="Search a place or city" aria-label="Search BTC Map">
@@ -35,6 +35,7 @@
       <button type="button" id="clearBtcMapSearch" aria-label="Clear search" title="Clear" hidden><i class="lni lni-xmark" aria-hidden="true"></i></button>
     </form>
 
+    <button type="button" id="btcMapSearchToggle" class="btc-map-icon btc-map-search-toggle" aria-label="Search BTC Map" title="Search" aria-expanded="false" aria-controls="btcMapSearch"><i class="lni lni-search-1" aria-hidden="true"></i></button>
     <button type="button" id="btcMapAccount" class="btc-map-icon btc-map-account" aria-label="Nostr account and favorite places" title="Nostr account"><i class="lni lni-user-4" aria-hidden="true"></i></button>
     <button type="button" id="btcMapLocate" class="btc-map-icon" aria-label="Find Bitcoin places near me" title="Near me"><i class="lni lni-location-arrow-right" aria-hidden="true"></i></button>
 

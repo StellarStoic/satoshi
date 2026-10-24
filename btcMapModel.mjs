@@ -1,6 +1,7 @@
 const API_BASE = 'https://api.btcmap.org/v4';
 export const BTC_MAP_AUTH_URL = `${API_BASE}/auth/nostr`;
 export const BTC_MAP_SAVED_URL = `${API_BASE}/places/saved`;
+export const BTC_MAP_HEAT_PLACES_URL = `${API_BASE}/places?fields=id%2Clat%2Clon`;
 
 export function btcMapAuthTemplate(now = Date.now()) {
   return {
@@ -16,6 +17,71 @@ export function nip98Authorization(event) {
   let binary = '';
   bytes.forEach(byte => { binary += String.fromCharCode(byte); });
   return `Nostr ${btoa(binary)}`;
+}
+
+function heatMercator(lon, lat) {
+  const latitude = Math.max(-85, Math.min(85, Number(lat) || 0)) * Math.PI / 180;
+  return {
+    x:(Number(lon) + 180) / 360,
+    y:.5 - Math.log(Math.tan(Math.PI / 4 + latitude / 2)) / (2 * Math.PI),
+  };
+}
+
+function heatLngLat(x, y) {
+  return [x * 360 - 180, (2 * Math.atan(Math.exp((.5 - y) * 2 * Math.PI)) - Math.PI / 2) * 180 / Math.PI];
+}
+
+function roundHeatHex(q, r) {
+  const x = q;
+  const z = r;
+  const y = -x - z;
+  let rx = Math.round(x);
+  let ry = Math.round(y);
+  let rz = Math.round(z);
+  const dx = Math.abs(rx - x);
+  const dy = Math.abs(ry - y);
+  const dz = Math.abs(rz - z);
+  if (dx > dy && dx > dz) rx = -ry - rz;
+  else if (dy > dz) ry = -rx - rz;
+  else rz = -rx - ry;
+  return {q:rx, r:rz};
+}
+
+function heatHexSize(zoom) {
+  return Math.max(.00000012, .022 / (2 ** Math.max(0, Number(zoom) - 2)));
+}
+
+export function btcMapHeatFeatures(places = [], zoom = 2) {
+  const size = heatHexSize(zoom);
+  const bins = new Map();
+  for (const place of places) {
+    const lat = Number(place?.lat);
+    const lon = Number(place?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+    const point = heatMercator(lon, lat);
+    const cell = roundHeatHex(
+      ((Math.sqrt(3) / 3) * point.x - point.y / 3) / size,
+      (2 * point.y / 3) / size,
+    );
+    const key = `${cell.q}:${cell.r}`;
+    const bin = bins.get(key) || {q:cell.q, r:cell.r, count:0};
+    bin.count += 1;
+    bins.set(key, bin);
+  }
+  return [...bins.values()].map(bin => {
+    const center = {x:size * Math.sqrt(3) * (bin.q + bin.r / 2), y:size * 1.5 * bin.r};
+    const ring = Array.from({length:6}, (_, index) => {
+      const angle = (60 * index - 30) * Math.PI / 180;
+      return heatLngLat(center.x + size * Math.cos(angle), center.y + size * Math.sin(angle));
+    });
+    ring.push(ring[0]);
+    const [centerLon, centerLat] = heatLngLat(center.x, center.y);
+    return {
+      type:'Feature',
+      properties:{count:bin.count, label:String(bin.count), centerLon, centerLat},
+      geometry:{type:'Polygon', coordinates:[ring]},
+    };
+  });
 }
 
 export const PLACE_DETAIL_FIELDS = [
