@@ -125,7 +125,10 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /map\.getBounds\(\)\.contains/);
   assert.match(page, /classList\.add\('btc-map-heat-overlay'\)/);
   assert.match(page, /map\.project\(coordinate\)/);
+  assert.match(page, /const HEAT_MIN_ZOOM = 4/);
   assert.match(page, /const MARKER_ZOOM = 9/);
+  assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
+  assert.match(page, /Zoom in to see Bitcoin place density/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
   assert.match(page, /setTimeout\(syncMapMode, 180\)/);
   assert.match(page, /focusSearchResults\(results\)/);

@@ -33,6 +33,7 @@ const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
+const HEAT_MIN_ZOOM = 4;
 const MARKER_ZOOM = 9;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const elements = {
@@ -365,13 +366,12 @@ function setHeatLayersVisible(visible) {
 
 function heatSummary() {
   if (!heatPlaces) return;
-  const scope = map.getZoom() >= 5 ? 'on screen' : 'worldwide';
-  setStatus(`${heatVisibleCount.toLocaleString()} mapped Bitcoin places across ${heatCells.length.toLocaleString()} regions ${scope}. Select a hexagon to zoom in.`);
+  setStatus(`${heatVisibleCount.toLocaleString()} mapped Bitcoin places across ${heatCells.length.toLocaleString()} regions on screen. Select a hexagon to zoom in.`);
 }
 
 function drawHeatMap() {
   if (!heatPlaces) return;
-  const places = map.getZoom() < 5 ? heatPlaces : heatPlaces.filter(place => {
+  const places = heatPlaces.filter(place => {
     const lat = Number(place?.lat);
     const lon = Number(place?.lon);
     return Number.isFinite(lat) && Number.isFinite(lon) && map.getBounds().contains([lon, lat]);
@@ -409,6 +409,14 @@ async function enterHeatMode() {
 
 async function syncMapMode() {
   if (!sourceReady()) return;
+  if (map.getZoom() < HEAT_MIN_ZOOM) {
+    heatMode = false;
+    heatController?.abort();
+    setHeatLayersVisible(false);
+    setPlaceLayersVisible(false);
+    setStatus('Zoom in to see Bitcoin place density.');
+    return;
+  }
   if (map.getZoom() < MARKER_ZOOM) {
     await enterHeatMode();
     return;
@@ -764,7 +772,8 @@ map.on('moveend', () => {
   moveTimer = setTimeout(syncMapMode, 180);
 });
 map.on('move', () => {
-  if (heatMode) renderHeatOverlay();
+  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) renderHeatOverlay();
+  else if (heatOverlay) heatOverlay.hidden = true;
 });
 map.on('error', event => {
   if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');
