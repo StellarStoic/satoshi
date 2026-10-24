@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v471';   // v471: merge place lookup data with outline-only Pinstr 3D worlds
+const CACHE = 'satoshi-static-v475';   // v475: Nostr login and BTC Map favorites
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs',
@@ -15,6 +15,7 @@ const CORE = [
  '/noteGifts.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/board-cork.png', '/img/note-crumple.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
     '/vendor/three/three.module.min.js', '/vendor/three/three.core.min.js', '/vendor/three/OrbitControls.js',
     '/vendor/maplibre/maplibre-gl.js', '/vendor/maplibre/maplibre-gl.css',
+    '/btcMap.html', '/btcMap.css', '/btcMap.mjs', '/btcMapModel.mjs',
     '/vendor/lineicons/lineicons.css', '/vendor/lineicons/lineicons-free.woff2',
     '/offers.html', '/offers.css', '/offers.js', '/offers-data.json',
     '/coockieConsent.js', '/copyonclick.js', '/mempoolWebSocket.js',

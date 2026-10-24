@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Find nearby shops, cafes, services, communities, and events that accept or support Bitcoin using BTC Map data.">
+  <link rel="canonical" href="https://satoshi.si/btcMap.html">
+  <title>BTC Map | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/btcMap.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="btc-map-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main class="btc-map-shell">
+    <div id="btcMap" class="btc-map" aria-label="Map of places that accept Bitcoin"></div>
+    <h1>BTC map</h1>
+
+    <form id="btcMapSearch" class="btc-map-search" role="search">
+      <label class="btc-map-search__field" for="btcMapQuery">
+        <i class="lni lni-search-1" aria-hidden="true"></i>
+        <input id="btcMapQuery" type="search" minlength="3" maxlength="100" autocomplete="off" spellcheck="false" placeholder="Search a place or city" aria-label="Search BTC Map">
+      </label>
+      <button type="submit" aria-label="Search"><i class="lni lni-arrow-right" aria-hidden="true"></i></button>
+      <button type="button" id="clearBtcMapSearch" aria-label="Clear search" title="Clear" hidden><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    </form>
+
+    <button type="button" id="btcMapAccount" class="btc-map-icon btc-map-account" aria-label="Nostr account and favorite places" title="Nostr account"><i class="lni lni-user-4" aria-hidden="true"></i></button>
+    <button type="button" id="btcMapLocate" class="btc-map-icon" aria-label="Find Bitcoin places near me" title="Near me"><i class="lni lni-location-arrow-right" aria-hidden="true"></i></button>
+
+    <section id="btcMapResults" class="btc-map-results" aria-labelledby="btcMapResultsTitle" hidden>
+      <header><h2 id="btcMapResultsTitle">Search results</h2><span id="btcMapResultCount"></span></header>
+      <div id="btcMapResultList" class="btc-map-result-list"></div>
+    </section>
+
+    <aside id="btcMapDetails" class="btc-map-details" aria-label="Place details" hidden>
+      <button type="button" id="closeBtcMapDetails" class="btc-map-close" aria-label="Close place details"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+      <div id="btcMapDetailsBody"></div>
+    </aside>
+
+    <div id="btcMapStatus" class="btc-map-status" role="status" aria-live="polite">Search a city, use your location, or zoom into the map.</div>
+  </main>
+
+  <dialog id="btcMapAccountDialog" class="btc-map-account-dialog" aria-labelledby="btcMapAccountTitle">
+    <button type="button" id="closeBtcMapAccount" class="btc-map-dialog-close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
+    <h2 id="btcMapAccountTitle">Nostr &amp; favorites</h2>
+    <p id="btcMapIdentity">Connect your Nostr identity to keep favorite places across devices.</p>
+    <div class="btc-map-account-actions">
+      <button type="button" id="connectBtcMap" class="btc-map-primary"><i class="lni lni-key-1" aria-hidden="true"></i><span>Connect Nostr</span></button>
+      <button type="button" id="connectBtcMapAmber" hidden><i class="lni lni-phone" aria-hidden="true"></i><span>Amber</span></button>
+      <button type="button" id="disconnectBtcMap" hidden>Disconnect BTC Map</button>
+    </div>
+    <p id="btcMapAccountStatus" class="btc-map-account-status" role="status" aria-live="polite"></p>
+    <section id="btcMapFavorites" class="btc-map-favorites" hidden>
+      <h3>Favorite places</h3>
+      <div id="btcMapFavoritesList"></div>
+    </section>
+    <p class="btc-map-account-note">BTC Map receives a one-time Nostr signature and returns a temporary login token. Your private key stays in your signer.</p>
+  </dialog>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <span id="block-height" role="button" tabindex="0">Block --</span>
+    <span id="fee-rate" role="button" tabindex="0">-- sat/vB</span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
+  </footer>
+
+  <script src="/vendor/maplibre/maplibre-gl.js"></script>
+  <script src="/stego/vendor/nostr-tools.bundle.js"></script>
+  <script src="/stego/vendor/nostr-bunker.bundle.js"></script>
+  <script src="/burgerMenu.js"></script>
+  <script type="module" src="/btcMap.mjs"></script>
+</body>
+</html>

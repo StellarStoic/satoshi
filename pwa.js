@@ -121,6 +121,7 @@ const MENU_ITEMS = [
     ]},
     {label: 'Tools', children: [
         {label: 'Bitcoin & Ark TX cost', href: '/bitcoinTxCost.html'},
+        {label: 'BTC map', href: '/btcMap.html'},
         {label: 'Entropy Lab', href: '/entropy.html'},
         {label: '21FM', href: '/21fm.html'},
         {label: 'Steganography & Ciphers', href: '/stego.html'},

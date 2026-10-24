@@ -19,6 +19,31 @@ export const PAGE_HELP = Object.freeze({
         title: 'About Bitcoin and Ark transaction costs',
         description: 'Choose where bitcoin starts and ends to estimate ordinary on-chain mining fees, Ark and Lightning service fees, boarding, or offboarding. The final wallet quote may differ.'
     },
+    '/btcMap.html': {
+        title: 'About BTC map',
+        description: 'Find shops, cafes, services, communities, and upcoming events connected to Bitcoin.',
+        sections: [
+            {
+                label: 'In plain words',
+                paragraphs: [
+                    'Search for a place or city, use the location button, or zoom into the map. Orange markers are places listed by BTC Map. A number groups nearby places; select it to move closer.',
+                    'Select a marker to see its address, opening hours, payment provider, verification age, visitor notes, website, and OpenStreetMap page when BTC Map has that information. A listing can be outdated, so check its verification date or contact the place before making a special trip.',
+                    'Search also finds Bitcoin communities and upcoming events. Selecting a community moves the map to its published area; selecting an event shows its time and website.',
+                    'Open the account button to connect a Nostr identity. Once connected, the heart in a place card saves or removes that place from your BTC Map favorites. Favorites belong to that Nostr identity, so they can follow you to another browser after you sign in there.',
+                    'Using Near me asks the browser for your location only after you press it. The location is sent to BTC Map as the centre of a nearby-place search and is not stored by satoshi.si.'
+                ]
+            },
+            {
+                label: 'Technical',
+                paragraphs: [
+                    'The map renderer is the open-source MapLibre GL JS library with OpenFreeMap tiles. Place, community, event, verification, contact, and comment data comes directly from the public BTC Map REST API v4. No API key is embedded or required.',
+                    'The page does not download the complete global place database. Below zoom level 5 it waits; once the view is closer, it calculates a radius from the map centre to the visible north-east corner, caps that radius at 300 km, and calls the v4 place-search endpoint. Map movements are debounced and stale requests are aborted.',
+                    'Markers use MapLibre GeoJSON clustering in the browser. Text search uses the unified v4 search endpoint, which can return places, areas, and future events. Selecting a place requests its chosen detail fields and public comments. The last map centre and zoom are kept locally in this browser.',
+                    'Nostr login uses a signed NIP-98 kind 27235 event for the exact BTC Map login URL and POST method. BTC Map exchanges that proof for an opaque Bearer token. The token stays in session storage and is removed when the tab session ends or you disconnect; no private key is sent. Favorite IDs are stored by BTC Map against the resulting account.'
+                ]
+            }
+        ]
+    },
     '/entropy.html': {
         title: 'About the entropy lab',
         description: 'Explore how unpredictable input becomes wallet entropy, why strong randomness matters, and why guessing a properly generated Bitcoin wallet is effectively impossible.'
@@ -383,6 +408,7 @@ function iconMarkup() {
 }
 
 const TOP_RIGHT_COMPANIONS = Object.freeze({
+    '/btcMap.html': {selector: '#btcMapLocate', group: true, icon: true},
     '/opreturn.html': {selector: '#listIcon', group: true, icon: true},
     '/opreturnBoard.html': {selector: '#writeIcon', group: true, icon: true},
     '/quotes.html': {selector: '#next-quote', group: true, icon: true},

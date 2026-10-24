@@ -408,6 +408,18 @@ Use the selected page section to answer questions such as "What does this button
     - **Warning**: This page is for learning only; never use website-generated entropy for real bitcoin.
     - **[Ignore unless specifically asked for]**: Footer content.
 
+### Page: [BTC Map]
+- **URL**: /btcMap.html
+- **Purpose**: Discover shops, cafes, services, communities, and upcoming events connected to Bitcoin using the public BTC Map dataset.
+- **Key Elements**:
+    - **Map (`#btcMap`)**: An open-source MapLibre GL JS map using OpenFreeMap tiles. At zoom level 5 or closer, the visible area loads BTC Map places and groups dense markers into client-side clusters.
+    - **Search (`#btcMapSearch`, `#btcMapQuery`)**: Searches BTC Map API v4 across places, communities/areas, and upcoming events. Results are ranked by BTC Map and biased toward the current map centre.
+    - **Near me (`#btcMapLocate`)**: Requests browser location only after a direct press, moves the map there, and searches that visible area. Satoshi.si does not store the coordinates; the browser sends the map-centre coordinates to BTC Map for the public nearby search.
+    - **Nostr & favorites (`#btcMapAccount`, `#btcMapAccountDialog`)**: Connects the visitor's existing satoshi.si Nostr identity to BTC Map with one NIP-98 signature. BTC Map returns an opaque token kept only in session storage. The heart in place details adds or removes that place from the BTC Map account's saved places; the account dialog lists those favorites. No private key is sent to BTC Map or satoshi.si.
+    - **Place details (`#btcMapDetails`)**: Shows available address, opening hours, payment provider, verification age, public visitor comments, contact links, and OpenStreetMap link. Missing API fields are omitted. A verification date is useful evidence, not a guarantee that a merchant still accepts bitcoin.
+    - **Data behavior**: Public map browsing uses BTC Map REST API v4 without an API key. It does not download the complete global database. Viewport requests are debounced, limited to a 300 km radius, and superseded requests are aborted. The last centre and zoom stay in local storage. Saving favorites is optional and requires the Nostr-authenticated BTC Map token.
+    - **[Ignore unless specifically asked for]**: Footer content.
+
 ### Page: [Bitcoin and Ark Transaction Cost]
 - **URL**: /bitcoinTxCost.html
 - **Purpose**: Estimates a route between an Ark balance and ordinary Bitcoin address types. It combines current mining-fee recommendations with Second's published Bark pricing.
