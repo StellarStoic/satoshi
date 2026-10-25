@@ -4400,6 +4400,8 @@ test('a free-tier name is covered for life, not missing a subscription', async (
   assert.match(three.sentence, /3-letter name is free for life/);
   assert.match(three.sentence, /nothing to pay/, 'the reader is told they owe nothing');
   assert.match(three.sentence, /nothing to renew/, 'and that there is no renewal to wait for');
+  assert.match(three.sentence, /Take a plan once \(0 sats\) and the 10-a-day limit is gone/,
+    'and that a free plan still has to be taken before the daily allowance stops applying');
 
   // A four-letter name is a member at half price, not free, so it keeps the ordinary card.
   assert.equal(subscriptionFreeOffer({free: false, memberNameLength: 4, weekSats: 5, yearSats: 205}), null);

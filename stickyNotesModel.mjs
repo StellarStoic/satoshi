@@ -854,9 +854,14 @@ export function subscriptionFreeOffer(prices = {}) {
   return {
     label: 'Free for life',
     nameLength,
+    // Free is not the same as switched on, and the difference is now money: a free plan still has to
+    // be taken before the notes are unlimited, and until it is, the daily allowance applies. Saying
+    // only "nothing to pay" left a member reading "free for life" beside a meter counting their notes.
     sentence: nameLength
-      ? `Your ${nameLength}-letter name is free for life: nothing to pay, and nothing to renew.`
-      : 'Free for life: nothing to pay, and nothing to renew.',
+      ? `Your ${nameLength}-letter name is free for life: nothing to pay, and nothing to renew. `
+        + `Take a plan once (0 sats) and the ${STICKY_FREE_NOTES_PER_DAY}-a-day limit is gone.`
+      : `Free for life: nothing to pay, and nothing to renew. Take a plan once (0 sats) and the `
+        + `${STICKY_FREE_NOTES_PER_DAY}-a-day limit is gone.`,
   };
 }
 
