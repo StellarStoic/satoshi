@@ -167,6 +167,7 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.match(page, /xrController\.addEventListener\('select', selectInAr\)/);
   assert.match(page, /raycaster\.intersectObjects\(portalMeshes, false\)/);
   assert.match(page, /beginPortalWarp\(portal\)/);
+  assert.match(page, /worldHref,[\s\S]*worldPortalWarpProgress/);
   assert.match(page, /location\.assign\(worldHref\(\[portalWarp\.cell\], board\.depth\)\)/);
   assert.match(page, /function animatePortals\(now\)/);
   assert.match(page, /group\.scale\.setScalar\(1\.07 \+ wave \* \.14\)/);
