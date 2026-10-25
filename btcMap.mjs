@@ -922,7 +922,11 @@ elements.locate.addEventListener('click', () => {
 map.on('load', async () => {
   await installPlaceLayers();
   setPlaceLayersVisible(map.getZoom() >= MARKER_ZOOM);
+  console.log(`BTC Map zoom level: ${map.getZoom().toFixed(2)}`);
   syncMapMode();
+});
+map.on('zoomend', () => {
+  console.log(`BTC Map zoom level: ${map.getZoom().toFixed(2)}`);
 });
 map.on('moveend', () => {
   rememberView();

@@ -175,6 +175,7 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /function heatFeatureAtPoint\(point\)/);
   assert.match(page, /classList\.toggle\('is-hidden', hidden\)/);
   assert.match(page, /map\.on\('move',/);
+  assert.match(page, /map\.on\('zoomend',[\s\S]*BTC Map zoom level:/);
   assert.match(page, /isIgnorableMapError\(event\.error\)/);
   assert.doesNotMatch(page, /map\.on\('mousemove'/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
