@@ -272,6 +272,8 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(on.price, 0, 'a covered note is never given a price');
   assert.equal(on.label, 'Place your note');
   assert.match(on.state, /Subscription active until 2027-01-15/);
+  assert.match(on.state, /Unlimited notes — the daily allowance does not apply/,
+    'and the meter they do not have is stated as gone rather than left for them to discover');
 
   // A reader with no subscription but with a name is told the note is free, and told how that is
   // decided: the site asks their domain, so the promise is the check rather than the outcome.

@@ -1043,7 +1043,8 @@ export function describeStickyAction({ anonymous = false, stranger = false, subs
   if (active) {
     return {
       label: 'Place your note',
-      state: `Subscription active${until ? ` until ${until}` : ''}. Posting is included. ${discount}`,
+      state: `Subscription active${until ? ` until ${until}` : ''}. Unlimited notes — the daily `
+        + `allowance does not apply. ${discount}`,
       needsSubscription: false,
       price: 0,
       active: true,
