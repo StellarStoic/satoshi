@@ -149,6 +149,14 @@ export function worldFlightProgress(value) {
   return smooth + settle;
 }
 
+/** Accelerate hard into a portal, then ease the final approach before navigation. */
+export function worldPortalWarpProgress(value) {
+  const t = Math.max(0, Math.min(1, Number(value) || 0));
+  if (t < .72) return .82 * (t / .72) ** 3;
+  const brake = (t - .72) / .28;
+  return .82 + .18 * (1 - (1 - brake) ** 3);
+}
+
 export function boardPlacementFromWorld(position = {}, centre = {}) {
   const x = Math.max(0, Math.min(1, .5 + (Number(position.x) - (Number(centre.x) || 0)) / 7));
   const y = Math.max(0, Math.min(1, 1 - ((Number(position.y) || 0) - .65) / 4));

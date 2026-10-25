@@ -22,6 +22,7 @@ import {
   worldComposerHref,
   worldBoardRelation,
   worldFlightProgress,
+  worldPortalWarpProgress,
   worldNearbyCells,
   worldNotePosition,
   worldPortalPosition,
@@ -143,6 +144,9 @@ let nearbySocket = null;
 let nearbyReconnectTimer = 0;
 let nearbyConnectionVersion = 0;
 let flight = null;
+let portalWarp = null;
+let portalPress = null;
+let hoveredPortalCell = '';
 let pointerStart = null;
 let pinPress = null;
 let dragged = null;
@@ -766,6 +770,7 @@ function portalLabelTexture(cell, count, color) {
 }
 
 function clearPortals() {
+  setHoveredPortal(null);
   for (const portal of portals.values()) {
     scene.remove(portal);
     portal.traverse(object => {
@@ -799,12 +804,17 @@ function renderPortals(activity, origin = activeCell) {
     const hit = new THREE.Mesh(new THREE.CircleGeometry(1.08, 32), new THREE.MeshBasicMaterial({
       transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false,
     }));
-    hit.userData = {cell, relation:placement.relation};
     const label = new THREE.Mesh(new THREE.PlaneGeometry(2.7, .56), new THREE.MeshBasicMaterial({
       map:portalLabelTexture(cell, ids.size, color), transparent:true, side:THREE.DoubleSide, depthWrite:false,
     }));
     label.position.y = -1.42;
     group.add(glow, ring, hit, label);
+    const portalData = {
+      cell, relation:placement.relation, group, glow, ring, hit,
+      phase:portals.size * .73,
+    };
+    group.userData = portalData;
+    hit.userData = portalData;
     scene.add(group);
     portals.set(cell, group);
     portalMeshes.push(hit);
@@ -1018,7 +1028,7 @@ function selectInAr() {
   raycaster.ray.origin.setFromMatrixPosition(xrController.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(xrSelectMatrix);
   const portal = raycaster.intersectObjects(portalMeshes, false)[0]?.object?.userData;
-  if (portal?.cell) { location.assign(worldHref([portal.cell], board.depth)); return; }
+  if (portal?.cell) { beginPortalWarp(portal); return; }
   const pin = raycaster.intersectObjects(pinMeshes, false)[0]?.object;
   if (pin) { showNote(pin.userData.note, {x:innerWidth / 2, y:innerHeight / 2}); return; }
   const signature = signatureFromHit(raycaster.intersectObjects(paperMeshes, false)[0]);
@@ -1033,6 +1043,29 @@ function platformAt(clientX, clientY) {
 function portalAt(clientX, clientY) {
   updatePointer(clientX, clientY);
   return raycaster.intersectObjects(portalMeshes, false)[0]?.object?.userData || null;
+}
+
+function setHoveredPortal(portal) {
+  hoveredPortalCell = portal?.cell || '';
+  elements.canvas.style.cursor = hoveredPortalCell ? 'pointer' : '';
+}
+
+function animatePortals(now) {
+  for (const group of portals.values()) {
+    const data = group.userData;
+    const hovered = data.cell === hoveredPortalCell;
+    if (!hovered) {
+      group.scale.setScalar(1);
+      data.glow.material.opacity = .24;
+      data.ring.material.opacity = .9;
+      continue;
+    }
+    const wave = .5 + Math.sin(now * .012 + data.phase) * .5;
+    group.scale.setScalar(1.07 + wave * .14);
+    data.glow.material.opacity = .34 + wave * .38;
+    data.ring.material.opacity = .82 + wave * .18;
+    data.ring.rotation.z = now * .0008;
+  }
 }
 
 function setActiveCell(cell) {
@@ -1056,7 +1089,7 @@ function resetView() {
 }
 
 function flyToWorld(cell) {
-  if (!cell || cell === activeCell || flight || !platforms.has(cell)) return;
+  if (!cell || cell === activeCell || flight || portalWarp || !platforms.has(cell)) return;
   const destination = platforms.get(cell).position;
   flight = {
     cell,
@@ -1072,6 +1105,45 @@ function flyToWorld(cell) {
   elements.flight.classList.remove('is-flying');
   void elements.flight.offsetWidth;
   elements.flight.classList.add('is-flying');
+}
+
+function beginPortalWarp(portal) {
+  if (!portal?.cell || portalWarp || flight) return;
+  const group = portals.get(portal.cell);
+  if (!group) return;
+  const destination = new THREE.Vector3();
+  group.getWorldPosition(destination);
+  const direction = destination.clone().sub(camera.position).normalize();
+  portalWarp = {
+    cell:portal.cell,
+    started:performance.now(),
+    duration:matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1120,
+    fromCamera:camera.position.clone(),
+    fromTarget:orbit.target.clone(),
+    toCamera:destination.clone().addScaledVector(direction, -.18),
+    toTarget:destination,
+    fromZoom:camera.zoom,
+  };
+  setHoveredPortal(portal);
+  orbit.enabled = false;
+  closeNoteMenu();
+  setStatus(`Warping to ${portal.cell}...`);
+  elements.flight.classList.remove('is-flying', 'is-warping');
+  void elements.flight.offsetWidth;
+  elements.flight.classList.add('is-warping');
+}
+
+function stepPortalWarp(now) {
+  if (!portalWarp || portalWarp.finished) return;
+  const amount = Math.min(1, (now - portalWarp.started) / portalWarp.duration);
+  const eased = worldPortalWarpProgress(amount);
+  camera.position.lerpVectors(portalWarp.fromCamera, portalWarp.toCamera, eased);
+  orbit.target.lerpVectors(portalWarp.fromTarget, portalWarp.toTarget, eased);
+  camera.zoom = portalWarp.fromZoom * (1 + eased * .16);
+  camera.updateProjectionMatrix();
+  if (amount < 1) return;
+  portalWarp.finished = true;
+  location.assign(worldHref([portalWarp.cell], board.depth));
 }
 
 function stepFlight(now) {
@@ -1090,7 +1162,7 @@ function stepFlight(now) {
 }
 
 function moveView(forward, sideways = 0, vertical = 0) {
-  if (flight) return;
+  if (flight || portalWarp) return;
   const direction = new THREE.Vector3();
   camera.getWorldDirection(direction);
   direction.y = 0;
@@ -1248,10 +1320,23 @@ elements.canvas.addEventListener('pointerdown', event => {
         pinPress = null;
         orbit.enabled = !flight;
       }
+      if (portalPress) {
+        portalPress = null;
+        orbit.enabled = !flight && !portalWarp;
+      }
       return;
     }
   }
-  if (event.button > 0 || flight) return;
+  if (event.button > 0 || flight || portalWarp) return;
+  const portal = portalAt(event.clientX, event.clientY);
+  if (portal?.cell) {
+    event.preventDefault();
+    elements.canvas.setPointerCapture(event.pointerId);
+    orbit.enabled = false;
+    portalPress = {id:event.pointerId, portal, x:event.clientX, y:event.clientY};
+    setHoveredPortal(portal);
+    return;
+  }
   const signature = signatureAt(event.clientX, event.clientY);
   if (signature) {
     event.preventDefault();
@@ -1299,6 +1384,13 @@ elements.canvas.addEventListener('pointermove', event => {
       return;
     }
   }
+  if (portalPress?.id === event.pointerId) {
+    if (Math.hypot(event.clientX - portalPress.x, event.clientY - portalPress.y) > 12) {
+      portalPress = null;
+      orbit.enabled = !flight && !portalWarp;
+    }
+    return;
+  }
   if (pinPress?.id === event.pointerId) {
     if (Math.hypot(event.clientX - pinPress.x, event.clientY - pinPress.y) > PIN_MOVE_SLOP_PX) {
       clearTimeout(pinPress.timer);
@@ -1307,7 +1399,10 @@ elements.canvas.addEventListener('pointermove', event => {
     }
     return;
   }
-  if (!dragged || dragged.id !== event.pointerId) return;
+  if (!dragged || dragged.id !== event.pointerId) {
+    if (event.pointerType !== 'touch' && !flight && !portalWarp) setHoveredPortal(portalAt(event.clientX, event.clientY));
+    return;
+  }
   moveDraggedNote(event.clientX, event.clientY);
   dragged.moved ||= Math.hypot(event.clientX - dragged.x, event.clientY - dragged.y) > 6;
 });
@@ -1316,6 +1411,13 @@ function releasePointer(event) {
   if (event.pointerType === 'touch') {
     zoomPointers.delete(event.pointerId);
     if (zoomPointers.size < 2) pinchZoom = null;
+  }
+  if (portalPress?.id === event.pointerId) {
+    const released = portalPress;
+    portalPress = null;
+    beginPortalWarp(released.portal);
+    pointerStart = null;
+    return;
   }
   if (pinPress?.id === event.pointerId) {
     const released = pinPress;
@@ -1335,12 +1437,6 @@ function releasePointer(event) {
     return;
   }
   if (pointerStart && Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) <= 7) {
-    const portal = portalAt(event.clientX, event.clientY);
-    if (portal?.cell) {
-      location.assign(worldHref([portal.cell], board.depth));
-      pointerStart = null;
-      return;
-    }
     const cell = platformAt(event.clientX, event.clientY);
     if (cell) flyToWorld(cell);
   }
@@ -1357,8 +1453,15 @@ elements.canvas.addEventListener('pointercancel', event => {
     pinPress = null;
     orbit.enabled = !flight;
   }
+  if (portalPress?.id === event.pointerId) {
+    portalPress = null;
+    orbit.enabled = !flight && !portalWarp;
+  }
   if (dragged?.id === event.pointerId) { dragged = null; orbit.enabled = !flight; }
   pointerStart = null;
+});
+elements.canvas.addEventListener('pointerleave', event => {
+  if (event.pointerType !== 'touch' && !portalPress) setHoveredPortal(null);
 });
 elements.canvas.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1432,7 +1535,9 @@ createDraft();
 connectBoard();
 renderer.setAnimationLoop(now => {
   stepFlight(now);
-  if (!flight && !compassActive && !xrSession) orbit.update();
+  stepPortalWarp(now);
+  animatePortals(now);
+  if (!flight && !portalWarp && !compassActive && !xrSession) orbit.update();
   renderer.render(scene, camera);
   if (!xrSession) updatePictureOverlays();
 });

@@ -43,9 +43,15 @@ body { font-family:var(--site-font, "Roboto Mono", monospace); }
 .world-mode-button:hover, .world-mode-button:focus-visible, .world-mode-button[aria-pressed="true"] { border-color:var(--accent, #f2a900); color:var(--accent, #f2a900); outline:0; }
 .world-mode-button[hidden] { display:none; }
 body.is-xr .world-picture-layer { display:none; }
-.world-flight { position:fixed; z-index:5; inset:-18%; opacity:0; pointer-events:none; background:repeating-radial-gradient(ellipse at center, transparent 0 7%, rgba(242,169,0,.08) 7.3%, transparent 7.7% 13%); filter:blur(8px); scale:.7; transition:opacity .12s linear; }
+.world-flight { position:fixed; z-index:5; inset:-18%; opacity:0; overflow:hidden; pointer-events:none; background:repeating-radial-gradient(ellipse at center, transparent 0 7%, rgba(242,169,0,.08) 7.3%, transparent 7.7% 13%); filter:blur(8px); scale:.7; transition:opacity .12s linear; }
+.world-flight::before,.world-flight::after { content:""; position:absolute; inset:-45%; opacity:0; background:repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 2.4deg, rgba(255,255,255,.72) 2.55deg 2.7deg, transparent 2.85deg 7.2deg); -webkit-mask-image:radial-gradient(circle at center, transparent 0 9%, #000 31% 100%); mask-image:radial-gradient(circle at center, transparent 0 9%, #000 31% 100%); transform:scale(.18); }
+.world-flight::after { rotate:1.8deg; opacity:.48; filter:blur(1px); }
 .world-flight.is-flying { opacity:1; animation:world-flight .9s cubic-bezier(.5,0,.15,1) both; }
+.world-flight.is-warping { opacity:1; filter:none; animation:world-warp-shell 1.12s cubic-bezier(.68,0,.22,1) both; }
+.world-flight.is-warping::before,.world-flight.is-warping::after { animation:world-warp-lines 1.12s cubic-bezier(.68,0,.2,1) both; }
 @keyframes world-flight { 0% { opacity:0; scale:.72; } 38% { opacity:.8; scale:1.5; } 78% { opacity:.28; scale:2.25; } 100% { opacity:0; scale:2.42; } }
+@keyframes world-warp-shell { 0% { opacity:0; background-color:transparent; } 22% { opacity:.2; } 72% { opacity:.95; background-color:rgba(8,10,12,.18); } 100% { opacity:1; background-color:rgba(242,169,0,.1); } }
+@keyframes world-warp-lines { 0% { opacity:0; transform:scale(.15); } 18% { opacity:.14; } 74% { opacity:.92; transform:scale(1.55); } 100% { opacity:.28; transform:scale(3.8); } }
 @media (max-width:600px) {
   .world-back, .world-write { top:calc(10px + env(safe-area-inset-top)); }
   .world-back { left:10px; }.world-write { right:10px; }

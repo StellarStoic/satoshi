@@ -10,6 +10,7 @@ import {
   worldBoardRelation,
   worldComposerHref,
   worldFlightProgress,
+  worldPortalWarpProgress,
   worldHref,
   worldNearbyCells,
   worldNotePosition,
@@ -78,6 +79,14 @@ test('world flight accelerates, moves slightly forward, and settles exactly', ()
   assert.ok(worldFlightProgress(.25) < worldFlightProgress(.5));
   assert.ok(worldFlightProgress(.9) > 1, 'the last approach moves slightly beyond the destination');
   assert.ok(Math.abs(worldFlightProgress(1) - 1) < 1e-10);
+});
+
+test('portal warp accelerates hard and brakes into the destination', () => {
+  assert.equal(worldPortalWarpProgress(0), 0);
+  assert.ok(worldPortalWarpProgress(.25) < worldPortalWarpProgress(.5));
+  assert.ok(worldPortalWarpProgress(.72) > .8);
+  assert.ok(worldPortalWarpProgress(.9) < 1);
+  assert.equal(worldPortalWarpProgress(1), 1);
 });
 
 test('a 3D draft position becomes the ordinary board placement signed into the note', () => {
@@ -157,7 +166,12 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.match(page, /renderer\.setClearColor\(0x000000, 0\)/);
   assert.match(page, /xrController\.addEventListener\('select', selectInAr\)/);
   assert.match(page, /raycaster\.intersectObjects\(portalMeshes, false\)/);
-  assert.match(page, /location\.assign\(worldHref\(\[portal\.cell\], board\.depth\)\)/);
+  assert.match(page, /beginPortalWarp\(portal\)/);
+  assert.match(page, /location\.assign\(worldHref\(\[portalWarp\.cell\], board\.depth\)\)/);
+  assert.match(page, /function animatePortals\(now\)/);
+  assert.match(page, /group\.scale\.setScalar\(1\.07 \+ wave \* \.14\)/);
+  assert.match(page, /worldPortalWarpProgress\(amount\)/);
+  assert.match(worldCss, /\.world-flight\.is-warping::before/);
   assert.match(page, /new THREE\.RingGeometry/);
   for (const colour of ['#43d17b', '#ff5151', '#bf78ff']) assert.match(page, new RegExp(colour));
   assert.match(page, /function connectNearbyBoards\(cell = activeCell\)/);
