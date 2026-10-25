@@ -166,7 +166,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /Bitcoin payment/);
   assert.match(page, /btc-map-place-image/);
   assert.match(page, /btcMapHeatFeatures\(places, map\.getZoom\(\)\)/);
-  assert.match(page, /map\.getBounds\(\)\.contains/);
+  assert.match(page, /function placesInCurrentView\(places = \[\]\)/);
+  assert.match(page, /bounds\.contains\(\[lon, lat\]\)/);
   assert.match(page, /document\.createElement\('canvas'\)/);
   assert.match(page, /classList\.add\('btc-map-heat-overlay'\)/);
   assert.match(page, /map\.project\(coordinate\)/);
@@ -179,11 +180,12 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /isIgnorableMapError\(event\.error\)/);
   assert.doesNotMatch(page, /map\.on\('mousemove'/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
-  assert.match(page, /const MARKER_ZOOM = 5/);
+  assert.match(page, /const MARKER_PREFETCH_ZOOM = 7/);
+  assert.match(page, /const MARKER_ZOOM = 7\.5/);
   assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
   assert.match(page, /Zoom in to see Bitcoin place density/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
-  assert.match(page, /setTimeout\(syncMapMode, 180\)/);
+  assert.match(page, /setTimeout\(syncMapMode, 80\)/);
   assert.match(page, /PLACE_FETCH_BUFFER = 1\.4/);
   assert.match(page, /viewportCoverageContains\(viewportCoverage/);
   assert.match(page, /cachePlaces\(loadedPlaces\)/);
@@ -192,6 +194,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /'icon-allow-overlap':true/);
   assert.match(page, /'icon-ignore-placement':true/);
   assert.match(page, /loadViewportPlaces\(\{allowDuringHeat:true\}\)/);
+  assert.match(page, /function seedVisibleHeatPlaces\(\)/);
+  assert.match(page, /seedVisibleHeatPlaces\(\);/);
   assert.match(page, /function visibleCachedPlaceCount\(\)/);
   assert.match(page, /if \(visibleCachedPlaceCount\(\)\) \{/);
   assert.match(page, /map\.getZoom\(\) >= MARKER_ZOOM && visibleCachedPlaceCount\(\)/);

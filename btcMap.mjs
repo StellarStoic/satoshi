@@ -39,7 +39,8 @@ const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
 const HEAT_MIN_ZOOM = 4;
-const MARKER_ZOOM = 5;
+const MARKER_PREFETCH_ZOOM = 7;
+const MARKER_ZOOM = 7.5;
 const PLACE_CACHE_LIMIT = 6000;
 const PLACE_FETCH_BUFFER = 1.4;
 const elements = {
@@ -421,15 +422,20 @@ function heatSummary() {
 
 function drawHeatMap() {
   if (!heatPlaces) return;
-  const places = heatPlaces.filter(place => {
-    const lat = Number(place?.lat);
-    const lon = Number(place?.lon);
-    return Number.isFinite(lat) && Number.isFinite(lon) && map.getBounds().contains([lon, lat]);
-  });
+  const places = placesInCurrentView(heatPlaces);
   heatVisibleCount = places.length;
   heatCells = btcMapHeatFeatures(places, map.getZoom());
   renderHeatOverlay();
   if (heatMode) heatSummary();
+}
+
+function placesInCurrentView(places = []) {
+  const bounds = map.getBounds();
+  return places.filter(place => {
+    const lat = Number(place?.lat);
+    const lon = Number(place?.lon);
+    return Number.isFinite(lat) && Number.isFinite(lon) && bounds.contains([lon, lat]);
+  });
 }
 
 async function enterHeatMode() {
@@ -469,8 +475,10 @@ async function syncMapMode() {
   }
   if (map.getZoom() < MARKER_ZOOM) {
     await enterHeatMode();
+    if (map.getZoom() >= MARKER_PREFETCH_ZOOM) loadViewportPlaces({allowDuringHeat:true});
     return;
   }
+  seedVisibleHeatPlaces();
   setPlaceLayersVisible(true);
   if (visibleCachedPlaceCount()) {
     heatMode = false;
@@ -553,14 +561,17 @@ function cachePlaces(places) {
 }
 
 function visibleCachedPlaceCount() {
-  const bounds = map.getBounds();
-  let count = 0;
-  for (const place of placeCache.values()) {
-    const lat = Number(place?.lat);
-    const lon = Number(place?.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon) && bounds.contains([lon, lat])) count += 1;
-  }
-  return count;
+  return placesInCurrentView([...placeCache.values()]).length;
+}
+
+function seedVisibleHeatPlaces() {
+  if (!heatPlaces?.length) return 0;
+  const missing = placesInCurrentView(heatPlaces).filter(place => {
+    const key = String(place?.id ?? `${place?.lat}:${place?.lon}:${place?.name || ''}`);
+    return !placeCache.has(key);
+  });
+  if (missing.length) cachePlaces(missing);
+  return missing.length;
 }
 
 async function loadViewportPlaces({allowDuringHeat = false} = {}) {
@@ -931,7 +942,7 @@ map.on('zoomend', () => {
 map.on('moveend', () => {
   rememberView();
   clearTimeout(moveTimer);
-  moveTimer = setTimeout(syncMapMode, 180);
+  moveTimer = setTimeout(syncMapMode, 80);
 });
 map.on('move', () => {
   const zoom = map.getZoom();
