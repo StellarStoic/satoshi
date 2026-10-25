@@ -732,8 +732,14 @@ test('mobile board and note gestures support pinch zoom and two-finger rotation'
   assert.match(placementGestures, /gesture\.scale \* distanceBetween\(\) \/ gesture\.distance/);
   assert.match(placementGestures, /scheduleBoardTransform\(rect\)[\s\S]{0,100}setBinArmed/,
     'one two-finger gesture zooms the board and rotates the note');
-  assert.match(script, /if \(event\.target\.closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)[\s\S]{0,180}return;/,
-    'the pin, a note link, the board plate and the signature keep their own click instead of dragging the board');
+  const boardControls = script.match(/const BOARD_CONTROLS = '([^']+)'/)[1];
+  assert.match(script, /if \(event\.target\.closest\(BOARD_CONTROLS\)[\s\S]{0,180}return;/,
+    'the pan guard reads one list of controls instead of a selector typed twice');
+  for (const control of ['.sticky-note__pin', '.sticky-note__link', '.board-plate', '.sticky-note__author',
+                         '.board-empty-hint']) {
+    assert.ok(boardControls.includes(control),
+      `the pin, a note link, a plate, the signature and the clue keep their own click: ${control} missing`);
+  }
   assert.match(css, /sticky-note--placing[^}]+touch-action:\s*none/);
   // The board is a pattern drawn into a canvas inside the transformed element, not a repeating
   // background on the 2048px board element. That tiled form has to be produced at device resolution
@@ -2236,7 +2242,8 @@ test('the top rail wears the bottom rail\u2019s plate, and both of them share th
   // It also has to survive a board switch, and the pan guard already names the plate's class.
   assert.match(script,
     /\.\.\.\[elements\.boardPaint, elements\.boardFrame, elements\.boardPlate, elements\.boardPlateTop\]\.filter\(Boolean\)\)/);
-  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)/,
+  const controlsNamed = script.match(/const BOARD_CONTROLS = '([^']+)'/)[1];
+  assert.ok(controlsNamed.includes('.board-plate'),
     'so a press on either plaque, or on a signature, reaches the button rather than the pan');
 });
 
@@ -2447,7 +2454,8 @@ test('a board is shared by the link that carries its picture', async () => {
   assert.match(page, /<button type="button" id="boardPlate"/,
     'the plate names the board, so the plate is what opens the share dialog');
   assert.ok(!/<div id="boardPlate"/.test(page), 'and it is no longer a div that cannot be pressed');
-  assert.match(script, /closest\('\.sticky-note__pin, \.sticky-note__link, \.board-plate, \.sticky-note__author'\)/,
+  const controlList = script.match(/const BOARD_CONTROLS = '([^']+)'/)[1];
+  assert.ok(controlList.includes('.board-plate') && controlList.includes('.board-empty-hint'),
     'a control on the board is unreachable unless the pan guard names it');
   assert.doesNotMatch(css, /\.board-plate \{[^}]*pointer-events: none/,
     'and the plate must stop swallowing its own clicks');
@@ -3450,7 +3458,7 @@ test('the signature opens the react-or-zap dialog, and the board stops dragging 
   assert.match(page, /author\.setAttribute\('role', 'button'\)/);
   assert.match(page, /author\.addEventListener\('pointerdown', press => press\.stopPropagation\(\)\)/);
   assert.match(page, /openNoteGiftDialog\(sticky\.id, author\)/);
-  assert.match(page, /\.board-plate, \.sticky-note__author'\)/, 'the board ignores a drag begun on the signature');
+  assert.match(page, /const BOARD_CONTROLS = '[^']*\.sticky-note__author[^']*'/, 'the board ignores a drag begun on the signature');
   assert.match(page, /wireNoteGiftDialog\(\);/, 'its controls are wired');
   assert.match(page, /elements\.noteGiftLogin\.addEventListener\('click'/,
     'the signed-out message opens the existing login dialog directly');
@@ -4388,6 +4396,20 @@ test('an empty board shows where to press, and the chooser waits to be asked for
   const hintRule = css.slice(css.indexOf('.board-empty-hint {'), css.indexOf('.board-empty-hint[hidden]'));
   assert.ok(hintRule.includes('pointer-events: auto'),
     'the clue takes the pointer back, or pressing it does nothing at all');
+
+  // And taking the pointer back is not enough on its own: the board pans from a pointerdown on its own
+  // surface and captures the pointer there, which retargets the click to the board. A mouse press on the
+  // clue therefore opened nothing while a touch tap did, and the clue has to be named among the controls
+  // that keep their press - as the pins, the plates and a note's own link are.
+  const panStart = script.indexOf("elements.board.addEventListener('pointerdown'");
+  const panHandler = script.slice(panStart, panStart + 900);
+  const clueNamed = script.match(/const BOARD_CONTROLS = '([^']+)'/)[1];
+  assert.ok(clueNamed.includes('.board-empty-hint'),
+    'the clue keeps its press: the pan guard must name it, or its listener never runs');
+  assert.ok(/if \(event\.target\.closest\(BOARD_CONTROLS\)/.test(script),
+    'and the guard is what the handler reads');
+  assert.ok(panHandler.includes('setPointerCapture'),
+    'and that is the capture this exemption is about');
 
   // The press does what the clue promises, and the clue is a standing invitation rather than a one-shot: it comes
   // back when the reader closes the chooser without picking a board, because the empty board is where they land.

@@ -5562,12 +5562,17 @@ function installBoardNavigation() {
     gesture = {id: remaining[0], x: remaining[1].x, y: remaining[1].y, boardX: boardView.x, boardY: boardView.y};
   };
 
+  // A control on the board is a control, not a handle. The pan below captures the pointer, which retargets
+  // the click to the board itself - so every control has to be named here or its own listener never runs.
+  // The clue on an empty board was missing from this list and opened nothing on a desktop mouse, while a
+  // touch tap still worked: exactly the difference between a captured pointer and a compatibility click.
+  const BOARD_CONTROLS = '.sticky-note__pin, .sticky-note__link, .board-plate, .sticky-note__author, .board-empty-hint';
   elements.board.addEventListener('pointerdown', event => {
     if (placingNote) return;
     // Ordinary paper is part of the board surface: dragging or pinching on it must move
     // the board too. A pin and a note's own link remain buttons, while concealed paper owns a
     // four-second hold.
-    if (event.target.closest('.sticky-note__pin, .sticky-note__link, .board-plate, .sticky-note__author')
+    if (event.target.closest(BOARD_CONTROLS)
         || event.target.closest('.sticky-note--filtered-out:not(.sticky-note--filter-revealed)')) return;
     closeNoteMenu();
     elements.board.setPointerCapture(event.pointerId);
