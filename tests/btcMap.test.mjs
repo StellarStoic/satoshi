@@ -178,7 +178,7 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /isIgnorableMapError\(event\.error\)/);
   assert.doesNotMatch(page, /map\.on\('mousemove'/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
-  assert.match(page, /const MARKER_ZOOM = 7/);
+  assert.match(page, /const MARKER_ZOOM = 6/);
   assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
   assert.match(page, /Zoom in to see Bitcoin place density/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
