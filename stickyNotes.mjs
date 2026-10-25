@@ -1852,7 +1852,9 @@ function renderAccountSubscription(session) {
   // A free-tier name holds no subscription to report, and saying "Not active" about one was misleading: the
   // reader is covered for life and simply never pays. The desk's own quote decides it, never a guess here.
   const free = resolved && !active ? subscriptionFreeOffer(state.prices) : null;
-  elements.accountSubscriptionState.textContent = active ? 'Active' : (free ? free.label : (resolved ? 'Not active' : 'Checking…'));
+  elements.accountSubscriptionState.textContent = active
+    ? 'Active · unlimited notes'
+    : (free ? free.label : (resolved ? 'Not active' : 'Checking…'));
   elements.accountSubscriptionState.classList.toggle('is-active', active || Boolean(free));
   elements.accountSubscriptionRows.hidden = !active;
   if (free) {

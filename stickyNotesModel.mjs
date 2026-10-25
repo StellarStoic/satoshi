@@ -18,6 +18,9 @@ export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
 // trade the tier offers is exactly that — put a name on your key and it is free, or pay for a note.
 // Agents over MCP are priced here too: a program pays per note whatever name it carries.
 export const STICKY_ANONYMOUS_PRICE_SATS = 10;
+// The free door's meter, the board's copy of the desk's `nip05DailyMax`. It is used for the sentence
+// a reader with a name is shown, never to decide anything: the desk holds the count and refuses.
+export const STICKY_FREE_NOTES_PER_DAY = 10;
 // D's ladder: how short a satoshi.si name is decides how much of a plan it pays.
 // Three characters post free, four pay half, five or more pay three quarters. This
 // is the board's copy of the desk's table, and `deploy/check-frontend-contract.mjs`
@@ -948,6 +951,9 @@ export function anonymousForQuote(session, subscription) {
  * spent one should not look settled.
  */
 export function stickyFreeNotesLine(freeNotes) {
+  // A subscription removes the meter; there is nothing to draw, and drawing a full bar for it would
+  // read as an allowance about to run out.
+  if (freeNotes?.unlimited === true) return null;
   const limit = Number(freeNotes?.limit);
   const used = Number(freeNotes?.used);
   if (!Number.isInteger(limit) || !Number.isInteger(used) || limit <= 0 || used < 0) return null;
@@ -1021,7 +1027,8 @@ export function describeStickyAction({ anonymous = false, stranger = false, subs
     return {
       label: 'Place your note',
       state: `${name} makes this note free: the site asks your domain when you place it, and nothing `
-        + 'is charged when the answer names this key.',
+        + `is charged when the answer names this key. ${STICKY_FREE_NOTES_PER_DAY} notes a day; a `
+        + 'subscription removes the limit.',
       needsSubscription: false,
       price: 0,
       active: false,

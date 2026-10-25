@@ -113,12 +113,16 @@ export const AGENT_PIN_REASON = 'agents pay per note, name or no name';
  * How many free notes a name buys in a day.
  *
  * A free door with no meter is not a door, it is a hole: a domain costs a few sats and a name is a
- * DNS record, so "free for anyone with a NIP-05" would be free for anyone who can type. Sixty-nine
- * is enough for a person who writes — a busy day on a board, not a wire service — and it is the
- * same figure as a week of belonging, which keeps one sentence true: a day of free notes costs what
- * a week of posting costs, and a note costs what a week of belonging costs.
+ * DNS record, so "free for anyone with a NIP-05" would be free for anyone who can type. Ten notes is
+ * a real day of writing on a board — enough to say what happened, where it happened, and to correct
+ * yourself twice — and not enough to run a wire service.
+ *
+ * The meter is also the edge of the subscription, which is what it is for: ten notes a day for
+ * nothing, or unlimited notes for a week at ten sats. A subscriber is never counted here — the
+ * subscription is decided before this door in `createStickyOrder`, so a covered note is not a free
+ * one and cannot spend the allowance.
  */
-export const NIP05_DAILY_MAX = 69;
+export const NIP05_DAILY_MAX = 10;
 /**
  * The window a free note is counted in: a rolling 24 hours.
  *
@@ -141,7 +145,7 @@ export const NIP05_WINDOW_SECONDS = 24 * 60 * 60;
  * starts coming back, not when it is empty.
  */
 export function freeNoteUsage(orders, pubkey, now = Math.floor(Date.now() / 1000),
-  { limit = NIP05_DAILY_MAX, windowSeconds = NIP05_WINDOW_SECONDS } = {}) {
+  { limit = NIP05_DAILY_MAX, windowSeconds = NIP05_WINDOW_SECONDS, subscribed = false } = {}) {
   const key = String(pubkey || '').toLowerCase();
   const since = now - windowSeconds;
   const times = Object.values(orders || {})
@@ -151,10 +155,17 @@ export function freeNoteUsage(orders, pubkey, now = Math.floor(Date.now() / 1000
     .filter(at => at > since && at <= now)
     .sort((a, b) => a - b);
   const used = times.length;
+  // A subscription removes the meter rather than raising it. The count is still reported beside
+  // `unlimited: true`, so a client can say "unlimited while it runs, 4 free ones today" without
+  // inventing either half of that sentence.
+  if (subscribed) {
+    return { limit, used, remaining: null, unlimited: true, windowSeconds, allowed: true, resetsAt: null };
+  }
   return {
     limit,
     used,
     remaining: Math.max(0, limit - used),
+    unlimited: false,
     windowSeconds,
     allowed: used < limit,
     // A full allowance comes back one note at a time, starting when the oldest one ages out.
@@ -1046,17 +1057,21 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
     // A 24-hour throwaway identity cannot hold a name, so it can never be a
     // member and can never subscribe: it pays per note, flat, and may pin one.
     quote = { sats: STICKY_ANON_SATS, baseSats: STICKY_ANON_SATS, discount: { applied: false, reason: ANON_REASON } };
-  } else if (nip05Free) {
-    // Nothing to pay: the name answered for this key, so the note is settled here and the token is
-    // fresh the moment it is asked for. `baseSats` stays 0 rather than quoting a price it did not
-    // cost, and the reason travels with the order so the board can say why it was free.
-    nip05Settled = true;
-    quote = { sats: 0, baseSats: 0, discount: { applied: true, reason: NIP05_REASON } };
   } else if (hasActiveSubscription(subscriptions, pubkey, now)) {
     // Already paid for: no invoice, and the order is settled here so the note can
     // be published straight away.
+    // Decided **before** the free door on purpose. A subscriber who sends their NIP-05 name would
+    // otherwise settle as a free note, which is the metered door — and removing that meter is
+    // exactly what a subscription buys. A covered note must never spend the allowance.
     covered = true;
     quote = { sats: 0, baseSats: 0, discount: { applied: true, reason: SUB_REASON } };
+  } else if (nip05Free) {
+    // Nothing to pay: the name answered for this key, so the note is settled here and the token is
+    // fresh the moment it is asked for. `baseSats` stays 0 rather than quoting a price it did not
+    // cost, and the reason travels with the order so the board can say why it was free. Free notes
+    // are the only ones the daily meter counts — see `freeNoteUsage`.
+    nip05Settled = true;
+    quote = { sats: 0, baseSats: 0, discount: { applied: true, reason: NIP05_REASON } };
   } else if (powPin) {
     // One note, paid for with work rather than sats, and only for a key that claims a
     // NIP-05 name — its own, on any domain, because a name on another domain can only be

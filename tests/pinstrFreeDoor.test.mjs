@@ -125,12 +125,17 @@ test('a name nobody verified is not a door: the key has no subscription, so the 
   assert.match(created.error, new RegExp(`${SUB_WEEK_SATS} sats a week`));
 });
 
-test('a verified name outranks a subscription quote, because both are free and the name is simpler', () => {
-  const subscriptions = { [PUBKEY]: { until: NOW + 10_000, plan: 'year' } };
+test('a subscriber who sends a name is covered by the subscription, not by the metered door', () => {
+  // Both doors are free, and the order this branch is in decides which one a note is counted
+  // against: a subscription buys unlimited notes, so it has to win, or ten notes a day would apply
+  // to somebody who has already paid to be rid of them.
+  const subscriptions = { [PUBKEY]: { expiresAt: NOW + 10_000, plan: 'year', sats: 411, startedAt: NOW - 100, extendedAt: NOW } };
   const created = createStickyOrder(pinBody({ nip05: 'd@example.com' }), { now: NOW, nip05Verified: true, subscriptions });
   assert.equal(created.ok, true);
-  assert.equal(created.order.nip05Free, true);
-  assert.equal(created.order.paymentMethod, 'nip05');
+  assert.equal(created.order.covered, true);
+  assert.equal(created.order.nip05Free, false);
+  assert.equal(created.order.paymentMethod, 'subscription');
+  assert.equal(created.order.sats, 0);
 });
 
 test('the free door is a pin door only: a subscription carries no name and no agent marker', () => {
@@ -302,13 +307,13 @@ function freeNote(pubkey, createdAt, extra = {}) {
   return { id: `o${createdAt}`, pubkey, nip05Free: true, createdAt, sats: 0, ...extra };
 }
 
-test('a name buys 69 free notes a day, and the day is a rolling 24 hours', () => {
-  assert.equal(NIP05_DAILY_MAX, 69);
+test('a name buys 10 free notes a day, and the day is a rolling 24 hours', () => {
+  assert.equal(NIP05_DAILY_MAX, 10, 'ten is a day of writing, not a wire service');
   assert.equal(NIP05_WINDOW_SECONDS, 86400);
   const fresh = freeNoteUsage({}, PUBKEY, NOW);
   assert.deepEqual(
     { used: fresh.used, remaining: fresh.remaining, allowed: fresh.allowed, limit: fresh.limit },
-    { used: 0, remaining: 69, allowed: true, limit: 69 });
+    { used: 0, remaining: 10, allowed: true, limit: 10 });
   assert.equal(fresh.resetsAt, null, 'nothing to wait for when nothing has been spent');
 });
 
@@ -327,16 +332,16 @@ test('the count is what the key ordered, and only the free ones', () => {
   };
   const usage = freeNoteUsage(orders, PUBKEY, NOW);
   assert.equal(usage.used, 3);
-  assert.equal(usage.remaining, 66);
+  assert.equal(usage.remaining, 7);
   assert.equal(usage.allowed, true);
   assert.equal(usage.resetsAt, null, 'a partly spent day has nothing falling off yet');
 });
 
-test('the sixty-ninth note is the last one, and the seventieth is refused until one ages out', () => {
+test('the tenth note is the last one, and the eleventh waits for one to age out', () => {
   const orders = {};
-  for (let i = 0; i < 69; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 3600 + i);
+  for (let i = 0; i < 10; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 3600 + i);
   const spent = freeNoteUsage(orders, PUBKEY, NOW);
-  assert.equal(spent.used, 69);
+  assert.equal(spent.used, 10);
   assert.equal(spent.remaining, 0);
   assert.equal(spent.allowed, false);
   assert.equal(spent.resetsAt, (NOW - 3600) + NIP05_WINDOW_SECONDS,
@@ -345,7 +350,7 @@ test('the sixty-ninth note is the last one, and the seventieth is refused until 
   // Time moves on and the allowance comes back one note at a time, oldest first: a second past the
   // first note's window, the two oldest have aged out and there is room for two.
   const later = freeNoteUsage(orders, PUBKEY, (NOW - 3600) + NIP05_WINDOW_SECONDS + 1);
-  assert.equal(later.used, 67);
+  assert.equal(later.used, 8);
   assert.equal(later.remaining, 2);
   assert.equal(later.allowed, true);
   assert.equal(later.resetsAt, null, 'a day with room left has nothing to wait for');
@@ -353,10 +358,10 @@ test('the sixty-ninth note is the last one, and the seventieth is refused until 
 
 test('the meter never reports a negative remainder or counts a note from the future', () => {
   const orders = {};
-  for (let i = 0; i < 75; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 60 - i);
+  for (let i = 0; i < 15; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 60 - i);
   orders.future = freeNote(PUBKEY, NOW + 600);
   const usage = freeNoteUsage(orders, PUBKEY, NOW);
-  assert.equal(usage.used, 75, 'the future note is not counted until it is ordered');
+  assert.equal(usage.used, 15, 'the future note is not counted until it is ordered');
   assert.equal(usage.remaining, 0, 'and a remainder is never negative');
   assert.equal(usage.allowed, false);
 });
@@ -368,4 +373,34 @@ test('an empty or absent store is a full allowance, not a crash', () => {
     assert.equal(usage.allowed, true, 'a desk that cannot read its own orders must not refuse a free note');
   }
   assert.equal(freeNoteUsage({}, '', NOW).used, 0);
+});
+
+test('a subscription does not raise the meter, it removes it', () => {
+  // Ten free notes are exactly what a week of unlimited notes replaces, so a subscriber must never be
+  // measured at all — not even when they send the NIP-05 name that would open the free door.
+  const orders = {};
+  for (let i = 0; i < 40; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 60 - i);
+  const free = freeNoteUsage(orders, PUBKEY, NOW);
+  assert.equal(free.allowed, false, 'without a subscription, forty notes is far past the allowance');
+
+  const subscribed = freeNoteUsage(orders, PUBKEY, NOW, { subscribed: true });
+  assert.equal(subscribed.unlimited, true);
+  assert.equal(subscribed.allowed, true);
+  assert.equal(subscribed.remaining, null, 'there is no remainder to report when there is no ceiling');
+  assert.equal(subscribed.used, 40, 'and the count is still told, because it is true');
+});
+
+test('a covered note is never a free one, so a subscriber cannot spend the allowance', () => {
+  // The branch order in createStickyOrder is the whole of this rule: a subscription is decided
+  // before the free door, so a subscriber who sends their name is covered rather than free.
+  const subscriptions = { [PUBKEY]: { expiresAt: NOW + 10_000, plan: 'week', sats: 10, startedAt: NOW - 100, extendedAt: NOW } };
+  const covered = createStickyOrder(pinBody({ nip05: 'd@example.com' }), { now: NOW, nip05Verified: true, subscriptions });
+  assert.equal(covered.ok, true);
+  assert.equal(covered.order.covered, true, 'the subscription pays, not the free door');
+  assert.equal(covered.order.nip05Free, false, 'so the note does not count against the daily allowance');
+  assert.equal(covered.order.paymentMethod, 'subscription');
+
+  const freed = createStickyOrder(pinBody({ nip05: 'd@example.com' }), { now: NOW, nip05Verified: true });
+  assert.equal(freed.order.nip05Free, true, 'and without one, the same order is a free note');
+  assert.equal(freed.order.covered, false);
 });

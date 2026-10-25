@@ -84,9 +84,15 @@ test('no price in the explainer is missing from the agent contract, or the other
     'AGENTS.md has the free row too');
   // The free door has a meter, and both readers are told the figure: a limit discovered by being
   // refused is a limit that looks like a bug.
-  assert.match(about, /<strong>69 notes a day<\/strong>/, 'the explainer states the daily allowance');
-  assert.match(agents, /69 free notes per key in a\s+rolling 24 hours/, 'AGENTS.md states it too');
+  assert.match(about, /<strong>10 notes a day<\/strong>/, 'the explainer states the daily allowance');
+  assert.match(agents, /10 free notes per key in a\s+rolling 24 hours/, 'AGENTS.md states it too');
   assert.match(agents, /nip05_daily_limit/, 'and names the refusal an agent will meet');
+  // The other half of the bargain, in both documents: a subscription removes the meter rather than
+  // raising it, so nobody buys a week expecting more than ten a day.
+  assert.match(about, /<strong>A subscription removes the meter entirely<\/strong>/,
+    'the explainer says what lifts the limit');
+  assert.match(agents, /A subscription removes the meter rather than raising it/,
+    'and so does the contract');
   // The one price that differs by who is asking, said in both documents: a name makes a person's
   // note free and an agent's note costs 10 whatever name it carries.
   assert.match(agents, /One note from an agent \(`agent: true`\) \| 10 — always, whatever name the key carries/,

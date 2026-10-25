@@ -777,6 +777,7 @@ const handleRequest = async (req, res) => {
         agentSats: STICKY_ANON_SATS,
         // The free door's meter, published so a client can show it without inventing a number.
         nip05DailyMax: NIP05_DAILY_MAX,
+        subscriptionUnlocksLimit: true,
         agentPays: 'send agent: true and the note is charged at agentSats whatever name you carry',
 
         // A machine that arrives here should not have to guess where the instructions are, nor
@@ -931,14 +932,15 @@ const handleRequest = async (req, res) => {
       // here so the page can show the truth instead of a price it may not pay; the
       // answer is cached, and the decision is taken again when an order is created.
       const stranger = await isStrangerKey(pubkey, names);
+      const view = subscriptionView(loadSubscriptions(), pubkey, now);
       return send(res, 200, {
         ok: true,
         pubkey: pubkey || null,
-        ...subscriptionView(loadSubscriptions(), pubkey, now),
+        ...view,
         // What today's free allowance looks like for this key: how many free notes it has ordered in
         // the last 24 hours and how many are left. A count, not a promise — the gate is applied again
         // when an order is created, because a client is free to show a stale number and not to spend it.
-        freeNotes: freeNoteUsage(loadSticky(now), pubkey, now),
+        freeNotes: freeNoteUsage(loadSticky(now), pubkey, now, { subscribed: view.active === true }),
         // The desk's verdict about the key, never the board's claim about itself.
         anonymous: stranger,
         anonymousReason: stranger ? STRANGER_REASON : null,
@@ -1052,7 +1054,7 @@ const handleRequest = async (req, res) => {
       // name" would be free for anyone who can type. The allowance is counted from the stored
       // orders — the record that survives a restart — and refused here, before the order exists.
       if (created.order.nip05Free === true) {
-        const usage = freeNoteUsage(orders, created.order.pubkey, now);
+        const usage = freeNoteUsage(orders, created.order.pubkey, now, { subscribed: false });
         if (!usage.allowed) {
           console.log(JSON.stringify({
             event: 'pinstr_nip05_allowance_spent', pubkey: created.order.pubkey,
@@ -1065,7 +1067,7 @@ const handleRequest = async (req, res) => {
             error: `Your name covers ${usage.limit} notes a day and all ${usage.limit} are spent: `
               + `${usage.used} free notes in the last 24 hours. `
               + (back ? `The oldest falls off at ${back} UTC. ` : '')
-              + 'A subscription has no such limit.',
+              + `A week of unlimited notes is ${SUB_WEEK_SATS} sats, or ${SUB_YEAR_SATS} for a year.`,
             freeNotes: usage,
           }, { 'cache-control': 'no-store', ...(usage.resetsAt ? { 'retry-after': String(Math.max(1, usage.resetsAt - now)) } : {}) });
         }

@@ -105,12 +105,17 @@ Do not try to be clever about this: an agent that omits the marker is not paying
 is taking a door meant for someone else and making the one payment rail that works for machines look
 unreliable. The price is 10 sats. Pay it, or mine the note.
 
-That door also has a meter, which is the other reason not to lean on it: **69 free notes per key in a
-rolling 24 hours** (`nip05DailyMax` on `/config`). The seventieth is refused with
+That door also has a meter, which is the other reason not to lean on it: **10 free notes per key in a
+rolling 24 hours** (`nip05DailyMax` on `/config`). The eleventh is refused with
 `reason: "nip05_daily_limit"` and HTTP 429, an allowance comes back one note at a time as the oldest
 ages out (`freeNotes.resetsAt` on `GET /subscription?pubkey=`), and `GET /subscription` always carries
-`freeNotes: {limit, used, remaining, resetsAt, windowSeconds}` so a client can show the count without
-inventing one. A subscription has no such limit; a note paid for with sats is never counted against it.
+`freeNotes: {limit, used, remaining, unlimited, resetsAt, windowSeconds}` so a client can show the count
+without inventing one.
+
+**A subscription removes the meter rather than raising it** (`subscriptionUnlocksLimit: true` on
+`/config`): while a week or a year runs, notes are unlimited and are covered by the subscription, so
+they never count against the free allowance. `freeNotes.unlimited` is `true` and `remaining` is `null`
+for a subscribed key. A note paid for with sats is never counted against it either.
 
 A clump of cells is priced as one note, never per cell, and the expiry you choose does not change the
 price.

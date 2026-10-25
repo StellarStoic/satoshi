@@ -948,28 +948,44 @@ test('published notes resolve a readable author label in relay batches', async (
 test('the account dialog shows how much of the day a name has left', () => {
   // The count comes from the desk; the board only puts it into words and into a bar. Thirteen pinned
   // out of sixty-nine is the sentence a reader needs, in both directions at once.
-  const thirteen = stickyFreeNotesLine({ limit: 69, used: 13, remaining: 56 });
-  assert.equal(thirteen.head, '13 of 69 used');
-  assert.equal(thirteen.sentence, 'You pinned 13 notes \u00b7 56 left of 69 a day.');
-  assert.equal(thirteen.tone, 'fine');
+  const three = stickyFreeNotesLine({ limit: 10, used: 3, remaining: 7 });
+  assert.equal(three.head, '3 of 10 used');
+  assert.equal(three.sentence, 'You pinned 3 notes \u00b7 7 left of 10 a day.');
+  assert.equal(three.tone, 'fine');
 
-  const oneLeft = stickyFreeNotesLine({ limit: 69, used: 68, remaining: 1 });
+  const oneLeft = stickyFreeNotesLine({ limit: 10, used: 9, remaining: 1 });
   assert.equal(oneLeft.tone, 'low', 'the last tenth of the allowance looks different');
 
-  const spent = stickyFreeNotesLine({ limit: 69, used: 69, remaining: 0, resetsAt: 1_800_082_800 });
+  const spent = stickyFreeNotesLine({ limit: 10, used: 10, remaining: 0, resetsAt: 1_800_082_800 });
   assert.equal(spent.tone, 'spent');
-  assert.equal(spent.head, '69 of 69 used');
-  assert.match(spent.sentence, /You pinned 69 notes and the day's free allowance is spent\./);
+  assert.equal(spent.head, '10 of 10 used');
+  assert.match(spent.sentence, /You pinned 10 notes and the day's free allowance is spent\./);
   assert.match(spent.sentence, /The oldest falls off at \d\d:\d\d UTC/,
     'and says when one comes back, because a spent allowance with no answer is a dead end');
 
-  assert.equal(stickyFreeNotesLine({ limit: 69, used: 1, remaining: 68 }).sentence,
-    'You pinned 1 note \u00b7 68 left of 69 a day.', 'one note is not one notes');
+  assert.equal(stickyFreeNotesLine({ limit: 10, used: 1, remaining: 9 }).sentence,
+    'You pinned 1 note \u00b7 9 left of 10 a day.', 'one note is not one notes');
+
+  // A subscriber has no meter at all: drawing one would read as an allowance about to run out.
+  assert.equal(stickyFreeNotesLine({ limit: 10, used: 40, remaining: null, unlimited: true }), null,
+    'a subscription removes the meter, so there is nothing to draw');
 
   // A meter that invents a number is worse than no meter.
-  for (const bad of [null, undefined, {}, { limit: 0, used: 0 }, { limit: 69 }, { limit: '69', used: 'x' }]) {
+  for (const bad of [null, undefined, {}, { limit: 0, used: 0 }, { limit: 10 }, { limit: '10', used: 'x' }]) {
     assert.equal(stickyFreeNotesLine(bad), null, `no meter from ${JSON.stringify(bad)}`);
   }
+});
+
+test('the composer and the account chip both say what ten a day and a subscription mean', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const model = await readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8');
+  assert.match(model, /export const STICKY_FREE_NOTES_PER_DAY = 10;/,
+    'the board carries the figure once, to say it before the order rather than after a refusal');
+  const named = describeStickyAction({ subscription: { active: false, prices: {} }, nip05: 'd@example.com' });
+  assert.match(named.state, /10 notes a day/);
+  assert.match(named.state, /a subscription removes the limit/);
+  assert.match(script, /Active \u00b7 unlimited notes/,
+    'and a subscriber is told the meter is gone, not that they are close to a limit they do not have');
 });
 
 test('the dialog carries the meter, and it is drawn from the desk count', async () => {
