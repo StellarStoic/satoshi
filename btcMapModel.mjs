@@ -186,6 +186,12 @@ export function viewportCoverageContains(coverage, center, radiusKm) {
   return haversineKm(coverage.center, center) + Number(radiusKm) <= Number(coverage.radiusKm);
 }
 
+export function isIgnorableMapError(error) {
+  const message = String(error?.message || error || '');
+  return /expected value to be of type number, but found null instead/i.test(message)
+    || /(?:aborterror|operation was aborted)/i.test(message);
+}
+
 export function placeFeature(place = {}) {
   const lat = Number(place.lat);
   const lon = Number(place.lon);

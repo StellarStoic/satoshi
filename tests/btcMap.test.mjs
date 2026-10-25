@@ -7,6 +7,7 @@ import {
   btcMapPlaceUrl,
   btcMapPlacesUrl,
   btcMapSearchUrl,
+  isIgnorableMapError,
   BTC_MAP_AUTH_URL,
   BTC_MAP_HEAT_PLACES_URL,
   BTC_MAP_SAVED_URL,
@@ -96,6 +97,12 @@ test('place collections discard invalid coordinates and keep safe marker data', 
     'the same place keeps the same marker tilt');
 });
 
+test('nonfatal map tile warnings do not masquerade as connection failures', () => {
+  assert.equal(isIgnorableMapError(new Error('Expected value to be of type number, but found null instead.')), true);
+  assert.equal(isIgnorableMapError(new DOMException('The operation was aborted', 'AbortError')), true);
+  assert.equal(isIgnorableMapError(new Error('Failed to fetch')), false);
+});
+
 test('labels and outbound URLs fail safely', () => {
   assert.equal(verificationLabel('', Date.UTC(2026,0,1)), 'Not recently verified');
   assert.equal(verificationLabel('2026-01-01', Date.UTC(2026,0,1)), 'Verified today');
@@ -168,6 +175,7 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /function heatFeatureAtPoint\(point\)/);
   assert.match(page, /classList\.toggle\('is-hidden', hidden\)/);
   assert.match(page, /map\.on\('move',/);
+  assert.match(page, /isIgnorableMapError\(event\.error\)/);
   assert.doesNotMatch(page, /map\.on\('mousemove'/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
   assert.match(page, /const MARKER_ZOOM = 7/);

@@ -8,6 +8,7 @@ import {
   BTC_MAP_AUTH_URL,
   BTC_MAP_HEAT_PLACES_URL,
   BTC_MAP_SAVED_URL,
+  isIgnorableMapError,
   nip98Authorization,
   osmPlaceUrl,
   placeDescription,
@@ -947,7 +948,13 @@ map.on('click', event => {
   });
 });
 map.on('error', event => {
-  if (event?.error) setStatus('Part of the map could not load. Check your content blocker or connection.');
+  if (!event?.error) return;
+  if (isIgnorableMapError(event.error)) {
+    console.debug('Ignoring a nonfatal map tile-data warning.', event.error);
+    return;
+  }
+  console.warn('BTC Map resource error.', event.error);
+  setStatus('Part of the map could not load. Check your content blocker or connection.');
 });
 
 refreshAccountUi();
