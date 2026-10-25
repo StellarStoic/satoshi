@@ -417,7 +417,7 @@ function setHeatLayersVisible(visible) {
 
 function heatSummary() {
   if (!heatPlaces) return;
-  setStatus(`${heatVisibleCount.toLocaleString()} mapped Bitcoin places across ${heatCells.length.toLocaleString()} regions on screen. Select a hexagon to zoom in.`);
+  setStatus(`${heatVisibleCount.toLocaleString()} mapped Bitcoin places across ${heatCells.length.toLocaleString()} regions on screen. Select a hexagon to zoom in.`, 1600);
 }
 
 function drawHeatMap() {
@@ -947,6 +947,7 @@ map.on('moveend', () => {
 map.on('move', () => {
   const zoom = map.getZoom();
   const visiblePins = zoom >= MARKER_ZOOM && visibleCachedPlaceCount() > 0;
+  if (heatMode && zoom >= MARKER_ZOOM) setStatus('');
   if (heatMode && zoom >= HEAT_MIN_ZOOM && !visiblePins) scheduleHeatOverlay();
   if (zoom >= MARKER_ZOOM) {
     setPlaceLayersVisible(true);

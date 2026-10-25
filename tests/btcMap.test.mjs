@@ -196,6 +196,8 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /loadViewportPlaces\(\{allowDuringHeat:true\}\)/);
   assert.match(page, /function seedVisibleHeatPlaces\(\)/);
   assert.match(page, /seedVisibleHeatPlaces\(\);/);
+  assert.match(page, /Select a hexagon to zoom in\.`?, 1600\)/);
+  assert.match(page, /if \(heatMode && zoom >= MARKER_ZOOM\) setStatus\(''\)/);
   assert.match(page, /function visibleCachedPlaceCount\(\)/);
   assert.match(page, /if \(visibleCachedPlaceCount\(\)\) \{/);
   assert.match(page, /map\.getZoom\(\) >= MARKER_ZOOM && visibleCachedPlaceCount\(\)/);
