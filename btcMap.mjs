@@ -433,7 +433,6 @@ function drawHeatMap() {
 
 async function enterHeatMode() {
   heatMode = true;
-  setPlaceLayersVisible(false);
   if (!heatPlaces) setStatus('Building the global place-density map…');
   try {
     if (!heatPlaces) {
@@ -445,6 +444,7 @@ async function enterHeatMode() {
     if (!heatMode) return;
     drawHeatMap();
     setHeatLayersVisible(true);
+    setPlaceLayersVisible(false);
   } catch (error) {
     if (error.name !== 'AbortError') {
       heatMode = false;
@@ -470,10 +470,16 @@ async function syncMapMode() {
     await enterHeatMode();
     return;
   }
-  heatMode = false;
-  setHeatLayersVisible(false);
   setPlaceLayersVisible(true);
-  await loadViewportPlaces();
+  if (placeCache.size) {
+    heatMode = false;
+    setHeatLayersVisible(false);
+  }
+  await loadViewportPlaces({allowDuringHeat:true});
+  if (placeCache.size || !pendingViewportCoverage) {
+    heatMode = false;
+    setHeatLayersVisible(false);
+  }
 }
 
 async function installPlaceLayers() {
@@ -505,7 +511,8 @@ async function installPlaceLayers() {
       'icon-size':['interpolate',['linear'],['zoom'],MARKER_ZOOM,.48,14,.68],
       'icon-rotate':['get','tilt'],
       'icon-rotation-alignment':'viewport',
-      'icon-allow-overlap':false,
+      'icon-allow-overlap':true,
+      'icon-ignore-placement':true,
       'icon-padding':2,
     },
   } : {
@@ -544,9 +551,9 @@ function cachePlaces(places) {
   map.getSource('btc-places').setData(placeCollection([...placeCache.values()]));
 }
 
-async function loadViewportPlaces() {
+async function loadViewportPlaces({allowDuringHeat = false} = {}) {
   if (!sourceReady()) return;
-  if (heatMode) return;
+  if (heatMode && !allowDuringHeat) return;
   const zoom = map.getZoom();
   if (zoom < 5) {
     setStatus('Zoom closer, search a city, or use your location to load places.');
@@ -567,10 +574,26 @@ async function loadViewportPlaces() {
   try {
     const places = await getJson(btcMapPlacesUrl({lat:center.lat,lon:center.lng,radiusKm:fetchRadiusKm}), controller);
     if (controller.signal.aborted) return;
-    cachePlaces(Array.isArray(places) ? places : []);
+    const loadedPlaces = Array.isArray(places) ? places : [];
+    cachePlaces(loadedPlaces);
     viewportCoverage = pendingViewportCoverage;
-    const count = Array.isArray(places) ? places.length : 0;
-    setStatus(count ? `${count.toLocaleString()} Bitcoin place${count === 1 ? '' : 's'} in this area.` : 'No mapped Bitcoin places in this area.', 4200);
+    const visibleBounds = map.getBounds();
+    const visibleCount = loadedPlaces.filter(place => {
+      const lat = Number(place?.lat);
+      const lon = Number(place?.lon);
+      return Number.isFinite(lat) && Number.isFinite(lon) && visibleBounds.contains([lon, lat]);
+    }).length;
+    const count = loadedPlaces.length;
+    if (visibleCount) {
+      setStatus(`${visibleCount.toLocaleString()} Bitcoin place${visibleCount === 1 ? '' : 's'} visible in this view.`, 4200);
+    } else if (count) {
+      setStatus(`${count.toLocaleString()} Bitcoin place${count === 1 ? '' : 's'} loaded nearby. Zoom out slightly to see them.`, 4200);
+    } else setStatus('No mapped Bitcoin places in this area.', 4200);
+    if (map.getZoom() >= MARKER_ZOOM) {
+      setPlaceLayersVisible(true);
+      heatMode = false;
+      setHeatLayersVisible(false);
+    }
   } catch (error) {
     if (error.name !== 'AbortError') setStatus('BTC Map could not be reached. Move the map or try again shortly.');
   } finally {
@@ -895,8 +918,12 @@ map.on('moveend', () => {
   moveTimer = setTimeout(syncMapMode, 180);
 });
 map.on('move', () => {
-  if (heatMode && map.getZoom() >= HEAT_MIN_ZOOM && map.getZoom() < MARKER_ZOOM) scheduleHeatOverlay();
-  else hideHeatOverlay(true);
+  const zoom = map.getZoom();
+  if (heatMode && zoom >= HEAT_MIN_ZOOM && (zoom < MARKER_ZOOM || !placeCache.size)) scheduleHeatOverlay();
+  if (zoom >= MARKER_ZOOM) {
+    setPlaceLayersVisible(true);
+    if (placeCache.size) hideHeatOverlay(true);
+  }
 });
 map.on('click', event => {
   const feature = heatFeatureAtPoint(event.point);

@@ -177,9 +177,15 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /setTimeout\(syncMapMode, 180\)/);
   assert.match(page, /PLACE_FETCH_BUFFER = 1\.4/);
   assert.match(page, /viewportCoverageContains\(viewportCoverage/);
-  assert.match(page, /cachePlaces\(Array\.isArray\(places\)/);
+  assert.match(page, /cachePlaces\(loadedPlaces\)/);
   assert.match(page, /loadImage\('\/img\/btc-map-pin\.png'\)/);
   assert.match(page, /'icon-rotate':\['get','tilt'\]/);
+  assert.match(page, /'icon-allow-overlap':true/);
+  assert.match(page, /'icon-ignore-placement':true/);
+  assert.match(page, /loadViewportPlaces\(\{allowDuringHeat:true\}\)/);
+  assert.match(page, /placeCache\.size \|\| !pendingViewportCoverage/);
+  assert.match(page, /Bitcoin place\$\{visibleCount === 1 \? '' : 's'\} visible in this view/);
+  assert.match(page, /loaded nearby\. Zoom out slightly to see them/);
   assert.match(page, /focusSearchResults\(results\)/);
   assert.match(page, /document\.addEventListener\('pointerdown'/);
   assert.match(page, /!path\.includes\(elements\.results\)/);
