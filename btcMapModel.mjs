@@ -90,7 +90,57 @@ export const PLACE_DETAIL_FIELDS = [
   'created_at', 'updated_at', 'verified_at', 'osm_id', 'osm_url', 'phone',
   'website', 'twitter', 'facebook', 'instagram', 'line', 'telegram', 'email',
   'boosted_until', 'required_app_url', 'description', 'image', 'payment_provider',
+  'osm:shop', 'osm:amenity', 'osm:tourism', 'osm:craft', 'osm:office',
+  'osm:leisure', 'osm:healthcare', 'osm:cuisine', 'osm:product', 'osm:service',
+  'osm:description', 'osm:goods', 'osm:produce', 'osm:clothes', 'osm:beauty',
+  'osm:healthcare:speciality', 'osm:sport', 'osm:second_hand',
+  'osm:delivery', 'osm:takeaway', 'osm:payment:onchain', 'osm:payment:lightning',
+  'osm:payment:lightning_contactless', 'osm:payment:bitcoin',
 ].join(',');
+
+function readableTag(value = '') {
+  return String(value).split(/[;,]/).map(part => part.trim()).filter(Boolean)
+    .map(part => part.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())).join(', ');
+}
+
+export function placeOfferingFacts(place = {}) {
+  const facts = [];
+  const categories = [
+    ['osm:shop', 'Shop'], ['osm:amenity', 'Type'], ['osm:tourism', 'Type'],
+    ['osm:craft', 'Craft'], ['osm:office', 'Office'], ['osm:leisure', 'Leisure'],
+    ['osm:healthcare', 'Healthcare'],
+  ];
+  categories.forEach(([field, label]) => {
+    if (place[field]) facts.push({label, value:readableTag(place[field])});
+  });
+  [
+    ['osm:cuisine', 'Cuisine'], ['osm:product', 'Products'], ['osm:goods', 'Goods'],
+    ['osm:produce', 'Produce'], ['osm:clothes', 'Clothes'], ['osm:beauty', 'Beauty'],
+    ['osm:healthcare:speciality', 'Speciality'], ['osm:sport', 'Sport'],
+    ['osm:service', 'Services'], ['osm:second_hand', 'Second-hand'],
+  ]
+    .forEach(([field, label]) => {
+      if (place[field]) facts.push({label, value:readableTag(place[field])});
+    });
+  if (/^(yes|only)$/i.test(String(place['osm:delivery'] || ''))) facts.push({label:'Option', value:'Delivery'});
+  if (/^(yes|only)$/i.test(String(place['osm:takeaway'] || ''))) facts.push({label:'Option', value:'Takeaway'});
+  if (!facts.length && place.icon) facts.push({label:'Type', value:readableTag(place.icon)});
+  return facts.filter((fact, index) => fact.value
+    && facts.findIndex(candidate => candidate.label === fact.label && candidate.value === fact.value) === index);
+}
+
+export function placeDescription(place = {}) {
+  return String(place.description || place['osm:description'] || '').trim();
+}
+
+export function placePaymentMethods(place = {}) {
+  const methods = [];
+  if (/^(yes|only)$/i.test(String(place['osm:payment:onchain'] || ''))) methods.push('On-chain');
+  if (/^(yes|only)$/i.test(String(place['osm:payment:lightning'] || ''))) methods.push('Lightning');
+  if (/^(yes|only)$/i.test(String(place['osm:payment:lightning_contactless'] || ''))) methods.push('Contactless Lightning');
+  if (!methods.length && /^(yes|only)$/i.test(String(place['osm:payment:bitcoin'] || ''))) methods.push('Bitcoin');
+  return methods.join(', ');
+}
 
 export function btcMapSearchUrl(query = '', location = null, limit = 30) {
   const params = new URLSearchParams({q:String(query).trim(), limit:String(Math.max(1, Math.min(100, limit)))});

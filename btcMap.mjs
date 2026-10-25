@@ -10,7 +10,10 @@ import {
   BTC_MAP_SAVED_URL,
   nip98Authorization,
   osmPlaceUrl,
+  placeDescription,
+  placeOfferingFacts,
   placeCollection,
+  placePaymentMethods,
   safeHttpUrl,
   verificationLabel,
   viewportRadiusKm,
@@ -654,6 +657,34 @@ function externalLink(label, href, iconName = 'lni-arrow-angular-top-right') {
   return link;
 }
 
+function offeringSection(place) {
+  const facts = placeOfferingFacts(place);
+  const descriptionText = placeDescription(place);
+  if (!facts.length && !descriptionText) return null;
+  const section = document.createElement('section');
+  section.className = 'btc-map-offering';
+  const heading = document.createElement('h3');
+  heading.textContent = 'What you can get';
+  section.append(heading);
+  if (facts.length) {
+    const list = document.createElement('dl');
+    facts.forEach(fact => {
+      const term = document.createElement('dt');
+      const detail = document.createElement('dd');
+      term.textContent = fact.label;
+      detail.textContent = fact.value;
+      list.append(term, detail);
+    });
+    section.append(list);
+  }
+  if (descriptionText) {
+    const description = document.createElement('p');
+    description.textContent = descriptionText;
+    section.append(description);
+  }
+  return section;
+}
+
 function renderPlace(place, comments = []) {
   currentPlace = {place, comments};
   const fragment = document.createDocumentFragment();
@@ -675,16 +706,23 @@ function renderPlace(place, comments = []) {
   verified.append(document.createTextNode(verificationLabel(place.verified_at)));
   fragment.append(verified);
   fragment.append(favoriteButton(place));
-  if (place.description) {
-    const description = document.createElement('p');
-    description.textContent = place.description;
-    fragment.append(description);
+  const imageUrl = safeHttpUrl(place.image);
+  if (imageUrl) {
+    const image = document.createElement('img');
+    image.className = 'btc-map-place-image';
+    image.src = imageUrl;
+    image.alt = place.name ? `${place.name} photo` : 'Bitcoin place photo';
+    image.loading = 'lazy';
+    fragment.append(image);
   }
+  const offering = offeringSection(place);
+  if (offering) fragment.append(offering);
   const facts = document.createElement('dl');
   facts.className = 'btc-map-facts';
   [
     factRow('Hours', place.opening_hours),
-    factRow('Payment', place.payment_provider),
+    factRow('Bitcoin payment', placePaymentMethods(place)),
+    factRow('Payment provider', place.payment_provider),
     factRow('Phone', place.phone),
     factRow('Email', place.email),
   ].filter(Boolean).forEach(row => facts.append(row));
@@ -695,7 +733,10 @@ function renderPlace(place, comments = []) {
     externalLink('Website', place.website, 'lni-globe-1'),
     externalLink('OpenStreetMap', osmPlaceUrl(place), 'lni-map-marker-1'),
     externalLink('Instagram', place.instagram, 'lni-instagram'),
+    externalLink('Facebook', place.facebook, 'lni-facebook'),
+    externalLink('X / Twitter', place.twitter, 'lni-twitter-old'),
     externalLink('Telegram', place.telegram, 'lni-telegram'),
+    externalLink('LINE', place.line, 'lni-link-2-angular-right'),
     externalLink('Required app', place.required_app_url, 'lni-app-store'),
   ].filter(Boolean).forEach(link => links.append(link));
   if (links.children.length) fragment.append(links);

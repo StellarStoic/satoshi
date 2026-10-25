@@ -44,6 +44,13 @@ body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companio
 .btc-map-place-icon { width:42px; height:42px; display:grid; place-items:center; margin-bottom:14px; border:1px solid color-mix(in srgb,var(--accent,#f2a900) 55%,transparent); border-radius:50%; color:var(--accent,#f2a900); font-size:1.15rem; }
 .btc-map-save { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; min-height:40px; margin:0 0 17px; border:1px solid var(--border,#444); border-radius:5px; background:transparent; color:var(--text,#fff); font:inherit; font-size:.78rem; cursor:pointer; }
 .btc-map-save:hover,.btc-map-save:focus-visible,.btc-map-save.is-saved { border-color:var(--accent,#f2a900); color:var(--accent,#f2a900); outline:0; }
+.btc-map-place-image { display:block; width:100%; max-height:230px; margin:0 0 18px; border:1px solid var(--border,#444); border-radius:5px; object-fit:cover; }
+.btc-map-offering { margin:0 0 18px; padding:14px; border-left:3px solid var(--accent,#f2a900); background:color-mix(in srgb,var(--surface-raised,#262929) 82%,transparent); }
+.btc-map-offering h3 { margin:0 0 11px; color:var(--accent,#f2a900); font-size:.82rem; }
+.btc-map-offering dl { display:flex; flex-wrap:wrap; gap:7px; margin:0; }
+.btc-map-offering dt { padding:5px 0; color:var(--text-muted,#bec1be); font-size:.75rem; }
+.btc-map-offering dd { margin:0 8px 0 0; padding:5px 8px; border:1px solid var(--border,#444); border-radius:4px; color:var(--text,#fff); font-size:.75rem; }
+.btc-map-offering p { margin:12px 0 0 !important; color:var(--text,#fff) !important; }
 .btc-map-details h2 { margin:0 42px 7px 0; font-size:1.15rem; line-height:1.25; }
 .btc-map-details address,.btc-map-details p { margin:0 0 13px; color:var(--text-muted,#c4c7c4); font-size:.76rem; line-height:1.55; font-style:normal; }
 .btc-map-verified { display:inline-flex; align-items:center; gap:6px; margin-bottom:17px; color:#75d699; font-size:.75rem; }

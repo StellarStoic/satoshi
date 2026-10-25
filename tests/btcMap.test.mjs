@@ -13,7 +13,10 @@ import {
   haversineKm,
   nip98Authorization,
   osmPlaceUrl,
+  placeDescription,
+  placeOfferingFacts,
   placeCollection,
+  placePaymentMethods,
   safeHttpUrl,
   verificationLabel,
   viewportRadiusKm,
@@ -88,6 +91,24 @@ test('labels and outbound URLs fail safely', () => {
   assert.equal(osmPlaceUrl({lat:46,lon:14}), 'https://www.openstreetmap.org/?mlat=46&mlon=14#map=19/46/14');
 });
 
+test('place details explain what a visitor can buy and how bitcoin is accepted', () => {
+  assert.deepEqual(placeOfferingFacts({
+    icon:'lunch_dining', 'osm:shop':'kiosk', 'osm:amenity':'fast_food',
+    'osm:cuisine':'burger;pizza', 'osm:takeaway':'only',
+  }), [
+    {label:'Shop', value:'Kiosk'},
+    {label:'Type', value:'Fast Food'},
+    {label:'Cuisine', value:'Burger, Pizza'},
+    {label:'Option', value:'Takeaway'},
+  ]);
+  assert.deepEqual(placeOfferingFacts({icon:'menu_book'}), [{label:'Type', value:'Menu Book'}]);
+  assert.equal(placeDescription({'osm:description':'Independent books and coffee'}), 'Independent books and coffee');
+  assert.equal(placePaymentMethods({
+    'osm:payment:onchain':'no', 'osm:payment:lightning':'yes',
+    'osm:payment:lightning_contactless':'yes',
+  }), 'Lightning, Contactless Lightning');
+});
+
 test('BTC Map page is integrated with navigation, help, PWA and page context', async () => {
   const [html, css, page, pwa, help, context, seo, worker, sitemap] = await Promise.all([
     readFile(new URL('../btcMap.html', import.meta.url), 'utf8'),
@@ -121,6 +142,9 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /getClusterExpansionZoom/);
   assert.match(page, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(page, /function focusSearchResults\(results\)/);
+  assert.match(page, /What you can get/);
+  assert.match(page, /Bitcoin payment/);
+  assert.match(page, /btc-map-place-image/);
   assert.match(page, /btcMapHeatFeatures\(places, map\.getZoom\(\)\)/);
   assert.match(page, /map\.getBounds\(\)\.contains/);
   assert.match(page, /document\.createElement\('canvas'\)/);
