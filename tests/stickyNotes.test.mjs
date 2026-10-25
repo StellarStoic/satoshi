@@ -4381,6 +4381,14 @@ test('an empty board shows where to press, and the chooser waits to be asked for
   assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'and it does not move for a reader who asked for less');
   assert.ok(css.includes('.board-empty-hint.is-pulsing { animation: none; }'), 'the reduced-motion answer is to hold still');
 
+  // The frame refuses the pointer so a pan can start on its rails, and a child inherits that refusal - so the
+  // marker pulses, looks pressable and swallows nothing: the click lands on the board behind it. It has to ask
+  // for the pointer back by name, exactly as the two plates do.
+  assert.ok(/\.board-frame \{[^}]*pointer-events: none/.test(css), 'the frame still refuses the pointer');
+  const hintRule = css.slice(css.indexOf('.board-empty-hint {'), css.indexOf('.board-empty-hint[hidden]'));
+  assert.ok(hintRule.includes('pointer-events: auto'),
+    'the clue takes the pointer back, or pressing it does nothing at all');
+
   // The press does what the clue promises, and the clue is a standing invitation rather than a one-shot: it comes
   // back when the reader closes the chooser without picking a board, because the empty board is where they land.
   const wiring = script.slice(script.indexOf("elements.boardEmptyHint.addEventListener('click'"));

@@ -1023,6 +1023,9 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
   top: calc(50% - 96px);
   left: 50%;
   z-index: 6;
+  /* The frame refuses the pointer so its rails do not swallow a pan, and a child inherits that refusal:
+     without this line the marker pulses, cannot be pressed, and the click lands on the board behind it. */
+  pointer-events: auto;
   display: grid;
   place-items: center;
   width: 56px;
