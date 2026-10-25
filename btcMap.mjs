@@ -471,12 +471,12 @@ async function syncMapMode() {
     return;
   }
   setPlaceLayersVisible(true);
-  if (placeCache.size) {
+  if (visibleCachedPlaceCount()) {
     heatMode = false;
     setHeatLayersVisible(false);
   }
   await loadViewportPlaces({allowDuringHeat:true});
-  if (placeCache.size || !pendingViewportCoverage) {
+  if (visibleCachedPlaceCount()) {
     heatMode = false;
     setHeatLayersVisible(false);
   }
@@ -551,6 +551,17 @@ function cachePlaces(places) {
   map.getSource('btc-places').setData(placeCollection([...placeCache.values()]));
 }
 
+function visibleCachedPlaceCount() {
+  const bounds = map.getBounds();
+  let count = 0;
+  for (const place of placeCache.values()) {
+    const lat = Number(place?.lat);
+    const lon = Number(place?.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon) && bounds.contains([lon, lat])) count += 1;
+  }
+  return count;
+}
+
 async function loadViewportPlaces({allowDuringHeat = false} = {}) {
   if (!sourceReady()) return;
   if (heatMode && !allowDuringHeat) return;
@@ -589,7 +600,7 @@ async function loadViewportPlaces({allowDuringHeat = false} = {}) {
     } else if (count) {
       setStatus(`${count.toLocaleString()} Bitcoin place${count === 1 ? '' : 's'} loaded nearby. Zoom out slightly to see them.`, 4200);
     } else setStatus('No mapped Bitcoin places in this area.', 4200);
-    if (map.getZoom() >= MARKER_ZOOM) {
+    if (map.getZoom() >= MARKER_ZOOM && visibleCachedPlaceCount()) {
       setPlaceLayersVisible(true);
       heatMode = false;
       setHeatLayersVisible(false);
@@ -919,10 +930,11 @@ map.on('moveend', () => {
 });
 map.on('move', () => {
   const zoom = map.getZoom();
-  if (heatMode && zoom >= HEAT_MIN_ZOOM && (zoom < MARKER_ZOOM || !placeCache.size)) scheduleHeatOverlay();
+  const visiblePins = zoom >= MARKER_ZOOM && visibleCachedPlaceCount() > 0;
+  if (heatMode && zoom >= HEAT_MIN_ZOOM && !visiblePins) scheduleHeatOverlay();
   if (zoom >= MARKER_ZOOM) {
     setPlaceLayersVisible(true);
-    if (placeCache.size) hideHeatOverlay(true);
+    if (visiblePins) hideHeatOverlay(true);
   }
 });
 map.on('click', event => {

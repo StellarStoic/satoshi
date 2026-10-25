@@ -183,7 +183,10 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /'icon-allow-overlap':true/);
   assert.match(page, /'icon-ignore-placement':true/);
   assert.match(page, /loadViewportPlaces\(\{allowDuringHeat:true\}\)/);
-  assert.match(page, /placeCache\.size \|\| !pendingViewportCoverage/);
+  assert.match(page, /function visibleCachedPlaceCount\(\)/);
+  assert.match(page, /if \(visibleCachedPlaceCount\(\)\) \{/);
+  assert.match(page, /map\.getZoom\(\) >= MARKER_ZOOM && visibleCachedPlaceCount\(\)/);
+  assert.doesNotMatch(page, /placeCache\.size \|\| !pendingViewportCoverage/);
   assert.match(page, /Bitcoin place\$\{visibleCount === 1 \? '' : 's'\} visible in this view/);
   assert.match(page, /loaded nearby\. Zoom out slightly to see them/);
   assert.match(page, /focusSearchResults\(results\)/);
