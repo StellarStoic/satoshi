@@ -16,6 +16,7 @@ import {
   placePaymentMethods,
   safeHttpUrl,
   verificationLabel,
+  viewportCoverageContains,
   viewportRadiusKm,
 } from './btcMapModel.mjs';
 import {
@@ -37,7 +38,9 @@ const VIEW_KEY = 'satoshi:btc-map:view:v1';
 const TOKEN_KEY = 'satoshi:btc-map:token:v1';
 const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
 const HEAT_MIN_ZOOM = 4;
-const MARKER_ZOOM = 9;
+const MARKER_ZOOM = 7;
+const PLACE_CACHE_LIMIT = 6000;
+const PLACE_FETCH_BUFFER = 1.4;
 const elements = {
   form:document.getElementById('btcMapSearch'), query:document.getElementById('btcMapQuery'),
   searchToggle:document.getElementById('btcMapSearchToggle'),
@@ -54,9 +57,12 @@ const elements = {
 };
 
 let requestController = null;
+let viewportController = null;
 let detailController = null;
 let moveTimer = 0;
-let lastViewportRequest = '';
+let viewportCoverage = null;
+let pendingViewportCoverage = null;
+const placeCache = new Map();
 let savedPlaceIds = new Set();
 let savedPlaces = [];
 let currentPlace = null;
@@ -470,8 +476,8 @@ async function syncMapMode() {
   await loadViewportPlaces();
 }
 
-function installPlaceLayers() {
-  map.addSource('btc-places', {type:'geojson', data:EMPTY_COLLECTION, cluster:true, clusterRadius:48, clusterMaxZoom:15});
+async function installPlaceLayers() {
+  map.addSource('btc-places', {type:'geojson', data:EMPTY_COLLECTION, cluster:true, clusterRadius:48, clusterMaxZoom:11});
   map.addLayer({
     id:'place-clusters', type:'circle', source:'btc-places', filter:['has','point_count'],
     paint:{
@@ -484,7 +490,25 @@ function installPlaceLayers() {
     layout:{'text-field':['get','point_count_abbreviated'],'text-size':11},
     paint:{'text-color':'#17140d'},
   });
-  map.addLayer({
+  let customMarker = false;
+  try {
+    const markerImage = await map.loadImage('/img/btc-map-pin.png');
+    if (!map.hasImage('bitcoin-place-pin')) map.addImage('bitcoin-place-pin', markerImage.data, {pixelRatio:8});
+    customMarker = true;
+  } catch (error) {
+    console.warn('BTC Map marker image could not load; using the fallback marker.', error);
+  }
+  map.addLayer(customMarker ? {
+    id:'place-points', type:'symbol', source:'btc-places', filter:['!',['has','point_count']],
+    layout:{
+      'icon-image':'bitcoin-place-pin',
+      'icon-size':['interpolate',['linear'],['zoom'],MARKER_ZOOM,.48,14,.68],
+      'icon-rotate':['get','tilt'],
+      'icon-rotation-alignment':'viewport',
+      'icon-allow-overlap':false,
+      'icon-padding':2,
+    },
+  } : {
     id:'place-points', type:'circle', source:'btc-places', filter:['!',['has','point_count']],
     paint:{
       'circle-color':['case',['==',['get','boosted'],true],'#f2a900','#171919'],
@@ -510,32 +534,50 @@ function installPlaceLayers() {
   });
 }
 
+function cachePlaces(places) {
+  places.forEach(place => {
+    const key = String(place?.id ?? `${place?.lat}:${place?.lon}:${place?.name || ''}`);
+    placeCache.delete(key);
+    placeCache.set(key, place);
+  });
+  while (placeCache.size > PLACE_CACHE_LIMIT) placeCache.delete(placeCache.keys().next().value);
+  map.getSource('btc-places').setData(placeCollection([...placeCache.values()]));
+}
+
 async function loadViewportPlaces() {
   if (!sourceReady()) return;
   if (heatMode) return;
   const zoom = map.getZoom();
   if (zoom < 5) {
-    map.getSource('btc-places').setData(EMPTY_COLLECTION);
-    lastViewportRequest = '';
     setStatus('Zoom closer, search a city, or use your location to load places.');
     return;
   }
   const center = map.getCenter();
   const bounds = map.getBounds();
   const radiusKm = viewportRadiusKm({lat:center.lat,lon:center.lng}, {lat:bounds.getNorth(),lon:bounds.getEast()});
-  const requestKey = `${center.lat.toFixed(3)}:${center.lng.toFixed(3)}:${Math.ceil(radiusKm / 5)}`;
-  if (requestKey === lastViewportRequest) return;
-  lastViewportRequest = requestKey;
-  requestController?.abort();
-  requestController = new AbortController();
+  const requestCenter = {lat:center.lat, lon:center.lng};
+  if (viewportCoverageContains(viewportCoverage, requestCenter, radiusKm)
+      || viewportCoverageContains(pendingViewportCoverage, requestCenter, radiusKm)) return;
+  const fetchRadiusKm = Math.min(300, Math.max(radiusKm + 2, radiusKm * PLACE_FETCH_BUFFER));
+  viewportController?.abort();
+  const controller = new AbortController();
+  viewportController = controller;
+  pendingViewportCoverage = {center:requestCenter, radiusKm:fetchRadiusKm};
   setStatus('Looking for Bitcoin places…');
   try {
-    const places = await getJson(btcMapPlacesUrl({lat:center.lat,lon:center.lng,radiusKm}), requestController);
-    map.getSource('btc-places').setData(placeCollection(Array.isArray(places) ? places : []));
+    const places = await getJson(btcMapPlacesUrl({lat:center.lat,lon:center.lng,radiusKm:fetchRadiusKm}), controller);
+    if (controller.signal.aborted) return;
+    cachePlaces(Array.isArray(places) ? places : []);
+    viewportCoverage = pendingViewportCoverage;
     const count = Array.isArray(places) ? places.length : 0;
     setStatus(count ? `${count.toLocaleString()} Bitcoin place${count === 1 ? '' : 's'} in this area.` : 'No mapped Bitcoin places in this area.', 4200);
   } catch (error) {
     if (error.name !== 'AbortError') setStatus('BTC Map could not be reached. Move the map or try again shortly.');
+  } finally {
+    if (viewportController === controller) {
+      viewportController = null;
+      pendingViewportCoverage = null;
+    }
   }
 }
 
@@ -842,8 +884,8 @@ elements.locate.addEventListener('click', () => {
   }, () => setStatus('Location was not shared. Search a city instead.'), {enableHighAccuracy:false,timeout:10000,maximumAge:300000});
 });
 
-map.on('load', () => {
-  installPlaceLayers();
+map.on('load', async () => {
+  await installPlaceLayers();
   setPlaceLayersVisible(map.getZoom() >= MARKER_ZOOM);
   syncMapMode();
 });

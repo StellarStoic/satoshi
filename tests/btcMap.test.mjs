@@ -19,6 +19,7 @@ import {
   placePaymentMethods,
   safeHttpUrl,
   verificationLabel,
+  viewportCoverageContains,
   viewportRadiusKm,
 } from '../btcMapModel.mjs';
 
@@ -47,6 +48,13 @@ test('viewport radius is geographic and capped', () => {
   assert.ok(haversineKm({lat:0,lon:0},{lat:0,lon:1}) > 110);
   assert.ok(haversineKm({lat:0,lon:0},{lat:0,lon:1}) < 112);
   assert.equal(viewportRadiusKm({lat:0,lon:0},{lat:50,lon:50}), 300);
+});
+
+test('buffered viewport coverage avoids refetching after small pans', () => {
+  const coverage = {center:{lat:46.05, lon:14.5}, radiusKm:50};
+  assert.equal(viewportCoverageContains(coverage, {lat:46.08, lon:14.55}, 35), true);
+  assert.equal(viewportCoverageContains(coverage, {lat:46.5, lon:15.2}, 35), false);
+  assert.equal(viewportCoverageContains(null, {lat:46.05, lon:14.5}, 1), false);
 });
 
 test('place heat map groups coordinates into closed hexagons', () => {
@@ -82,6 +90,10 @@ test('place collections discard invalid coordinates and keep safe marker data', 
   assert.deepEqual(collection.features[0].geometry.coordinates, [14,46]);
   assert.equal(collection.features[0].properties.name, 'Sats Cafe');
   assert.equal(collection.features[0].properties.boosted, true);
+  assert.ok(collection.features[0].properties.tilt >= -20 && collection.features[0].properties.tilt <= 20);
+  assert.equal(collection.features[0].properties.tilt,
+    placeCollection([{id:7,lat:46,lon:14}]).features[0].properties.tilt,
+    'the same place keeps the same marker tilt');
 });
 
 test('labels and outbound URLs fail safely', () => {
@@ -110,7 +122,7 @@ test('place details explain what a visitor can buy and how bitcoin is accepted',
 });
 
 test('BTC Map page is integrated with navigation, help, PWA and page context', async () => {
-  const [html, css, page, pwa, help, context, seo, worker, sitemap] = await Promise.all([
+  const [html, css, page, pwa, help, context, seo, worker, sitemap, marker] = await Promise.all([
     readFile(new URL('../btcMap.html', import.meta.url), 'utf8'),
     readFile(new URL('../btcMap.css', import.meta.url), 'utf8'),
     readFile(new URL('../btcMap.mjs', import.meta.url), 'utf8'),
@@ -120,6 +132,7 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
     readFile(new URL('../seo.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../sw.js', import.meta.url), 'utf8'),
     readFile(new URL('../sitemap.xml', import.meta.url), 'utf8'),
+    readFile(new URL('../img/btc-map-pin.png', import.meta.url)),
   ]);
   assert.match(html, /id="toggle"/);
   assert.match(html, /<nav id="menu"[^>]*><ul><\/ul><\/nav>/);
@@ -157,11 +170,16 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /map\.on\('move',/);
   assert.doesNotMatch(page, /map\.on\('mousemove'/);
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
-  assert.match(page, /const MARKER_ZOOM = 9/);
+  assert.match(page, /const MARKER_ZOOM = 7/);
   assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
   assert.match(page, /Zoom in to see Bitcoin place density/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);
   assert.match(page, /setTimeout\(syncMapMode, 180\)/);
+  assert.match(page, /PLACE_FETCH_BUFFER = 1\.4/);
+  assert.match(page, /viewportCoverageContains\(viewportCoverage/);
+  assert.match(page, /cachePlaces\(Array\.isArray\(places\)/);
+  assert.match(page, /loadImage\('\/img\/btc-map-pin\.png'\)/);
+  assert.match(page, /'icon-rotate':\['get','tilt'\]/);
   assert.match(page, /focusSearchResults\(results\)/);
   assert.match(page, /document\.addEventListener\('pointerdown'/);
   assert.match(page, /!path\.includes\(elements\.results\)/);
@@ -180,5 +198,7 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(context, /### Page: \[BTC Map\]/);
   assert.match(seo, /'\/btcMap\.html'/);
   assert.match(worker, /'\/btcMap\.html', '\/btcMap\.css', '\/btcMap\.mjs', '\/btcMapModel\.mjs'/);
+  assert.match(worker, /'\/img\/btc-map-pin\.png'/);
+  assert.equal(marker.subarray(1, 4).toString(), 'PNG');
   assert.match(sitemap, /https:\/\/satoshi\.si\/btcMap\.html/);
 });

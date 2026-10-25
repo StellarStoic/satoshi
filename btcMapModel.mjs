@@ -181,10 +181,17 @@ export function viewportRadiusKm(center, northEast) {
   return Math.max(1, Math.min(300, haversineKm(center, northEast)));
 }
 
+export function viewportCoverageContains(coverage, center, radiusKm) {
+  if (!coverage) return false;
+  return haversineKm(coverage.center, center) + Number(radiusKm) <= Number(coverage.radiusKm);
+}
+
 export function placeFeature(place = {}) {
   const lat = Number(place.lat);
   const lon = Number(place.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const markerKey = String(place.id ?? `${lat}:${lon}`);
+  const markerHash = [...markerKey].reduce((hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0, 7);
   return {
     type:'Feature',
     geometry:{type:'Point', coordinates:[lon, lat]},
@@ -195,6 +202,7 @@ export function placeFeature(place = {}) {
       address:String(place.address || ''),
       verifiedAt:String(place.verified_at || ''),
       boosted:Boolean(place.boosted_until && Date.parse(place.boosted_until) > Date.now()),
+      tilt:(markerHash % 41) - 20,
     },
   };
 }
