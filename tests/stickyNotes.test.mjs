@@ -184,7 +184,7 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(STICKY_SUB_YEAR_SATS, 411);
   assert.equal(STICKY_SUB_MEMBER_WEEK_SATS, 5);
   assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, 205);
-  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 69);
+  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 10);
 
   assert.equal(stickySubscriptionPrice('week'), 10);
   assert.equal(stickySubscriptionPrice('week', {member: true}), 5);
@@ -221,7 +221,10 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(stickyOrderPrice({sats: 205}), 205);
   assert.equal(stickyOrderPrice({sats: 7}), 7, 'the 25% tier\u2019s weekly price is a price we quote');
   assert.equal(stickyOrderPrice({sats: 308}), 308, 'and so is its yearly one');
-  assert.equal(stickyOrderPrice({sats: 69}), 69);
+  assert.equal(stickyOrderPrice({sats: STICKY_ANONYMOUS_PRICE_SATS}), STICKY_ANONYMOUS_PRICE_SATS,
+    'the anonymous price is quotable, whatever it is set to');
+  assert.equal(stickyOrderPrice({sats: 69}), STICKY_SUB_WEEK_SATS,
+    'and the price it replaced is retired: 69 is no longer a figure this board will show');
   assert.equal(stickyOrderPrice({sats: 42}), STICKY_SUB_WEEK_SATS, 'a retired removal price is not displayed');
   assert.equal(stickyOrderPrice({sats: 11}), STICKY_SUB_WEEK_SATS, 'the retired per-note price is not shown');
   assert.equal(stickyOrderPrice({sats: 10.5}), STICKY_SUB_WEEK_SATS);
@@ -270,10 +273,23 @@ test('the composer says what posting costs, and what a subscription changes', ()
   assert.equal(on.label, 'Place your note');
   assert.match(on.state, /Subscription active until 2027-01-15/);
 
+  // A reader with no subscription but with a name is told the note is free, and told how that is
+  // decided: the site asks their domain, so the promise is the check rather than the outcome.
+  const named = describeStickyAction({subscription: {active: false, prices: {}}, nip05: 'd@example.com'});
+  assert.equal(named.price, 0, 'a name is the free door');
+  assert.equal(named.needsSubscription, false, 'and it is not a subscription being sold');
+  assert.equal(named.label, 'Place your note');
+  assert.match(named.state, /d@example\.com makes this note free/);
+  assert.match(named.state, /asks your domain when you place it/);
+  assert.equal(describeStickyAction({nip05: '  '}).price !== 0, true, 'an empty name is no door at all');
+  const subscriberWithName = describeStickyAction({subscription: covered, nip05: 'd@example.com'});
+  assert.match(subscriberWithName.state, /Subscription active until 2027-01-15/,
+    'a paid subscription is still the better thing to show a subscriber');
+
   const anon = describeStickyAction({anonymous: true, subscription: covered});
   assert.equal(anon.needsSubscription, false);
-  assert.equal(anon.price, 69, 'an anonymous note is priced even while a subscription runs');
-  assert.equal(anon.label, 'Post anonymously · 69 sats');
+  assert.equal(anon.price, 10, 'an anonymous note is priced even while a subscription runs');
+  assert.equal(anon.label, 'Post anonymously · 10 sats');
   assert.match(anon.state, /One key can post one note/);
   assert.match(anon.state, /cannot buy a weekly or yearly subscription/);
 
@@ -936,7 +952,7 @@ test('anonymous posting and signed-in profile details are present', async () => 
     readFile(new URL('../nostrSession.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
-  assert.match(html, /Post anonymously · 69 sats/);
+  assert.match(html, /Post anonymously · 10 sats/);
   assert.ok(html.indexOf('class="private-key-login"') < html.indexOf('data-login="anonymous"'),
     'anonymous posting belongs below private-key login');
   assert.ok(html.indexOf('class="login-status-divider"') < html.indexOf('id="loginStatus"'),

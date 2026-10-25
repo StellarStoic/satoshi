@@ -35,7 +35,12 @@ test('the agent contract describes the board the code implements', async () => {
 
   // The wire facts: where the desk is, what it costs, how hard the mining is, what the tags are.
   assert.match(agents, /https:\/\/pay\.satoshi\.si\/pinstr\/v1/, 'the API base is named');
-  assert.match(agents, /69/, 'the anonymous price is named');
+  assert.match(agents, /One anonymous note \(temporary 24-hour identity\) \| 10/,
+    'the anonymous price is named, at the figure the desk charges');
+  // The two facts an agent must not have to infer: it pays, and it says so.
+  assert.match(agents, /"agent": true/, 'the contract shows the marker on the order it sends');
+  assert.match(agents, /an order marked `agent: true` is charged `agentSats` \(10\)/i,
+    'and says what the marker costs, in the same breath');
   assert.match(agents, /29 leading zero bits/, 'the difficulty is named');
   for (const tag of ['["t","pinstr"]', '["expiration"', '["g",', '["i",', '["k","geo"]',
     '["client","satoshi.si"]', '["anonymous","24h-local-key"]', '["sticky"', '["nonce"']) {
@@ -127,7 +132,10 @@ test('the MCP server is named where an agent looks, and its tools are the ones t
   assert.match(agents, /never hold|hold no|hold your key/i, 'the desk still holds nothing');
   const llmsLine = read('llms.txt');
   assert.match(llmsLine, /ln\.bot\/guides\/ai-agent-payments/);
-  assert.match(llmsLine, /69 sats/);
+  assert.match(llmsLine, /one note from an agent is 10 sats/,
+    'the line an agent reads first names the price it will be charged');
+  assert.match(llmsLine, /free for a person whose own NIP-05 name answers for their key/,
+    'and the door it must not use, so the rule is read rather than discovered');
   // the config an agent reads first carries the same answer
   const desk = await readFile(new URL('/opt/data/satoshi-nip05/src/server.mjs', import.meta.url), 'utf8');
   assert.match(desk, /wallet: \{/, 'the desk config names a wallet block');

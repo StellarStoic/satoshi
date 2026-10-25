@@ -58,12 +58,13 @@ import {
   ANON_TAG_VALUE, EXPIRATION_TAG, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS,
   STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS,
   ANON_KEY_USED, ANON_NO_SUBSCRIPTION, STRANGER_REASON, memberName,
-  anonymousPinGate,
+  anonymousPinGate, powNameClaim,
   memberTierTable, hasNothingToPay, POW_BITS, POW_TAG, paymentBadge, PAYMENT_TAG, PAYMENT_BADGES,
 } from './sticky.mjs';
 import { fetchEventById, publishEvent } from './relay.mjs';
 import { pubkeyPresence } from './presence.mjs';
-import {boardCardPage, boardCardBytes, boardCellsFromPath} from './boardCard.mjs';
+import { verifyNip05Name, createNip05Cache } from './nip05.mjs';
+import {boardCardPage, boardCardBytes, boardCellsFromPath, boardIndex} from './boardCard.mjs';
 import {
   IMAGE_GRADE_IDS, isImageGrade, readCappedBody, storeImage,
   sweepImages, imagePath, imageReferrerExpiry, IMAGE_SWEEP_INTERVAL_MS,
@@ -88,6 +89,11 @@ const STICKY_WORKER_MAX_WAIT_MS = Number(process.env.STICKY_WORKER_MAX_WAIT_MS |
 const ORDERS_FILE = `${STATE_DIR}/orders.json`;
 
 // TON rail pricing for Pinstr. Fixed ladder, fee on top, order id as the transfer comment.
+
+// The free door's memory: one answer per NIP-05 name, for an hour, and a ceiling on how many
+// lookups may be in flight so a slow domain cannot hold the desk open. See nip05.mjs.
+const NIP05_CACHE = createNip05Cache();
+const NIP05_INFLIGHT = { count: 0 };
 
 const NAMES_FILE = `${STATE_DIR}/names.json`;
 // Names this desk minted itself (Telegram identities). Kept apart from names.json, which the
@@ -151,6 +157,12 @@ const BOARD_CARD_SITE_URL = (process.env.PINSTR_CARD_SITE_URL || BOARD_CARD_BASE
 // The service may write only inside its own state directory (ProtectSystem=strict), so a picture
 // it is to keep has to live there rather than under /var/cache.
 const BOARD_CARD_CACHE_DIR = process.env.PINSTR_CARD_CACHE || '/var/lib/satoshi-nip05/cards';
+// The board index feeds pinstr.si's sitemap-boards.xml: a board is a real page (it canonicalises
+// itself and has its own picture), but nothing else would ever tell a crawler it exists. Only boards
+// carrying a live pin inside the window are listed — an expired board is an empty page and has no
+// business in a sitemap — and the list is capped so one busy month cannot publish an enormous file.
+const BOARD_INDEX_WINDOW_SECONDS = Number(process.env.PINSTR_BOARD_INDEX_WINDOW || 30 * 24 * 60 * 60);
+const BOARD_INDEX_LIMIT = Number(process.env.PINSTR_BOARD_INDEX_LIMIT || 500);
 // The pictures pinned to notes. They live in the state directory too, for the same reason:
 // ProtectSystem=strict leaves the service one writable place, and a picture the board has
 // to go and fetch is a picture the service has to be able to keep.
@@ -471,6 +483,20 @@ const handleRequest = async (req, res) => {
   const now = nowS();
 
   try {
+    // The boards that carry a live pin, newest first. pinstr.si turns this into sitemap-boards.xml,
+    // so the board pages - the only original content on the site - are discoverable at all. Read
+    // only: no request header is trusted, and boardIndex re-validates every cell on the way out.
+    if (path === '/pinstr/v1/board-index') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return send(res, 405, {ok: false, error: 'method not allowed'}, {allow: 'GET, HEAD'});
+      }
+      const boards = boardIndex(loadSticky(now), now, {
+        windowSeconds: BOARD_INDEX_WINDOW_SECONDS,
+        limit: BOARD_INDEX_LIMIT,
+      });
+      return send(res, 200, {ok: true, boards}, {'cache-control': 'public, max-age=300'});
+    }
+
     // A shared board link. The page carries the board's picture so a chat can unfurl the board
     // itself, and the picture is a render of the board's own page (see boardCard.mjs). Both are
     // reads of one board's address: nothing here writes, and nothing here trusts a request header.
@@ -740,6 +766,57 @@ const handleRequest = async (req, res) => {
         ok: true,
         anonymousSats: STICKY_ANON_SATS,
 
+        // Who pays, and who does not. A note is free when the writer's own NIP-05 name answers for
+        // their key — asked of that domain at order time, never taken on the client's word. A client
+        // that says it is a program pays per note whatever name it carries, because the door is for
+        // a person who holds a key, not for something that mints one per note. The MCP server marks
+        // its own orders, so automation pays by its own statement rather than by being guessed at.
+        freeWithNip05: true,
+        nip05Free: 'send nip05: "name@domain" with a pin order: when that domain\u2019s '
+          + '/.well-known/nostr.json names your pubkey, the note costs nothing',
+        agentSats: STICKY_ANON_SATS,
+        agentPays: 'send agent: true and the note is charged at agentSats whatever name you carry',
+
+        // A machine that arrives here should not have to guess where the instructions are, nor
+        // learn the order of the calls by trying them. Everything an autonomous writer needs to find
+        // is named in one object: the contract, this desk as OpenAPI, the five steps, the relay a
+        // published note lands on, and the rule that cannot be broken — the note must be signed by
+        // the key the order was bought for, with a key the writer generated itself.
+        agent: {
+          docs: `${BOARD_CARD_BASE_URL}/AGENTS.md`,
+          spec: `${BOARD_CARD_BASE_URL}/pinstr-api.json`,
+          llms: `${BOARD_CARD_BASE_URL}/llms.txt`,
+          // A host that speaks MCP can call the same desk as tools; this server holds no key and no
+          // wallet, so the address is public.
+          mcp: `${BOARD_CARD_BASE_URL}/mcp`,
+          humanDocs: `${BOARD_CARD_BASE_URL}/about.html`,
+          flow: [
+            'generate your own Nostr key: the pubkey is the identity, nothing is registered',
+            'POST /pinstr/v1/orders with action=pin, the pubkey, contentHash, geohash or geohashes, and either anonymous or pow',
+            'pay order.payment.bolt11 — or, when the order was sold for work, mine the event id to the bits below',
+            'GET /pinstr/v1/orders/{id} until publishToken is there; it is good for 15 minutes and one publish',
+            'POST /pinstr/v1/orders/{id}/publish with {"event": <the signed note>} and the token as a bearer',
+          ],
+          relays: ['wss://nostr.satoshi.si'],
+          signWith: 'a key you generate and keep; a note signed by any other key is refused',
+          cors: 'open to the board\'s own two origins only; a server-side agent is unaffected',
+          wrongNoteCosts: 'a refused event is not refunded, so build and check the note before paying for it',
+          // Money for a machine. Bitcoin over Lightning is the one rail an agent can use on its own:
+          // no account to register, no card, no billing agreement, nobody to ask, and an invoice
+          // settles in about a second. This desk never sees the wallet, only whether the invoice paid.
+          wallet: {
+            why: 'bitcoin over lightning: no signup, no card, no permission, settles in about a second',
+            ifYouHaveNone: 'a wallet your host already exposes as a tool, or one you can import as an '
+              + 'SDK; ln.bot documents both, MCP and Python/TypeScript '
+              + '(https://ln.bot/guides/ai-agent-payments)',
+            fundedBy: 'create an invoice and ask the human who runs you to pay it; one note is '
+              + `${STICKY_ANON_SATS} sats and a year of pins is ${SUB_YEAR_SATS}, so ask for a round `
+              + 'amount and keep the change',
+            withoutOne: 'mine the note instead: proof of work costs no sats at all',
+            neverHeld: 'this desk keeps no key and no wallet; it only checks whether an invoice settled',
+          },
+        },
+
         // Posting one note can also be paid for with work instead of sats, by any key
         // claiming a NIP-05 name of its own. The difficulty is published here so the
         // board offers exactly the number of bits this desk will check, and so a board
@@ -776,7 +853,7 @@ const handleRequest = async (req, res) => {
           yearDiscount: SUB_YEAR_DISCOUNT,
           plans: SUB_PLANS,
           covers: 'every pin while it lasts',
-          anonymous: 'not eligible — an anonymous identity pays per note: 69 sats to pin one',
+          anonymous: `not eligible — an anonymous identity pays per note: ${STICKY_ANON_SATS} sats to pin one`,
         },
         geohash: {
           requiredForPin: true,
@@ -871,7 +948,7 @@ const handleRequest = async (req, res) => {
           anonymousSats: STICKY_ANON_SATS,
           weeksPerYear: SUB_WEEKS_PER_YEAR,
           yearDiscount: SUB_YEAR_DISCOUNT,
-          // A stranger has no plan to buy: what it can do is pin one note for 69 sats.
+          // A stranger has no plan to buy: what it can do is pin one note, at the anonymous price.
           plans: stranger ? [] : SUB_PLANS,
           member: week.ok ? Boolean(week.discount?.applied) : false,
           memberName: week.ok ? (week.discount?.name ?? null) : null,
@@ -924,13 +1001,33 @@ const handleRequest = async (req, res) => {
       // A key the big relays have never seen is a one-time key, whatever the client
       // calls it — so it is marked anonymous *before* the order is priced, and the
       // gates that already exist for the keys this board mints itself do the rest:
-      // 69 sats for one note, no plan, no second note, no mining discount.
+      // the anonymous price for one note, no plan, no second note, no mining discount.
       const stranger = await isStrangerKey(String((body && body.pubkey) || '').toLowerCase(), names);
       if (stranger && body && typeof body === 'object') body.anonymous = true;
+      // The free door, and the one place a stranger's address is fetched on request. Asked only
+      // when the client offers a name, never for a program (an agent pays whatever name it
+      // carries), and never for a key this board minted itself — that key was made a minute ago
+      // and no domain can be answering for it. The answer is a price, so a failure to answer is
+      // simply the paid price rather than an error: nobody is refused for their domain being down.
+      let nip05Verified = false;
+      if (body && typeof body === 'object' && body.action === 'pin' && body.agent !== true
+        && body.anonymous !== true && body.nip05 !== undefined && body.nip05 !== null) {
+        const claim = powNameClaim(body.nip05);
+        if (claim) {
+          const check = await verifyNip05Name(claim, String(body.pubkey || '').toLowerCase(),
+            { cache: NIP05_CACHE, now, inflight: NIP05_INFLIGHT });
+          nip05Verified = check.ok === true;
+          console.log(JSON.stringify({
+            event: 'pinstr_nip05_check', name: claim, pubkey: String(body.pubkey || '').toLowerCase(),
+            verified: nip05Verified, cached: check.cached === true, reason: check.reason || null,
+          }));
+        }
+      }
       const created = createStickyOrder(body, {
         now,
         names,
         subscriptions: loadSubscriptions(),
+        nip05Verified,
       });
       if (!created.ok) {
         // 402 for "you need a subscription to post as a registered user": the

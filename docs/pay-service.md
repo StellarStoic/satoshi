@@ -36,7 +36,7 @@ place: the page should read it from a single constant.
 
 Pinstr publishes a temporary public Nostr event pinned to one geohash cell or a connected
 clump of cells. A named Nostr identity posts through a time-limited subscription. A
-browser-generated anonymous key cannot subscribe, pays **69 sats**, and may pin exactly
+browser-generated anonymous key cannot subscribe, pays **10 sats**, and may pin exactly
 one note. Its local 24-hour limit exists only to finish publishing that note. Paid orders
 are payable over Ark and Lightning.
 
@@ -50,7 +50,7 @@ releasing the matching frontend. No previous topic marker is accepted or queried
 | ------------------ | -------------------- | --------------------------- | ------------------ |
 | one-week subscription | 10 sats          | 5 / 7 / 0 sats by name length | unavailable      |
 | one-year subscription | 411 sats         | 205 / 308 / 0 sats by name length | unavailable  |
-| pin                            | included while subscribed | included while subscribed | 69 sats |
+| pin                            | included while subscribed | included while subscribed | 10 sats |
 
 The yearly price is 52 weekly periods less 21%, rounded to a whole satoshi. Prices and
 membership eligibility are fixed server-side. The desk checks its authoritative NIP-05
@@ -110,7 +110,7 @@ subscribe ─► awaiting_invoice ─► awaiting_payment ─► paid ─► sub
                                                                   │
 pin with active subscription ─► paid at 0 sats ───────────────────┴─► published
 
-anonymous one-note pin (69 sats) ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
+anonymous one-note pin (10 sats) ─► awaiting_invoice ─► awaiting_payment ─► paid ─► published
 ```
 
 For a subscription or paid anonymous order, `paid` means BTCPay reports the invoice
@@ -155,10 +155,10 @@ clump: every cell cut to the **same depth**, each cell listed **once**, no more 
 clump is one connected piece. Any violation is `bad_geohash`, before anything is priced.
 The first cell is the *primary*: the one the note is written on, and the one the `["i"]`
 tag names. A clump remains one note: an active subscription includes it, while an
-anonymous identity pays the same 69 sats whether that note covers one or several cells.
+anonymous identity pays the same 10 sats whether that note covers one or several cells.
 
 `geohashMode` is required for a pin and is exactly `prefix` or `exact`. `anonymous: true`
-is optional and valid only for `pin`; it selects the fixed 69-sat path. A named pin
+is optional and valid only for `pin`; it selects the fixed 10-sat path. A named pin
 without an active subscription is refused with `402 subscription_required`, after
 which the client may buy a subscription and retry the same action. The created pin order
 binds every cell of the clump, geohash mode and identity mode alongside the pubkey and
@@ -193,7 +193,7 @@ weekly or yearly subscription.
 The response above is a pin covered by an active subscription. It must return the publish
 token in the creation response because there is nothing to poll or settle. Subscription
 orders use 10, 411, 5, 205, 7 or 308 sats by tier, and a three-character name's plan is 0
-sats with `freeTier: true`; an anonymous pin uses 69 sats. Those paid orders
+sats with `freeTier: true`; an anonymous pin uses 10 sats. Those paid orders
 keep the existing `awaiting_invoice` / `awaiting_payment` shape and payment rails. A paid
 subscription activates the pass but has no Nostr event and therefore no publish token.
 
@@ -397,7 +397,7 @@ is charged per mention.
   21%), **5 / 205** with a satoshi.si NIP-05 name — and while it runs, every pin is
   included, so a covered note is created already settled at 0 sats. A registered key with no
   subscription gets `subscription_required` (402). A temporary anonymous identity cannot
-  subscribe, pays **69 sats**, and may pin one note with that key.
+  subscribe, pays **10 sats**, and may pin one note with that key.
 * Free orders never create a BTCPay invoice or enter the invoice worker queue. The service
   marks them paid and returns their short-lived publish token directly.
 * Paid rails: **Ark and Lightning**. The invoice requests `BARK` and `BTC-LN`; on-chain is
@@ -612,7 +612,7 @@ Two facts make it safe to accept from a key this desk has never seen:
   no tag is refused (`bad_pow`).
 
 A throwaway anonymous identity is **not** offered this route, and the desk refuses it
-(`anonymous_no_pow`): that tier's price is 69 sats per note, which is the whole point of it.
+(`anonymous_no_pow`): that tier's price is 10 sats per note, which is the whole point of it.
 Nothing is unverifiable about the work. The NIP-05 *claim* is a different matter — a desk
 cannot resolve a name on somebody else's domain without fetching an address a stranger chose,
 so the claim is recorded on the order (`powName`) and the work is what decides the note. The

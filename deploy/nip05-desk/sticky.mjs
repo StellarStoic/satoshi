@@ -26,11 +26,14 @@ import { verifyEvent, npubEncode, mentionTokens } from './nostr.mjs';
 // The one exception is a 24-hour anonymous identity, which pays per message and
 // can never subscribe. See the SUB_* block below for the subscription prices.
 // A note published from a throwaway 24-hour identity is priced on its own:
-// 69 sats flat, and never discounted. An anonymous identity cannot hold a
-// satoshi.si NIP-05 name, so it can never be a member — the flat price is
-// the whole point of the tier, not a discount waiting to be applied.
-// It gets one note, and only one; there is no second price for it.
-export const STICKY_ANON_SATS = 69;
+// 10 sats flat, and never discounted. An anonymous identity cannot hold a
+// NIP-05 name, so it can never be a member — the flat price is the whole point
+// of the tier, not a discount waiting to be applied. It gets one note, and only
+// one; there is no second price for it.
+// The figure is deliberately the price of a week: posting one note without an
+// identity costs what belonging costs, which is the trade the tier is offering —
+// put a name on your key and it is free, or pay for one note here.
+export const STICKY_ANON_SATS = 10;
 /** Removing the one note an anonymous key posted, priced apart from posting it. */
 export const ANON_REASON = 'anonymous 24-hour identity — no NIP-05 discount';
 /** A second note from the same throwaway key: it has spent its one note. */
@@ -89,6 +92,23 @@ export const POW_BITS = 29;
 export const POW_NAME_MAX = 128;
 /** One note paid for by work rather than money. */
 export const POW_REASON = 'paid for with NIP-13 proof of work';
+/**
+ * Why a note costs nothing: the writer's own NIP-05 name answers for their key.
+ *
+ * A name on any domain, not only this service's: a NIP-05 is a promise a domain makes about a
+ * pubkey, and a domain that keeps it is as good a floor as this one. The verification itself is a
+ * network question and lives in nip05.mjs; this module is told the answer.
+ */
+export const NIP05_REASON = 'free — a NIP-05 name that answers for this key';
+/**
+ * Why an agent pays even when it carries a name.
+ *
+ * The free door is for a person: a key somebody holds, with a name on a domain they run or are
+ * known on. A program that can mint a key per note and point it at a name it just published is not
+ * the thing that door is for, so a client that says it is an agent says it pays per note — and the
+ * MCP server says so on every order it places.
+ */
+export const AGENT_PIN_REASON = 'agents pay per note, name or no name';
 /** A throwaway identity may not mine its way in either: it pays per note. */
 export const ANON_NO_POW = 'anonymous_no_pow';
 /** The tag a note uses to say how it was paid for, and the words allowed in it. */
@@ -220,6 +240,11 @@ export const BAD_GEOHASH_MODE = 'bad_geohash_mode';
 export const GEOHASH_DEPTH_ERROR = 'geohashMode must be a depth from 0 to 6, as digits'
   + ' — or the words "exact" (0) and "prefix" (6)';
 export const CLIENT_TAG = 'client';            // ["client", "satoshi.si"]
+// An agent may declare itself. ["agent", "pinstr-mcp/1.0"] is optional, at most one, and shaped
+// like a client name — a label, not a paragraph. It is a declaration and nothing more: the desk
+// cannot verify who typed the words, so the board draws it as the writer's own claim.
+export const AGENT_TAG = 'agent';
+export const AGENT_LABEL_RE = /^[a-z0-9][a-z0-9._/-]{0,47}$/;
 export const CLIENT_VALUE = 'satoshi.si';
 export const ANON_TAG = 'anonymous';           // ["anonymous", "24h-local-key"]
 export const ANON_TAG_VALUE = '24h-local-key';
@@ -770,7 +795,7 @@ export function validateOrderInput(input) {
           + `(${STICKY_ANON_SATS} sats to pin one). Log in with your own key to subscribe.`,
       };
     }
-    for (const field of ['geohash', 'contentHash', 'anonymous', 'pow', 'powName']) {
+    for (const field of ['geohash', 'contentHash', 'anonymous', 'pow', 'powName', 'nip05', 'agent']) {
       if (input[field] !== undefined) {
         return { ok: false, code: 'bad_subscription', error: `a subscription carries no ${field}` };
       }
@@ -845,6 +870,44 @@ export function validateOrderInput(input) {
           + 'Log in with your own key to mine your note instead.',
       };
     }
+    // The name a writer offers for the free door. Checked for shape here and for truth by the
+    // route, which asks the domain and passes the answer back in as `nip05Verified`: a model that
+    // fetches addresses on request is a model that cannot be reasoned about, so it does not.
+    if (input.nip05 !== undefined && input.nip05 !== null) {
+      const claim = powNameClaim(input.nip05);
+      if (!claim) {
+        return {
+          ok: false,
+          code: 'bad_nip05',
+          error: 'nip05 must be your own NIP-05 name as name@domain — the name a domain publishes '
+            + 'for your pubkey in /.well-known/nostr.json',
+        };
+      }
+      // A throwaway identity has no name to offer: the desk would have to ask a domain about a key
+      // that was minted a minute ago on this board, and the answer could only ever be no. An agent
+      // is the exception: its name has no bearing on its price, so the name is simply not recorded
+      // rather than turning a pin it would have paid for into a refusal.
+      if (out.anonymous && input.agent === true) {
+        out.nip05 = null;
+      } else if (out.anonymous) {
+        return {
+          ok: false,
+          code: 'anon_nip05',
+          error: 'A temporary anonymous identity carries no NIP-05 name. Log in with your own key — '
+            + `if it has a name that answers for it, pinning is free; otherwise a note is ${STICKY_ANON_SATS} sats.`,
+        };
+      }
+      out.nip05 = claim;
+    } else {
+      out.nip05 = null;
+    }
+    // Whether the caller is a program. Not a security boundary — a client that lies about this
+    // takes a door meant for people — but the MCP server sets it on every order it places, so
+    // automation pays by its own statement rather than by being guessed at from its address.
+    if (input.agent !== undefined && typeof input.agent !== 'boolean') {
+      return { ok: false, code: 'bad_agent', error: 'agent must be true or false when it is present' };
+    }
+    out.agent = input.agent === true;
     if (out.pow) {
       const claim = powNameClaim(input.powName);
       if (!claim) {
@@ -897,20 +960,28 @@ export function anonymousPinGate(orders, pubkey) {
  * @param {{now?: number, names?: object|null, subscriptions?: object|null}} options
  *   names and subscriptions are the authoritative records the price is read from.
  */
-export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), names = null, subscriptions = null } = {}) {
+export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), names = null, subscriptions = null,
+  nip05Verified = false } = {}) {
   const validated = validateOrderInput(input);
   if (!validated.ok) return validated;
   const { action, pubkey, contentHash, pictureHash = null, geohash = null, geohashes = null, geohashMode = null,
-          geohashDepth = null, anonymous = false, plan = null, pow = false, powName = null } = validated.order;
+          geohashDepth = null, anonymous = false, plan = null, pow = false, powName = null,
+          nip05 = null, agent = false } = validated.order;
   // Priced here, from the names database and the subscription records, every
   // single time. Whatever the browser was shown (or claims) has no bearing on
   // what it is charged.
   const anonymousPin = action === 'pin' && anonymous === true;
   const powPin = action === 'pin' && pow === true && !anonymousPin;
+  // The free door. `nip05Verified` is the route's answer to "does this name answer for this key",
+  // asked of the domain and cached; here it only decides the price. An agent never walks through
+  // it, whatever name it carries — that is the whole of the difference between a person and a
+  // program, and it is the caller's own statement about itself.
+  const nip05Free = action === 'pin' && !anonymousPin && agent !== true && nip05Verified === true && Boolean(nip05);
   let quote;
   let covered = false;
   let freeTier = false;
   let powFree = false;
+  let nip05Settled = false;
   if (action === 'subscribe') {
     quote = quoteSubscription(pubkey, plan, names);
     if (!quote.ok) return quote;
@@ -923,6 +994,12 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
     // A 24-hour throwaway identity cannot hold a name, so it can never be a
     // member and can never subscribe: it pays per note, flat, and may pin one.
     quote = { sats: STICKY_ANON_SATS, baseSats: STICKY_ANON_SATS, discount: { applied: false, reason: ANON_REASON } };
+  } else if (nip05Free) {
+    // Nothing to pay: the name answered for this key, so the note is settled here and the token is
+    // fresh the moment it is asked for. `baseSats` stays 0 rather than quoting a price it did not
+    // cost, and the reason travels with the order so the board can say why it was free.
+    nip05Settled = true;
+    quote = { sats: 0, baseSats: 0, discount: { applied: true, reason: NIP05_REASON } };
   } else if (hasActiveSubscription(subscriptions, pubkey, now)) {
     // Already paid for: no invoice, and the order is settled here so the note can
     // be published straight away.
@@ -943,6 +1020,14 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
       baseSats: weekly.ok ? weekly.sats : SUB_WEEK_SATS,
       discount: { applied: true, reason: POW_REASON },
     };
+  } else if (agent === true) {
+    // A program with a per-note price, whether or not the big relays know its key. An agent that is
+    // not anonymous in the board's sense still has nobody to bill a week to, and the MCP server says
+    // what it is on every order, so it is priced as one note — the same as a throwaway key. That is
+    // the whole of "an agent pays per note": the free door is a door for a person with a name, and
+    // paying by the note is what a program can do instead. Mining is above this, because work is
+    // work whoever does it.
+    quote = { sats: STICKY_ANON_SATS, baseSats: STICKY_ANON_SATS, discount: { applied: false, reason: AGENT_PIN_REASON } };
   } else {
     return {
       ok: false,
@@ -954,6 +1039,9 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
         + `A key with a NIP-05 name on any domain may instead mine the note: ${POW_BITS} bits of work.`,
     };
   }
+  // Everything that settles an order without an invoice: a paid subscription, a free tier, a mined
+  // note and a verified name. One name for it, so a new door cannot be added and then half-wired.
+  const settledNow = covered || freeTier || powFree || nip05Settled;
   return {
     ok: true,
     order: {
@@ -972,21 +1060,25 @@ export function createStickyOrder(input, { now = Math.floor(Date.now() / 1000), 
       covered,                            // true when a subscription already paid for it
       freeTier,                           // true when the name's tier makes this plan free
       powFree,                            // true when the note is paid for with work, not sats
+      nip05Free: nip05Settled,            // true when the writer's own NIP-05 name paid instead
+      nip05: nip05 ?? null,               // the name offered, verified when nip05Free is true
+      agent: agent === true,              // the caller says it is a program, and pays accordingly
       powBits: powFree ? POW_BITS : null, // the difficulty the note's id must reach
       powName: powFree ? powName : null,  // the NIP-05 name the writer claimed, on any domain
       sats: quote.sats,                   // fixed here, never from the caller
       baseSats: quote.baseSats,
       discount: quote.discount,
-      paymentMethod: covered ? 'subscription' : (powFree ? 'pow' : PAYMENT_METHOD),
-      status: covered || freeTier || powFree ? 'paid' : 'awaiting_invoice',
+      paymentMethod: nip05Settled ? 'nip05' : (covered ? 'subscription' : (powFree ? 'pow' : PAYMENT_METHOD)),
+      status: settledNow ? 'paid' : 'awaiting_invoice',
       invoiceId: null,
-      payment: covered ? { method: 'subscription', sats: 0 } : null,   // {arkAddress, paymentLink}
+      payment: nip05Settled ? { method: 'nip05', sats: 0 }
+        : (covered ? { method: 'subscription', sats: 0 } : null),   // {arkAddress, paymentLink}
       createdAt: now,
       expiresAt: now + ORDER_TTL_SECONDS,
-      paidAt: covered || freeTier || powFree ? now : null,
+      paidAt: settledNow ? now : null,
       // A free plan and a mined note are settled here as well as a covered one: the
       // buyer has already paid, so the token has to be fresh the moment they poll.
-      publishTokenExpiresAt: covered || freeTier || powFree ? now + TOKEN_TTL_SECONDS : null,
+      publishTokenExpiresAt: settledNow ? now + TOKEN_TTL_SECONDS : null,
       publishTokenUsedAt: null,
       publishedEventId: null,
       pinExpiresAt: null,
@@ -1439,6 +1531,19 @@ export function verifyPublishEvent({ order, event, now = Math.floor(Date.now() /
     const client = exactlyOneTag(event, CLIENT_TAG, 1);
     if (!client.ok || client.values[0] !== CLIENT_VALUE) {
       return fail(`a pin must carry exactly one ["${CLIENT_TAG}","${CLIENT_VALUE}"] tag`, 'bad_marker');
+    }
+    // An agent that posts a note may say so, once, with a name short enough to draw. Optional:
+    // a note without the tag is simply a note that said nothing about who wrote it.
+    const agentTags = tagValues(event, AGENT_TAG);
+    if (agentTags.length > 1) {
+      return fail(`a note may carry at most one ["${AGENT_TAG}","<who>"] tag`, 'bad_agent_tag');
+    }
+    if (agentTags.length === 1) {
+      const label = agentTags[0].length === 1 ? String(agentTags[0][0]) : '';
+      if (!AGENT_LABEL_RE.test(label)) {
+        return fail(`the ["${AGENT_TAG}", …] tag must be one lowercase name like `
+          + `"pinstr-mcp/1.0", got ${agentTags[0].length} value(s)`, 'bad_agent_tag');
+      }
     }
     // ["sticky","v1",color,x,y,rotation,font]
     const sticky = exactlyOneTag(event, STICKY_TAG, 6);

@@ -33,7 +33,7 @@
     "commentCarriesOrderId": true
   },
   "price": {
-    "anonymousSats": 69,
+    "anonymousSats": 10,
     "weekSats": 10,
     "yearSats": 411,
     "memberWeekSats": 5,

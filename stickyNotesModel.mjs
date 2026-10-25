@@ -14,7 +14,10 @@ export const STICKY_SUB_MEMBER_YEAR_SATS = 205;
 export const STICKY_SUB_WEEKS_PER_YEAR = 52;
 export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
 export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
-export const STICKY_ANONYMOUS_PRICE_SATS = 69;
+// One note from a key with no name to offer: the same 10 sats a week of posting costs, because the
+// trade the tier offers is exactly that — put a name on your key and it is free, or pay for a note.
+// Agents over MCP are priced here too: a program pays per note whatever name it carries.
+export const STICKY_ANONYMOUS_PRICE_SATS = 10;
 // D's ladder: how short a satoshi.si name is decides how much of a plan it pays.
 // Three characters post free, four pay half, five or more pay three quarters. This
 // is the board's copy of the desk's table, and `deploy/check-frontend-contract.mjs`
@@ -936,7 +939,8 @@ export function anonymousForQuote(session, subscription) {
   return Boolean(subscription && subscription.anonymous === true);
 }
 
-export function describeStickyAction({ anonymous = false, stranger = false, subscription = null, plan = 'week' } = {}) {
+export function describeStickyAction({ anonymous = false, stranger = false, subscription = null, plan = 'week',
+  nip05 = '' } = {}) {
   const prices = subscription?.prices || {};
   const member = Boolean(prices.member);
   // The desk answers with this key's own tier. The board's ladder is only the
@@ -968,6 +972,29 @@ export function describeStickyAction({ anonymous = false, stranger = false, subs
       active: false,
       member: false,
       offPercent: 0,
+      week,
+      year,
+    };
+  }
+
+  // A name that answers for this key is the free door, and it is the only thing a reader with no
+  // subscription needs. The board cannot verify it itself — that is a question for the reader's own
+  // domain, asked by the desk when the note is placed — so the copy promises the check rather than
+  // the result, and the price that comes back with the order is the one that decides.
+  // A subscription is the better thing to show when there is one: it was paid for, and the reader
+  // should see the time it has left rather than a door they no longer need.
+  const name = active ? '' : String(nip05 || '').trim();
+  if (name) {
+    return {
+      label: 'Place your note',
+      state: `${name} makes this note free: the site asks your domain when you place it, and nothing `
+        + 'is charged when the answer names this key.',
+      needsSubscription: false,
+      price: 0,
+      active: false,
+      nip05: name,
+      member,
+      offPercent,
       week,
       year,
     };

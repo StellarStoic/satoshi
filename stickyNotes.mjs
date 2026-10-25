@@ -1924,7 +1924,10 @@ function renderQuotedPrice() {
   const stranger = !anonymousMode && Boolean(subscription && subscription.anonymous === true);
   const anonymous = anonymousMode || stranger;
   const checkingSubscription = Boolean(session && !anonymousMode && !subscriptionResolved);
-  actionInfo = describeStickyAction({anonymous, stranger, subscription, plan: subscribePlan});
+  // The name on the reader's own profile, when it is already in hand: the composer uses it for the
+  // free-door copy only, and the order asks the relays for the name again if it is missing.
+  const profileName = anonymousMode ? '' : String(session?.profile?.nip05 || '').trim();
+  actionInfo = describeStickyAction({anonymous, stranger, subscription, plan: subscribePlan, nip05: profileName});
   // A person who is not signed in sees no price at all: the buttons only mean
   // something once we know which key — and which identity mode — is posting.
   quotedPrice = session && !checkingSubscription ? actionInfo.price : 0;
@@ -4401,7 +4404,10 @@ async function startPayment() {
     // session.profile is only filled when a profile happened to load, which is why a key that
     // does have a name could still be told it had none: the name is looked up on the relays
     // here rather than assumed to be cached.
-    let nip05Name = miningRequested ? await nip05ForMining(session.pubkey) : '';
+    // The writer's own NIP-05 name, if the relays know one. It is used for two things now: the work
+    // route, and the free door — a note is free when the name answers for this key, and the desk
+    // asks the domain. A throwaway key has no name to offer, so it is not even looked up.
+    let nip05Name = session.method === 'anonymous' ? '' : await nip05ForMining(session.pubkey);
     if (miningRequested && !nip05Name) {
       throw new Error('Mining requires a NIP-05 name. Anonymous one-time keys cannot mine. Add a name to your Nostr profile or pay in sats.');
     }
@@ -4412,6 +4418,7 @@ async function startPayment() {
         body: JSON.stringify({pubkey: session.pubkey, action: 'pin', contentHash,
           geohash: activeGeohash, geohashes: [...activeGeohashes],
           ...(pictureHash ? {pictureHash} : {}),
+          ...(nip05Name ? {nip05: nip05Name} : {}),
           ...(miningRequested ? {pow: true, powName: nip05Name} : {}),
           geohashMode: exactGeohash ? 'exact' : 'prefix',
           // Say it rather than let the desk infer it: the two sides agree on what this

@@ -96,12 +96,15 @@
       <tr><th scope="row">With a 5+ character satoshi.si name</th><td>7 sats a week, 308 a year — 25% off the list price</td></tr>
       <tr><th scope="row">With a 4-character satoshi.si name</th><td>5 sats a week, 205 a year — half the list price</td></tr>
       <tr><th scope="row">With a 3-character satoshi.si name</th><td><span class="free">free</span> — the subscription costs nothing at all</td></tr>
-      <tr><th scope="row">An anonymous note</th><td><strong>69 sats per note</strong>, from a throwaway key that may pin one</td></tr>
-      <tr><th scope="row">A key with a NIP-05 name on any domain</th><td><span class="free">free</span>, paid in work instead: <strong>29 bits</strong> of proof of work on the note's own id</td></tr>
+      <tr><th scope="row">A note from a key with its own NIP-05 name</th><td><span class="free">free</span> — the site asks your domain's <code>/.well-known/nostr.json</code> when you place the note, and charges nothing when it names your key</td></tr>
+      <tr><th scope="row">An anonymous note</th><td><strong>10 sats per note</strong>, from a throwaway key that may pin one</td></tr>
+      <tr><th scope="row">A note from an AI agent</th><td><strong>10 sats</strong>, always, whatever name the agent's key carries</td></tr>
+      <tr><th scope="row">A named key that would rather not wait on its domain</th><td>pay in work instead: <strong>29 bits</strong> of proof of work on the note's own id</td></tr>
     </tbody>
   </table>
   <p>The name is what decides a member's price, and the names are priced the same way round: on satoshi.si a 3-character name costs 50,000 sats, a 4-character one 21,000, and anything from 5 to 30 characters 5,000. The shorter the name, the less you pay every week — so a short name is worth the sats if you intend to keep pinning. Names of one or two characters are not sold.</p>
-  <p>Proof of work is the free way in for anyone with a Nostr identity: instead of sats, the note's id must start with enough zero bits, which costs electricity rather than money. It needs a NIP-05 name to claim, and the board checks the work itself — a note that claims work it does not have is refused like any other bad order.</p>
+  <p>A NIP-05 name is a promise a domain makes about a pubkey, and any domain will do: satoshi.si, your own server, wherever you are known. That is why the first row above says free. An agent is the exception — a program that can mint a key per note is not who that door is for, so the agent that talks to this board over MCP is quoted one price and pays it.</p>
+  <p>Proof of work is another free way in for anyone with a Nostr identity: instead of sats, the note's id must start with enough zero bits, which costs electricity rather than money. It needs a NIP-05 name to claim, and the board checks the work itself — a note that claims work it does not have is refused like any other bad order.</p>
 
   <h2>Public by nature</h2>
   <p>A pinned note is public. Notes can be seen on other Nostr clients, and relays outside <code>wss://nostr.satoshi.si</code> could store them too, so it's very important not to post anything you would not say out loud in the streets.</p>

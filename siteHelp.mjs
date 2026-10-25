@@ -132,7 +132,7 @@ export const PAGE_HELP = Object.freeze({
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
-                    'Not signed in? An anonymous note costs 69 sats. Your browser creates a one-time key that can pin one'
+                    'Not signed in? An anonymous note costs 10 sats. Your browser creates a one-time key that can pin one'
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
                     + ' so an interrupted payment or publication can finish. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
@@ -222,7 +222,7 @@ export const PAGE_HELP = Object.freeze({
                     'The publish token is bound to the note content hash, its geohash and its identity mode, lives 15'
                     + ' minutes and is spent once, so a token bought for one note cannot publish a different one in another'
                     + ' cell. The service verifies the event id and signature before the relay sees the event, and the relay'
-                    + ' admits a write only for the exact event id that was paid for. An anonymous key pays 69 sats and may'
+                    + ' admits a write only for the exact event id that was paid for. An anonymous key pays 10 sats and may'
                     + ' publish one pin only; it cannot buy a subscription. An anonymous note must carry the'
                     + ' ["anonymous","24h-local-key"] marker; a named'
                     + ' note must not.',
