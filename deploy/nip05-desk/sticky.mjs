@@ -109,6 +109,58 @@ export const NIP05_REASON = 'free — a NIP-05 name that answers for this key';
  * MCP server says so on every order it places.
  */
 export const AGENT_PIN_REASON = 'agents pay per note, name or no name';
+/**
+ * How many free notes a name buys in a day.
+ *
+ * A free door with no meter is not a door, it is a hole: a domain costs a few sats and a name is a
+ * DNS record, so "free for anyone with a NIP-05" would be free for anyone who can type. Sixty-nine
+ * is enough for a person who writes — a busy day on a board, not a wire service — and it is the
+ * same figure as a week of belonging, which keeps one sentence true: a day of free notes costs what
+ * a week of posting costs, and a note costs what a week of belonging costs.
+ */
+export const NIP05_DAILY_MAX = 69;
+/**
+ * The window a free note is counted in: a rolling 24 hours.
+ *
+ * Not a calendar day, because a calendar day has a midnight and a midnight belongs to a time zone
+ * the writer may not be in — a limit that resets at somebody else's midnight is a limit that is
+ * twice as generous once a day and unexplainable the rest of it.
+ */
+export const NIP05_WINDOW_SECONDS = 24 * 60 * 60;
+
+/**
+ * How much of today's free allowance a key has spent, and when the oldest of it falls off.
+ *
+ * Counted from the stored orders rather than from a counter, because the orders are the record that
+ * cannot drift: a cached count survives neither a restart nor a restored backup, and a quota that
+ * resets when the service restarts is a quota an agent can spend by crashing it. Only the free ones
+ * count — a subscribed pin and a mined note were paid for in another currency — and a note counts
+ * from the moment it was ordered, since on this door the order *is* the note.
+ *
+ * `resetsAt` is when the oldest free note of the window ages out, which is when a full allowance
+ * starts coming back, not when it is empty.
+ */
+export function freeNoteUsage(orders, pubkey, now = Math.floor(Date.now() / 1000),
+  { limit = NIP05_DAILY_MAX, windowSeconds = NIP05_WINDOW_SECONDS } = {}) {
+  const key = String(pubkey || '').toLowerCase();
+  const since = now - windowSeconds;
+  const times = Object.values(orders || {})
+    .filter(order => order && order.nip05Free === true
+      && String(order.pubkey || '').toLowerCase() === key)
+    .map(order => Number(order.createdAt) || 0)
+    .filter(at => at > since && at <= now)
+    .sort((a, b) => a - b);
+  const used = times.length;
+  return {
+    limit,
+    used,
+    remaining: Math.max(0, limit - used),
+    windowSeconds,
+    allowed: used < limit,
+    // A full allowance comes back one note at a time, starting when the oldest one ages out.
+    resetsAt: used >= limit ? times[0] + windowSeconds : null,
+  };
+}
 /** A throwaway identity may not mine its way in either: it pays per note. */
 export const ANON_NO_POW = 'anonymous_no_pow';
 /** The tag a note uses to say how it was paid for, and the words allowed in it. */

@@ -4,7 +4,7 @@ import {webcrypto, createHash} from 'node:crypto';
 import {readFile, stat} from 'node:fs/promises';
 import {MENTION_MAX, MENTION_TAG, mentionFilterAvailability, mentionIssue, mentionLabel, mentionPubkeys, mentionTokens, noteMentions, npubEncode, stickyTextParts, GEOHASH_MIN_LENGTH, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS, STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS, isStickyExpired, stickyExpiration, stickyExpiryCountdown, stickyLiveliness, STICKY_ANONYMOUS_PRICE_SATS, STICKY_MAX_CHARACTERS, stickyNoteLength, MAP_SEARCH_PRECISION, placeSearchResults, placeSearchUrl, linkRunIsComplete, STICKY_SUB_MEMBER_WEEK_SATS, STICKY_SUB_MEMBER_YEAR_SATS, STICKY_SUB_WEEK_SATS, STICKY_SUB_WEEKS_PER_YEAR, STICKY_SUB_YEAR_DISCOUNT, STICKY_SUB_YEAR_SATS, describeStickyAction, STICKY_MEMBER_TIERS, stickyMemberTier, stickyTierPrice, stickyDiscountSentence, boardPatternCss, BOARD_TEXTURES, encodeGeohash, geohashBounds, geohashMatchesBoard, geohashNeighbours, geohashPrecisionForZoom, geohashPrefixes, clampBoardView, ROTATION_MIN, ROTATION_MAX, clampRotation, STICKY_PIN_COLOURS, STICKY_PIN_LEFT_MIN, STICKY_PIN_LEFT_MAX, pinColourFor, pinLeftFor, STICKY_TOPIC, STICKY_HASHTAG_MAX, normaliseStickyHashtags, stickyHashtagIssue,
   geohashSetIssue, geohashTouches, makeStickyTemplate, mapZoomForGeohashPrecision, normaliseGeohash, parseStickyEvent, stickyContentHash, stickyPictureDigest, stickyDay, stickyOrderPrice, stickyPaymentRails, stickySubscriptionPrice, STICKY_NOTE_VIEWS, stickyVisibleNoteIds,
- stickyPowOffer, stickyPowSentence, stickyPowProgress, stickyPowDifficulty,
+ stickyPowOffer, stickyPowSentence, stickyPowProgress, stickyPowDifficulty, stickyFreeNotesLine,
   boardBitmapSize,
   boardPatternScale,
   apiHeaders,
@@ -943,6 +943,51 @@ test('published notes resolve a readable author label in relay batches', async (
   assert.match(script, /authors: pubkeys/);
   assert.match(script, /authorProfilesLoading/);
   assert.match(css, /\.sticky-note__author\s*\{[^}]*right:\s*10px;[^}]*bottom:\s*7px;/s);
+});
+
+test('the account dialog shows how much of the day a name has left', () => {
+  // The count comes from the desk; the board only puts it into words and into a bar. Thirteen pinned
+  // out of sixty-nine is the sentence a reader needs, in both directions at once.
+  const thirteen = stickyFreeNotesLine({ limit: 69, used: 13, remaining: 56 });
+  assert.equal(thirteen.head, '13 of 69 used');
+  assert.equal(thirteen.sentence, 'You pinned 13 notes \u00b7 56 left of 69 a day.');
+  assert.equal(thirteen.tone, 'fine');
+
+  const oneLeft = stickyFreeNotesLine({ limit: 69, used: 68, remaining: 1 });
+  assert.equal(oneLeft.tone, 'low', 'the last tenth of the allowance looks different');
+
+  const spent = stickyFreeNotesLine({ limit: 69, used: 69, remaining: 0, resetsAt: 1_800_082_800 });
+  assert.equal(spent.tone, 'spent');
+  assert.equal(spent.head, '69 of 69 used');
+  assert.match(spent.sentence, /You pinned 69 notes and the day's free allowance is spent\./);
+  assert.match(spent.sentence, /The oldest falls off at \d\d:\d\d UTC/,
+    'and says when one comes back, because a spent allowance with no answer is a dead end');
+
+  assert.equal(stickyFreeNotesLine({ limit: 69, used: 1, remaining: 68 }).sentence,
+    'You pinned 1 note \u00b7 68 left of 69 a day.', 'one note is not one notes');
+
+  // A meter that invents a number is worse than no meter.
+  for (const bad of [null, undefined, {}, { limit: 0, used: 0 }, { limit: 69 }, { limit: '69', used: 'x' }]) {
+    assert.equal(stickyFreeNotesLine(bad), null, `no meter from ${JSON.stringify(bad)}`);
+  }
+});
+
+test('the dialog carries the meter, and it is drawn from the desk count', async () => {
+  const html = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  assert.match(html, /<div id="accountQuota" class="account-quota" hidden>/,
+    'the meter sits in the account dialog, hidden until there is something to say');
+  assert.match(html, /role="progressbar"[\s\S]{0,140}aria-valuemax="69"[\s\S]{0,60}aria-valuenow="0"/,
+    'and it is a progress bar to a screen reader, not a picture of one');
+  assert.match(html, /id="accountQuotaNote"/, 'with a sentence beside it');
+  assert.match(script, /function renderAccountQuota\(session\)/, 'and a renderer of its own');
+  assert.match(script, /renderAccountQuota\(getNostrSession\(\)\)/, 'called when the dialog opens');
+  assert.match(script, /subscription\?\.freeNotes/, 'reading the desk count rather than keeping one');
+  assert.match(css, /\.account-quota__meter span \{[^}]*background:#4caf50/,
+    'green while there is room, which is the board colour for a thing that works');
+  assert.match(css, /\.account-quota\.is-spent \.account-quota__meter span \{[^}]*background:#5c6164/,
+    'and flat grey once it is gone');
 });
 
 test('anonymous posting and signed-in profile details are present', async () => {

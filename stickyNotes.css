@@ -966,6 +966,21 @@ body.is-card #stickyBoard { position: fixed; top: 34px; bottom: auto; left: 0; r
 .account-subscription__rows dd { margin:0; color:#f2f2ef; font-size:.86rem; text-align:right; overflow-wrap:anywhere; }
 .account-subscription__none { margin:0; color:#9ea19f; font-size:.8rem; }
 
+/* The free door's meter: what a name buys in a day, and how much of it is spent. Green while there
+   is room, amber when the last tenth is going, muted and flat when it is gone — the same three states
+   the subscription box uses for active, nearly and not. */
+.account-quota { display:grid; gap:7px; margin:12px 0 4px; padding:12px; border:1px solid #3a3d3f; border-radius:10px; background:#1d1f21; }
+.account-quota__head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.account-quota__head strong { color:#f2f2ef; font-size:.9rem; }
+.account-quota__count { font-size:.75rem; letter-spacing:.03em; text-transform:uppercase; color:#4caf50; }
+.account-quota.is-low .account-quota__count { color:#f2a900; }
+.account-quota.is-spent .account-quota__count { color:#9ea19f; }
+.account-quota__meter { height:6px; border-radius:99px; background:#2b2e30; overflow:hidden; }
+.account-quota__meter span { display:block; height:100%; width:0; border-radius:99px; background:#4caf50; transition:width .25s ease; }
+.account-quota.is-low .account-quota__meter span { background:#f2a900; }
+.account-quota.is-spent .account-quota__meter span { background:#5c6164; }
+.account-quota__note { margin:0; color:#9ea19f; font-size:.8rem; line-height:1.4; }
+
 /* A NIP-38 status, shown as the reader set it and never written from here. */
 .account-status { display:grid; gap:3px; margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--accent,#f2a900); border-radius:0 8px 8px 0; background:#1d1f20; }
 .account-status__type { color:#9ea19f; font-size:.75rem; letter-spacing:.05em; text-transform:uppercase; }

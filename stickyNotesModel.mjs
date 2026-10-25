@@ -939,6 +939,39 @@ export function anonymousForQuote(session, subscription) {
   return Boolean(subscription && subscription.anonymous === true);
 }
 
+/**
+ * Today's free allowance, said the way a reader needs it: what they have pinned, and what is left.
+ *
+ * The desk counts it (`freeNotes` on the subscription route) and this only puts it into words; a
+ * missing or malformed count returns null, because a meter that invents a number is worse than no
+ * meter at all. `tone` is for the styling only: a spent allowance should look spent, and a nearly
+ * spent one should not look settled.
+ */
+export function stickyFreeNotesLine(freeNotes) {
+  const limit = Number(freeNotes?.limit);
+  const used = Number(freeNotes?.used);
+  if (!Number.isInteger(limit) || !Number.isInteger(used) || limit <= 0 || used < 0) return null;
+  const remaining = Number.isInteger(freeNotes?.remaining) ? freeNotes.remaining : Math.max(0, limit - used);
+  const resetsAt = Number.isFinite(Number(freeNotes?.resetsAt)) && Number(freeNotes.resetsAt) > 0
+    ? Number(freeNotes.resetsAt) : null;
+  const clock = resetsAt ? new Date(resetsAt * 1000).toISOString().slice(11, 16) : '';
+  const pinned = used === 1 ? 'You pinned 1 note' : `You pinned ${used} notes`;
+  if (remaining <= 0) {
+    return {
+      used, limit, remaining: 0, tone: 'spent',
+      head: `${used} of ${limit} used`,
+      sentence: `${pinned} and the day's free allowance is spent.`
+        + (clock ? ` The oldest falls off at ${clock} UTC, one note at a time.` : ''),
+    };
+  }
+  return {
+    used, limit, remaining,
+    tone: remaining <= Math.ceil(limit / 10) ? 'low' : 'fine',
+    head: `${used} of ${limit} used`,
+    sentence: `${pinned} · ${remaining} left of ${limit} a day.`,
+  };
+}
+
 export function describeStickyAction({ anonymous = false, stranger = false, subscription = null, plan = 'week',
   nip05 = '' } = {}) {
   const prices = subscription?.prices || {};

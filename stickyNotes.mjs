@@ -13,6 +13,7 @@ import {
   STICKY_SUB_PLANS,
   STICKY_SUB_WEEK_SATS,
   describeStickyAction,
+  stickyFreeNotesLine,
   anonymousForQuote,
   stickySubscriptionPrice,
   STICKY_TOPIC,
@@ -231,6 +232,9 @@ const elements = {
   capacity: document.getElementById('noteCapacity'), pay: document.getElementById('payForSticky'),
   mine: document.getElementById('mineForSticky'), powOffer: document.getElementById('powOffer'),
   subscriptionState: document.getElementById('subscriptionState'), planPicker: document.getElementById('planPicker'),
+  accountQuota: document.getElementById('accountQuota'), accountQuotaCount: document.getElementById('accountQuotaCount'),
+  accountQuotaBar: document.getElementById('accountQuotaBar'), accountQuotaMeter: document.getElementById('accountQuotaMeter'),
+  accountQuotaNote: document.getElementById('accountQuotaNote'),
   noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
   draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
   noteImageGradesHint: document.getElementById('noteImageGradesHint'),
@@ -1873,6 +1877,40 @@ function renderAccountSubscription(session) {
   elements.accountSubscriptionLeft.textContent = left > 0 ? timeLeftLabel(left) : 'ended';
 }
 
+/**
+ * The free door's meter, for the reader who has a name and no subscription.
+ *
+ * The count is the desk's (`freeNotes` on the subscription route), never a tally kept here, so it
+ * survives a reload, a second browser and a restarted desk. It is shown when the reader's own profile
+ * carries a name — or when the desk says they have already used some, which is what a fresh browser
+ * with the name not yet fetched looks like. A subscriber is shown their subscription instead: the
+ * allowance does not apply to them.
+ */
+function renderAccountQuota(session) {
+  const box = elements.accountQuota;
+  if (!box) return;
+  const name = String(session?.profile?.nip05 || '').trim();
+  const active = subscriptionResolved && subscription?.active === true;
+  const counted = subscription?.freeNotes;
+  const eligible = session && session.method !== 'anonymous' && !active
+    && (Boolean(name) || Number(counted?.used) > 0);
+  const line = eligible ? stickyFreeNotesLine(counted) : null;
+  box.hidden = !line;
+  if (!line) return;
+  box.classList.toggle('is-low', line.tone === 'low');
+  box.classList.toggle('is-spent', line.tone === 'spent');
+  elements.accountQuotaCount.textContent = line.head;
+  elements.accountQuotaNote.textContent = line.sentence;
+  if (elements.accountQuotaBar) {
+    const share = Math.max(0, Math.min(1, line.used / line.limit));
+    elements.accountQuotaBar.style.width = `${(share * 100).toFixed(1)}%`;
+  }
+  if (elements.accountQuotaMeter) {
+    elements.accountQuotaMeter.setAttribute('aria-valuemax', String(line.limit));
+    elements.accountQuotaMeter.setAttribute('aria-valuenow', String(line.used));
+  }
+}
+
 function updateAccount() {
   const session = getNostrSession();
   const accountLabel = session ? `Nostr account: ${sessionLabel(session)}` : 'Log in to Nostr';
@@ -1895,6 +1933,7 @@ function updateAccount() {
     renderAccountDetails(session);
     renderAccountStatus(session);
     renderAccountSubscription(session);
+    renderAccountQuota(session);
     loadAccountStatus(session);
     elements.logout.querySelector('span').textContent = session.method === 'anonymous' ? 'Leave anonymous mode' : 'Log out';
     loadAccountProfile(session);
@@ -6365,6 +6404,7 @@ elements.editor.addEventListener('click', updateMentionMenu);
 elements.account.addEventListener('click', () => {
   if (getNostrSession()) {
     renderAccountSubscription(getNostrSession());
+    renderAccountQuota(getNostrSession());
     refreshPriceQuote(getNostrSession());
     showDialog(elements.accountDialog);
     return;

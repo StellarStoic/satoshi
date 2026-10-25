@@ -401,6 +401,17 @@
         <div class="account-field" id="accountWebsiteRow" hidden><dt>Website</dt><dd><a id="accountWebsite" target="_blank" rel="noopener noreferrer"></a></dd></div>
         <div class="account-field" id="accountLightningRow" hidden><dt>Lightning</dt><dd id="accountLightning"></dd></div>
       </dl>
+      <div id="accountQuota" class="account-quota" hidden>
+        <div class="account-quota__head">
+          <strong>Free notes today</strong>
+          <span id="accountQuotaCount" class="account-quota__count">—</span>
+        </div>
+        <div class="account-quota__meter" role="progressbar" aria-labelledby="accountQuotaNote"
+             aria-valuemin="0" aria-valuemax="69" aria-valuenow="0" id="accountQuotaMeter">
+          <span id="accountQuotaBar"></span>
+        </div>
+        <p id="accountQuotaNote" class="account-quota__note"></p>
+      </div>
       <div id="accountSubscription" class="account-subscription" hidden>
         <div class="account-subscription__head">
           <strong>Subscription</strong>

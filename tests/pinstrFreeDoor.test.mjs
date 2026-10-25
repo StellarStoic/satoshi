@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import {
   createStickyOrder, validateOrderInput, STICKY_ANON_SATS, SUB_WEEK_SATS, NIP05_REASON, AGENT_PIN_REASON,
+  freeNoteUsage, NIP05_DAILY_MAX, NIP05_WINDOW_SECONDS,
 } from '../deploy/nip05-desk/sticky.mjs';
 import {
   parseNip05Name, isPrivateHost, verifyNip05Name, createNip05Cache, NIP05_INFLIGHT_MAX,
@@ -291,4 +292,80 @@ test('only so many lookups run at once, and the rest pay the price', async () =>
 test('the agent reason says what the marker buys, and nothing else does', () => {
   assert.match(AGENT_PIN_REASON, /agents pay per note/);
   assert.match(NIP05_REASON, /NIP-05/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The meter: a free door with no meter is a hole.
+
+/** A stored free note, as the desk keeps one. */
+function freeNote(pubkey, createdAt, extra = {}) {
+  return { id: `o${createdAt}`, pubkey, nip05Free: true, createdAt, sats: 0, ...extra };
+}
+
+test('a name buys 69 free notes a day, and the day is a rolling 24 hours', () => {
+  assert.equal(NIP05_DAILY_MAX, 69);
+  assert.equal(NIP05_WINDOW_SECONDS, 86400);
+  const fresh = freeNoteUsage({}, PUBKEY, NOW);
+  assert.deepEqual(
+    { used: fresh.used, remaining: fresh.remaining, allowed: fresh.allowed, limit: fresh.limit },
+    { used: 0, remaining: 69, allowed: true, limit: 69 });
+  assert.equal(fresh.resetsAt, null, 'nothing to wait for when nothing has been spent');
+});
+
+test('the count is what the key ordered, and only the free ones', () => {
+  const orders = {
+    a: freeNote(PUBKEY, NOW - 60),
+    b: freeNote(PUBKEY, NOW - 120),
+    c: freeNote(PUBKEY, NOW - 180),
+    // Not free, so not counted: a subscribed pin and a mined note were paid in another currency.
+    d: { id: 'd', pubkey: PUBKEY, createdAt: NOW - 60, nip05Free: false, sats: 0, paymentMethod: 'subscription' },
+    e: { id: 'e', pubkey: PUBKEY, createdAt: NOW - 60, powFree: true, sats: 0 },
+    // Someone else's notes never count against this key.
+    f: freeNote(OTHER_KEY, NOW - 60),
+    // And a note from before the window has aged out.
+    g: freeNote(PUBKEY, NOW - 86401),
+  };
+  const usage = freeNoteUsage(orders, PUBKEY, NOW);
+  assert.equal(usage.used, 3);
+  assert.equal(usage.remaining, 66);
+  assert.equal(usage.allowed, true);
+  assert.equal(usage.resetsAt, null, 'a partly spent day has nothing falling off yet');
+});
+
+test('the sixty-ninth note is the last one, and the seventieth is refused until one ages out', () => {
+  const orders = {};
+  for (let i = 0; i < 69; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 3600 + i);
+  const spent = freeNoteUsage(orders, PUBKEY, NOW);
+  assert.equal(spent.used, 69);
+  assert.equal(spent.remaining, 0);
+  assert.equal(spent.allowed, false);
+  assert.equal(spent.resetsAt, (NOW - 3600) + NIP05_WINDOW_SECONDS,
+    'the allowance comes back when the oldest free note ages out, not at a midnight');
+
+  // Time moves on and the allowance comes back one note at a time, oldest first: a second past the
+  // first note's window, the two oldest have aged out and there is room for two.
+  const later = freeNoteUsage(orders, PUBKEY, (NOW - 3600) + NIP05_WINDOW_SECONDS + 1);
+  assert.equal(later.used, 67);
+  assert.equal(later.remaining, 2);
+  assert.equal(later.allowed, true);
+  assert.equal(later.resetsAt, null, 'a day with room left has nothing to wait for');
+});
+
+test('the meter never reports a negative remainder or counts a note from the future', () => {
+  const orders = {};
+  for (let i = 0; i < 75; i += 1) orders[`o${i}`] = freeNote(PUBKEY, NOW - 60 - i);
+  orders.future = freeNote(PUBKEY, NOW + 600);
+  const usage = freeNoteUsage(orders, PUBKEY, NOW);
+  assert.equal(usage.used, 75, 'the future note is not counted until it is ordered');
+  assert.equal(usage.remaining, 0, 'and a remainder is never negative');
+  assert.equal(usage.allowed, false);
+});
+
+test('an empty or absent store is a full allowance, not a crash', () => {
+  for (const store of [null, undefined, {}, []]) {
+    const usage = freeNoteUsage(store, PUBKEY, NOW);
+    assert.equal(usage.used, 0);
+    assert.equal(usage.allowed, true, 'a desk that cannot read its own orders must not refuse a free note');
+  }
+  assert.equal(freeNoteUsage({}, '', NOW).used, 0);
 });

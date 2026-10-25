@@ -58,7 +58,7 @@ import {
   ANON_TAG_VALUE, EXPIRATION_TAG, STICKY_LIVELINESS, STICKY_DEFAULT_LIVELINESS,
   STICKY_MIN_LIVELINESS_SECONDS, STICKY_MAX_LIVELINESS_SECONDS,
   ANON_KEY_USED, ANON_NO_SUBSCRIPTION, STRANGER_REASON, memberName,
-  anonymousPinGate, powNameClaim,
+  anonymousPinGate, powNameClaim, freeNoteUsage, NIP05_DAILY_MAX,
   memberTierTable, hasNothingToPay, POW_BITS, POW_TAG, paymentBadge, PAYMENT_TAG, PAYMENT_BADGES,
 } from './sticky.mjs';
 import { fetchEventById, publishEvent } from './relay.mjs';
@@ -775,6 +775,8 @@ const handleRequest = async (req, res) => {
         nip05Free: 'send nip05: "name@domain" with a pin order: when that domain\u2019s '
           + '/.well-known/nostr.json names your pubkey, the note costs nothing',
         agentSats: STICKY_ANON_SATS,
+        // The free door's meter, published so a client can show it without inventing a number.
+        nip05DailyMax: NIP05_DAILY_MAX,
         agentPays: 'send agent: true and the note is charged at agentSats whatever name you carry',
 
         // A machine that arrives here should not have to guess where the instructions are, nor
@@ -933,6 +935,10 @@ const handleRequest = async (req, res) => {
         ok: true,
         pubkey: pubkey || null,
         ...subscriptionView(loadSubscriptions(), pubkey, now),
+        // What today's free allowance looks like for this key: how many free notes it has ordered in
+        // the last 24 hours and how many are left. A count, not a promise — the gate is applied again
+        // when an order is created, because a client is free to show a stale number and not to spend it.
+        freeNotes: freeNoteUsage(loadSticky(now), pubkey, now),
         // The desk's verdict about the key, never the board's claim about itself.
         anonymous: stranger,
         anonymousReason: stranger ? STRANGER_REASON : null,
@@ -1041,6 +1047,29 @@ const handleRequest = async (req, res) => {
       }
 
       const orders = loadSticky(now);
+
+      // A free door with no meter is a hole: a domain costs a few sats, so "free for anyone with a
+      // name" would be free for anyone who can type. The allowance is counted from the stored
+      // orders — the record that survives a restart — and refused here, before the order exists.
+      if (created.order.nip05Free === true) {
+        const usage = freeNoteUsage(orders, created.order.pubkey, now);
+        if (!usage.allowed) {
+          console.log(JSON.stringify({
+            event: 'pinstr_nip05_allowance_spent', pubkey: created.order.pubkey,
+            nip05: created.order.nip05, used: usage.used, limit: usage.limit,
+          }));
+          const back = usage.resetsAt ? new Date(usage.resetsAt * 1000).toISOString().slice(11, 16) : null;
+          return send(res, 429, {
+            ok: false,
+            reason: 'nip05_daily_limit',
+            error: `Your name covers ${usage.limit} notes a day and all ${usage.limit} are spent: `
+              + `${usage.used} free notes in the last 24 hours. `
+              + (back ? `The oldest falls off at ${back} UTC. ` : '')
+              + 'A subscription has no such limit.',
+            freeNotes: usage,
+          }, { 'cache-control': 'no-store', ...(usage.resetsAt ? { 'retry-after': String(Math.max(1, usage.resetsAt - now)) } : {}) });
+        }
+      }
 
       // A subscription for a throwaway identity, refused on the stored orders rather
       // than on the request alone: a key that has ever ordered anonymously is one of
