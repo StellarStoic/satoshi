@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v505';   // v505: reduce Pinstr 3D mobile GPU pressure
+const CACHE = 'satoshi-static-v506';   // v506: batch Pinstr 3D layout and lighten mobile frames
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',

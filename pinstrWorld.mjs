@@ -40,7 +40,8 @@ const PIN_MOVE_SLOP_PX = 8;
 const WORLD_ZOOM_MIN = .45;
 const WORLD_ZOOM_MAX = 6;
 const MOBILE_RENDERING = matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 1;
-const TEXTURE_SCALE = MOBILE_RENDERING ? .5 : 1;
+const NOTE_TEXTURE_SCALE = MOBILE_RENDERING ? .25 : 1;
+const LABEL_TEXTURE_SCALE = MOBILE_RENDERING ? .5 : 1;
 const RENDER_PIXEL_RATIO = MOBILE_RENDERING ? 1 : 1.6;
 // Keep these identical to the --note colours used by the 2D board.
 const NOTE_COLORS = Object.freeze({yellow:'#f7dc63', pink:'#f3a7c4', blue:'#91d2eb', green:'#acd986', orange:'#f4b266'});
@@ -314,12 +315,12 @@ function setStatus(message = '', timeout = 0) {
   }, timeout);
 }
 
-function textureCanvas(logicalWidth, logicalHeight) {
+function textureCanvas(logicalWidth, logicalHeight, scale = LABEL_TEXTURE_SCALE) {
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(logicalWidth * TEXTURE_SCALE);
-  canvas.height = Math.round(logicalHeight * TEXTURE_SCALE);
+  canvas.width = Math.round(logicalWidth * scale);
+  canvas.height = Math.round(logicalHeight * scale);
   const context = canvas.getContext('2d');
-  context.scale(TEXTURE_SCALE, TEXTURE_SCALE);
+  context.scale(scale, scale);
   return {canvas, context};
 }
 
@@ -440,7 +441,7 @@ function renderNoteSurface(record, now = Math.floor(Date.now() / 1000)) {
 }
 
 function noteTexture(note) {
-  const {canvas, context} = textureCanvas(512, 512);
+  const {canvas, context} = textureCanvas(512, 512, NOTE_TEXTURE_SCALE);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
@@ -906,16 +907,17 @@ function layoutCellNotes(cell) {
   groups.forEach((group, index) => placeNoteGroup(group, cell, index, groups.length));
 }
 
-function addNote(note, event = null) {
-  if (!note?.id || notes.has(note.id)) return;
+function addNote(note, event = null, {layout = true} = {}) {
+  if (!note?.id || notes.has(note.id)) return '';
   const cell = worldCellForNote(note, board.cells, board.depth);
-  if (!cell) return;
+  if (!cell) return '';
   const detailed = {...note, event};
   notes.set(note.id, detailed);
   const group = buildNote(detailed);
   requestAuthorProfile(detailed);
   placeNoteGroup(group, cell);
-  layoutCellNotes(cell);
+  if (layout) layoutCellNotes(cell);
+  return cell;
 }
 
 function createDraft() {
@@ -1245,6 +1247,8 @@ function connectBoard() {
   clearTimeout(reconnectTimer);
   if (!board.cells.length) { setStatus('Choose a geohash on the board first.'); return; }
   const subscription = `pinstr-world-${Date.now()}`;
+  let initialSync = true;
+  const pendingLayouts = new Set();
   const socket = new WebSocket(RELAY);
   boardSocket = socket;
   socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, {
@@ -1254,6 +1258,9 @@ function connectBoard() {
     try {
       const data = JSON.parse(message.data);
       if (data[0] === 'EOSE' && data[1] === subscription) {
+        initialSync = false;
+        pendingLayouts.forEach(layoutCellNotes);
+        pendingLayouts.clear();
         setStatus(notes.size ? 'Tap a pin for details. Hold it for 500 ms to move the note.' : 'No notes are pinned in this world yet.', 5000);
         return;
       }
@@ -1261,7 +1268,8 @@ function connectBoard() {
       const note = parseStickyEvent(data[2]);
       if (!note || isStickyExpired(note)
         || !geohashMatchesBoard(note.geohashes, board.cells, board.depth, note.exactGeohash)) return;
-      addNote(note, data[2]);
+      const cell = addNote(note, data[2], {layout:!initialSync});
+      if (cell && initialSync) pendingLayouts.add(cell);
     } catch {}
   });
   socket.addEventListener('error', () => setStatus('The public Nostr board is temporarily unavailable.'));
@@ -1561,6 +1569,8 @@ resetView();
 createDraft();
 connectBoard();
 renderer.setAnimationLoop(now => {
+  if (MOBILE_RENDERING && !xrSession && now - renderer.userData.lastMobileFrame < 32) return;
+  renderer.userData.lastMobileFrame = now;
   stepFlight(now);
   stepPortalWarp(now);
   animatePortals(now);
