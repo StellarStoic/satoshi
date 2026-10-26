@@ -39,6 +39,9 @@ const PIN_HOLD_MS = 500;
 const PIN_MOVE_SLOP_PX = 8;
 const WORLD_ZOOM_MIN = .45;
 const WORLD_ZOOM_MAX = 6;
+const MOBILE_RENDERING = matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 1;
+const TEXTURE_SCALE = MOBILE_RENDERING ? .5 : 1;
+const RENDER_PIXEL_RATIO = MOBILE_RENDERING ? 1 : 1.6;
 // Keep these identical to the --note colours used by the 2D board.
 const NOTE_COLORS = Object.freeze({yellow:'#f7dc63', pink:'#f3a7c4', blue:'#91d2eb', green:'#acd986', orange:'#f4b266'});
 const PIN_COLORS = Object.freeze({red:'#c73935', blue:'#2975c7', yellow:'#e3be28', green:'#2d9a55', white:'#eeeeea', purple:'#8752b5', magenta:'#ca3b91', black:'#171717'});
@@ -83,8 +86,20 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0d0f0f, 0.018);
 const camera = new THREE.PerspectiveCamera(58, innerWidth / Math.max(1, innerHeight), 0.05, 260);
 camera.position.set(0, 1.65, .05);
-const renderer = new THREE.WebGLRenderer({canvas:elements.canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({
+    canvas:elements.canvas,
+    antialias:!MOBILE_RENDERING,
+    alpha:true,
+    powerPreference:MOBILE_RENDERING ? 'default' : 'high-performance',
+  });
+} catch (error) {
+  elements.status.textContent = 'This browser could not start the 3D renderer.';
+  elements.status.hidden = false;
+  throw error;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, RENDER_PIXEL_RATIO));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x0d0f0f, 1);
@@ -110,7 +125,8 @@ rimLight.position.set(8, 7, -8);
 scene.add(rimLight);
 
 const starPositions = [];
-for (let index = 0; index < 650; index += 1) {
+const starCount = MOBILE_RENDERING ? 320 : 650;
+for (let index = 0; index < starCount; index += 1) {
   const angle = index * 2.399963;
   const radius = 28 + (index % 31) * 2.8;
   starPositions.push(Math.cos(angle) * radius, ((index * 37) % 70) - 20, Math.sin(angle) * radius);
@@ -298,6 +314,15 @@ function setStatus(message = '', timeout = 0) {
   }, timeout);
 }
 
+function textureCanvas(logicalWidth, logicalHeight) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(logicalWidth * TEXTURE_SCALE);
+  canvas.height = Math.round(logicalHeight * TEXTURE_SCALE);
+  const context = canvas.getContext('2d');
+  context.scale(TEXTURE_SCALE, TEXTURE_SCALE);
+  return {canvas, context};
+}
+
 function wrapLines(context, text, maxWidth) {
   const lines = [];
   for (const paragraph of String(text || '').replace(/\r/g, '').split('\n')) {
@@ -415,9 +440,7 @@ function renderNoteSurface(record, now = Math.floor(Date.now() / 1000)) {
 }
 
 function noteTexture(note) {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 512;
-  const context = canvas.getContext('2d');
+  const {canvas, context} = textureCanvas(512, 512);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
@@ -677,10 +700,7 @@ function updatePictureOverlays() {
 }
 
 function labelTexture(text) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 128;
-  const context = canvas.getContext('2d');
+  const {canvas, context} = textureCanvas(1024, 128);
   context.font = '300 54px "Roboto Mono", monospace';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
@@ -748,23 +768,22 @@ function ensurePlatform(cell) {
 }
 
 function portalLabelTexture(cell, count, color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 768;
-  canvas.height = 160;
-  const context = canvas.getContext('2d');
+  const logicalWidth = 768;
+  const logicalHeight = 160;
+  const {canvas, context} = textureCanvas(logicalWidth, logicalHeight);
   context.fillStyle = 'rgba(8,10,10,.78)';
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillRect(0, 0, logicalWidth, logicalHeight);
   context.strokeStyle = color;
   context.lineWidth = 8;
-  context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+  context.strokeRect(4, 4, logicalWidth - 8, logicalHeight - 8);
   context.fillStyle = '#fff';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.font = '700 54px "Roboto Mono", monospace';
-  context.fillText(cell, canvas.width / 2, 61, 700);
+  context.fillText(cell, logicalWidth / 2, 61, 700);
   context.fillStyle = color;
   context.font = '600 31px "Roboto Mono", monospace';
-  context.fillText(`${count} live note${count === 1 ? '' : 's'}`, canvas.width / 2, 119, 700);
+  context.fillText(`${count} live note${count === 1 ? '' : 's'}`, logicalWidth / 2, 119, 700);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -1465,6 +1484,13 @@ elements.canvas.addEventListener('pointerleave', event => {
   if (event.pointerType !== 'touch' && !portalPress) setHoveredPortal(null);
 });
 elements.canvas.addEventListener('contextmenu', event => event.preventDefault());
+elements.canvas.addEventListener('webglcontextlost', event => {
+  event.preventDefault();
+  setStatus('3D paused because the graphics context was lost. Restoring it…');
+});
+elements.canvas.addEventListener('webglcontextrestored', () => {
+  setStatus('3D restored.', 1800);
+});
 
 elements.controlsToggle.addEventListener('click', () => {
   const opening = elements.controls.hidden;
@@ -1511,7 +1537,7 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / Math.max(1, innerHeight);
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight, false);
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, RENDER_PIXEL_RATIO));
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;

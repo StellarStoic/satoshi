@@ -153,6 +153,12 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.match(page, /function setWorldZoom\(value\)/);
   assert.match(page, /const WORLD_ZOOM_MIN = \.45/);
   assert.match(page, /const WORLD_ZOOM_MAX = 6/);
+  assert.match(page, /const MOBILE_RENDERING = matchMedia\('\(pointer:coarse\)'\)/);
+  assert.match(page, /const TEXTURE_SCALE = MOBILE_RENDERING \? \.5 : 1/);
+  assert.match(page, /antialias:!MOBILE_RENDERING/);
+  assert.match(page, /const starCount = MOBILE_RENDERING \? 320 : 650/);
+  assert.match(page, /function textureCanvas\(logicalWidth, logicalHeight\)/);
+  assert.match(page, /addEventListener\('webglcontextlost'/);
   assert.match(page, /Math\.max\(WORLD_ZOOM_MIN, Math\.min\(WORLD_ZOOM_MAX/);
   assert.match(page, /camera\.zoom \* Math\.exp\(-event\.deltaY \* \.0012\)/);
   assert.match(page, /pinchZoom\.zoom \* distance \/ pinchZoom\.distance/);
