@@ -1,6 +1,10 @@
 import {
   btcMapCommentsUrl,
   btcMapAuthTemplate,
+  btcMapReviewFilter,
+  btcMapReviewTags,
+  BTC_MAP_REVIEW_RATINGS,
+  collectBtcMapReviews,
   btcMapHeatFeatures,
   btcMapPlaceUrl,
   btcMapPlacesUrl,
@@ -30,6 +34,7 @@ import {
   loginWithExtension,
   reconnectBunker,
   shortNpub,
+  npubEncode,
   signNostrEvent,
   signerReady,
 } from './nostrSession.mjs';
@@ -175,7 +180,7 @@ async function loadFavorites() {
   savedPlaces = Array.isArray(places) ? places : [];
   savedPlaceIds = new Set(savedPlaces.map(place => Number(place.id)).filter(Number.isFinite));
   renderFavorites();
-  if (currentPlace) renderPlace(currentPlace.place, currentPlace.comments);
+  if (currentPlace) renderPlace(currentPlace.place, currentPlace.comments, currentPlace.reviews);
 }
 
 async function exchangeNip98(signed) {
@@ -781,8 +786,271 @@ function offeringSection(place) {
   return section;
 }
 
-function renderPlace(place, comments = []) {
-  currentPlace = {place, comments};
+/* Reviews live on Nostr, not in the BTC Map API: that API has no reviews and no ratings at all, and its
+   per-place comments carry no author. These are the relays a review is published to and read from - the
+   site's own relay first, then three public ones that answer a browser. */
+const REVIEW_RELAYS = [
+  'wss://nostr.satoshi.si',
+  'wss://relay.damus.io',
+  'wss://relay.primal.net',
+  'wss://relay.ditto.pub',
+];
+const REVIEW_TIMEOUT_MS = 6000;
+
+/** This place's reviews, from the relays. A relay that never answers cannot hold the panel shut. */
+function readReviews(placeId) {
+  const filter = btcMapReviewFilter(placeId);
+  const seen = new Map();
+  const sockets = [];
+  return new Promise(resolve => {
+    let pending = REVIEW_RELAYS.length;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      sockets.forEach(socket => { try { socket.close(); } catch { /* already closed */ } });
+      resolve([...seen.values()]);
+    };
+    const done = () => { pending -= 1; if (pending <= 0) finish(); };
+    setTimeout(finish, REVIEW_TIMEOUT_MS);
+    REVIEW_RELAYS.forEach(url => {
+      let socket;
+      try {
+        socket = new WebSocket(url);
+      } catch { done(); return; }
+      sockets.push(socket);
+      const subId = 'btcmap-reviews-' + Math.random().toString(36).slice(2, 10);
+      socket.onopen = () => {
+        try { socket.send(JSON.stringify(['REQ', subId, filter])); } catch { done(); }
+      };
+      socket.onmessage = message => {
+        let payload;
+        try { payload = JSON.parse(message.data); } catch { return; }
+        if (payload[0] === 'EVENT' && payload[2]?.id) seen.set(payload[2].id, payload[2]);
+        else if (payload[0] === 'EOSE') { try { socket.close(); } catch { /* fine */ } done(); }
+      };
+      socket.onerror = done;
+      socket.onclose = done;
+    });
+    if (!REVIEW_RELAYS.length) finish();
+  });
+}
+
+/** Publish one signed review and resolve with how many relays took it. */
+function publishReview(event) {
+  return new Promise(resolve => {
+    let accepted = 0;
+    let pending = REVIEW_RELAYS.length;
+    const sockets = [];
+    const finish = () => resolve(accepted);
+    setTimeout(finish, REVIEW_TIMEOUT_MS);
+    REVIEW_RELAYS.forEach(url => {
+      let socket;
+      const done = () => { pending -= 1; if (pending <= 0) finish(); };
+      try {
+        socket = new WebSocket(url);
+      } catch { done(); return; }
+      sockets.push(socket);
+      socket.onopen = () => {
+        try { socket.send(JSON.stringify(['EVENT', event])); } catch { done(); }
+      };
+      socket.onmessage = message => {
+        let payload;
+        try { payload = JSON.parse(message.data); } catch { return; }
+        if (payload[0] === 'OK' && payload[1] === event.id) {
+          if (payload[2] === true) accepted += 1;
+          try { socket.close(); } catch { /* fine */ }
+          done();
+        }
+      };
+      socket.onerror = done;
+      socket.onclose = done;
+    });
+  });
+}
+
+
+/* ---------------------------------------------------------------- reviews
+ *
+ * NIP-25 votes and NIP-88 polls have no equivalent for "is this shop any good", and the BTC Map API has
+ * nothing either, so a review is a kind 1 note carrying the convention in btcMapModel.mjs. It is shown above
+ * the BTC Map notes because it is the only one of the two that has an author and a score.
+ */
+
+/** The icon font ships `lni-star-fat` and nothing to pair it with, so a star is drawn: filled when earned,
+ *  outlined when not. A glyph that exists in one weight only makes every rating look like five stars. */
+const STAR_PATH = 'M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.6 9.7l5.8-.8z';
+
+function starIcon(filled) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.toggle('is-filled', filled);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', STAR_PATH);
+  svg.append(path);
+  return svg;
+}
+
+function starRow(rating, className = 'btc-map-stars') {
+  const row = document.createElement('span');
+  row.className = className;
+  row.setAttribute('role', 'img');
+  row.setAttribute('aria-label', rating ? `${rating} out of 5` : 'no rating');
+  for (const value of BTC_MAP_REVIEW_RATINGS) row.append(starIcon(value <= (rating || 0)));
+  return row;
+}
+
+function reviewSection(place, collected) {
+  const section = document.createElement('section');
+  section.className = 'btc-map-reviews';
+  const heading = document.createElement('h3');
+  const summary = document.createElement('span');
+  summary.className = 'btc-map-reviews-summary';
+  if (collected.count) {
+    heading.textContent = `${collected.count} review${collected.count === 1 ? '' : 's'}`;
+    if (collected.average !== null) {
+      summary.append(
+        starRow(Math.round(collected.average), 'btc-map-stars btc-map-stars--average'),
+        document.createTextNode(`${collected.average.toFixed(1)} of 5 · ${collected.rated} rated`),
+      );
+    }
+  } else {
+    heading.textContent = 'No reviews yet';
+  }
+  section.append(heading, summary);
+
+  collected.reviews.slice(0, 8).forEach(review => {
+    const entry = document.createElement('article');
+    entry.className = 'btc-map-review';
+    const top = document.createElement('div');
+    top.className = 'btc-map-review-top';
+    const author = document.createElement('span');
+    author.className = 'btc-map-review-author';
+    // an npub reads as a person's key; a bare hex fragment reads as a bug
+    let handle = '';
+    try {
+      handle = shortNpub(npubEncode(review.pubkey));
+    } catch {
+      handle = `${review.pubkey.slice(0, 10)}…`;
+    }
+    author.textContent = handle;
+    const when = document.createElement('time');
+    when.dateTime = new Date(review.created_at * 1000).toISOString();
+    when.textContent = new Date(review.created_at * 1000).toLocaleDateString(undefined,
+      {year: 'numeric', month: 'short', day: 'numeric'});
+    top.append(author, when);
+    if (review.rating !== null) top.append(starRow(review.rating, 'btc-map-stars btc-map-stars--small'));
+    entry.append(top);
+    if (review.text) {
+      const text = document.createElement('p');
+      text.textContent = review.text;
+      entry.append(text);
+    }
+    section.append(entry);
+  });
+
+  section.append(reviewForm(place));
+  return section;
+}
+
+/** Stars and a box, signed and published with whatever identity the reader connected. */
+function reviewForm(place) {
+  const form = document.createElement('form');
+  form.className = 'btc-map-review-form';
+  const session = getNostrSession();
+  const intro = document.createElement('p');
+  intro.className = 'btc-map-review-intro';
+  intro.textContent = session
+    ? 'Say what this place is like — it is published to Nostr under your identity.'
+    : 'Connect your Nostr identity to review this place.';
+  form.append(intro);
+
+  let rating = 0;
+  const stars = document.createElement('div');
+  stars.className = 'btc-map-review-stars';
+  BTC_MAP_REVIEW_RATINGS.forEach(value => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btc-map-review-star';
+    button.dataset.value = String(value);
+    button.setAttribute('aria-label', `${value} of 5`);
+    button.append(starIcon(false));
+    button.addEventListener('click', () => {
+      rating = rating === value ? 0 : value;
+      [...stars.children].forEach(node => {
+        const active = Number(node.dataset.value) <= rating;
+        node.classList.toggle('is-on', active);
+        const svg = node.querySelector('svg');
+        if (svg) svg.classList.toggle('is-filled', active);
+      });
+    });
+    stars.append(button);
+  });
+  const text = document.createElement('textarea');
+  text.rows = 2;
+  text.maxLength = 600;
+  text.placeholder = 'What did you find here? Did they take lightning?';
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btc-map-review-submit';
+  submit.textContent = 'Post review';
+  const status = document.createElement('p');
+  status.className = 'btc-map-review-status';
+  status.setAttribute('role', 'status');
+  if (!session) {
+    submit.disabled = true;
+    text.disabled = true;
+    stars.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  }
+  form.append(stars, text, submit, status);
+
+  form.addEventListener('submit', async submitEvent => {
+    submitEvent.preventDefault();
+    if (!await signerReady()) {
+      status.textContent = 'Open the signer for this Nostr identity (or connect one), then try again.';
+      return;
+    }
+    const body = text.value.trim();
+    if (!body && !rating) {
+      status.textContent = 'Add a line about the place, or a star rating.';
+      return;
+    }
+    submit.disabled = true;
+    status.textContent = 'Signing and sending…';
+    try {
+      const template = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: btcMapReviewTags(place.id, rating || null),
+        content: body,
+      };
+      const signed = await signNostrEvent(template, {action: 'btc-map-review', placeId: place.id});
+      if (!signed) {
+        // Amber hands the signature back through the clipboard, not through this call
+        status.textContent = 'Approve it in Amber, then come back to this place — it posts once the signature lands.';
+        return;
+      }
+      const accepted = await publishReview(signed);
+      if (!accepted) {
+        status.textContent = 'No relay took the review. Try again in a moment.';
+        return;
+      }
+      status.textContent = `Published to ${accepted} of ${REVIEW_RELAYS.length} relays.`;
+      text.value = '';
+      const events = await readReviews(place.id);
+      renderPlace(place, currentPlace?.comments || [], collectBtcMapReviews(events, place.id));
+    } catch (error) {
+      status.textContent = error?.message ? `Could not post the review: ${error.message}` : 'Could not post the review.';
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  return form;
+}
+
+function renderPlace(place, comments = [], reviews = null) {
+  currentPlace = {place, comments, reviews};
   const fragment = document.createDocumentFragment();
   const icon = document.createElement('div');
   icon.className = 'btc-map-place-icon';
@@ -836,11 +1104,13 @@ function renderPlace(place, comments = []) {
     externalLink('Required app', place.required_app_url, 'lni-app-store'),
   ].filter(Boolean).forEach(link => links.append(link));
   if (links.children.length) fragment.append(links);
+  if (reviews) fragment.append(reviewSection(place, reviews));
   if (comments.length) {
     const section = document.createElement('section');
     section.className = 'btc-map-comments';
     const heading = document.createElement('h3');
-    heading.textContent = 'Recent visitor notes';
+    // BTC Map's own notes: no author, no score, and nothing like a review - named for what they are
+    heading.textContent = 'Notes from Bitcoin Map';
     section.append(heading);
     comments.slice(-3).reverse().forEach(comment => {
       const quote = document.createElement('blockquote');
@@ -860,11 +1130,13 @@ async function showPlace(id, coordinates = null) {
   elements.detailsBody.textContent = 'Loading place…';
   if (Array.isArray(coordinates) && coordinates.every(Number.isFinite)) map.easeTo({center:coordinates});
   try {
-    const [place, comments] = await Promise.all([
+    const [place, comments, reviewEvents] = await Promise.all([
       getJson(btcMapPlaceUrl(id), detailController),
       getJson(btcMapCommentsUrl(id), detailController).catch(() => []),
+      readReviews(id).catch(() => []),
     ]);
-    renderPlace(place, Array.isArray(comments) ? comments : []);
+    renderPlace(place, Array.isArray(comments) ? comments : [],
+      collectBtcMapReviews(reviewEvents, id));
   } catch (error) {
     if (error.name !== 'AbortError') elements.detailsBody.textContent = 'Place details are unavailable right now.';
   }
@@ -911,7 +1183,7 @@ elements.disconnect.addEventListener('click', () => {
   savedPlaceIds = new Set();
   savedPlaces = [];
   renderFavorites();
-  if (currentPlace) renderPlace(currentPlace.place, currentPlace.comments);
+  if (currentPlace) renderPlace(currentPlace.place, currentPlace.comments, currentPlace.reviews);
   refreshAccountUi();
   setAccountStatus('Disconnected from BTC Map. Your Nostr sign-in is unchanged.');
 });

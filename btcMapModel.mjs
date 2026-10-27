@@ -247,3 +247,86 @@ export function osmPlaceUrl(place = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '';
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=19/${lat}/${lon}`;
 }
+
+/* ---------------------------------------------------------------- reviews, on Nostr
+ *
+ * BTC Map has no reviews and no ratings: `/v4/places/{id}/reviews` is a 404 and the only thing the API
+ * carries is a per-place `comment` with no author and no score, which this page already shows under
+ * "Recent visitor notes". No NIP defines reviews either, so this is a small convention of our own:
+ *
+ *   kind 1, with
+ *     ['r', 'https://btcmap.org/merchant/<id>']   the place it is about
+ *     ['t', 'btcmap-review']                      what makes it a review rather than a note
+ *     ['rating', '1'..'5']                        optional, because a review can be text alone
+ *
+ * The place reference is the merchant URL rather than the bare id so a review stays attached to the same
+ * place across clients, and so anyone can look the place up from the note alone. One review per pubkey per
+ * place, the newest wins — the same rule the room's polls and votes use.
+ */
+
+export const BTC_MAP_REVIEW_HASHTAG = 'btcmap-review';
+export const BTC_MAP_REVIEW_RATINGS = [1, 2, 3, 4, 5];
+
+/** The review's own reference to a place. */
+export function btcMapPlaceReference(placeId) {
+  return `https://btcmap.org/merchant/${Number(placeId)}`;
+}
+
+function cleanRating(value) {
+  const rating = Math.round(Number(value));
+  return BTC_MAP_REVIEW_RATINGS.includes(rating) ? rating : null;
+}
+
+/** The tags a review carries. A rating outside 1-5 is dropped rather than clamped. */
+export function btcMapReviewTags(placeId, rating) {
+  const tags = [['r', btcMapPlaceReference(placeId)], ['t', BTC_MAP_REVIEW_HASHTAG]];
+  const clean = cleanRating(rating);
+  if (clean !== null) tags.push(['rating', String(clean)]);
+  return tags;
+}
+
+/** The filter that asks the relays for this place's reviews. */
+export function btcMapReviewFilter(placeId) {
+  return {
+    kinds: [1],
+    '#r': [btcMapPlaceReference(placeId)],
+    '#t': [BTC_MAP_REVIEW_HASHTAG],
+    limit: 100,
+  };
+}
+
+/** One event as a review of this place, or null when it is about something else. */
+export function parseBtcMapReview(event, placeId) {
+  if (!event || Number(event.kind) !== 1) return null;
+  const tags = Array.isArray(event.tags) ? event.tags : [];
+  const reference = btcMapPlaceReference(placeId);
+  if (!tags.some(tag => tag[0] === 'r' && tag[1] === reference)) return null;
+  if (!tags.some(tag => tag[0] === 't' && tag[1] === BTC_MAP_REVIEW_HASHTAG)) return null;
+  const ratingTag = tags.find(tag => tag[0] === 'rating');
+  return {
+    id: String(event.id || ''),
+    pubkey: String(event.pubkey || ''),
+    created_at: Number(event.created_at) || 0,
+    text: String(event.content || '').trim(),
+    rating: ratingTag ? cleanRating(ratingTag[1]) : null,
+  };
+}
+
+/** Every review of one place: one per pubkey, newest first, with the average over the rated ones. */
+export function collectBtcMapReviews(events = [], placeId) {
+  const byAuthor = new Map();
+  for (const event of events) {
+    const review = parseBtcMapReview(event, placeId);
+    if (!review) continue;
+    if (!review.text && review.rating === null) continue;      // an empty note says nothing
+    const previous = byAuthor.get(review.pubkey);
+    if (previous && previous.created_at >= review.created_at) continue;
+    byAuthor.set(review.pubkey, review);
+  }
+  const reviews = [...byAuthor.values()].sort((a, b) => b.created_at - a.created_at);
+  const rated = reviews.filter(review => review.rating !== null);
+  const average = rated.length
+    ? rated.reduce((sum, review) => sum + review.rating, 0) / rated.length
+    : null;
+  return { reviews, count: reviews.length, rated: rated.length, average };
+}

@@ -170,6 +170,11 @@ export function shortNpub(npub) {
   return `${npub.slice(0, 9)}...${npub.slice(-5)}`;
 }
 
+/** A hex pubkey as the npub a reader recognises, from the same tools the session uses. */
+export function npubEncode(pubkey) {
+  return tools().nip19.npubEncode(pubkey);
+}
+
 export async function loginWithExtension() {
   if (!window.nostr?.getPublicKey || !window.nostr?.signEvent) throw new Error('No Nostr browser extension was found.');
   const pubkey = await window.nostr.getPublicKey();

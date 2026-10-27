@@ -22,6 +22,10 @@ import {
   verificationLabel,
   viewportCoverageContains,
   viewportRadiusKm,
+  btcMapReviewTags,
+  btcMapReviewFilter,
+  parseBtcMapReview,
+  collectBtcMapReviews,
 } from '../btcMapModel.mjs';
 
 test('NIP-98 login is scoped to the exact BTC Map endpoint and method', () => {
@@ -240,4 +244,73 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(worker, /'\/img\/btc-map-pin\.png'/);
   assert.equal(marker.subarray(1, 4).toString(), 'PNG');
   assert.match(sitemap, /https:\/\/satoshi\.si\/btcMap\.html/);
+});
+
+test('a review names the place, the tag and an optional 1-5 rating', () => {
+  const tags = btcMapReviewTags(26188, 4);
+  assert.deepEqual(tags, [['r', 'https://btcmap.org/merchant/26188'], ['t', 'btcmap-review'], ['rating', '4']]);
+  assert.deepEqual(btcMapReviewTags(26188, null), [['r', 'https://btcmap.org/merchant/26188'], ['t', 'btcmap-review']],
+    'a review can be text alone');
+  assert.equal(btcMapReviewTags(26188, 9).some(tag => tag[0] === 'rating'), false,
+    'a rating outside 1-5 is dropped rather than clamped into a score nobody gave');
+});
+
+test('the filter asks for the reviews of this place and nothing else', () => {
+  const filter = btcMapReviewFilter(26188);
+  assert.deepEqual(filter['#r'], ['https://btcmap.org/merchant/26188']);
+  assert.deepEqual(filter['#t'], ['btcmap-review']);
+  assert.deepEqual(filter.kinds, [1]);
+});
+
+test('a note about something else is not a review of this place', () => {
+  const otherRef = {kind: 1, id: 'x', pubkey: 'aa', created_at: 10, content: 'nice', tags: [['r', 'https://btcmap.org/merchant/1'], ['t', 'btcmap-review']]};
+  assert.equal(parseBtcMapReview(otherRef, 26188), null, 'a review of another place');
+  const noTag = {kind: 1, id: 'y', pubkey: 'aa', created_at: 10, content: 'nice', tags: [['r', 'https://btcmap.org/merchant/26188']]};
+  assert.equal(parseBtcMapReview(noTag, 26188), null, 'a note that never said it was a review');
+  const wrongKind = {...noTag, kind: 7, tags: btcMapReviewTags(26188, 5)};
+  assert.equal(parseBtcMapReview(wrongKind, 26188), null, 'a reaction is not a review');
+});
+
+test('one review per person, the newest wins, and the average is over the rated ones', () => {
+  const review = (pubkey, at, text, rating) => ({
+    kind: 1, id: `id${at}${pubkey}`, pubkey, created_at: at, content: text, tags: btcMapReviewTags(26188, rating),
+  });
+  const collected = collectBtcMapReviews([
+    review('aa', 100, 'Takes lightning', 5),
+    review('bb', 120, 'Onchain only', 3),
+    review('aa', 140, 'Lightning works now', 4),      // the same person, later
+    review('cc', 150, '', null),                      // empty and unrated: says nothing
+  ], 26188);
+
+  assert.equal(collected.count, 2, 'two people, not three reviews');
+  assert.equal(collected.average, 3.5, '(4 + 3) / 2, the later review of aa replacing the earlier one');
+  assert.equal(collected.rated, 2);
+  assert.equal(collected.reviews[0].pubkey, 'aa', 'newest first');
+  assert.equal(collected.reviews[0].text, 'Lightning works now');
+});
+
+test('a place nobody reviewed reports no average rather than zero', () => {
+  const collected = collectBtcMapReviews([], 26188);
+  assert.equal(collected.count, 0);
+  assert.equal(collected.average, null, 'zero would read as one star');
+});
+
+test('the page shows reviews above the BTC Map notes and calls those notes what they are', async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL('../btcMap.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../btcMap.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(page, /btcMapReviewFilter\(placeId\)/);
+  assert.match(page, /readReviews\(id\)/);
+  assert.match(page, /collectBtcMapReviews\(reviewEvents, id\)/);
+  assert.match(page, /if \(reviews\) fragment\.append\(reviewSection\(place, reviews\)\);/);
+  assert.match(page, /heading\.textContent = 'Notes from Bitcoin Map'/);
+  assert.doesNotMatch(page, /Recent visitor notes/);
+  assert.match(page, /signNostrEvent\(template, \{action: 'btc-map-review'/);
+  assert.match(page, /wss:\/\/nostr\.satoshi\.si/);
+  // the icon font has one star weight only, so the stars are drawn
+  assert.match(page, /function starIcon\(filled\)/);
+  assert.doesNotMatch(page, /lni-star-2/);
+  assert.match(css, /\.btc-map-reviews \{/);
+  assert.match(css, /\.btc-map-stars svg\.is-filled path/);
 });
