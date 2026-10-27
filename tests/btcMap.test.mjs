@@ -182,6 +182,21 @@ test('BTC Map page is integrated with navigation, help, PWA and page context', a
   assert.match(page, /const HEAT_MIN_ZOOM = 4/);
   assert.match(page, /const MARKER_PREFETCH_ZOOM = 7/);
   assert.match(page, /const MARKER_ZOOM = 7\.5/);
+  // The Bitcoin pins start exactly where the hexagons stop, so clustering has to be gone before that. It sat
+  // at 11 - four zoom levels past the hand-over - and the first zoom that showed places showed cluster
+  // bubbles instead of the business markers. MapLibre clusters by tile zoom (the floor of the map zoom), so
+  // the ceiling has to stay below 7 to be clear at 7.5.
+  assert.match(page, /const CLUSTER_MAX_ZOOM = MARKER_ZOOM - 1\.5/);
+  assert.match(page, /clusterMaxZoom:CLUSTER_MAX_ZOOM/);
+  assert.doesNotMatch(page, /clusterMaxZoom:\s*\d/, 'the ceiling is derived from the hand-over, not a literal');
+  {
+    const offset = Number((page.match(/const CLUSTER_MAX_ZOOM = MARKER_ZOOM - ([\d.]+)/) || [])[1]);
+    const marker = Number((page.match(/const MARKER_ZOOM = ([\d.]+)/) || [])[1]);
+    assert.ok(offset > 0, 'the ceiling is a distance below the hand-over');
+    assert.ok(marker - offset < Math.floor(marker),
+      `clustering must stop below tile zoom ${Math.floor(marker)} so ${marker} shows individual pins`);
+  }
+  assert.match(page, /id:'place-points', type:'symbol'[\s\S]*'icon-image':'bitcoin-place-pin'/);
   assert.match(page, /map\.getZoom\(\) < HEAT_MIN_ZOOM/);
   assert.match(page, /Zoom in to see Bitcoin place density/);
   assert.match(page, /map\.getZoom\(\) < MARKER_ZOOM/);

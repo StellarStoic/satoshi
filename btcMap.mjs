@@ -41,6 +41,12 @@ const EMPTY_COLLECTION = {type:'FeatureCollection', features:[]};
 const HEAT_MIN_ZOOM = 4;
 const MARKER_PREFETCH_ZOOM = 7;
 const MARKER_ZOOM = 7.5;
+/* Clustering has one job here: the fallback where the density data failed to load and the places are drawn
+   at whatever zoom the reader is on. It must stop *below* the level where the hexagons stop, or the first
+   zoom that shows places shows cluster bubbles instead of the Bitcoin pins - which is what it did until
+   clusterMaxZoom sat at 11, nearly four zoom levels past the hand-over. MapLibre clusters by tile zoom
+   (floor of the map zoom), so this has to stay under 7 to be gone by 7.5. */
+const CLUSTER_MAX_ZOOM = MARKER_ZOOM - 1.5;
 const PLACE_CACHE_LIMIT = 6000;
 const PLACE_FETCH_BUFFER = 1.4;
 const elements = {
@@ -492,7 +498,7 @@ async function syncMapMode() {
 }
 
 async function installPlaceLayers() {
-  map.addSource('btc-places', {type:'geojson', data:EMPTY_COLLECTION, cluster:true, clusterRadius:48, clusterMaxZoom:11});
+  map.addSource('btc-places', {type:'geojson', data:EMPTY_COLLECTION, cluster:true, clusterRadius:48, clusterMaxZoom:CLUSTER_MAX_ZOOM});
   map.addLayer({
     id:'place-clusters', type:'circle', source:'btc-places', filter:['has','point_count'],
     paint:{
@@ -513,6 +519,8 @@ async function installPlaceLayers() {
   } catch (error) {
     console.warn('BTC Map marker image could not load; using the fallback marker.', error);
   }
+  // From MARKER_ZOOM the hexagons are gone and this is what a business looks like: the Bitcoin pin, one per
+  // place, because clustering has already stopped below this zoom (see CLUSTER_MAX_ZOOM).
   map.addLayer(customMarker ? {
     id:'place-points', type:'symbol', source:'btc-places', filter:['!',['has','point_count']],
     layout:{
