@@ -105,21 +105,20 @@ body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companio
 .btc-map-reviews { margin-top:18px; padding-top:14px; border-top:1px solid var(--border,#444); }
 .btc-map-reviews h3 { margin:0; font-size:.78rem; display:inline-block; }
 .btc-map-reviews-summary { display:inline-flex; align-items:center; gap:8px; margin-left:10px;
-  color:var(--text-muted,#bec1be); font-size:.72rem; }
+  color:var(--text-muted,#bec1be); font-size:.75rem; }
 .btc-map-stars { display:inline-flex; gap:1px; color:var(--accent,#f2a900); }
 /* drawn stars: filled when earned, outlined when not */
 .btc-map-stars svg, .btc-map-review-star svg { width:13px; height:13px; display:block; }
 .btc-map-stars svg path, .btc-map-review-star svg path { fill:none; stroke:currentColor; stroke-width:1.6;
   stroke-linejoin:round; }
 .btc-map-stars svg.is-filled path, .btc-map-review-star svg.is-filled path { fill:currentColor; }
-.btc-map-stars--small { font-size:.7rem; }
 .btc-map-review { margin-top:10px; }
-.btc-map-review-top { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; font-size:.7rem;
+.btc-map-review-top { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; font-size:.75rem;
   color:var(--text-muted,#bec1be); }
 .btc-map-review-author { font-weight:600; color:var(--text,#f4f4f1); }
 .btc-map-review p { margin:4px 0 0; font-size:.76rem; line-height:1.45; }
 .btc-map-review-form { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border,#444); }
-.btc-map-review-intro { margin:0 0 8px; font-size:.72rem; color:var(--text-muted,#bec1be); }
+.btc-map-review-intro { margin:0 0 8px; font-size:.75rem; color:var(--text-muted,#bec1be); }
 .btc-map-review-stars { display:flex; gap:2px; margin-bottom:8px; }
 .btc-map-review-star { width:30px; height:30px; display:grid; place-items:center; padding:0;
   background:transparent; border:1px solid var(--border,#444); border-radius:4px; cursor:pointer;
@@ -131,8 +130,8 @@ body.btc-map-page :is(.site-help-trigger,.site-help-companion.site-help-companio
   padding:8px; background:transparent; color:var(--text,#f4f4f1); border:1px solid var(--border,#444);
   border-radius:4px; resize:vertical; }
 .btc-map-review-form textarea:focus-visible { outline:2px solid var(--accent,#f2a900); outline-offset:-1px; }
-.btc-map-review-submit { margin-top:8px; padding:7px 14px; font:inherit; font-size:.74rem; cursor:pointer;
+.btc-map-review-submit { margin-top:8px; padding:7px 14px; font:inherit; font-size:.75rem; cursor:pointer;
   background:var(--accent,#f2a900); color:#17140d; border:1px solid var(--accent,#f2a900); border-radius:4px;
   font-weight:600; }
 .btc-map-review-submit:disabled { opacity:.5; cursor:default; }
-.btc-map-review-status { margin:8px 0 0; font-size:.72rem; color:var(--text-muted,#bec1be); min-height:1em; }
+.btc-map-review-status { margin:8px 0 0; font-size:.75rem; color:var(--text-muted,#bec1be); min-height:1em; }
