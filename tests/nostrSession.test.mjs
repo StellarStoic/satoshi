@@ -1059,3 +1059,103 @@ test('a hand-over outlives the request it was made under, so a later tap knows w
     JSON.stringify({action: 'sign', createdAt: Date.now() - 31 * 60 * 1000}));
   assert.equal(sessionModule.lastAmberHandOver(), null, 'a stale hand-over does not decide a tap made later');
 });
+
+/* A NIP-46 request only lands if at least one relay the signer watches accepts it. The pool publishes with
+   Promise.any, so a list of dead relays produced "All promises were rejected" on the connect button - a
+   message that names nothing. These tests drive loginWithBunker against stubs to prove the page now probes
+   first, narrows to the relays that answered, and says which relays failed. */
+
+function stubSignerEnv({parseRelays, dead = [], connectError = null}) {
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  const opened = [];
+  globalThis.WebSocket = class {
+    constructor(url) {
+      this.url = url;
+      opened.push(url);
+      const deadRelay = dead.includes(url);
+      setTimeout(() => {
+        if (deadRelay) this.onerror?.({});
+        else this.onopen?.({});
+      }, 0);
+    }
+    close() {}
+  };
+  const built = [];
+  globalThis.window = {
+    location: {origin: 'https://pinstr.si', pathname: '/stickyNotes.html', host: 'pinstr.si'},
+    open() {},
+    dispatchEvent() {},
+    NostrTools: {
+      generateSecretKey: () => Uint8Array.from({length: 32}, (unused, index) => index + 1),
+      getPublicKey: () => 'a'.repeat(64),
+      nip19: {npubEncode: pubkey => `npub1${pubkey.slice(0, 58)}`},
+      finalizeEvent: template => ({...template, pubkey: 'a'.repeat(64), id: 'c'.repeat(64), sig: 'd'.repeat(128)}),
+    },
+    NostrBunker: {
+      parseBunkerInput: async () => ({pubkey: 'e'.repeat(64), relays: parseRelays}),
+      BunkerSigner: {
+        fromBunker: (secret, pointer) => {
+          built.push(pointer);
+          return {
+            connect: async () => {
+              if (connectError) throw connectError;
+            },
+            getPublicKey: async () => 'e'.repeat(64),
+            signEvent: async template => ({...template, pubkey: 'e'.repeat(64), id: 'f'.repeat(64), sig: 'g'.repeat(128)}),
+          };
+        },
+      },
+    },
+  };
+  return {opened, built};
+}
+
+test('a bunker connection only asks the relays that answered', async () => {
+  const dead = 'wss://dead.example';
+  const {opened, built} = stubSignerEnv({
+    parseRelays: [dead, 'wss://live.example'],
+    dead: [dead],
+  });
+  const module = await import(`../nostrSession.mjs?bunker-narrow=${Date.now()}`);
+  const session = await module.loginWithBunker(`bunker://${'e'.repeat(64)}?relay=${encodeURIComponent(dead)}&relay=${encodeURIComponent('wss://live.example')}`);
+
+  assert.equal(session.method, 'bunker');
+  assert.ok(opened.includes(dead), 'the dead relay is probed, not trusted');
+  assert.deepEqual(built.at(-1).relays, ['wss://live.example'],
+    'the signer is asked on the relay that answered, so the pool has nothing dead to reject');
+});
+
+test('when no relay answers, the reader is told which ones, not that promises were rejected', async () => {
+  stubSignerEnv({parseRelays: ['wss://dead-one.example', 'wss://dead-two.example'],
+                 dead: ['wss://dead-one.example', 'wss://dead-two.example']});
+  const module = await import(`../nostrSession.mjs?bunker-dead=${Date.now()}`);
+  await assert.rejects(
+    () => module.loginWithBunker(`bunker://${'e'.repeat(64)}?relay=wss%3A%2F%2Fdead-one.example&relay=wss%3A%2F%2Fdead-two.example`),
+    error => {
+      assert.doesNotMatch(error.message, /promises were rejected/i, 'the pool error never reaches the reader');
+      assert.match(error.message, /wss:\/\/dead-one\.example/);
+      assert.match(error.message, /wss:\/\/dead-two\.example/);
+      assert.match(error.message, /nostr\.satoshi\.si/, 'it says where a fresh invitation would meet');
+      return true;
+    },
+  );
+});
+
+test('a pool that still reports the AggregateError is translated on the way out', async () => {
+  stubSignerEnv({
+    parseRelays: ['wss://live.example'],
+    connectError: Object.assign(new Error('All promises were rejected'), {name: 'AggregateError'}),
+  });
+  const module = await import(`../nostrSession.mjs?bunker-aggregate=${Date.now()}`);
+  await assert.rejects(
+    () => module.loginWithBunker(`bunker://${'e'.repeat(64)}?relay=wss%3A%2F%2Flive.example`),
+    error => {
+      assert.doesNotMatch(error.message, /promises were rejected/i);
+      assert.match(error.message, /did not pick up the request/);
+      assert.match(error.message, /wss:\/\/live\.example/);
+      return true;
+    },
+  );
+});

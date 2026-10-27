@@ -769,7 +769,9 @@ function awaitNostrConnect(clientSecret, uri, relays, timeout) {
       resolve(saveSession(pubkey, 'bunker'));
     }).catch(error => {
       clearTimeout(timer);
-      reject(error);
+      // the invitation's own relays are ours, so reaching this means they refused: name them rather than
+      // passing the pool's AggregateError through
+      reject(bunkerRelayFailure(error, relays));
     });
   });
   return {
@@ -825,15 +827,85 @@ export function resumeNostrConnect({timeout = 5 * 60 * 1000} = {}) {
   return {uri: saved.uri, ...awaitNostrConnect(clientSecret, saved.uri, saved.relays, timeout)};
 }
 
+
+/**
+ * Which of these relays will actually take a socket.
+ *
+ * A NIP-46 request has to be accepted by at least one relay the signer watches, and the bunker client
+ * publishes with `Promise.any(pool.publish(pointer.relays, …))`. When every relay in that list refuses, that
+ * is an AggregateError whose message is "All promises were rejected" — which names nothing, blames nothing,
+ * and was what a reader saw on the connect button. Probing first turns it into a sentence, and lets the
+ * request go only to relays that answered.
+ */
+async function relaysThatAnswer(relays = [], timeoutMs = 3000) {
+  if (!Array.isArray(relays) || !relays.length) return [];
+  const probes = relays.map(url => new Promise(resolve => {
+    let socket;
+    let settled = false;
+    const done = ok => {
+      if (settled) return;
+      settled = true;
+      try { socket?.close(); } catch { /* already gone */ }
+      resolve(ok ? url : null);
+    };
+    try {
+      socket = new WebSocket(url);
+    } catch {
+      return resolve(null);
+    }
+    const timer = setTimeout(() => done(false), timeoutMs);
+    socket.onopen = () => { clearTimeout(timer); done(true); };
+    socket.onerror = () => { clearTimeout(timer); done(false); };
+    socket.onclose = () => { clearTimeout(timer); done(false); };
+  }));
+  return (await Promise.all(probes)).filter(Boolean);
+}
+
+/** The relays a saved bunker link points at, so a failure can name them. */
+function savedBunkerRelays() {
+  const saved = readJson(localStorage, BUNKER_KEY);
+  if (!saved?.url) return [];
+  try {
+    return new URL(saved.url).searchParams.getAll('relay');
+  } catch {
+    return [];
+  }
+}
+
+/** Turn a relay pool's AggregateError into something a reader can act on. */
+function bunkerRelayFailure(error, relays = []) {
+  const message = String(error?.message || error || '');
+  if (!/all promises were rejected|failed to connect|timed out/i.test(message)) return error;
+  const list = relays.length ? relays.join(', ') : 'its relay list';
+  return new Error(
+    `Your signer did not pick up the request on ${list}. Open the signer app, check it is online, then `
+    + `try again — or connect it fresh, so it meets this page on ${NOSTR_CONNECT_RELAYS[0]}.`,
+  );
+}
+
 async function connectBunker(saved) {
   if (!window.NostrBunker) throw new Error('Nostr bunker tools did not load.');
   const pointer = await window.NostrBunker.parseBunkerInput(saved.url);
   if (!pointer?.pubkey || !pointer.relays?.length) throw new Error('Enter a bunker:// link with at least one relay.');
   const clientSecret = Uint8Array.from(saved.clientSecret.match(/.{2}/g), pair => Number.parseInt(pair, 16));
-  const signer = window.NostrBunker.BunkerSigner.fromBunker(clientSecret, pointer, {
+  // A relay that never opens cannot carry a request, and one dead entry is enough to make the pool's
+  // Promise.any fail when it was the only one the signer watched.
+  const answering = await relaysThatAnswer(pointer.relays);
+  if (!answering.length) {
+    throw new Error(
+      `The signer's ${pointer.relays.length === 1 ? 'relay' : 'relays'} did not answer `
+      + `(${pointer.relays.join(', ')}). Open the signer app, then connect again — a fresh invitation meets `
+      + `this page on ${NOSTR_CONNECT_RELAYS[0]} instead.`,
+    );
+  }
+  const signer = window.NostrBunker.BunkerSigner.fromBunker(clientSecret, {...pointer, relays: answering}, {
     onauth: url => window.open(url, '_blank', 'noopener,noreferrer'),
   });
-  await signer.connect({name: 'satoshi.si', url: location.origin + '/stickyNotes.html'});
+  try {
+    await signer.connect({name: 'satoshi.si', url: location.origin + '/stickyNotes.html'});
+  } catch (error) {
+    throw bunkerRelayFailure(error, pointer.relays);
+  }
   bunkerSigner = signer;
   return signer;
 }
@@ -880,7 +952,9 @@ export function savedBunker() {
 export async function reconnectBunker() {
   const saved = savedBunker();
   if (!saved) throw new Error('No bunker connection is saved in this browser.');
-  const signer = await connectBunker(saved);
+  const signer = await connectBunker(saved).catch(error => {
+    throw bunkerRelayFailure(error, savedBunkerRelays());
+  });
   return saveSession(await signer.getPublicKey(), 'bunker');
 }
 
@@ -925,7 +999,11 @@ export async function signNostrEvent(template, context = null) {
   }
   if (session.method === 'bunker') {
     if (!await signerReady()) throw new Error('Reconnect your bunker to sign.');
-    return bunkerSigner.signEvent(template);
+    try {
+      return await bunkerSigner.signEvent(template);
+    } catch (error) {
+      throw bunkerRelayFailure(error, savedBunkerRelays());
+    }
   }
   if (session.method === 'amber') {
     // Sent without a callback on purpose. Amber's return through the callback URL is dropped between
