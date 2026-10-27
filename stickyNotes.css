@@ -8,6 +8,11 @@
 .sticky-top-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; background: rgba(18,19,19,.68); color: #f4f4f1; font: inherit; font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.2); backdrop-filter: blur(5px); cursor: pointer; }
 .sticky-top-button:hover, .sticky-top-button:focus-visible { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); outline: none; }
 .sticky-top-button:disabled { opacity:.6; cursor:default; }
+/* The 3D button is off on a phone-sized or touch-first screen (syncWorldButton in stickyNotes.mjs): the world
+   behind it is a pointer scene. It fades further than a merely disabled button and refuses the accent hover,
+   so a tap does not look like a control that was broken by the tap. */
+#openPinstrWorld:disabled, #openPinstrWorld.is-unavailable { opacity:.35; color:#8a8a86; cursor:not-allowed; border-style:dashed; }
+#openPinstrWorld:disabled:hover, #openPinstrWorld.is-unavailable:hover { border-color:rgba(255,255,255,.24); color:#8a8a86; }
 /* The sort button is the one top button whose ring changes colour - green while a filter is on - so it used to
    reserve that ring's thickness with a 2px TRANSPARENT border. That made it the only button in the row with no
    border at rest, reading as a missing control rather than a resting one. It carries the same border as its

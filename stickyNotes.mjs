@@ -6583,7 +6583,29 @@ elements.openBoard.addEventListener('click', () => {
   showDialog(elements.boardDialog);
   focusBoardDialog();
 });
+// The 3D world is a pointer-driven scene: on a phone it lands on a page whose panning fights the page's own
+// gestures and whose notes are barely readable at that size. So the button is disabled rather than removed - a
+// tablet or a narrow window with a real pointer keeps it - and it stays in place so the row does not reflow.
+const worldUnavailable = window.matchMedia('(pointer: coarse) and (hover: none), (max-width: 680px)');
+function syncWorldButton() {
+  const button = elements.openWorld;
+  if (!button) return;
+  const off = worldUnavailable.matches;
+  button.disabled = off;
+  button.classList.toggle('is-unavailable', off);
+  button.setAttribute('aria-disabled', String(off));
+  button.title = off ? '3D needs a bigger screen' : 'Open 3D';
+  button.setAttribute('aria-label', off
+    ? 'Open this board in 3D (unavailable on this screen)'
+    : 'Open this board in 3D');
+}
+syncWorldButton();
+if (typeof worldUnavailable.addEventListener === 'function') worldUnavailable.addEventListener('change', syncWorldButton);
+else if (typeof worldUnavailable.addListener === 'function') worldUnavailable.addListener(syncWorldButton);
+
 elements.openWorld.addEventListener('click', () => {
+  // a disabled button cannot fire, but a stray .click() can
+  if (worldUnavailable.matches) return;
   if (!activeGeohashes.length) {
     status(elements.boardChooserStatus, 'Choose a geohash before opening the 3D world.', true);
     showDialog(elements.boardDialog);
