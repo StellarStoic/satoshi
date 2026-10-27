@@ -791,8 +791,8 @@ function offeringSection(place) {
    site's own relay first, then three public ones that answer a browser. */
 const REVIEW_RELAYS = [
   'wss://nostr.satoshi.si',
-  'wss://relay.damus.io',
   'wss://relay.primal.net',
+  'wss://relay.snort.social',
   'wss://relay.ditto.pub',
 ];
 const REVIEW_TIMEOUT_MS = 6000;

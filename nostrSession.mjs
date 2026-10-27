@@ -700,7 +700,12 @@ export function resumeAmber() {
  * reach it needs nothing else; the other is a widely used public relay, because a phone that cannot
  * reach ours must still be able to answer.
  */
-const NOSTR_CONNECT_RELAYS = ['wss://nostr.satoshi.si', 'wss://relay.damus.io'];
+/* Where this page meets a remote signer. The site's own relay is first because it is 106 ms away and always
+   up; the second is relay.primal.net (185 ms in the same measurement) and not relay.damus.io, which answered
+   in 444 ms but refused a connection outright minutes earlier from the same machine. In a handshake a flaky
+   relay is worse than no relay: the signer waits on a socket the page never opened, and the reader sees a
+   failed WebSocket and nothing else. */
+const NOSTR_CONNECT_RELAYS = ['wss://nostr.satoshi.si', 'wss://relay.primal.net'];
 // The invitation this page has already given a signer. It is kept so a reload while the reader is
 // still enrolling in Amber can wait on the same client key and secret instead of minting a second
 // one. Ten minutes: long enough to walk Amber's own screens, short enough that a stale offer is never

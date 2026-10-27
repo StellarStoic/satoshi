@@ -500,7 +500,7 @@ test('a nostrconnect offer names this origin, waits for the signer, and can be c
 
   assert.equal(url.protocol, 'nostrconnect:');
   assert.match(url.host, /^[0-9a-f]{64}$/, 'the offer names the client key it will be answered to');
-  assert.deepEqual(url.searchParams.getAll('relay'), ['wss://nostr.satoshi.si', 'wss://relay.damus.io']);
+  assert.deepEqual(url.searchParams.getAll('relay'), ['wss://nostr.satoshi.si', 'wss://relay.primal.net']);
   assert.ok(url.searchParams.get('secret'), 'the handshake carries a secret the signer echoes back');
   assert.equal(url.searchParams.get('name'), 'pinstr.si', 'the signer is told which site it connects to');
   assert.equal(url.searchParams.get('url'), 'https://pinstr.si/stickyNotes.html');
@@ -511,7 +511,7 @@ test('a nostrconnect offer names this origin, waits for the signer, and can be c
   // Stored the way a bunker:// link stores it, so reconnecting later needs no code at all.
   const stored = JSON.parse(storage.getItem('satoshi:nostr:bunker:v1'));
   assert.equal(stored.clientSecret, '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20');
-  assert.equal(stored.url, `bunker://${'e'.repeat(64)}?relay=wss%3A%2F%2Fnostr.satoshi.si&relay=wss%3A%2F%2Frelay.damus.io`);
+  assert.equal(stored.url, `bunker://${'e'.repeat(64)}?relay=wss%3A%2F%2Fnostr.satoshi.si&relay=wss%3A%2F%2Frelay.primal.net`);
   assert.equal(seen.uri, offer.uri, 'the offer is what the signer is handed');
   assert.equal(closed, 0, 'a connection that was made is left open');
 
@@ -820,7 +820,7 @@ test('a nostrconnect invitation survives a reload, is spent on success, and is n
   assert.equal(saved.clientSecret, '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20',
     'the client key the signer answers to is kept');
   assert.ok(saved.secret, 'and the handshake secret is kept with it');
-  assert.deepEqual(saved.relays, ['wss://nostr.satoshi.si', 'wss://relay.damus.io']);
+  assert.deepEqual(saved.relays, ['wss://nostr.satoshi.si', 'wss://relay.primal.net']);
   assert.equal(sessionModule.pendingNostrConnect().uri, offer.uri);
 
   // The reload waits on that same invitation rather than starting a new one behind Amber's back.
