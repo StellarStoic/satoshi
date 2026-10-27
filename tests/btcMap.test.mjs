@@ -306,7 +306,12 @@ test('the page shows reviews above the BTC Map notes and calls those notes what 
   assert.match(page, /if \(reviews\) fragment\.append\(reviewSection\(place, reviews\)\);/);
   assert.match(page, /heading\.textContent = 'Notes from Bitcoin Map'/);
   assert.doesNotMatch(page, /Recent visitor notes/);
-  assert.match(page, /signNostrEvent\(template, \{action: 'btc-map-review'/);
+  // the review form no longer implements the signer hand-over itself: the shared module owns the four ways a
+  // signer can answer, and a review signed in Amber is published by the next load
+  assert.match(page, /signOrHandOver\(template, \{action: 'btc-map-review'/);
+  assert.match(page, /import \{resumeHandOver, signOrHandOver\} from '\.\/siteIdentity\.mjs'/);
+  assert.match(page, /async function resumeReviewHandOver\(\)/);
+  assert.match(page, /resumeReviewHandOver\(\);/);
   assert.match(page, /wss:\/\/nostr\.satoshi\.si/);
   // the icon font has one star weight only, so the stars are drawn
   assert.match(page, /function starIcon\(filled\)/);

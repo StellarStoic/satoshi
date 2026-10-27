@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v512';   // v512: the account modal names how the reader signed in
+const CACHE = 'satoshi-static-v513';   // v513: one identity module any page can use without the signer
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',
@@ -12,7 +12,7 @@ const CORE = [
     '/news.html', '/news.css', '/news.mjs', '/newsModel.mjs', '/news-data.json',
     '/opreturn.html', '/opreturnBoard.html', '/opreturnModel.mjs', '/opreturnCard.mjs', '/opreturnPayment.mjs', '/burgerMenu.js',
     '/stickyNotes.html', '/stickyNotes.css', '/stickyNotes.mjs', '/pinstrWorld.html', '/pinstrWorld.css', '/pinstrWorld.mjs', '/pinstrWorldModel.mjs', '/pinstrWorldGifts.mjs',
- '/noteGifts.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/img/board-cork.png', '/img/note-crumple.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
+ '/noteGifts.mjs', '/stickyNotesModel.mjs', '/nostrSession.mjs', '/siteIdentity.mjs', '/img/board-cork.png', '/img/note-crumple.png', '/img/pin_red.png', '/img/pin_blue.png', '/img/pin_yellow.png', '/img/pin_green.png', '/img/pin_white.png', '/img/pin_purple.png', '/img/pin_magenta.png', '/img/pin_black.png',
     '/vendor/three/three.module.min.js', '/vendor/three/three.core.min.js', '/vendor/three/OrbitControls.js',
     '/vendor/maplibre/maplibre-gl.js', '/vendor/maplibre/maplibre-gl.css',
     '/btcMap.html', '/btcMap.css', '/btcMap.mjs', '/btcMapModel.mjs',

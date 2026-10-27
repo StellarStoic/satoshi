@@ -24,6 +24,7 @@ import {
   viewportCoverageContains,
   viewportRadiusKm,
 } from './btcMapModel.mjs';
+import {resumeHandOver, signOrHandOver} from './siteIdentity.mjs';
 import {
   adoptAmberClipboard,
   adoptAmberSignature,
@@ -510,6 +511,30 @@ async function syncMapMode() {
   if (visibleCachedPlaceCount()) {
     heatMode = false;
     setHeatLayersVisible(false);
+  }
+}
+
+/**
+ * A review that was signed in Amber while the reader was in another app. The event comes back on the next
+ * load; its `r` tag says which place it belongs to, so it is published and, if that place is open, shown.
+ */
+async function resumeReviewHandOver() {
+  try {
+    const answer = await resumeHandOver();
+    if (!answer?.event) return;
+    const reference = (answer.event.tags || []).find(tag => tag[0] === 'r' && /btcmap\.org\/merchant\/\d+/.test(String(tag[1])));
+    if (!reference) return;
+    const placeId = Number(String(reference[1]).split('/').pop());
+    const accepted = await publishReview(answer.event);
+    setStatus(accepted
+      ? `Your review was signed and published to ${accepted} of ${REVIEW_RELAYS.length} relays.`
+      : 'Your review was signed but no relay took it.', 4200);
+    if (currentPlace && Number(currentPlace.place.id) === placeId) {
+      const events = await readReviews(placeId);
+      renderPlace(currentPlace.place, currentPlace.comments, collectBtcMapReviews(events, placeId));
+    }
+  } catch {
+    // nothing was waiting, which is the ordinary case
   }
 }
 
@@ -1018,10 +1043,6 @@ function reviewForm(place) {
 
   form.addEventListener('submit', async submitEvent => {
     submitEvent.preventDefault();
-    if (!await signerReady()) {
-      status.textContent = 'Open the signer for this Nostr identity (or connect one), then try again.';
-      return;
-    }
     const body = text.value.trim();
     if (!body && !rating) {
       status.textContent = 'Add a line about the place, or a star rating.';
@@ -1036,13 +1057,14 @@ function reviewForm(place) {
         tags: btcMapReviewTags(place.id, rating || null),
         content: body,
       };
-      const signed = await signNostrEvent(template, {action: 'btc-map-review', placeId: place.id});
-      if (!signed) {
-        // Amber hands the signature back through the clipboard, not through this call
-        status.textContent = 'Approve it in Amber, then come back to this place — it posts once the signature lands.';
+      // Amber answers on the clipboard and a bunker answers later: both come back as `pending`, which this
+      // form shows and the next load finishes (see resumeReviewHandOver). One implementation, for every page.
+      const answer = await signOrHandOver(template, {action: 'btc-map-review', placeId: place.id});
+      if (answer.pending) {
+        status.textContent = answer.message;
         return;
       }
-      const accepted = await publishReview(signed);
+      const accepted = await publishReview(answer.event);
       if (!accepted) {
         status.textContent = 'No relay took the review. Try again in a moment.';
         return;
@@ -1223,6 +1245,8 @@ elements.locate.addEventListener('click', () => {
 
 map.on('load', async () => {
   await installPlaceLayers();
+  // a review signed in Amber on the previous visit lands here
+  resumeReviewHandOver();
   setPlaceLayersVisible(map.getZoom() >= MARKER_ZOOM);
   console.log(`BTC Map zoom level: ${map.getZoom().toFixed(2)}`);
   syncMapMode();
