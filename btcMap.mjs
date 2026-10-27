@@ -114,10 +114,21 @@ function refreshAccountUi() {
     auth = null;
   }
   elements.account.classList.toggle('is-connected', Boolean(auth));
+  // How this identity was signed in decides what "Connect to BTC Map" will do next, and the modal used to say
+  // only "signed in" for all of them. An identity that arrived through a signer (which is how an Amber
+  // invitation is stored) needs that signer awake before it can approve anything, so the line names it.
+  const method = session?.method;
+  const through = method === 'bunker'
+    ? ' through your signer'
+    : method === 'amber'
+      ? ' through Amber'
+      : method === 'extension'
+        ? ' through your extension'
+        : '';
   elements.identity.textContent = auth
     ? `Connected as ${accountName(session)}.`
     : session
-      ? `Signed in as ${accountName(session)}. Connect this identity to BTC Map.`
+      ? `Signed in as ${accountName(session)}${through}. Connect this identity to BTC Map.`
       : 'Connect your Nostr identity to keep favorite places across devices.';
   elements.connect.querySelector('span').textContent = auth ? 'Refresh connection' : session ? 'Connect to BTC Map' : 'Browser extension';
   elements.disconnect.hidden = !auth;

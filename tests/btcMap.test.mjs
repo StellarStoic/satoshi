@@ -311,6 +311,11 @@ test('the page shows reviews above the BTC Map notes and calls those notes what 
   // the icon font has one star weight only, so the stars are drawn
   assert.match(page, /function starIcon\(filled\)/);
   assert.doesNotMatch(page, /lni-star-2/);
+  // the account modal used to say "signed in" for every method, which left an Amber-through-a-signer reader
+  // with no hint that their signer had to be awake before "Connect to BTC Map" could do anything
+  assert.match(page, /const method = session\?\.method;/);
+  assert.match(page, /method === 'bunker'\s*\n?\s*\? ' through your signer'/);
+  assert.match(page, /Signed in as \$\{accountName\(session\)\}\$\{through\}/);
   assert.match(css, /\.btc-map-reviews \{/);
   assert.match(css, /\.btc-map-stars svg\.is-filled path/);
 });
