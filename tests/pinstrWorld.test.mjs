@@ -97,8 +97,9 @@ test('a 3D draft position becomes the ordinary board placement signed into the n
 });
 
 test('the world is pure 3D, uses pins as handles, and includes compact desktop controls', async () => {
-  const [boardPage, world, worldCss, page, help, three] = await Promise.all([
+  const [boardPage, boardScript, world, worldCss, page, help, three] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../pinstrWorld.html', import.meta.url), 'utf8'),
     readFile(new URL('../pinstrWorld.css', import.meta.url), 'utf8'),
     readFile(new URL('../pinstrWorld.mjs', import.meta.url), 'utf8'),
@@ -154,6 +155,12 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.match(page, /const WORLD_ZOOM_MIN = \.45/);
   assert.match(page, /const WORLD_ZOOM_MAX = 6/);
   assert.match(page, /const MOBILE_RENDERING = matchMedia\('\(pointer:coarse\)'\)/);
+  // The board used to disable the 3D button on a touch or narrow screen. The world page sets touch-action:none
+  // so OrbitControls owns the gestures, ships a <=600px layout and lowers its own texture resolution on touch,
+  // so the board refusing that same screen contradicts the product. This asserts the refusal stays gone.
+  assert.doesNotMatch(boardScript, /worldUnavailable/);
+  assert.doesNotMatch(boardScript, /3D needs a bigger screen/);
+  assert.doesNotMatch(boardScript, /is-unavailable/);
   assert.match(page, /const NOTE_TEXTURE_SCALE = MOBILE_RENDERING \? \.25 : 1/);
   assert.match(page, /const LABEL_TEXTURE_SCALE = MOBILE_RENDERING \? \.5 : 1/);
   assert.match(page, /antialias:!MOBILE_RENDERING/);
