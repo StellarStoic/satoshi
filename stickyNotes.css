@@ -18,6 +18,10 @@
 }
 .sticky-note .sticky-note__event span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sticky-note .sticky-note__event:hover, .sticky-note .sticky-note__event:focus-visible { border-color: var(--accent, #f2a900); }
+/* The words' own wrapper is a flex item too, and its automatic minimum size is the card's min-content width — which
+   is the whole nowrap label. Without this the wrapper (and so the card) is as wide as the title, measured 302px inside
+   a 184px text box on a 140px note. Clamping the wrapper is what lets the label truncate instead. */
+.sticky-note .sticky-note__text > span { max-width: 100%; min-width: 0; }
 .note-gift__rsvp { display: grid; gap: 8px; margin: 4px 0 10px; text-align: left; }
 .note-gift__rsvp-title { margin: 0; font-weight: 600; }
 .note-gift__rsvp-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
