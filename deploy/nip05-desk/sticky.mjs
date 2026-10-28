@@ -542,20 +542,33 @@ function isFraction(value) {
 }
 const LINK_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
 export const LINK_LABEL = 'link';         // what the board prints in place of an address
+// A calendar-event reference is machine data the board draws as a card, so it counts as the card's own label.
+const EVENT_REFERENCE_PATTERN = /(?:nostr:)?(?:naddr1|nevent1)[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{20,}/gi;
+export const EVENT_LABEL = 'calendar event';
 
 /**
  * What a note's limit counts: the note as a reader will see it. An address is machine data
  * that can run to thousands of characters, while the board prints the word "link" in its
- * place, so a link counts as that word. The board measures the same way, and
- * deploy/check-frontend-contract.mjs holds the two together.
+ * place, so a link counts as that word; a calendar reference is drawn as a card and counts as
+ * that card's label. The board measures the same way, and deploy/check-frontend-contract.mjs
+ * holds the two together.
  */
 export function contentLength(content) {
   const text = String(content || '');
+  // one pass, longest match first, so a reference is never also counted as a link or as text
+  const runs = [...text.matchAll(EVENT_REFERENCE_PATTERN)].map(found => ({
+    index: found.index, length: found[0].length, label: EVENT_LABEL,
+  }));
+  runs.push(...[...text.matchAll(LINK_PATTERN)].map(found => ({
+    index: found.index, length: found[0].length, label: LINK_LABEL,
+  })));
+  runs.sort((left, right) => left.index - right.index);
   let length = 0;
   let cursor = 0;
-  for (const found of text.matchAll(LINK_PATTERN)) {
-    length += [...text.slice(cursor, found.index)].length + LINK_LABEL.length;
-    cursor = found.index + found[0].length;
+  for (const run of runs) {
+    if (run.index < cursor) continue;         // already inside a longer run
+    length += [...text.slice(cursor, run.index)].length + run.label.length;
+    cursor = run.index + run.length;
   }
   return length + [...text.slice(cursor)].length;
 }

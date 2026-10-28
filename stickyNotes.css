@@ -5,6 +5,44 @@
 .sticky-page-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .sticky-top-actions { position:absolute; top:calc(19px + env(safe-area-inset-top)); right:max(24px,env(safe-area-inset-right)); z-index:2200; display:flex; align-items:center; gap:10px; max-width:calc(100vw - 24px); }
 .sticky-help-slot { display:block; flex:0 0 40px; width:40px; height:40px; }
+/* The card a calendar reference becomes inside a note, and the answer row on the signature dialog. */
+.sticky-note__event {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 4px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 6px;
+  background: rgba(0,0,0,.28); font-size: .86em; line-height: 1.3; text-align: left; cursor: pointer;
+  color: inherit; vertical-align: middle;
+}
+.sticky-note__event span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sticky-note__event:hover, .sticky-note__event:focus-visible { border-color: var(--accent, #f2a900); }
+.note-gift__rsvp { display: grid; gap: 8px; margin: 4px 0 10px; text-align: left; }
+.note-gift__rsvp-title { margin: 0; font-weight: 600; }
+.note-gift__rsvp-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.note-gift__rsvp-buttons button { min-height: 44px; padding: 0 14px; border: 1px solid rgba(255,255,255,.24);
+  border-radius: 8px; background: rgba(18,19,19,.7); color: inherit; font: inherit; cursor: pointer; }
+.note-gift__rsvp-buttons button:hover:not(:disabled), .note-gift__rsvp-buttons button:focus-visible:not(:disabled) {
+  border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); }
+.note-gift__rsvp-buttons button[aria-pressed="true"] { border-color: var(--accent, #f2a900);
+  color: var(--accent, #f2a900); font-weight: 600; }
+.note-gift__rsvp-buttons button:disabled { opacity: .5; cursor: not-allowed; }
+/* The card a calendar reference becomes inside a note, and the answer row on the signature dialog. */
+.sticky-note__event {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 4px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 6px;
+  background: rgba(0,0,0,.28); font-size: .86em; line-height: 1.3; text-align: left; cursor: pointer;
+  color: inherit; vertical-align: middle;
+}
+.sticky-note__event span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sticky-note__event:hover, .sticky-note__event:focus-visible { border-color: var(--accent, #f2a900); }
+.note-gift__rsvp { display: grid; gap: 8px; margin: 4px 0 10px; text-align: left; }
+.note-gift__rsvp-title { margin: 0; font-weight: 600; }
+.note-gift__rsvp-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.note-gift__rsvp-buttons button { min-height: 44px; padding: 0 14px; border: 1px solid rgba(255,255,255,.24);
+  border-radius: 8px; background: rgba(18,19,19,.7); color: inherit; font: inherit; cursor: pointer; }
+.note-gift__rsvp-buttons button:hover:not(:disabled), .note-gift__rsvp-buttons button:focus-visible:not(:disabled) {
+  border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); }
+.note-gift__rsvp-buttons button[aria-pressed="true"] { border-color: var(--accent, #f2a900);
+  color: var(--accent, #f2a900); font-weight: 600; }
+.note-gift__rsvp-buttons button:disabled { opacity: .5; cursor: not-allowed; }
 .sticky-top-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255,255,255,.24); border-radius: 6px; background: rgba(18,19,19,.68); color: #f4f4f1; font: inherit; font-size: 22px; line-height: 1; box-shadow: 0 4px 14px rgba(0,0,0,.2); backdrop-filter: blur(5px); cursor: pointer; }
 .sticky-top-button:hover, .sticky-top-button:focus-visible { border-color: var(--accent, #f2a900); color: var(--accent, #f2a900); outline: none; }
 .sticky-top-button:disabled { opacity:.6; cursor:default; }

@@ -1,11 +1,8 @@
+import {RSVP_KIND} from '../stickyNotesModel.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  REACTION_SET, ZAP_AMOUNTS, emojiTagFor, reactionContent, reactionTemplate,
-  bech32Encode, bech32Decode, lnurlEncode, lnurlDecode, lud16ToLnurlpUrl,
-  parseLnurlPay, clampZapAmount, zapRequestTemplate, zapCallbackUrl, parseInvoice,
-} from '../noteGifts.mjs';
+import {REACTION_SET, ZAP_AMOUNTS, emojiTagFor, reactionContent, reactionTemplate, bech32Encode, bech32Decode, lnurlEncode, lnurlDecode, lud16ToLnurlpUrl, parseLnurlPay, clampZapAmount, zapRequestTemplate, zapCallbackUrl, parseInvoice, rsvpTemplate} from '../noteGifts.mjs';
 // The names this file's first import list predates, taken the same way rather than rewritten.
 import {
   invoiceAmountSats, zapReceiptSats, zapReceiptRequest, giftTally,
@@ -238,4 +235,23 @@ test('the answer is an invoice or a reason, and nothing else passes for one', ()
   assert.equal(parseInvoice({}).ok, false);
   assert.equal(parseInvoice({pr: 'https://example.com'}).ok, false, 'not every string is an invoice');
   assert.equal(parseInvoice({pr: 'lnbc 1p3unwfus'}).ok, false);
+});
+
+// ------------------------------------------------------------------ the answer to a calendar event
+test('an RSVP is an addressable answer to one event coordinate', () => {
+  const coordinate = `31923:${'a'.repeat(64)}:ridge`;
+  const template = rsvpTemplate({coordinate, status: 'accepted', eventId: 'b'.repeat(64), authorPubkey: 'c'.repeat(64)});
+  assert.equal(template.kind, 31925);
+  assert.equal(template.content, '');
+  assert.deepEqual(template.tags.slice(0, 3), [['a', coordinate], ['d', coordinate], ['status', 'accepted']]);
+  // d is the coordinate itself, so answering again replaces the earlier answer instead of piling up
+  assert.equal(template.tags[1][1], template.tags[0][1]);
+});
+
+test('an RSVP refuses what it cannot answer', () => {
+  assert.throws(() => rsvpTemplate({coordinate: 'naddr1abc', status: 'accepted'}), /coordinate/);
+  assert.throws(() => rsvpTemplate({coordinate: `31922:${'a'.repeat(64)}:x`, status: 'yes'}), /attending|maybe/i);
+  for (const status of ['accepted', 'tentative', 'declined']) {
+    assert.equal(rsvpTemplate({coordinate: `31922:${'a'.repeat(64)}:x`, status}).tags[2][1], status);
+  }
 });

@@ -188,6 +188,42 @@ export function mentionTokens(content) {
   return [...new Set(mentionMatches(String(content || '')).map(match => match.npub.toLowerCase()))];
 }
 
+// The other thing a note's text can carry besides words: an addressable calendar event (NIP-52). The reference is
+// the `nostr:naddr1…` form the maker writes on snofl and the board's own pages render, so a client that knows nothing
+// about Pinstr still shows a working link, and this board resolves it into a card.
+const EVENT_REFERENCE_PATTERN = /(?:nostr:)?(naddr1|nevent1)[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{20,}/gi;
+
+/** The label printed where a calendar card's reference used to be, in the word the paper uses. */
+export const EVENT_LABEL = 'calendar event';
+
+/** Every calendar-event reference in a note's text, by position. */
+export function eventReferenceMatches(content) {
+  const source = String(content || "");
+  const matches = [];
+  for (const found of source.matchAll(EVENT_REFERENCE_PATTERN)) {
+    const token = found[0];
+    const bech32 = token.startsWith("nostr:") ? token.slice(6) : token;
+    // a bech32 character on either side means this is part of a longer word, not a reference of its own
+    const before = source[found.index - 1] || "";
+    const after = source[found.index + token.length] || "";
+    if (/[qpzry9x8gf2tvdw0s3jn54khce6mua7l]/i.test(before) || /[qpzry9x8gf2tvdw0s3jn54khce6mua7l]/i.test(after)) continue;
+    matches.push({index: found.index, length: token.length, token, bech32, prefix: bech32.slice(0, 5).toLowerCase()});
+  }
+  return matches;
+}
+
+/** The calendar references a note carries, deduplicated, in the order written. */
+export function eventReferences(content) {
+  return [...new Set(eventReferenceMatches(content).map(match => match.bech32))];
+}
+
+/** What kind of note this is: a picture, a note carrying a calendar event, or words alone. */
+export function stickyNoteKind(note) {
+  if (note && (note.image || note.picture)) return "image";
+  if (note && eventReferences(note.content).length) return "event";
+  return "text";
+}
+
 function mentionMatches(content) {
   const matches = [];
   const pattern = /(?:nostr:)?npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}/gi;
@@ -218,6 +254,7 @@ export function stickyNoteLength(content) {
   let length = 0;
   for (const part of stickyTextParts(content)) {
     if (part.type === 'link') length += LINK_LABEL.length;
+    else if (part.type === 'event') length += EVENT_LABEL.length;   // a card, not seventy characters of address
     else if (part.type === 'mention') length += [...part.token].length; // travels as its npub
     else length += [...part.text].length;
   }
@@ -289,16 +326,116 @@ export function stickyTextParts(content) {
   const text = String(content || '');
   const parts = [];
   let cursor = 0;
-  const found = [...mentionMatches(text), ...linkMatches(text)].sort((a, b) => a.index - b.index);
+  const found = [...mentionMatches(text), ...linkMatches(text), ...eventReferenceMatches(text)]
+    .sort((a, b) => a.index - b.index);
   for (const match of found) {
     if (match.index < cursor) continue;
     if (match.index > cursor) parts.push({type: 'text', text: text.slice(cursor, match.index)});
     if (match.npub) parts.push({type: 'mention', npub: match.npub, token: `nostr:${match.npub}`});
+    else if (match.bech32) parts.push({type: 'event', bech32: match.bech32, token: match.token,
+                                       kind: match.prefix === 'naddr' ? 'address' : 'id'});
     else parts.push({type: 'link', url: match.url, href: match.href});
     cursor = match.index + match.length;
   }
   if (cursor < text.length) parts.push({type: 'text', text: text.slice(cursor)});
   return parts;
+}
+
+// NIP-52's answer to a calendar event. Addressable, so answering again replaces the earlier answer instead of
+// piling up, and `d` is the coordinate itself for the same reason: one visitor holds one answer per event.
+export const RSVP_KIND = 31925;
+export const RSVP_STATUSES = Object.freeze(['accepted', 'tentative', 'declined']);
+export const RSVP_LABELS = Object.freeze({accepted: 'Attending', tentative: 'Maybe', declined: 'Declined'});
+
+/** An event's coordinate: `31923:<pubkey>:<d>`, the thing an RSVP and a reference both point at. */
+export function eventCoordinate(kind, pubkey, identifier) {
+  if (!pubkey || identifier === undefined || identifier === null) return '';
+  return `${Number(kind)}:${String(pubkey).toLowerCase()}:${String(identifier)}`;
+}
+
+/** The tags an RSVP carries: the coordinate twice, its status, and nothing else that could lie. */
+export function rsvpTags(coordinate, status) {
+  if (!coordinate) return [];
+  if (!RSVP_STATUSES.includes(status)) return [];
+  return [['a', coordinate], ['d', coordinate], ['status', status]];
+}
+
+/** The tag value under a name, escaped nowhere: tags come off a relay and are rendered as text, never as markup. */
+function tagValue(event, name) {
+  const tag = (event?.tags || []).find(entry => entry?.[0] === name);
+  return tag ? String(tag[1] ?? '') : '';
+}
+
+/**
+ * A NIP-52 event read into what a card shows. Kinds 31922 (whole days) and 31923 (a time) carry different shapes:
+ * the date one is `YYYY-MM-DD` with an exclusive `end`, the timed one is unix seconds with optional zone names.
+ */
+export function calendarEventFromEvent(event, {locale = 'en-GB', timeZone = undefined} = {}) {
+  if (!event || ![31922, 31923].includes(Number(event.kind))) return null;
+  const identifier = tagValue(event, 'd');
+  const allDay = Number(event.kind) === 31922;
+  const start = tagValue(event, 'start');
+  const end = tagValue(event, 'end');
+  const tzid = tagValue(event, allDay ? 'start_tzid' : 'start_tzid') || '';
+
+  const dayLabel = (value) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString(locale, {day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'});
+  };
+  const timeLabel = (seconds) => {
+    const date = new Date(Number(seconds) * 1000);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(locale, {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', ...(timeZone ? {timeZone} : {})});
+  };
+
+  let when = '';
+  if (allDay && start) {
+    // NIP-52's `end` is exclusive, so the last day the writer picked is `end - 1 day`; equal to start means one day
+    let last = '';
+    if (end) {
+      const inclusive = new Date(`${end}T00:00:00Z`);
+      inclusive.setUTCDate(inclusive.getUTCDate() - 1);
+      last = inclusive.toISOString().slice(0, 10);
+    }
+    when = !last || last === start ? dayLabel(start) : `${dayLabel(start)} – ${dayLabel(last)}`;
+  } else if (!allDay && start) {
+    when = timeLabel(start);
+    if (end) {
+      const endDate = new Date(Number(end) * 1000);
+      when += Number.isNaN(endDate.getTime()) ? '' : ` – ${timeLabel(end)}`;
+    }
+  }
+
+  return {
+    coordinate: eventCoordinate(event.kind, event.pubkey, identifier),
+    id: String(event.id || ''),
+    kind: Number(event.kind),
+    pubkey: String(event.pubkey || ''),
+    identifier,
+    allDay,
+    title: tagValue(event, 'title') || String(event.content || '').slice(0, 90) || 'Calendar event',
+    summary: tagValue(event, 'summary') || String(event.content || ''),
+    location: tagValue(event, 'location'),
+    start,
+    end,
+    tzid,
+    when,
+  };
+}
+
+/** One answer per pubkey, newest wins — the same rule the vote tally uses. */
+export function tallyRsvps(answers = new Map()) {
+  const counts = {accepted: 0, tentative: 0, declined: 0};
+  let total = 0;
+  for (const answer of answers.values()) {
+    if (answer && RSVP_STATUSES.includes(answer.status)) {
+      counts[answer.status] += 1;
+      total += 1;
+    }
+  }
+  return {counts, total};
 }
 
 /** The people a note tags: one entry per key, in the order the tags carry them. */

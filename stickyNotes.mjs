@@ -86,11 +86,14 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
- isGiftAction, noteStackOrder, subscriptionFreeOffer} from './stickyNotesModel.mjs';
+ isGiftAction, noteStackOrder, subscriptionFreeOffer,
+ // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
+ EVENT_LABEL, calendarEventFromEvent, eventReferences, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
+} from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
 import {
-  REACTION_SET, ZAP_AMOUNTS, reactionTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
+  REACTION_SET, ZAP_AMOUNTS, reactionTemplate, rsvpTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
   giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice,
 } from './noteGifts.mjs';
@@ -297,8 +300,15 @@ const elements = {
   noteAgentBadgeLabel: document.getElementById('noteAgentBadgeLabel'),
   notePaidBadgeLabel: document.getElementById('notePaidBadgeLabel'), copyNoteJson: document.getElementById('copyNoteJson'),
   noteGift: document.getElementById('noteGiftDialog'), noteGiftAuthor: document.getElementById('noteGiftAuthor'),
+  noteGiftTitle: document.getElementById('noteGiftTitle'),
   noteGiftStatus: document.getElementById('noteGiftStatus'), noteGiftLogin: document.getElementById('noteGiftLogin'),
   noteGiftReactions: document.getElementById('noteGiftReactions'),
+  noteEventRsvp: document.getElementById('noteEventRsvp'),
+  noteEventRsvpTitle: document.getElementById('noteEventRsvpTitle'),
+  noteEventRsvpWhen: document.getElementById('noteEventRsvpWhen'),
+  noteEventRsvpButtons: document.getElementById('noteEventRsvpButtons'),
+  noteEventRsvpCounts: document.getElementById('noteEventRsvpCounts'),
+  noteEventRsvpHint: document.getElementById('noteEventRsvpHint'),
   userRelayList: document.getElementById('userRelayList'), userRelayCount: document.getElementById('userRelayCount'),
   userRelayInput: document.getElementById('userRelayInput'), userRelayStatus: document.getElementById('userRelayStatus'),
   addUserRelay: document.getElementById('addUserRelay'), checkUserRelays: document.getElementById('checkUserRelays'),
@@ -1602,7 +1612,7 @@ async function flushAuthorProfiles() {
     const results = await Promise.allSettled([
       readAuthorProfilesFromRelay(RELAY, pubkeys),
       readAuthorProfilesFromRelay('wss://relay.damus.io', pubkeys),
-      readAuthorProfilesFromRelay('wss://nos.lol', pubkeys),
+      readAuthorProfilesFromRelay('wss://relay.ditto.pub', pubkeys),
       readAuthorProfilesFromRelay('wss://relay.ditto.pub', pubkeys),
     ]);
     const newest = new Map();
@@ -1715,7 +1725,7 @@ async function loadAccountStatus(session) {
   const results = await Promise.allSettled([
     readUserStatusesFromRelay(RELAY, session.pubkey),
     readUserStatusesFromRelay('wss://relay.damus.io', session.pubkey),
-    readUserStatusesFromRelay('wss://nos.lol', session.pubkey),
+    readUserStatusesFromRelay('wss://relay.ditto.pub', session.pubkey),
     readUserStatusesFromRelay('wss://relay.ditto.pub', session.pubkey),
   ]);
   const events = results.filter(result => result.status === 'fulfilled').flatMap(result => result.value || []);
@@ -1766,7 +1776,7 @@ async function loadAccountProfile(session) {
   const results = await Promise.allSettled([
     readProfileFromRelay(RELAY, session.pubkey),
     readProfileFromRelay('wss://relay.damus.io', session.pubkey),
-    readProfileFromRelay('wss://nos.lol', session.pubkey),
+    readProfileFromRelay('wss://relay.ditto.pub', session.pubkey),
     readProfileFromRelay('wss://relay.ditto.pub', session.pubkey),
   ]);
   const events = results.filter(result => result.status === 'fulfilled').map(result => result.value);
@@ -2347,7 +2357,8 @@ async function nip05ForMining(pubkey) {
   const cached = String(getNostrSession()?.profile?.nip05 || '').trim();
   if (cached) return cached;
   if (!/^[0-9a-f]{64}$/.test(pubkey || '')) return '';
-  for (const relay of [RELAY, 'wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.ditto.pub']) {
+  // nos.lol refuses a browser socket; primal answers one
+  for (const relay of [RELAY, 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub']) {
     try {
       const event = await readProfileFromRelay(relay, pubkey);
       const content = event && typeof event.content === 'string' ? JSON.parse(event.content) : null;
@@ -3679,7 +3690,7 @@ function renderNote(sticky, event = null, temporary = false) {
   const text = document.createElement('div');
   text.className = 'sticky-note__text';
   const textContent = document.createElement('span');
-  renderNoteContent(textContent, sticky.content);
+  renderNoteContent(textContent, sticky.content, sticky);
   text.appendChild(textContent);
   if (picture) {
     // A print is the picture and nothing else. The paper holds the image and the note's own
@@ -5212,7 +5223,7 @@ function publishToRelays(event, urls = giftRelays()) {
 async function resolveAuthorZapTarget(pubkey) {
   const results = await Promise.allSettled([
     readAuthorProfilesFromRelay(RELAY, [pubkey]),
-    readAuthorProfilesFromRelay('wss://nos.lol', [pubkey]),
+    readAuthorProfilesFromRelay('wss://relay.ditto.pub', [pubkey]),
     readAuthorProfilesFromRelay('wss://relay.damus.io', [pubkey]),
   ]);
   let newest = null;
@@ -5392,6 +5403,22 @@ async function openNoteGiftDialog(eventId, opener = null) {
   elements.noteGiftInvoiceText.textContent = '';
   elements.noteGiftCustom.value = '';
   elements.noteGiftAuthor.textContent = authorLabels.get(record.event?.pubkey) || `~${shortAuthor(record.event?.pubkey || '')}`;
+
+  // A note that carries a calendar event opens on the answer, not on the reactions: the reader was asked to come, so
+  // the three buttons and their counts come first. Everything below them is what this dialog already did.
+  const reference = eventReferences(record.sticky?.content)[0] || '';
+  const card = reference ? await resolveCalendarEvent(reference) : null;
+  if (elements.noteGiftTitle) elements.noteGiftTitle.textContent = card ? 'Respond to this event' : 'React or zap this note';
+  if (card) {
+    rsvpAnswers.delete(card.coordinate);
+    paintRsvpSection(card);
+    loadRsvpAnswers(card.coordinate).then(answers => {
+      rsvpAnswers.set(card.coordinate, answers);
+      if (elements.noteEventRsvp && !elements.noteEventRsvp.hidden) paintRsvpSection(card);
+    }).catch(() => {});
+  } else {
+    paintRsvpSection(null);
+  }
 
   const session = getNostrSession();
   elements.noteGiftReactions.replaceChildren(...REACTION_SET.map(reaction => {
@@ -5867,7 +5894,7 @@ async function flushMentionProfiles() {
     const results = await Promise.allSettled([
       readAuthorProfilesFromRelay(RELAY, pubkeys),
       readAuthorProfilesFromRelay('wss://relay.damus.io', pubkeys),
-      readAuthorProfilesFromRelay('wss://nos.lol', pubkeys),
+      readAuthorProfilesFromRelay('wss://relay.ditto.pub', pubkeys),
     ]);
     const newest = new Map();
     results.filter(result => result.status === 'fulfilled').forEach(result => {
@@ -5946,7 +5973,195 @@ function toggleLinkRest() {
   elements.linkExpand.querySelector('span').textContent = expanded ? linkRestLabel() : 'Show less';
 }
 
-function renderNoteContent(container, content) {
+/* ---------------------------------------------------------------- a note's calendar event
+ *
+ * A note carries the event as a reference in its text — `nostr:naddr1…`, the form the rest of the site uses — so a
+ * client that knows nothing about this still shows a working link. Here the reference becomes a card, and the card's
+ * answers (NIP-52 kind 31925) hang off the note's signature: the one place on the paper that is about the writer, and
+ * already the place a reader goes to give them something.
+ *
+ * Nothing is invented locally: the event is read from the relay, and an answer is signed by the reader's own key and
+ * published there. A reader with no identity sees the buttons disabled and the sentence that says what is missing.
+ */
+const calendarEvents = new Map();      // bech32 → parsed card data, or null when it does not resolve
+const calendarPending = new Set();
+const rsvpAnswers = new Map();         // coordinate → Map(pubkey → {status, at})
+const rsvpPainted = new Set();         // coordinates currently shown in the dialog
+
+/** An naddr/nevent cut into what a relay filter needs, or null when it is not one. */
+function readEventReference(bech32) {
+  try {
+    const decoded = window.NostrTools?.nip19?.decode?.(String(bech32 || ''));
+    if (!decoded) return null;
+    if (decoded.type === 'naddr') {
+      return {kind: decoded.data.kind, pubkey: decoded.data.pubkey, identifier: decoded.data.identifier,
+        filter: {kinds: [decoded.data.kind], authors: [decoded.data.pubkey], '#d': [decoded.data.identifier]}};
+    }
+    if (decoded.type === 'nevent') {
+      return {kind: decoded.data.kind, filter: {ids: [decoded.data.id],
+        ...(decoded.data.author ? {authors: [decoded.data.author]} : {})}};
+    }
+  } catch { /* not a reference this board can read */ }
+  return null;
+}
+
+/** One question to one relay: the events a filter answers with, until EOSE or the timeout. */
+function readCalendarEvents(url, filter, {timeout = 4000} = {}) {
+  return new Promise(resolve => {
+    const events = [];
+    let socket;
+    try { socket = new WebSocket(url); } catch { resolve(events); return; }
+    const subscription = `sticky-calendar-${crypto.randomUUID?.() || Date.now()}`;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { socket.close(); } catch {}
+      resolve(events);
+    };
+    const timer = setTimeout(finish, timeout);
+    socket.addEventListener('open', () => socket.send(JSON.stringify(['REQ', subscription, filter])));
+    socket.addEventListener('message', message => {
+      let data;
+      try { data = JSON.parse(message.data); } catch { return; }
+      if (data[0] === 'EOSE' && data[1] === subscription) { finish(); return; }
+      if (data[0] !== 'EVENT' || data[1] !== subscription) return;
+      const event = data[2];
+      if (!event || (window.NostrTools?.verifyEvent && !window.NostrTools.verifyEvent(event))) return;
+      events.push(event);
+    });
+    socket.addEventListener('error', finish);
+    socket.addEventListener('close', finish);
+  });
+}
+
+/** The card data for a reference, read once per reference and remembered for the visit. */
+async function resolveCalendarEvent(bech32) {
+  if (calendarEvents.has(bech32)) return calendarEvents.get(bech32);
+  if (calendarPending.has(bech32)) return null;
+  const reference = readEventReference(bech32);
+  if (!reference) { calendarEvents.set(bech32, null); return null; }
+  calendarPending.add(bech32);
+  try {
+    for (const relay of [RELAY, 'wss://relay.damus.io']) {
+      const events = await readCalendarEvents(relay, reference.filter);
+      // addressable events are replaceable: the newest wins, and an older copy must not shadow it
+      const newest = events.sort((left, right) => right.created_at - left.created_at)[0];
+      const card = newest ? calendarEventFromEvent(newest) : null;
+      if (card) { calendarEvents.set(bech32, card); return card; }
+    }
+    calendarEvents.set(bech32, null);
+    return null;
+  } finally {
+    calendarPending.delete(bech32);
+  }
+}
+
+/** The chip a reference is drawn as, filled in when the event arrives. */
+function calendarCardFor(bech32, noteId) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'sticky-note__event';
+  chip.dataset.eventRef = bech32;
+  const label = document.createElement('span');
+  label.textContent = EVENT_LABEL;
+  chip.append(document.createTextNode('\u{1F4C5} '), label);
+  chip.title = 'Calendar event — tap the signature to answer it';
+  chip.setAttribute('aria-label', 'Calendar event in this note');
+  chip.addEventListener('pointerdown', press => press.stopPropagation());
+  chip.addEventListener('click', press => {
+    press.stopPropagation();
+    const target = noteId || '';
+    if (target) openNoteGiftDialog(target, chip);
+  });
+  resolveCalendarEvent(bech32).then(card => {
+    if (!card || !chip.isConnected) return;
+    label.textContent = card.when ? `${card.title} · ${card.when}` : card.title;
+    chip.title = [card.title, card.when, card.location].filter(Boolean).join(' · ');
+  });
+  return chip;
+}
+
+/** Who answered a coordinate, newest per pubkey: one person holds one answer. */
+async function loadRsvpAnswers(coordinate) {
+  if (!coordinate) return new Map();
+  const events = await readCalendarEvents(RELAY, {kinds: [RSVP_KIND], '#a': [coordinate], limit: 500});
+  const answers = new Map();
+  for (const event of events) {
+    const status = (event.tags || []).find(tag => tag?.[0] === 'status')?.[1];
+    if (!RSVP_STATUSES.includes(status)) continue;
+    const current = answers.get(event.pubkey);
+    if (!current || event.created_at > current.at) answers.set(event.pubkey, {status, at: event.created_at});
+  }
+  rsvpAnswers.set(coordinate, answers);
+  return answers;
+}
+
+/** Paint the answers: three buttons, their counts, and the reader's own answer marked. */
+function paintRsvpSection(card) {
+  const box = elements.noteEventRsvp;
+  if (!box) return;
+  if (!card) { box.hidden = true; return; }
+  box.hidden = false;
+  const session = getNostrSession();
+  elements.noteEventRsvpTitle.textContent = card.title;
+  elements.noteEventRsvpWhen.textContent = [card.when, card.location].filter(Boolean).join(' · ');
+  const answers = rsvpAnswers.get(card.coordinate) || new Map();
+  const {counts, total} = tallyRsvps(answers);
+  const mine = session ? answers.get(session.pubkey)?.status : '';
+  elements.noteEventRsvpButtons.replaceChildren(...RSVP_STATUSES.map(status => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.rsvpStatus = status;
+    button.textContent = `${RSVP_LABELS[status]}${counts[status] ? ` · ${counts[status]}` : ''}`;
+    button.setAttribute('aria-pressed', String(mine === status));
+    button.disabled = !session;
+    button.title = session ? `Answer ${RSVP_LABELS[status].toLowerCase()}` : 'Log in to respond to this event';
+    button.addEventListener('click', () => sendRsvp(card, status));
+    return button;
+  }));
+  elements.noteEventRsvpCounts.textContent = total
+    ? `${total} ${total === 1 ? 'person has answered' : 'people have answered'}`
+    : 'Nobody has answered yet';
+  // D's sentence, word for word: a reader who cannot answer is told what is missing, not left with dead buttons
+  elements.noteEventRsvpHint.textContent = session ? '' : 'Log in to respond to this event';
+  if (elements.noteGiftLogin) elements.noteGiftLogin.hidden = Boolean(session);
+  rsvpPainted.add(card.coordinate);
+}
+
+/** Sign and publish an answer, then read the tallies back off the relay. */
+async function sendRsvp(card, status) {
+  const session = getNostrSession();
+  if (!session) {
+    elements.noteEventRsvpHint.textContent = 'Log in to respond to this event';
+    return;
+  }
+  elements.noteEventRsvpHint.textContent = 'Sending your answer…';
+  try {
+    const template = rsvpTemplate({
+      coordinate: card.coordinate, status, eventId: card.id,
+      authorPubkey: card.pubkey, relay: RELAY, pubkey: session.pubkey,
+    });
+    const signed = await signNostrEvent(template, {action: 'rsvp', coordinate: card.coordinate, status});
+    if (!signed) {
+      elements.noteEventRsvpHint.textContent = 'Approve the answer in your signer, then come back to this page.';
+      return;
+    }
+    const took = await publishToRelays(signed);
+    if (!took) {
+      elements.noteEventRsvpHint.textContent = 'No relay took the answer. Try again in a moment.';
+      return;
+    }
+    await loadRsvpAnswers(card.coordinate);
+    paintRsvpSection(card);
+    elements.noteEventRsvpHint.textContent = `Answer sent: ${RSVP_LABELS[status]}.`;
+  } catch (error) {
+    elements.noteEventRsvpHint.textContent = error?.message || 'That answer could not be sent.';
+  }
+}
+
+function renderNoteContent(container, content, note = null) {
   const parts = stickyTextParts(content);
   parts.forEach((part, index) => {
     // A link chip must never sit welded to the character before it. A note whose text has no
@@ -5973,6 +6188,10 @@ function renderNoteContent(container, content) {
         openLinkDialog(href);
       });
       container.appendChild(link);
+      return;
+    }
+    if (part.type === 'event') {
+      container.append(calendarCardFor(part.bech32, note?.id || ''));
       return;
     }
     if (part.type !== 'mention') { container.appendChild(document.createTextNode(part.text)); return; }
@@ -6291,7 +6510,7 @@ async function loadFollowList(session = namedNostrSession()) {
   const results = await Promise.allSettled([
     readContactListFromRelay(RELAY, session.pubkey),
     readContactListFromRelay('wss://relay.damus.io', session.pubkey),
-    readContactListFromRelay('wss://nos.lol', session.pubkey),
+    readContactListFromRelay('wss://relay.ditto.pub', session.pubkey),
     readContactListFromRelay('wss://relay.ditto.pub', session.pubkey),
   ]);
   if (getNostrSession()?.pubkey !== session.pubkey) {

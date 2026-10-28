@@ -28,6 +28,10 @@ export const REACTION_SET = Object.freeze([
 ]);
 
 /** The amounts the dialog offers, in sats. A zap below the recipient's floor is raised to it. */
+// The answer to a calendar event shares the model's constants, so the board, the card and the RSVP cannot disagree
+// about what a status is called or which kind it travels as.
+import {RSVP_KIND, RSVP_STATUSES} from './stickyNotesModel.mjs';
+
 export const ZAP_AMOUNTS = Object.freeze([21, 100, 1000, 5000]);
 
 /** How much of a zap receipt the board keeps: none. Read-back is a later pass. */
@@ -73,6 +77,26 @@ export function reactionTemplate({noteId, noteKind = 1, authorPubkey, reaction, 
   const emoji = emojiTagFor(reaction);
   if (emoji) tags.push(emoji);
   return {kind: 7, content, created_at: createdAt, pubkey, tags};
+}
+
+/**
+ * A NIP-52 answer to a calendar event: kind 31925.
+ *
+ * Addressable, so answering again replaces the earlier answer instead of piling up — which is why `d` carries the
+ * event's own coordinate rather than a random identifier. `a` is the coordinate it answers and `e` the event's id
+ * when the caller knows it; a reader counts one answer per pubkey, newest first, the same rule the board's votes use.
+ */
+export function rsvpTemplate({coordinate, status, eventId = '', authorPubkey = '', relay = '',
+                               createdAt = Math.floor(Date.now() / 1000), pubkey = ''}) {
+  const target = String(coordinate || '').trim();
+  if (!/^\d+:[0-9a-f]{64}:.+$/.test(target)) throw new Error('An answer needs the event coordinate it is for.');
+  if (!RSVP_STATUSES.includes(status)) throw new Error('Say whether you are attending, maybe, or not.');
+  const tags = [['a', target], ['d', target], ['status', status]];
+  const id = String(eventId || '').trim();
+  if (/^[0-9a-f]{64}$/.test(id)) tags.push(relay ? ['e', id, relay] : ['e', id]);
+  const author = String(authorPubkey || '').trim();
+  if (/^[0-9a-f]{64}$/.test(author)) tags.push(relay ? ['p', author, relay] : ['p', author]);
+  return {kind: RSVP_KIND, content: '', created_at: createdAt, pubkey, tags};
 }
 
 /**

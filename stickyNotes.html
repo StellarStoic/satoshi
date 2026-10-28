@@ -296,6 +296,24 @@
     <button type="button" id="closeNoteGift" class="note-menu__close" aria-label="Close"><i class="lni lni-xmark" aria-hidden="true"></i></button>
     <h2 id="noteGiftTitle">React or zap this note</h2>
     <p id="noteGiftAuthor" class="note-gift__author"></p>
+    <!-- A note that carries a calendar event answers a second question on its signature: are you coming? The buttons
+         are built and disabled in JavaScript, because whether a reader may answer depends on whether they hold a key. -->
+    <div id="noteEventRsvp" class="note-gift__rsvp" hidden>
+      <p id="noteEventRsvpTitle" class="note-gift__rsvp-title"></p>
+      <p id="noteEventRsvpWhen" class="note-gift__hint"></p>
+      <div id="noteEventRsvpButtons" class="note-gift__rsvp-buttons" role="group" aria-label="Answer this event"></div>
+      <p id="noteEventRsvpCounts" class="note-gift__hint"></p>
+      <p id="noteEventRsvpHint" class="note-gift__hint" role="status"></p>
+    </div>
+    <!-- A note that carries a calendar event answers a second question on its signature: are you coming? The buttons
+         are built and disabled in JavaScript, because whether a reader may answer depends on whether they hold a key. -->
+    <div id="noteEventRsvp" class="note-gift__rsvp" hidden>
+      <p id="noteEventRsvpTitle" class="note-gift__rsvp-title"></p>
+      <p id="noteEventRsvpWhen" class="note-gift__hint"></p>
+      <div id="noteEventRsvpButtons" class="note-gift__rsvp-buttons" role="group" aria-label="Answer this event"></div>
+      <p id="noteEventRsvpCounts" class="note-gift__hint"></p>
+      <p id="noteEventRsvpHint" class="note-gift__hint" role="status"></p>
+    </div>
     <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
     <button type="button" id="noteGiftLogin" class="secondary-action note-gift__login" hidden><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in to Nostr</span></button>
     <div class="note-gift__block">
