@@ -32,8 +32,11 @@
 .note-event__field input { min-height: 40px; padding: 8px 10px; font: inherit; font-size: .95rem;
   color: inherit; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.22); border-radius: 8px; }
 .note-event__field input:focus-visible { outline: 1px solid var(--accent, #f2a900); outline-offset: 1px; }
-.note-event__row { display: grid; gap: 10px; }
-@media (min-width: 520px) { .note-event__row { grid-template-columns: 1fr 1fr; } }
+/* One per row, always. Two `datetime-local` fields side by side clip their own value — the browser keeps the date and
+   cuts the time, which is the half a writer needs — and the composer is a narrow dialog, so there is no width at which
+   they fit (measured: "10/29/2026, 01" in a 350px panel). A whole-day event uses date inputs and could share a row,
+   but a layout that changes with the checkbox is a second thing to keep right for no gain. */
+.note-event__row { display: grid; gap: 10px; grid-template-columns: 1fr; }
 .note-event__check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: .86rem;
   color: var(--text-muted, #9aa0a6); }
 .note-event__check input { width: 18px; height: 18px; accent-color: var(--accent, #f2a900); }
