@@ -132,7 +132,7 @@ test('the MCP server is named where an agent looks, and its tools are the ones t
   assert.match(agents, /never hold|hold no|hold your key/i, 'the desk still holds nothing');
   const llmsLine = read('llms.txt');
   assert.match(llmsLine, /ln\.bot\/guides\/ai-agent-payments/);
-  assert.match(llmsLine, /one note from an agent is 10 sats/,
+  assert.match(llmsLine, /one note from an agent is 21 sats/,
     'the line an agent reads first names the price it will be charged');
   assert.match(llmsLine, /free for a person whose own NIP-05 name answers for their key/,
     'and the door it must not use, so the rule is read rather than discovered');

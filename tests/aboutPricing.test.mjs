@@ -22,9 +22,9 @@ const situations = [
   ['With a 5+ character satoshi.si name', '7 sats a week', '308 a year'],
   ['With a 4-character satoshi.si name', '5 sats a week', '205 a year'],
   ['With a 3-character satoshi.si name', 'free'],
-  ['An anonymous note', '10 sats per note'],
+  ['An anonymous note', '21 sats per note'],
   ['A note from a key with its own NIP-05 name', 'free', '/.well-known/nostr.json'],
-  ['A note from an AI agent', '10 sats'],
+  ['A note from an AI agent', '21 sats'],
   ['A named key that would rather not wait on its domain', '29 bits'],
 ];
 
@@ -108,6 +108,6 @@ test('both documents agree that a clump is one note, and that expiry is not pric
   assert.match(agents, /A clump is priced as \*\*one\*\* note, not per cell/, 'and is replaced by this');
   assert.match(about, /a note that straddles several cells costs the same as one that fits inside a single cell/,
     'the explainer says the same thing in the reader\'s words');
-  assert.match(about, /the expiry you choose — a day or a year — does not change it/,
+  assert.match(about, /the expiry you choose — 1 day, 1 week, 1 month, 6 months or 1 year — does not change it/,
     'and that expiry does not move the price');
 });

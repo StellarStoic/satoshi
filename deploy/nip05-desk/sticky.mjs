@@ -30,10 +30,12 @@ import { verifyEvent, npubEncode, mentionTokens } from './nostr.mjs';
 // NIP-05 name, so it can never be a member — the flat price is the whole point
 // of the tier, not a discount waiting to be applied. It gets one note, and only
 // one; there is no second price for it.
-// The figure is deliberately the price of a week: posting one note without an
-// identity costs what belonging costs, which is the trade the tier is offering —
-// put a name on your key and it is free, or pay for one note here.
-export const STICKY_ANON_SATS = 10;
+// The figure is deliberately above the price of a week (10 sats): posting one note
+// without an identity must not be the cheap way to belong, or a key anyone can mint
+// in a second would undercut the only thing that funds the board. So a throwaway
+// note costs about two weeks, and an agent — which can mint a key per note — pays
+// the same and is quoted it whatever name its key carries.
+export const STICKY_ANON_SATS = 21;
 /** Removing the one note an anonymous key posted, priced apart from posting it. */
 export const ANON_REASON = 'anonymous 24-hour identity — no NIP-05 discount';
 /** A second note from the same throwaway key: it has spent its one note. */

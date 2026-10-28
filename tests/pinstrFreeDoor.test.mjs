@@ -1,6 +1,6 @@
 // The free door, and the two prices beside it.
 //
-// A note is 10 sats when nobody is paying attention to who wrote it, nothing when the writer's own
+// A note is 21 sats when nobody is paying attention to who wrote it, nothing when the writer's own
 // NIP-05 name answers for their key, and 10 again when the client says it is a program — because a
 // door that opens for a name is a door for a person, and a program can publish a name as easily as
 // it can mint a key. The verification is a network question, so it is tested here against a stub
@@ -54,9 +54,11 @@ function costOf(order) {
   return order.ok ? order.order.sats : null;
 }
 
-test('an anonymous note costs 10 sats, which is what it costs to be a stranger', () => {
-  assert.equal(STICKY_ANON_SATS, 10,
-    'the anonymous price is the price of a week: one note without a name, or a name and a week of them');
+test('an anonymous note costs 21 sats, more than a week of belonging, so a throwaway key is never the cheap door', () => {
+  assert.equal(STICKY_ANON_SATS, 21, 'the anonymous price is 21 sats');
+  assert.ok(STICKY_ANON_SATS > SUB_WEEK_SATS,
+    'a stranger pays more for one note than a named key pays for a week of posting: if one note were the cheaper '
+    + 'door, a key anyone can mint in a second would undercut the only thing that funds the board');
   const created = createStickyOrder(pinBody({ anonymous: true }), { now: NOW });
   assert.equal(created.ok, true);
   assert.equal(created.order.sats, STICKY_ANON_SATS);
