@@ -1159,3 +1159,13 @@ test('a pool that still reports the AggregateError is translated on the way out'
     },
   );
 });
+
+test('a label survives a session that carries no npub', async () => {
+  const {shortNpub} = await import('../nostrSession.mjs');
+  // a session written by an earlier version may have a pubkey and a method but no npub: a label must not throw
+  assert.equal(shortNpub(undefined), '');
+  assert.equal(shortNpub(''), '');
+  assert.equal(shortNpub('npub1short'), 'npub1short');
+  const long = 'npub1' + 'q'.repeat(58);
+  assert.equal(shortNpub(long), `${long.slice(0, 9)}...${long.slice(-5)}`);
+});

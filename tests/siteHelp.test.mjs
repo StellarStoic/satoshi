@@ -118,9 +118,9 @@ test('the explainer states the prices the board actually charges, and no retired
     for (const price of live) {
         assert.match(copy, new RegExp(`\\b${price}\\b`), `the explainer should state ${price} sats`);
     }
-    // There is no per-note price for a signed-in writer any more, so the modal must
-    // not advertise one.
-    assert.doesNotMatch(copy, /\b11 sats\b|\b21 sats\b/);
+    // There is no per-note price for a signed-in writer any more, so the modal must not advertise one. 21 is no
+    // longer in this list: it became the anonymous price, and the loop above requires it to be stated.
+    assert.doesNotMatch(copy, /\b11 sats\b/);
     assert.doesNotMatch(copy, /remove note|kind 5 deletion|42 sats/i);
 });
 

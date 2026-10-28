@@ -166,8 +166,15 @@ export function updateNostrProfile(pubkey, profile) {
   return saveSession(session.pubkey, session.method, profile, session.expiresAt ? {expiresAt: session.expiresAt} : {});
 }
 
+/**
+ * A shortened npub for a label. Tolerant on purpose: a session stored by an earlier version of the site may carry a
+ * pubkey and a method but no npub, and a label is not worth taking the whole board down for.
+ */
 export function shortNpub(npub) {
-  return `${npub.slice(0, 9)}...${npub.slice(-5)}`;
+  const text = String(npub ?? '');
+  if (!text) return '';
+  if (text.length <= 15) return text;
+  return `${text.slice(0, 9)}...${text.slice(-5)}`;
 }
 
 /** A hex pubkey as the npub a reader recognises, from the same tools the session uses. */

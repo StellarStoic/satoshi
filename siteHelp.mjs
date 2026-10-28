@@ -129,10 +129,16 @@ export const PAGE_HELP = Object.freeze({
                     + ' The signature at a note\'s foot is a button: press it to react to that note, or to zap its writer'
                     + ' sats. A reaction is signed by you and published where the note lives; a zap is paid from any'
                     + ' lightning wallet you hold, and the writer\'s own server records the receipt.',
+                    'A note can also carry a calendar event. The event is written into the note as an address, and the'
+                    + ' board draws it as a small card with its title, when and where — so a note can ask people to come to'
+                    + ' something instead of only telling them about it. Press the card, or the signature, and the card'
+                    + ' offers three answers: Attending, Maybe or Declined, with how many people said each. Your answer is'
+                    + ' signed by you and replaces your earlier one if you change your mind. Not signed in? The buttons are'
+                    + ' there but disabled, and the dialog says so: log in to respond to this event.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
-                    'Not signed in? An anonymous note costs 10 sats. Your browser creates a one-time key that can pin one'
+                    'Not signed in? An anonymous note costs 21 sats. Your browser creates a one-time key that can pin one'
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
                     + ' so an interrupted payment or publication can finish. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
@@ -147,6 +153,14 @@ export const PAGE_HELP = Object.freeze({
             {
                 label: 'Technical',
                 paragraphs: [
+                    'A calendar note carries the event as a reference in its text, not as another event: nostr:naddr1…'
+                    + ' (or an nevent1…) pointing at a NIP-52 event — kind 31923 for a time, 31922 for whole days, where'
+                    + ' end is exclusive, so one day is start plus the next day. A reference counts as the label the'
+                    + ' reader sees toward the 501-character limit rather than as its own seventy characters, and the card'
+                    + ' is drawn from the relay copy: the note stores no copy of the event. An answer is kind 31925 with'
+                    + ' a and d both the event coordinate — addressable, so answering again replaces the earlier answer —'
+                    + ' and a status of accepted, tentative or declined; the tally takes one answer per pubkey, newest'
+                    + ' first, and an answer needs a signed-in identity because it is signed by the reader.',
                     'A note is one kind 1 Nostr event signed by your own signer: a browser extension, a bunker, or a key'
                     + ' pasted for a single visit. The text is the event content and everything else travels in tags:'
                     + ' ["t","pinstr"], up to three additional hashtag t tags, ["client","satoshi.si"], and one'
