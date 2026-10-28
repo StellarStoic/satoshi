@@ -4324,7 +4324,10 @@ function prepareCalendarForm() {
   if (elements.noteEventEndLabel) elements.noteEventEndLabel.textContent = allDay ? 'Last day (optional)' : 'Ends (optional)';
   if (start.value) return;
   const now = new Date();
-  const nextHour = new Date(now.getTime() + (60 - now.getMinutes()) * 60000, 0, 0);
+  // The next round hour, on the hour: `new Date(ms, 0, 0)` is not that — extra arguments switch the constructor to
+  // (year, month, day) and it returns an Invalid Date, which the date input rejects with a NaN warning.
+  const nextHour = new Date(now.getTime() + (60 - now.getMinutes()) * 60000);
+  nextHour.setSeconds(0, 0);
   const stamp = (date, withTime) => {
     const pad = value => String(value).padStart(2, '0');
     const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -4389,7 +4392,7 @@ function attachCalendarReference(template) {
                              pubkey: template.pubkey, kind: template.kind});
   const next = appendCalendarReference(editorContent(), naddr);
   if (next === editorContent()) return {template, naddr};
-  if (stickyNoteLength(normaliseStickyText(next)) > STICKY_MAX_LENGTH) {
+  if (stickyNoteLength(normaliseStickyText(next)) > STICKY_MAX_CHARACTERS) {
     throw new Error('The event will not fit on this note. Take a few words out and pin it again.');
   }
   elements.editor.textContent = next;
