@@ -4786,3 +4786,16 @@ test('the written page explains the board, and the board links to it', async () 
   const about = seo.indexOf("'/about.html': [");
   assert.ok(about > seo.indexOf("'/index.html': ["), 'added after the adjacent pair, which must stay adjacent');
 });
+
+test('an answer the relay has not indexed yet is not taken off the screen', async () => {
+  const {mergeRsvpAnswers} = await import('../stickyNotesModel.mjs');
+  const mine = {status: 'tentative', at: 2000};
+  const other = {status: 'accepted', at: 1500};
+  const merged = mergeRsvpAnswers(new Map([['aaaa', mine]]), new Map([['bbbb', other]]));
+  assert.deepEqual(merged.get('aaaa'), mine, "the reader's own answer survives a lagging relay");
+  assert.deepEqual(merged.get('bbbb'), other);
+  // a newer answer from the same key replaces the older one, whichever side it came from
+  const newer = {status: 'declined', at: 2500};
+  assert.deepEqual(mergeRsvpAnswers(new Map([['aaaa', mine]]), new Map([['aaaa', newer]])).get('aaaa'), newer);
+  assert.deepEqual(mergeRsvpAnswers(new Map([['aaaa', newer]]), new Map([['aaaa', mine]])).get('aaaa'), newer);
+});
