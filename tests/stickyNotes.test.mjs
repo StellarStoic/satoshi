@@ -3214,22 +3214,33 @@ test('a paid picture note can still be placed, words or none', async () => {
   assert.match(script, /image: noteKind === 'image' \? String\(pending\?\.image \|\| ''\) : ''/);
 });
 
-test('the composer offers a note or a picture, and asks only a note for words', async () => {
-  // The two kinds are named what they are, and the words field is offered to a written note only:
-  // a picture note has no words on it, so a text box (or a placeholder asking for them) is an
-  // invitation to type something the print would never show anyone.
+test('the composer offers a note, a picture or an event, and asks only a note for words', async () => {
+  // The three kinds are named what they are, and the words field is offered to a written note and to a calendar note:
+  // a picture has no words on it, so a text box (or a placeholder asking for them) is an invitation to type something
+  // the print would never show anyone — while a calendar note keeps its paper, because the reference is written on it
+  // and a line of words before the card is what a reader usually wants.
   const html = await readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8');
   assert.match(html, /data-note-kind="text"[^>]*><i[^>]*><\/i><span>Note<\/span>/);
   assert.match(html, /data-note-kind="image"[^>]*><i[^>]*><\/i><span>Picture<\/span>/);
+  assert.match(html, /data-note-kind="event"[^>]*><i[^>]*><\/i><span>Calendar<\/span>/,
+    'the event kind sits beside the other two, as D asked');
   assert.doesNotMatch(html, /Written note|Pinned picture/, 'the kinds are called what they are');
   assert.doesNotMatch(html, /words are optional/, 'the picture is not told it may have words');
   assert.match(html, /<div class="composer-count" id="composerCount">/, 'the counter can hide with the paper it counts for');
+  // The event form is in the markup, hidden until its kind is chosen, and it asks for the four things NIP-52 needs.
+  for (const id of ['noteEvent', 'noteEventTitle', 'noteEventAllDay', 'noteEventStart', 'noteEventEnd', 'noteEventLocation']) {
+    assert.match(html, new RegExp(`id="${id}"`), `${id} is in the composer`);
+  }
+  assert.match(html, /<div id="noteEvent" class="note-event" hidden>/, 'and it starts hidden');
 
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   assert.match(script, /if \(elements\.draftNote\) elements\.draftNote\.hidden = noteKind === 'image'/);
   assert.match(script, /if \(elements\.composerCount\) elements\.composerCount\.hidden = noteKind === 'image'/);
+  assert.match(script, /if \(elements\.noteEvent\) elements\.noteEvent\.hidden = noteKind !== 'event'/,
+    'the event form shows for its own kind only');
   assert.doesNotMatch(script, /if you like/, 'and no placeholder asks for them either');
-  assert.match(script, /composerTitle\.textContent = noteKind === 'image' \? 'Pin a picture' : 'Pin a note'/, 'the heading follows the kind');
+  assert.match(script, /noteKind === 'image' \? 'Pin a picture'\s*\n?\s*: noteKind === 'event' \? 'Pin an event' : 'Pin a note'/,
+    'the heading follows the kind');
   // Words left in the paper by a written draft are not part of a picture note, and its length
   // cannot make a picture note too full: the paper is not on screen for it at all.
   assert.match(script, /const content = pictureComing \? '' : normaliseStickyText\(editorContent\(\)\)/);

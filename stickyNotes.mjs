@@ -89,6 +89,8 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
  isGiftAction, noteStackOrder, subscriptionFreeOffer,
  // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
  EVENT_LABEL, calendarEventFromEvent, eventReferences, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
+ // the composer's own calendar: the event it builds, the reference the note carries, and the coordinate both agree on
+ buildCalendarEvent, appendCalendarReference, eventCoordinate,
  mergeRsvpAnswers,
 } from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
@@ -96,7 +98,7 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
 import {
   REACTION_SET, ZAP_AMOUNTS, reactionTemplate, rsvpTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
-  giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice,
+  giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice, naddrEncode,
 } from './noteGifts.mjs';
 import {
   beginAmberLogin,
@@ -240,6 +242,11 @@ const elements = {
   accountQuotaBar: document.getElementById('accountQuotaBar'), accountQuotaMeter: document.getElementById('accountQuotaMeter'),
   accountQuotaNote: document.getElementById('accountQuotaNote'),
   noteKind: document.getElementById('noteKind'), noteImage: document.getElementById('noteImage'),
+  noteEvent: document.getElementById('noteEvent'), noteEventTitle: document.getElementById('noteEventTitle'),
+  noteEventAllDay: document.getElementById('noteEventAllDay'), noteEventStart: document.getElementById('noteEventStart'),
+  noteEventEnd: document.getElementById('noteEventEnd'), noteEventLocation: document.getElementById('noteEventLocation'),
+  noteEventStartLabel: document.getElementById('noteEventStartLabel'), noteEventEndLabel: document.getElementById('noteEventEndLabel'),
+  noteEventStatus: document.getElementById('noteEventStatus'),
   draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
   noteImageGradesHint: document.getElementById('noteImageGradesHint'),
   composerTitle: document.getElementById('composerTitle'),
@@ -333,6 +340,8 @@ let lastValidEditor = '';
 // reader chose (kept in memory only — it is never read, only sent), and the grade they picked
 // for it. All three are per-note state and none of them is part of what a written note is.
 let noteKind = 'text';
+// The calendar coordinate's third part, made once per composer session: pressing Pin again must replace the same event.
+let calendarSlug = '';
 let pickedImage = null;
 let selectedImageGrade = STICKY_IMAGE_DEFAULT_GRADE;
 let pending = readPending();
@@ -4265,23 +4274,162 @@ function setImageStatus(message = '', error = false) {
  * it and the note points at it, so the note itself stays as small as a written one.
  */
 function selectNoteKind(kind) {
-  noteKind = kind === 'image' ? 'image' : 'text';
+  noteKind = ['image', 'event'].includes(kind) ? kind : 'text';
   elements.noteKind?.querySelectorAll('[data-note-kind]').forEach(button => {
     const chosen = button.dataset.noteKind === noteKind;
     button.classList.toggle('is-selected', chosen);
     button.setAttribute('aria-pressed', String(chosen));
   });
   if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
+  if (elements.noteEvent) elements.noteEvent.hidden = noteKind !== 'event';
   // A picture note has no words on it, so the paper and the counter are offered to a written note
   // only: an empty text box, or a placeholder asking for words, invites typing that the print
-  // would never show anyone.
+  // would never show anyone. A calendar note keeps its paper — the reference is written on it, and a
+  // line of words before the card is what a reader usually wants.
   if (elements.draftNote) elements.draftNote.hidden = noteKind === 'image';
   if (elements.composerCount) elements.composerCount.hidden = noteKind === 'image';
   // The heading says what is being pinned, in the word this board uses everywhere else for it.
-  if (elements.composerTitle) elements.composerTitle.textContent = noteKind === 'image' ? 'Pin a picture' : 'Pin a note';
+  if (elements.composerTitle) {
+    elements.composerTitle.textContent = noteKind === 'image' ? 'Pin a picture'
+      : noteKind === 'event' ? 'Pin an event' : 'Pin a note';
+  }
+  if (noteKind === 'event') prepareCalendarForm();
   elements.editor.setAttribute('data-placeholder', 'Type here...');
   if (noteKind === 'image') renderImageGrades();
   requestAnimationFrame(() => { fitDraftTypography(); updateCapacity(); });
+}
+
+/**
+ * The calendar form: what it offers before the writer fills it in, and what it hands back.
+ *
+ * Two fields are dates when the event is whole days and moments when it is a time, so the input type follows the
+ * checkbox rather than being guessed. The defaults are the next round hour, because a date picker opened on last
+ * year's date is a form that has to be corrected before it can be used.
+ */
+function prepareCalendarForm() {
+  const start = elements.noteEventStart;
+  const end = elements.noteEventEnd;
+  if (!start || !end) return;
+  const allDay = Boolean(elements.noteEventAllDay?.checked);
+  const type = allDay ? 'date' : 'datetime-local';
+  if (start.type !== type) {
+    const startValue = start.value;
+    const endValue = end.value;
+    start.type = type;
+    end.type = type;
+    start.value = startValue;
+    end.value = endValue;
+  }
+  if (elements.noteEventStartLabel) elements.noteEventStartLabel.textContent = allDay ? 'First day' : 'Starts';
+  if (elements.noteEventEndLabel) elements.noteEventEndLabel.textContent = allDay ? 'Last day (optional)' : 'Ends (optional)';
+  if (start.value) return;
+  const now = new Date();
+  const nextHour = new Date(now.getTime() + (60 - now.getMinutes()) * 60000, 0, 0);
+  const stamp = (date, withTime) => {
+    const pad = value => String(value).padStart(2, '0');
+    const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    return withTime ? `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}` : day;
+  };
+  if (allDay) {
+    start.value = stamp(nextHour, false);
+  } else {
+    start.value = stamp(nextHour, true);
+    end.value = stamp(new Date(nextHour.getTime() + 2 * 3600 * 1000), true);
+  }
+}
+
+/**
+ * The event the writer just described, read out of the form.
+ *
+ * `identifier` is the coordinate's third part and is chosen here, before anything is paid, because the note's text
+ * carries the reference and the reference must be in the text before the note is hashed. A short random slug is
+ * enough: the coordinate is `kind:pubkey:identifier`, and the pubkey is what keeps one writer's `ridge-walk` apart
+ * from another's. Made once per composer session and kept, so pressing Pin again after a refusal replaces the same
+ * event rather than littering the relay with a second one.
+ */
+function calendarEventFromForm(pubkey) {
+  const title = String(elements.noteEventTitle?.value || '').trim();
+  const allDay = Boolean(elements.noteEventAllDay?.checked);
+  const location = String(elements.noteEventLocation?.value || '').trim();
+  if (!title) throw new Error('Say what the event is before pinning it.');
+  const startValue = String(elements.noteEventStart?.value || '');
+  if (!startValue) throw new Error('Choose when the event happens.');
+  const endValue = String(elements.noteEventEnd?.value || '');
+  const identifier = calendarSlug || (calendarSlug = `pin-${globalThis.crypto.randomUUID().slice(0, 8)}`);
+
+  // A date input gives YYYY-MM-DD; a moment gives a local wall time, which becomes unix seconds so the event means the
+  // same thing to a reader in another zone. The zone is named as well, because NIP-52 carries it.
+  const start = allDay ? startValue : Math.floor(new Date(startValue).getTime() / 1000);
+  let end = '';
+  if (endValue) {
+    if (allDay) {
+      end = endValue;
+      // NIP-52's end is exclusive; a writer who picks the same day twice means one day, not none
+      if (end <= start) end = start;
+    } else {
+      end = Math.floor(new Date(endValue).getTime() / 1000);
+    }
+  } else if (allDay) {
+    const day = new Date(`${startValue}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + 1);
+    end = day.toISOString().slice(0, 10);
+  }
+  const tzid = allDay ? '' : (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+  return buildCalendarEvent({title, identifier, pubkey, start, end, location, allDay, tzid});
+}
+
+/**
+ * Put the event's reference on the paper, so the note is hashed with it and the reader sees the card they are buying.
+ *
+ * Refused when the note would no longer fit: the desk counts a reference as the card's label, not as seventy
+ * characters, and a note refused after payment is not refunded.
+ */
+function attachCalendarReference(template) {
+  const naddr = naddrEncode({identifier: template.tags.find(t => t[0] === 'd')?.[1],
+                             pubkey: template.pubkey, kind: template.kind});
+  const next = appendCalendarReference(editorContent(), naddr);
+  if (next === editorContent()) return {template, naddr};
+  if (stickyNoteLength(normaliseStickyText(next)) > STICKY_MAX_LENGTH) {
+    throw new Error('The event will not fit on this note. Take a few words out and pin it again.');
+  }
+  elements.editor.textContent = next;
+  lastValidEditor = next;
+  updateCapacity();
+  return {template, naddr};
+}
+
+/**
+ * Publish the calendar event beside the note, on the same key.
+ *
+ * The note is already pinned by the time this runs, so a failure here is reported and not thrown: the reader has paid
+ * once, and the card that will not resolve is worth saying out loud rather than taking their note away.
+ */
+async function publishCalendarEvent(template) {
+  const session = getNostrSession();
+  if (!session || session.pubkey !== template.pubkey) {
+    status(elements.boardStatus, 'The note is pinned, but the calendar event was not published: the identity changed.');
+    elements.boardStatus.hidden = false;
+    return false;
+  }
+  try {
+    const signed = await signNostrEvent(template, {action: 'calendar', coordinate: eventCoordinate(template.kind, template.pubkey, template.tags.find(tag => tag[0] === 'd')?.[1])});
+    if (!signed) {
+      status(elements.boardStatus, 'The note is pinned. Your signer did not answer for the calendar event, so the card has nothing behind it yet — pin again to retry.');
+      elements.boardStatus.hidden = false;
+      return false;
+    }
+    const took = await publishToRelays(signed);
+    if (!took) {
+      status(elements.boardStatus, 'The note is pinned, but no relay took the calendar event. The card has nothing behind it yet.');
+      elements.boardStatus.hidden = false;
+      return false;
+    }
+    return true;
+  } catch (error) {
+    status(elements.boardStatus, `The note is pinned. The calendar event did not publish: ${error?.message || 'unknown reason'}.`);
+    elements.boardStatus.hidden = false;
+    return false;
+  }
 }
 
 /**
@@ -4424,6 +4572,16 @@ async function startPayment() {
     // written draft left in it is not part of the note — the print has no words on it, so they
     // would be paid for, published, and never shown to anyone.
     const pictureComing = noteKind === 'image';
+    // A calendar note is hashed with its reference already on the paper, because the desk recomputes that hash from
+    // the published text: a reference added after the order would be a note that does not match what was paid for.
+    const calendarComing = noteKind === 'event';
+    let calendarTemplate = null;
+    if (calendarComing) {
+      const written = calendarEventFromForm(session.pubkey);
+      const attached = attachCalendarReference(written);
+      calendarTemplate = attached.template;
+      status(elements.noteEventStatus, `Card on the paper: ${written.tags.find(tag => tag[0] === 'title')?.[1] || 'event'}.`);
+    }
     const mentions = pictureComing ? [] : editorMentions();
     const content = pictureComing ? '' : normaliseStickyText(editorContent());
     // A written note has to say something. A pinned picture is the note itself, so it may be
@@ -4452,7 +4610,10 @@ async function startPayment() {
       // note carries none. The grade is kept here too, for the composer's own memory only —
       // it is baked into the stored picture and never travels in the note.
       image: noteKind === 'image' ? String(pending?.image || '') : '',
-      imageGrade: noteKind === 'image' ? selectedImageGrade : ''};
+      imageGrade: noteKind === 'image' ? selectedImageGrade : '',
+      // The event the note's reference points at, kept with the draft so a reload between paying and pinning still
+      // publishes it — the coordinate is fixed, so this is the same event either way.
+      calendar: calendarTemplate || undefined};
     // Mining is the NIP-05 perk, so the name has to be in hand before the order is asked for.
     // session.profile is only filled when a profile happened to load, which is why a key that
     // does have a name could still be told it had none: the name is looked up on the relays
@@ -5048,8 +5209,13 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // while the installed PWA is still visible; this lets that original board finish too.
     signalStickyFlow('published', {orderId, event, message: result.message || 'Your note is pinned.'});
     publishToUserRelays(event);
-    // The pin is done on this page, so the hand-over that asked for the signature comes down with it.
+    // The pin is done on this page, so the hand-over that asked for the signature comes down with it. Nothing that can
+    // wait for a network goes in front of this: the reader is waiting to be given their page back.
     retireAmberHandOver();
+    // The calendar event then goes up beside the note it is written on, on the same key, so the card in the note
+    // resolves to an event that is really there. The note is already pinned, so a failure here is told and not thrown.
+    calendarSlug = '';
+    if (pending.calendar) publishCalendarEvent(pending.calendar);
     // The flow that launched this publish hears the outcome before anything else, so it can retire
     // its own wait even when this page's reader has already looked away.
     report?.(true, result.message || 'Your note is pinned.');

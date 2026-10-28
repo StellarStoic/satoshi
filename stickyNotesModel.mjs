@@ -426,6 +426,68 @@ export function calendarEventFromEvent(event, {locale = 'en-GB', timeZone = unde
 }
 
 /**
+ * A calendar event as its writer's own event: NIP-52 kind 31923 for a moment, 31922 for whole days.
+ *
+ * The identifier is chosen by the writer, not derived, because an addressable event's coordinate is
+ * `kind:pubkey:identifier` — and the coordinate has to be known *before* the note is hashed, since the note's text
+ * carries the reference. That is what lets one pin be two events: the note pays the desk, the calendar event is
+ * published beside it on the same key.
+ */
+export function buildCalendarEvent({title, identifier, pubkey, start, end = '', location = '', allDay = false,
+                                    tzid = '', createdAt = Math.floor(Date.now() / 1000)}) {
+  const name = String(title || '').trim();
+  if (!name) throw new Error('Say what the event is.');
+  if (name.length > 90) throw new Error('The event name is too long.');
+  const slug = String(identifier || '').trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(slug)) throw new Error('That event has no usable identifier.');
+  if (!/^[0-9a-f]{64}$/.test(String(pubkey || ''))) throw new Error('A calendar event needs the key that signs it.');
+
+  const tags = [['d', slug], ['title', name]];
+  if (allDay) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(start || ''))) throw new Error('A whole-day event needs a start date.');
+    tags.push(['start', String(start)]);
+    // NIP-52's end is exclusive: a one-day event ends the next day, so a writer who says one day still gets one day
+    if (end) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(end))) throw new Error('The end date is not a date.');
+      tags.push(['end', String(end)]);
+    }
+  } else {
+    const startSeconds = Number(start);
+    if (!Number.isInteger(startSeconds) || startSeconds <= 0) throw new Error('A calendar event needs a start time.');
+    tags.push(['start', String(startSeconds)]);
+    if (end) {
+      const endSeconds = Number(end);
+      if (!Number.isInteger(endSeconds) || endSeconds <= startSeconds) throw new Error('The event ends before it starts.');
+      tags.push(['end', String(endSeconds)]);
+    }
+    if (tzid) tags.push(['start_tzid', String(tzid)]);
+  }
+  if (location) tags.push(['location', String(location).trim().slice(0, 90)]);
+  return {kind: allDay ? 31922 : 31923, created_at: createdAt, pubkey, content: '', tags};
+}
+
+/** The reference a note carries in its text: `nostr:naddr1…`, which any client renders as a link. */
+export function calendarReference(naddr) {
+  const text = String(naddr || '').trim();
+  return text ? `nostr:${text}` : '';
+}
+
+/**
+ * A note's words with the event's reference on the end, once.
+ *
+ * An event note may still have words, so the reference is appended rather than replacing them; pressing the button
+ * twice must not stack two references onto one note.
+ */
+export function appendCalendarReference(content, naddr) {
+  const reference = calendarReference(naddr);
+  if (!reference) return String(content || '');
+  const text = String(content || '');
+  if (text.includes(reference)) return text;
+  const trimmed = text.replace(/\s+$/, '');
+  return trimmed ? `${trimmed} ${reference}` : reference;
+}
+
+/**
  * What is known about an event's answers, from what was known and what the relay just said.
  *
  * A relay is allowed to be behind: the answer a reader sent a moment ago may not be in its copy yet, and replacing

@@ -151,6 +151,29 @@ function convertBits(data, from, to, pad) {
 }
 
 /** Encode bytes as bech32 with the given human-readable prefix. */
+/**
+ * `naddr` for an addressable event — the identifier, the author and the kind, as NIP-19 lays them out (type 0, 2, 3).
+ *
+ * Written here rather than reached for from the vendor bundle because the board must produce it before the note is
+ * hashed, in code the tests can run: the browser bundle is not loadable in Node, and a reference the note is paid for
+ * has to be the reference the event answers to.
+ */
+export function naddrEncode({identifier, pubkey, kind}) {
+  const slug = String(identifier || '');
+  if (!slug) throw new Error('An addressable event needs an identifier.');
+  if (!/^[0-9a-f]{64}$/.test(String(pubkey || ''))) throw new Error('An addressable event needs an author.');
+  const kindNumber = Number(kind);
+  if (!Number.isInteger(kindNumber) || kindNumber < 0) throw new Error('An addressable event needs a kind.');
+  const chunk = (type, payload) => [type, payload.length, ...payload];
+  const kindBytes = [(kindNumber >>> 24) & 255, (kindNumber >>> 16) & 255, (kindNumber >>> 8) & 255, kindNumber & 255];
+  const bytes = [
+    ...chunk(0, [...new TextEncoder().encode(slug)]),
+    ...chunk(2, [...Uint8Array.from(String(pubkey).match(/../g).map(pair => parseInt(pair, 16)))]),
+    ...chunk(3, kindBytes),
+  ];
+  return bech32Encode('naddr', Uint8Array.from(bytes));
+}
+
 export function bech32Encode(hrp, bytes) {
   const data = convertBits([...bytes], 8, 5, true);
   const checksum = bech32Polymod([...bech32HrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0]) ^ 1;
