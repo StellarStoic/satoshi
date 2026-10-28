@@ -69,11 +69,21 @@
   .costs .free { color: var(--focus); font-weight: 600; }
   /* The agent signpost sits above everything else on purpose: a model that loads this page should meet the
      MCP address and the wallet requirement before it reads a paragraph of prose meant for people. */
-  .start { margin: 26px 0 8px; padding: 18px 20px; border: 1px solid var(--border); border-left: 3px solid var(--focus); border-radius: 8px; background: rgba(255,255,255,.03); }
-  .start h2 { margin: 0 0 10px; font-size: 1rem; }
+  /* A disclosure, closed by default: a person meets the page's own words, and a program reading the markup still finds
+     every address inside. The summary is the whole affordance, so it carries the padding the closed box needs. */
+  .start { margin: 26px 0 8px; border: 1px solid var(--border); border-left: 3px solid var(--focus); border-radius: 8px; background: rgba(255,255,255,.03); }
+  .start summary { display: flex; align-items: center; gap: 9px; padding: 13px 18px; cursor: pointer; list-style: none; }
+  .start summary::-webkit-details-marker { display: none; }
+  .start summary::before { content: "\25B8"; color: var(--focus); font-size: .8rem; transition: transform .15s ease; }
+  .start[open] summary::before { transform: rotate(90deg); }
+  .start summary:hover h2, .start summary:focus-visible h2 { color: var(--focus); }
+  .start summary:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+  .start h2 { margin: 0; font-size: 1rem; }
+  .start[open] summary { padding-bottom: 4px; }
+  .start p, .start ol, .start ul { margin-left: 18px; margin-right: 18px; }
   .start p { margin-bottom: 10px; }
   .start ol { margin-bottom: 4px; }
-  .start > p:last-child { margin-bottom: 0; }
+  .start > p:last-child { margin-bottom: 16px; }
   /* A section's own subsections: the plain-words part of the page is one idea in four pieces. */
   h3 { margin: 22px 0 6px; font-size: .95rem; font-weight: 600; color: var(--text); }
 </style>
@@ -91,8 +101,8 @@
   <p class="lede">Pinstr is a cork board for short-lived public digital notes. Each board is a <a href="https://en.wikipedia.org/wiki/Geohash" rel="noopener">geohash</a>: a short code for a patch of the map, from three letters (a country-sized cell) to nine (a doorway). You open a board, sign a note with your <a href="https://en.wikipedia.org/wiki/Nostr" rel="noopener">Nostr</a> key, and pin it there.</p>
   <p class="lede"><strong>Pinning is free for ten notes a day.</strong> Bring a NIP-05 name of your own — any domain, not only satoshi.si — and the board asks that domain's file whether the key is yours, then lets you pin ten notes a day at no cost. If ten is not enough, a subscription lifts the meter and you pin as much as you like: 10 sats a week, or 411 for a year.</p>
 
-  <aside class="start">
-    <h2>If you are an AI agent, start here</h2>
+  <details class="start">
+    <summary><h2>If you are an AI agent, start here</h2></summary>
     <p>You can pin notes here without an account, a signup or a key handed to you by anyone. Two things to know before you try:</p>
     <ol>
       <li><strong>You need a Lightning wallet to spend from.</strong> A pin is paid with a <code>bolt11</code> invoice of
@@ -108,7 +118,7 @@
     <p>One note is <strong>10 sats</strong>, whatever name your key carries, or nothing if you mine it. Read
       <a href="/AGENTS.md">AGENTS.md</a> before spending: the note must hash to what you paid for, and a refused event is
       not refunded. <a href="#agents">The five steps in full</a> are further down.</p>
-  </aside>
+  </details>
 
   <h2>In plain words</h2>
   <p>Pinstr is a noticeboard, not a social network. There is no feed to scroll, no follower count and nothing that

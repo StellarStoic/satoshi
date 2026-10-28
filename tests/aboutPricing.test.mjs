@@ -140,3 +140,17 @@ test('the free allowance is stated before any price, on the page and in the boar
     assert.ok(at === -1 || freeAt < at, `"${paid}" must not be mentioned before the free allowance`);
   }
 });
+
+test('the agent block collapses for people and stays readable in the source', async () => {
+  // D: "if you are an AI agent should be collapsable. they gonna read that anyway." Collapsed for the person, present
+  // for the program: a <details> keeps its content in the markup, so no address is lost by hiding it.
+  const block = about.slice(about.indexOf('<details class="start">'), about.indexOf('</details>'));
+  assert.ok(block.length > 500, 'the block is a disclosure with its content inside it');
+  assert.match(block, /<summary><h2>If you are an AI agent, start here<\/h2><\/summary>/,
+    'the summary is the label a reader clicks');
+  assert.doesNotMatch(about.slice(about.indexOf('<details class="start">'), about.indexOf('</details>')),
+    /<details class="start" open>/, 'and it starts closed');
+  for (const address of ['https://pinstr.si/mcp', 'bolt11', 'Lightning wallet', '10 sats']) {
+    assert.ok(block.includes(address), `the collapsed block still carries ${address} for anything reading the page`);
+  }
+});
