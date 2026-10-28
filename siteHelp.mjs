@@ -140,9 +140,11 @@ export const PAGE_HELP = Object.freeze({
                     + ' The signature at a note\'s foot is a button: press it to react to that note, or to zap its writer'
                     + ' sats. A reaction is signed by you and published where the note lives; a zap is paid from any'
                     + ' lightning wallet you hold, and the writer\'s own server records the receipt.',
-                    'A note can also carry a calendar event. The event is written into the note as an address, and the'
-                    + ' board draws it as a small card with its title, when and where — so a note can ask people to come to'
-                    + ' something instead of only telling them about it. Press the card, or the signature, and the card'
+                    'A note can also carry a calendar event. Choose Calendar in the note maker instead of Note or'
+                    + ' Picture, then say what it is, when it starts and ends, and where — the board writes the event,'
+                    + ' writes its address on the note, and publishes both together, so the note keeps its words and'
+                    + ' gains a card with the title, when and where. That is how a note asks people to come to something'
+                    + ' instead of only telling them about it. Press the card, or the signature, and the card'
                     + ' offers three answers: Attending, Maybe or Declined, with how many people said each. Your answer is'
                     + ' signed by you and replaces your earlier one if you change your mind. Not signed in? The buttons are'
                     + ' there but disabled, and the dialog says so: log in to respond to this event.',
