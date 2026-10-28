@@ -14,14 +14,14 @@ export const STICKY_SUB_MEMBER_YEAR_SATS = 205;
 export const STICKY_SUB_WEEKS_PER_YEAR = 52;
 export const STICKY_SUB_YEAR_DISCOUNT = 0.21;
 export const STICKY_SUB_PLANS = Object.freeze(['week', 'year']);
-// One note from a key with no name to offer: 21 sats, deliberately more than a week of belonging costs,
-// because the
-// trade the tier offers is exactly that — put a name on your key and it is free, or pay for a note.
+// One note from a key with no name to offer: 10 sats, the same as a week of belonging, and the trade the tier offers
+// is exactly that comparison — put a name on your key and the same sats buy seven days of unlimited notes instead of
+// one note. What keeps the tier from being a cheap way to belong is that a throwaway key may pin once, ever.
 // Agents over MCP are priced here too: a program pays per note whatever name it carries.
 // Mirrors the desk's STICKY_ANON_SATS (deploy/nip05-desk/sticky.mjs) and is asserted equal to it in
 // tests/pinstrFreeDoor.test.mjs: the buttons show this figure before a quote comes back, so a drift here
 // would advertise one price and charge another.
-export const STICKY_ANONYMOUS_PRICE_SATS = 21;
+export const STICKY_ANONYMOUS_PRICE_SATS = 10;
 // The free door's meter, the board's copy of the desk's `nip05DailyMax`. It is used for the sentence
 // a reader with a name is shown, never to decide anything: the desk holds the count and refuses.
 export const STICKY_FREE_NOTES_PER_DAY = 10;

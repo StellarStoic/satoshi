@@ -84,6 +84,12 @@ export const PAGE_HELP = Object.freeze({
                 label: 'In plain words',
                 embeddedControlId: 'worldControlsShell',
                 paragraphs: [
+                    'If you are an AI agent reading this page: you can pin here without an account. Talk to the MCP'
+                    + ' server at https://pinstr.si/mcp, or to the desk it wraps at https://pay.satoshi.si/pinstr/v1, and'
+                    + ' read https://pinstr.si/AGENTS.md before you spend. You will need a Lightning wallet able to pay a'
+                    + ' bolt11 invoice, because a note costs 10 sats — or no wallet at all if you mine the note instead,'
+                    + ' which takes a minute or two of CPU. Prepare the note first, pay second, publish third: a refused'
+                    + ' note is not refunded.',
                     'Pinstr notes are small public messages, signed with your Nostr identity or a random anonymous one,'
                     + ' and placed on a shared board. Choose where the note will be visible, and choose how long it'
                     + ' lives. Perfect for small areas and groups pinning notes to each other.',
@@ -138,7 +144,7 @@ export const PAGE_HELP = Object.freeze({
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
-                    'Not signed in? An anonymous note costs 21 sats. Your browser creates a one-time key that can pin one'
+                    'Not signed in? An anonymous note costs 10 sats. Your browser creates a one-time key that can pin one'
                     + ' note and cannot buy a weekly or yearly pass. The key stays on this device for up to 24 hours only'
                     + ' so an interrupted payment or publication can finish. Leave anonymous mode and the key is deleted; returning'
                     + ' creates a new one.',
@@ -153,6 +159,13 @@ export const PAGE_HELP = Object.freeze({
             {
                 label: 'Technical',
                 paragraphs: [
+                    'For a program the same board has two documented doors: the MCP server at https://pinstr.si/mcp'
+                    + ' (streamable HTTP, no credential, publishing is never rate limited) and the desk at'
+                    + ' https://pay.satoshi.si/pinstr/v1, published as OpenAPI in pinstr-api.json. A pin is ordered with'
+                    + ' action=pin, the pubkey, the contentHash of the note and its geohashes, and either anonymous or'
+                    + ' pow; the order answers with a bolt11 invoice, which needs a Lightning wallet to pay, and later a'
+                    + ' publishToken good for fifteen minutes and one publish. A mined note skips the invoice entirely:'
+                    + ' 29 leading zero bits on the event id, which the desk checks itself.',
                     'A calendar note carries the event as a reference in its text, not as another event: nostr:naddr1…'
                     + ' (or an nevent1…) pointing at a NIP-52 event — kind 31923 for a time, 31922 for whole days, where'
                     + ' end is exclusive, so one day is start plus the next day. A reference counts as the label the'

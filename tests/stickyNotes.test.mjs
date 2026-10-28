@@ -184,7 +184,7 @@ test('prices are the subscription plans, and nothing else counts as one', () => 
   assert.equal(STICKY_SUB_YEAR_SATS, 411);
   assert.equal(STICKY_SUB_MEMBER_WEEK_SATS, 5);
   assert.equal(STICKY_SUB_MEMBER_YEAR_SATS, 205);
-  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 21);
+  assert.equal(STICKY_ANONYMOUS_PRICE_SATS, 10);
 
   assert.equal(stickySubscriptionPrice('week'), 10);
   assert.equal(stickySubscriptionPrice('week', {member: true}), 5);
@@ -290,8 +290,8 @@ test('the composer says what posting costs, and what a subscription changes', ()
 
   const anon = describeStickyAction({anonymous: true, subscription: covered});
   assert.equal(anon.needsSubscription, false);
-  assert.equal(anon.price, 21, 'an anonymous note is priced even while a subscription runs');
-  assert.equal(anon.label, 'Post anonymously · 21 sats');
+  assert.equal(anon.price, 10, 'an anonymous note is priced even while a subscription runs');
+  assert.equal(anon.label, 'Post anonymously · 10 sats');
   assert.match(anon.state, /One key can post one note/);
   assert.match(anon.state, /cannot buy a weekly or yearly subscription/);
 
@@ -1015,7 +1015,7 @@ test('anonymous posting and signed-in profile details are present', async () => 
     readFile(new URL('../nostrSession.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
   ]);
-  assert.match(html, /Post anonymously · 21 sats/);
+  assert.match(html, /Post anonymously · 10 sats/);
   assert.ok(html.indexOf('class="private-key-login"') < html.indexOf('data-login="anonymous"'),
     'anonymous posting belongs below private-key login');
   assert.ok(html.indexOf('class="login-status-divider"') < html.indexOf('id="loginStatus"'),

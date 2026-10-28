@@ -54,11 +54,13 @@ function costOf(order) {
   return order.ok ? order.order.sats : null;
 }
 
-test('an anonymous note costs 21 sats, more than a week of belonging, so a throwaway key is never the cheap door', () => {
-  assert.equal(STICKY_ANON_SATS, 21, 'the anonymous price is 21 sats');
-  assert.ok(STICKY_ANON_SATS > SUB_WEEK_SATS,
-    'a stranger pays more for one note than a named key pays for a week of posting: if one note were the cheaper '
-    + 'door, a key anyone can mint in a second would undercut the only thing that funds the board');
+test('an anonymous note costs a week of belonging, and one note per key is what keeps the tier from undercutting', () => {
+  assert.equal(STICKY_ANON_SATS, 10, 'the anonymous price is 10 sats');
+  // D set this equal to a week on purpose. The comparison a reader makes is "the same sats buy one note, or seven
+  // days of unlimited ones", which is the trade the tier offers — and what stops a key anyone can mint in a second
+  // from undercutting the board is that such a key may pin exactly one note, ever (asserted below and in
+  // 'a paying agent is never throttled to one note, and a throwaway key still is').
+  assert.equal(STICKY_ANON_SATS, SUB_WEEK_SATS, 'one note costs what a week of posting costs');
   const created = createStickyOrder(pinBody({ anonymous: true }), { now: NOW });
   assert.equal(created.ok, true);
   assert.equal(created.order.sats, STICKY_ANON_SATS);

@@ -22,9 +22,9 @@ const situations = [
   ['With a 5+ character satoshi.si name', '7 sats a week', '308 a year'],
   ['With a 4-character satoshi.si name', '5 sats a week', '205 a year'],
   ['With a 3-character satoshi.si name', 'free'],
-  ['An anonymous note', '21 sats per note'],
+  ['An anonymous note', '10 sats per note'],
   ['A note from a key with its own NIP-05 name', 'free', '/.well-known/nostr.json'],
-  ['A note from an AI agent', '21 sats'],
+  ['A note from an AI agent', '10 sats'],
   ['A named key that would rather not wait on its domain', '29 bits'],
 ];
 
