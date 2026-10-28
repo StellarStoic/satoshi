@@ -169,7 +169,9 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.match(page, /textureCanvas\(512, 512, NOTE_TEXTURE_SCALE\)/);
   assert.match(page, /pendingLayouts\.forEach\(layoutCellNotes\)/);
   assert.match(page, /addNote\(note, data\[2\], \{layout:!initialSync\}\)/);
-  assert.match(page, /now - renderer\.userData\.lastMobileFrame < 32/);
+  // this used to assert the *bug*: the throttle read `renderer.userData`, which does not exist, and the throw
+  // inside the animation callback is why the world never drew a frame
+  assert.match(page, /now - lastMobileFrame < 32/);
   assert.match(page, /addEventListener\('webglcontextlost'/);
   assert.match(page, /Math\.max\(WORLD_ZOOM_MIN, Math\.min\(WORLD_ZOOM_MAX/);
   assert.match(page, /camera\.zoom \* Math\.exp\(-event\.deltaY \* \.0012\)/);
@@ -254,4 +256,32 @@ test('the world is pure 3D, uses pins as handles, and includes compact desktop c
   assert.doesNotMatch(page, /CylinderGeometry|TorusGeometry/);
   assert.doesNotMatch(world + page, /getUserMedia|geolocation|Panoramax|panoramax|maplibre|streetView/i);
   assert.match(three, /three\.core\.min\.js/);
+});
+
+test('the animation loop cannot throw before it renders', async () => {
+  // `renderer.userData` is not a property of WebGLRenderer (that is Object3D), so writing the mobile throttle's
+  // timestamp there threw a TypeError inside the animation callback — before render() — once every frame, and the
+  // world opened to a canvas that never drew. A binding owns the number now, and this keeps it that way.
+  const {readFile} = await import('node:fs/promises');
+  const world = await readFile(new URL('../pinstrWorld.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(world, /renderer\.userData/, 'the loop must not store state on the renderer');
+  assert.match(world, /let lastMobileFrame = 0;/);
+  assert.match(world, /if \(MOBILE_RENDERING && !xrSession && now - lastMobileFrame < 32\) return;/);
+  const loop = world.slice(world.indexOf('renderer.setAnimationLoop'));
+  assert.ok(loop.includes('renderer.render(scene, camera)'), 'the loop still renders');
+  assert.ok(loop.indexOf('lastMobileFrame = now') < loop.indexOf('renderer.render(scene, camera)'),
+    'the throttle is assigned before the render, not instead of it');
+});
+
+test('author profiles come from relays that answer a browser', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const world = await readFile(new URL('../pinstrWorld.mjs', import.meta.url), 'utf8');
+  const profiles = world.slice(world.indexOf('async function flushAuthorProfiles'),
+                               world.indexOf('function requestAuthorProfile'));
+  // a *call* is what matters: a comment explaining why a relay was dropped is allowed to name it
+  for (const dead of ['nos.lol', 'nostr.mom', 'relay.nostr.band']) {
+    assert.ok(!profiles.includes(`readAuthorProfiles('wss://${dead}`),
+      `${dead} refuses a browser socket and must not be queried`);
+  }
+  assert.match(profiles, /readAuthorProfiles\(RELAY, pubkeys\)/);
 });

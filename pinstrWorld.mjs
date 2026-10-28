@@ -526,9 +526,11 @@ async function flushAuthorProfiles() {
   pubkeys.forEach(pubkey => authorProfilesLoading.add(pubkey));
   try {
     const results = await Promise.allSettled([
+      // Three relays that answer a browser. wss://nos.lol used to be in this list and never answered a socket, so
+      // every author name stayed blank while the console showed a dead WebSocket; the first that answers wins, so a
+      // relay that cannot answer costs a timeout and a red line for nothing.
       readAuthorProfiles(RELAY, pubkeys),
       readAuthorProfiles('wss://relay.damus.io', pubkeys),
-      readAuthorProfiles('wss://nos.lol', pubkeys),
       readAuthorProfiles('wss://relay.ditto.pub', pubkeys),
     ]);
     const newest = new Map();
@@ -1568,9 +1570,13 @@ setActiveCell(activeCell);
 resetView();
 createDraft();
 connectBoard();
+// The mobile throttle keeps its time in a binding, not on the renderer: WebGLRenderer has no `userData` (that
+// belongs to Object3D), and writing to it threw a TypeError *inside* the animation callback, before render() — so
+// the scene never drew a single frame and the page threw once every 16 ms, which is what "freezes on open" was.
+let lastMobileFrame = 0;
 renderer.setAnimationLoop(now => {
-  if (MOBILE_RENDERING && !xrSession && now - renderer.userData.lastMobileFrame < 32) return;
-  renderer.userData.lastMobileFrame = now;
+  if (MOBILE_RENDERING && !xrSession && now - lastMobileFrame < 32) return;
+  lastMobileFrame = now;
   stepFlight(now);
   stepPortalWarp(now);
   animatePortals(now);
