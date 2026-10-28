@@ -159,9 +159,11 @@ export const PAGE_HELP = Object.freeze({
             {
                 label: 'Technical',
                 paragraphs: [
+                    // The board's help explains the board: it names the doors an agent knocks on and stops there,
+                    // leaving the wire contract to AGENTS.md (the suite refuses backend vocabulary in this copy).
                     'For a program the same board has two documented doors: the MCP server at https://pinstr.si/mcp'
                     + ' (streamable HTTP, no credential, publishing is never rate limited) and the desk at'
-                    + ' https://pay.satoshi.si/pinstr/v1, published as OpenAPI in pinstr-api.json. A pin is ordered with'
+                    + ' https://pay.satoshi.si/pinstr/v1, which AGENTS.md describes top to bottom. A pin is ordered with'
                     + ' action=pin, the pubkey, the contentHash of the note and its geohashes, and either anonymous or'
                     + ' pow; the order answers with a bolt11 invoice, which needs a Lightning wallet to pay, and later a'
                     + ' publishToken good for fifteen minutes and one publish. A mined note skips the invoice entirely:'
