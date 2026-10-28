@@ -425,6 +425,22 @@ export function calendarEventFromEvent(event, {locale = 'en-GB', timeZone = unde
   };
 }
 
+/**
+ * What is known about an event's answers, from what was known and what the relay just said.
+ *
+ * A relay is allowed to be behind: the answer a reader sent a moment ago may not be in its copy yet, and replacing
+ * what we knew with that copy would make the reader's own press disappear. So the newer of the two wins per pubkey —
+ * the same rule the tally applies, applied across the two sources instead of inside one.
+ */
+export function mergeRsvpAnswers(previous = new Map(), fresh = new Map()) {
+  const merged = new Map(fresh);
+  for (const [pubkey, answer] of previous) {
+    const known = merged.get(pubkey);
+    if (!known || (answer?.at || 0) > (known?.at || 0)) merged.set(pubkey, answer);
+  }
+  return merged;
+}
+
 /** One answer per pubkey, newest wins — the same rule the vote tally uses. */
 export function tallyRsvps(answers = new Map()) {
   const counts = {accepted: 0, tentative: 0, declined: 0};

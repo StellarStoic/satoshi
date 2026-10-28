@@ -89,6 +89,7 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
  isGiftAction, noteStackOrder, subscriptionFreeOffer,
  // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
  EVENT_LABEL, calendarEventFromEvent, eventReferences, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
+ mergeRsvpAnswers,
 } from './stickyNotesModel.mjs';
 // What a reader can give a note. The event building and the lnurl arithmetic live in their own
 // module so they can be tested against the specs without a browser anywhere near them.
@@ -6087,13 +6088,15 @@ function calendarCardFor(bech32, noteId) {
 async function loadRsvpAnswers(coordinate) {
   if (!coordinate) return new Map();
   const events = await readCalendarEvents(RELAY, {kinds: [RSVP_KIND], '#a': [coordinate], limit: 500});
-  const answers = new Map();
+  const fromRelay = new Map();
   for (const event of events) {
     const status = (event.tags || []).find(tag => tag?.[0] === 'status')?.[1];
     if (!RSVP_STATUSES.includes(status)) continue;
-    const current = answers.get(event.pubkey);
-    if (!current || event.created_at > current.at) answers.set(event.pubkey, {status, at: event.created_at});
+    const current = fromRelay.get(event.pubkey);
+    if (!current || event.created_at > current.at) fromRelay.set(event.pubkey, {status, at: event.created_at});
   }
+  // merged, not replaced: a relay that has not indexed the answer we just sent must not take it off the screen
+  const answers = mergeRsvpAnswers(rsvpAnswers.get(coordinate) || new Map(), fromRelay);
   rsvpAnswers.set(coordinate, answers);
   return answers;
 }
