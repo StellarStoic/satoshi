@@ -6153,9 +6153,20 @@ async function sendRsvp(card, status) {
       elements.noteEventRsvpHint.textContent = 'No relay took the answer. Try again in a moment.';
       return;
     }
-    await loadRsvpAnswers(card.coordinate);
+    // The answer is ours and it is already signed, so it shows on the button now; the relay read then folds in
+    // everyone else's. Waiting for the relay to echo our own answer back would leave the press looking ignored.
+    const answers = rsvpAnswers.get(card.coordinate) || new Map();
+    answers.set(session.pubkey, {status, at: signed.created_at || Math.floor(Date.now() / 1000)});
+    rsvpAnswers.set(card.coordinate, answers);
     paintRsvpSection(card);
     elements.noteEventRsvpHint.textContent = `Answer sent: ${RSVP_LABELS[status]}.`;
+    loadRsvpAnswers(card.coordinate).then(fresh => {
+      rsvpAnswers.set(card.coordinate, fresh);
+      if (elements.noteEventRsvp && !elements.noteEventRsvp.hidden) {
+        paintRsvpSection(card);
+        elements.noteEventRsvpHint.textContent = `Answer sent: ${RSVP_LABELS[status]}.`;
+      }
+    }).catch(() => {});
   } catch (error) {
     elements.noteEventRsvpHint.textContent = error?.message || 'That answer could not be sent.';
   }
