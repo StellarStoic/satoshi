@@ -12,9 +12,12 @@
    note). The label keeps its ellipsis, which needs min-width: 0 on the span as well. */
 .sticky-note .sticky-note__event {
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0;
-  padding: 4px 9px; border: 1px solid rgba(255,255,255,.28); border-radius: 6px;
-  background: rgba(0,0,0,.28); font-size: .86em; line-height: 1.3; text-align: left; cursor: pointer;
+  padding: 4px 9px; border-radius: 6px; font-size: .86em; line-height: 1.3; text-align: left; cursor: pointer;
   color: inherit; vertical-align: middle;
+  /* Drawn from the note's own ink, so the card reads as stamped on any paper colour instead of a black band that
+     only works on white. A fixed dark fill over yellow measured as mud. */
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 .sticky-note .sticky-note__event span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .sticky-note .sticky-note__event:hover, .sticky-note .sticky-note__event:focus-visible { border-color: var(--accent, #f2a900); }

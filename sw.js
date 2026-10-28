@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v523';   // v523: the calendar card truncates inside the note instead of hanging off it
+const CACHE = 'satoshi-static-v524';   // v524: the calendar card is tinted from the note's own ink
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',
