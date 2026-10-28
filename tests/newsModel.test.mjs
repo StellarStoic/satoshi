@@ -21,7 +21,7 @@ test('search requires every word across title, summary, and source', () => {
 test('deduplication keeps the first matching URL', () => assert.equal(deduplicateNews([items[0], {...items[0]}]).length, 1));
 
 // ------------------------------------------------------------------------------- images in the text
-import {imageUrlFrom, isImageUrl, stripImageUrls, withMedia} from '../newsModel.mjs';
+import {imageUrlFrom, isImageUrl, mediaUrlFromTags, stripImageUrls, withMedia} from '../newsModel.mjs';
 
 const BLOSSOM = 'https://blossom.primal.net/f15b7690333b8cde51ec7a800d75b98ef3f91a891df8649fe7e1a4b53d';
 
@@ -67,4 +67,21 @@ test('the search text no longer contains the image url', () => {
   const item = withMedia({sourceId: 's', source: 'Nostr', title: `Headline ${BLOSSOM}`, summary: ''});
   assert.equal(filterNews([item], {query: 'blossom'}).length, 0);
   assert.equal(filterNews([item], {query: 'headline'}).length, 1);
+});
+
+test('a note carries its picture in an imeta tag, and that is what a thumbnail uses', () => {
+  const tags = [['t', 'nostr'], ['imeta', `url ${BLOSSOM}`, 'm image/png'], ['title', 'Just a headline']];
+  assert.equal(mediaUrlFromTags(tags), BLOSSOM);
+});
+
+test('older media tags still work, and a note without an image yields nothing', () => {
+  assert.equal(mediaUrlFromTags([['image', 'https://cdn.example.com/i.jpg']]), 'https://cdn.example.com/i.jpg');
+  assert.equal(mediaUrlFromTags([['r', 'https://example.com/story.html']]), '');
+  assert.equal(mediaUrlFromTags(undefined), '');
+  assert.equal(mediaUrlFromTags([['title', 'Text only'], ['t', 'bitcoin']]), '');
+});
+
+test('an imeta text url is not mistaken for a picture', () => {
+  const tags = [['imeta', 'url https://example.com/article', 'alt a link'], ['imeta', `url ${BLOSSOM}`]];
+  assert.equal(mediaUrlFromTags(tags), BLOSSOM);
 });

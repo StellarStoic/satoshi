@@ -77,3 +77,13 @@ export function withMedia(item) {
   const image = incoming && isImageUrl(incoming) ? incoming : imageUrlFrom(rest.title, rest.summary);
   return {...rest, title: title || rest.title || '', summary, ...(image ? {image} : {})};
 }
+
+/** The picture a note carries in its tags: NIP-92 `imeta` (a "url …" entry), or the older image/thumb/r tags. */
+export function mediaUrlFromTags(tags) {
+  return (Array.isArray(tags) ? tags : []).flatMap(tag => {
+    if (!Array.isArray(tag)) return [];
+    if (tag[0] === 'imeta') return tag.slice(1).filter(part => String(part).startsWith('url ')).map(part => String(part).slice(4));
+    if (tag[0] === 'image' || tag[0] === 'thumb' || tag[0] === 'r') return [tag[1] || ''];
+    return [];
+  }).find(isImageUrl) || '';
+}

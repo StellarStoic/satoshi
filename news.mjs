@@ -1,4 +1,4 @@
-import {deduplicateNews, filterNews, parseKeywords, withMedia} from './newsModel.mjs';
+import {deduplicateNews, filterNews, mediaUrlFromTags, parseKeywords, withMedia} from './newsModel.mjs';
 
 const SETTINGS_KEY = 'bitcoinNewsSettings';
 const PAGE_SIZE = 24;
@@ -393,6 +393,9 @@ function readRelay(url, pubkey, source) {
       const note = message[2];
       const titleTag = note.tags?.find(tag => tag[0] === 'title')?.[1];
       const summaryTag = note.tags?.find(tag => tag[0] === 'summary')?.[1];
+      // a note normally carries its picture in a NIP-92 imeta tag, not in the text; the title is only where some
+      // authors paste it. The rest is withMedia's job.
+      const mediaUrl = mediaUrlFromTags(note.tags);
       const content = cleanText(note.content);
       items.push({
         id: note.id,
@@ -401,6 +404,7 @@ function readRelay(url, pubkey, source) {
         kind: note.kind === 30023 ? 'Nostr article' : 'Nostr note',
         title: titleTag || content.slice(0, 110) || 'Nostr post',
         summary: summaryTag || (titleTag ? content : ''),
+        ...(mediaUrl ? {image: mediaUrl} : {}),
         url: `https://njump.me/${note.id}`,
         published: new Date(note.created_at * 1000).toISOString(),
       });
