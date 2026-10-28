@@ -1,4 +1,4 @@
-import {deduplicateNews, filterNews, parseKeywords} from './newsModel.mjs';
+import {deduplicateNews, filterNews, parseKeywords, withMedia} from './newsModel.mjs';
 
 const SETTINGS_KEY = 'bitcoinNewsSettings';
 const PAGE_SIZE = 24;
@@ -125,13 +125,26 @@ function renderNews() {
   const enabled = [...(settings.enabledSources || []), ...settings.customSources.map(source => source.id)];
   const filtered = currentFilteredNews();
   const shown = filtered.slice(0, visibleCount);
-  feed.replaceChildren(...shown.map(item => {
+  feed.replaceChildren(...shown.map(rawItem => {
+    // the picture rides in the title on some Nostr sources; lift it out once, here, so every source is covered
+    const item = withMedia(rawItem);
     const article = node('article', undefined, 'news-item');
     article.id = `news-${item.id}`;
     article.tabIndex = -1;
     const meta = node('div', undefined, 'news-item-meta');
     meta.append(node('strong', item.source, 'news-item-source'), node('time', formatDate(item.published)));
-    const content = node('div');
+    const content = node('div', undefined, 'news-item-body');
+    if (item.image) {
+      const thumb = node('img', undefined, 'news-item-thumb');
+      thumb.src = item.image;
+      thumb.alt = '';
+      thumb.loading = 'lazy';
+      thumb.decoding = 'async';
+      thumb.referrerPolicy = 'no-referrer';
+      // a dead blob host must not leave a broken-image glyph in the feed
+      thumb.addEventListener('error', () => thumb.remove());
+      content.append(thumb);
+    }
     const heading = node('h2');
     const link = node('a', item.title || 'Untitled');
     try {
@@ -206,6 +219,7 @@ function xmlItems(xmlText, source) {
       kind: 'custom feed',
       title: cleanText(get('title')),
       summary: cleanText(get('description', 'summary', 'content')),
+      image: entry.querySelector('enclosure[url], media\\:content[url], content[url]')?.getAttribute('url') || '',
       url: atomLink || get('link'),
       published: get('pubDate', 'published', 'updated') || new Date().toISOString(),
     };
