@@ -111,3 +111,32 @@ test('both documents agree that a clump is one note, and that expiry is not pric
   assert.match(about, /the expiry you choose — 1 day, 1 week, 1 month, 6 months or 1 year — does not change it/,
     'and that expiry does not move the price');
 });
+
+test('the free allowance is stated before any price, on the page and in the board help', async () => {
+  // D: "before we even say anything about prices we should say that it's free for 10 notes per day". The order is the
+  // feature, not a detail of the wording, so it is asserted as positions rather than left to the next rewrite.
+  const freeLede = about.indexOf('Pinning is free for ten notes a day');
+  const firstPaidFigure = about.indexOf('10 sats', about.indexOf('<body'));
+  assert.ok(freeLede > 0, 'the lede states the free allowance');
+  assert.ok(freeLede < firstPaidFigure,
+    'and states it before the first price on the page, which is where the agent section quotes one');
+
+  const costs = about.slice(about.indexOf('<h2>What it costs</h2>'), about.indexOf('<h2 id="agents">'));
+  assert.match(costs, /^<h2>What it costs<\/h2>\s*<p><strong>Ten notes a day cost nothing/,
+    'the section opens by saying pinning is free');
+  assert.ok(costs.indexOf('A note from a key with its own NIP-05 name') < costs.indexOf('A subscribed key'),
+    'and the table lists the free door above the subscription');
+  assert.ok(costs.indexOf('ten notes a day') < costs.indexOf('411 sats a year'),
+    'the daily allowance is named before the yearly price');
+
+  const {PAGE_HELP} = await import('../siteHelp.mjs');
+  const plain = PAGE_HELP['/stickyNotes.html'].sections[0].paragraphs.join(' ');
+  assert.ok(plain.indexOf('free for ten notes a day') > 0, 'the board help says it is free too');
+  assert.ok(plain.indexOf('free for ten notes a day') < plain.indexOf('10 sats for a week'),
+    'and says it before the price, in the same order as the page');
+  const freeAt = plain.indexOf('free for ten notes a day');
+  for (const paid of ['10 sats for a week', '411 for a year', '29 bits']) {
+    const at = plain.indexOf(paid);
+    assert.ok(at === -1 || freeAt < at, `"${paid}" must not be mentioned before the free allowance`);
+  }
+});
