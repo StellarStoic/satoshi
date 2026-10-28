@@ -85,10 +85,11 @@ export const NO_NAME_REASON = 'no satoshi.si NIP-05 name for this pubkey';
 // makes it safe to accept from a key this desk has never heard of, on a domain it
 // cannot resolve: the work is checked here, in this process, from the event alone.
 //
-// 25 bits is 2^25 = 33,554,432 sha256 tries, expected. Measured against the miner the
-// board runs (four workers, a synchronous sha256 each), that is roughly half a minute
-// on a desktop and two to five minutes on a phone. It is one constant to change, and
-// /config publishes it, so the board always offers the difficulty the desk will check.
+// The difficulty is POW_BITS below (29). The miner the board runs — four workers, a synchronous sha256 each — was
+// measured at about 33.5 million tries (2^25) in half a minute on a desktop and two to five minutes on a phone.
+// 29 bits is sixteen times that work, so a mined note is minutes on a desktop and a good deal longer on a phone;
+// the copy on the board and the help says minutes rather than seconds for that reason. It is one constant to
+// change, and /config publishes it, so the board always mines the difficulty the desk will check.
 export const POW_TAG = 'nonce';
 export const POW_BITS = 29;
 export const POW_NAME_MAX = 128;
