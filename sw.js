@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v533';   // v533: the calendar form shows only for the calendar kind
+const CACHE = 'satoshi-static-v534';   // v534: a Telegram session no longer takes over a key from another signer
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',

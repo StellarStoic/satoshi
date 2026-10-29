@@ -124,6 +124,29 @@ function readTelegramSession() {
   }
 }
 
+/**
+ * Is the board's current session one this module hosts?
+ *
+ * The board has six ways in (extension, private key, bunker, Amber, anonymous, Telegram) and this module only answers
+ * for one of them. Everything below used to ask "is there a stored Telegram session?" and treat a yes as "the reader is
+ * signed in through Telegram", so a reader who signed in with Amber was still handed the Telegram key panel on top of
+ * their own identity — the account dialog said Telegram while the signature came from Amber.
+ */
+function hostedBoardSession(session) {
+  if (!session || !/^[0-9a-f]{64}$/.test(session.pubkey || '')) return false;
+  return ['method', 'signer', 'source', 'via'].some(key => session[key] === 'telegram');
+}
+
+/** The board's current session, or null. */
+function currentBoardSession() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
 function adoptBoardSession(pubkey) {
   if (!/^[0-9a-f]{64}$/.test(pubkey || '') || typeof localStorage === 'undefined') return;
   try {
@@ -140,7 +163,7 @@ function adoptBoardSession(pubkey) {
   } catch { /* storage blocked: the board will keep asking, but nothing breaks */ }
 }
 
-function installSessionSigner(detail) {
+function installSessionSigner(detail, {fresh = false} = {}) {
   if (!detail || !detail.pubkey || !detail.session) return;
   const unsupported = () => {
     throw new Error('This signer signs notes only. Use your own signer for encrypted messages.');
@@ -166,9 +189,16 @@ function installSessionSigner(detail) {
     nip44: { encrypt: unsupported, decrypt: unsupported },
   };
   try {
-    // The board composes, prices and mines from session.pubkey, so the signer and session
-    // are installed together before the successful login is announced.
-    adoptBoardSession(detail.pubkey);
+    // The board composes, prices and mines from session.pubkey, so the signer and session are installed together
+    // before the successful login is announced.
+    //
+    // Writing the board session is a *login*, and only a login may do it. This module also runs as a re-mount of a
+    // session it previously hosted, and that path used to write too: a reader who had ever used the Telegram door got
+    // their Amber (or extension, or pasted-key) session overwritten with `method: 'telegram'` on the next page load,
+    // so the account dialog named the wrong signer and signing would have gone through this module.
+    if (fresh || hostedBoardSession(currentBoardSession()) || !currentBoardSession()) {
+      adoptBoardSession(detail.pubkey);
+    }
     try { document.dispatchEvent(new CustomEvent('nostr:login', { detail: { pubkey: detail.pubkey } })); } catch {}
   } catch {}
 }
@@ -449,10 +479,14 @@ function restoreTelegramSession() {
   } catch {
     boardSession = null;
   }
-  const pubkey = boardSession && /^[0-9a-f]{64}$/.test(boardSession.pubkey || '') ? boardSession.pubkey : '';
-  if (!pubkey) return;
+  // A stored Telegram session is not the same thing as being signed in through Telegram: the board may have moved on
+  // to an Amber, extension or pasted key since, and dressing that identity as this one is what made the account dialog
+  // report the wrong signer.
+  if (!hostedBoardSession(boardSession)) return;
+  const pubkey = boardSession.pubkey;
   const detail = { active: true, signedIn: true, pubkey, session: stored.session, user: stored.user || {}, npub: boardSession.npub || '' };
   try {
+    // A re-mount only: the session is already the reader's, and this must not write it again.
     installSessionSigner(detail);
   } catch { /* the board will say it needs a signer rather than pretending to have one */ }
   mountKeyTools(detail);
@@ -465,11 +499,14 @@ function remountKeyToolsFromSession() {
   } catch {
     return;
   }
-  if (!session || !session.pubkey) return;
   // adoptBoardSession writes { pubkey, method: 'telegram', npub, profile }; older shapes used
   // signer/source/via, so accept any of them rather than assuming one.
-  const hosted = ['method', 'signer', 'source', 'via'].some((key) => session[key] === 'telegram');
-  if (!hosted) return;
+  if (!hostedBoardSession(session)) {
+    // The identity changed under this module (an Amber sign-in after a Telegram one, say): the panel it mounted
+    // belongs to the session that is gone, so it comes down rather than sitting on someone else's account.
+    document.querySelectorAll('#accountDialog .pinstr-key-tools').forEach(node => node.remove());
+    return;
+  }
   mountKeyTools({
     active: true,
     signedIn: true,
@@ -507,7 +544,9 @@ function announce(detail) {
   try {
     if (detail && detail.active && detail.signedIn) {
       setStatus(`Signed in with Telegram as ${detail.user.id}${detail.created ? ' · key created now' : ''}${detail.npub ? ' · ' + detail.npub : ''}`, 'ok');
-      installSessionSigner(detail);
+      // `fresh: true` because this is a login the reader just made: it may take the board session over from whatever
+      // signer was there before, which the re-mount path above must never do.
+      installSessionSigner(detail, {fresh: true});
       mountKeyTools(detail);
       rememberTelegramSession(detail);
       const login = document.querySelector('#loginDialog');
