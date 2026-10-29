@@ -6293,7 +6293,15 @@ async function resolveCalendarEvent(bech32) {
   calendarPending.add(bech32);
   try {
     for (const relay of [RELAY, 'wss://relay.damus.io']) {
-      const events = await readCalendarEvents(relay, reference.filter);
+      // A relay that refuses the socket rejects the read, and a rejection here used to travel all the way up and stop
+      // the dialog from opening at all — the reader tapped the signature and nothing happened. A lookup that fails is
+      // a miss, not an exception: the card simply has nothing to show yet.
+      let events = [];
+      try {
+        events = await readCalendarEvents(relay, reference.filter);
+      } catch {
+        continue;
+      }
       // addressable events are replaceable: the newest wins, and an older copy must not shadow it
       const newest = events.sort((left, right) => right.created_at - left.created_at)[0];
       const card = newest ? calendarEventFromEvent(newest) : null;

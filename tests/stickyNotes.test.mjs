@@ -4921,3 +4921,15 @@ test('the calendar event is published before the note that points at it, and a f
   assert.match(page, /async function finishCalendarFromSigner\(answer\)[\s\S]{0,900}await publishPinnedNote\(\)/,
     'the event\'s signature publishes the event and then carries the pin on to the note');
 });
+
+test('a relay that refuses the socket cannot stop the dialog from opening', async () => {
+  // Relays close sockets under a page all the time. When the miss stopped being cached, the resolver was asked again on
+  // the dialog's own path, the read rejected, and the rejection travelled out of openNoteGiftDialog — so tapping the
+  // signature did nothing at all instead of opening the note.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const resolver = page.slice(page.indexOf('async function resolveCalendarEvent'), page.indexOf('function calendarCardFor'));
+  assert.match(resolver, /try \{\s*events = await readCalendarEvents\(relay, reference\.filter\);\s*\} catch \{\s*continue;\s*\}/,
+    'each relay read is guarded, and a dead one is skipped rather than thrown');
+  assert.match(resolver, /return null;\s*\} finally \{\s*calendarPending\.delete\(bech32\);/,
+    'a miss is a null answer, and the pending marker is still cleared');
+});
