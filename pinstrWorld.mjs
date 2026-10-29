@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/three/OrbitControls.js';
-import {createWorldGiftDialog} from './pinstrWorldGifts.mjs';
+import {createWorldGiftDialog, readEventsEverywhere} from './pinstrWorldGifts.mjs';
 import {
   STICKY_TOPIC,
   geohashMatchesBoard,
@@ -13,6 +13,11 @@ import {
   noteAgeFraction,
   noteAgeTextureOpacity,
   noteTexturePlacement,
+  eventReferences,
+  eventReferenceMatches,
+  EVENT_LABEL,
+  POLL_LABEL,
+  POLL_KIND,
 } from './stickyNotesModel.mjs';
 import {
   boardHref,
@@ -351,8 +356,81 @@ function wrapLines(context, text, maxWidth) {
   return lines;
 }
 
-function fittedNoteText(context, note) {
+// What a reference is drawn as on the paper, by the address itself. A note names a companion event with a long bech32
+// string; the board's paper has always printed the card's own word there, and the 3D world printed the string.
+const referenceKinds = new Map();     // bech32 → 'calendar' | 'poll', once a relay has said
+const referenceAsking = new Set();
+
+/**
+ * The word a note's reference is drawn as, or null when the note carries none.
+ *
+ * The prefix is the honest first guess — an `naddr` is addressable, which is what a calendar event is, and a poll is a
+ * regular event named by `nevent` — and the relay then corrects it. A note carrying a calendar event as an `nevent` is
+ * legal, so the answer from the event itself wins over the prefix: it is redrawn the moment it arrives.
+ */
+function referenceWord(note) {
+  const reference = eventReferences(note?.content)[0] || '';
+  if (!reference) return null;
+  const known = referenceKinds.get(reference);
+  if (known === 'poll') return POLL_LABEL;
+  if (known === 'calendar') return EVENT_LABEL;
+  askReferenceKind(reference, note);
+  return reference.startsWith('nevent') ? POLL_LABEL : EVENT_LABEL;
+}
+
+/** Ask a relay what kind the referenced event is, once, and redraw the paper that carries it. */
+function askReferenceKind(reference, note) {
+  if (referenceAsking.has(reference)) return;
+  referenceAsking.add(reference);
+  let decoded;
+  try {
+    decoded = window.NostrTools?.nip19?.decode?.(reference);
+  } catch {
+    referenceAsking.delete(reference);
+    return;
+  }
+  if (!decoded) { referenceAsking.delete(reference); return; }
+  const filter = decoded.type === 'naddr'
+    ? {kinds: [decoded.data.kind], authors: [decoded.data.pubkey], '#d': [decoded.data.identifier], limit: 1}
+    : (decoded.type === 'nevent' ? {ids: [decoded.data.id], limit: 1} : null);
+  if (!filter) { referenceAsking.delete(reference); return; }
+  readReferenceEvent(reference, filter, note).catch(() => {}).finally(() => referenceAsking.delete(reference));
+}
+
+/**
+ * Read the referenced event and remember which kind it turned out to be.
+ *
+ * The prefix guesses, this settles it: a calendar event may also be referenced as an `nevent`, and a note whose paper
+ * says "poll" over a calendar event would be the board telling the reader something untrue.
+ */
+async function readReferenceEvent(reference, filter, note) {
+  const events = await readEventsEverywhere(RELAY, filter);
+  const event = events.sort((left, right) => right.created_at - left.created_at)[0];
+  if (!event) return;
+  const kind = Number(event.kind) === POLL_KIND ? 'poll' : 'calendar';
+  const previous = referenceKinds.get(reference);
+  referenceKinds.set(reference, kind);
+  if (previous === kind) return;
+  for (const record of noteSurfaces) {
+    if (record.note?.id !== note?.id) continue;
+    renderNoteSurface(record);
+  }
+}
+
+/** The word the paper prints where the address was, for the text that is measured and drawn. */
+function contentForPaper(note) {
+  const word = referenceWord(note);
   const content = String(note.content || 'Your note');
+  if (!word) return content;
+  let painted = content;
+  for (const match of eventReferenceMatches(content).reverse()) {
+    painted = painted.slice(0, match.index) + word + painted.slice(match.index + match.token.length);
+  }
+  return painted;
+}
+
+function fittedNoteText(context, note) {
+  const content = contentForPaper(note);
   const family = FONT_FAMILIES[note.font] || FONT_FAMILIES.typewriter;
   let size = note.font === 'handwritten' ? 51 : 40;
   let lines = [];

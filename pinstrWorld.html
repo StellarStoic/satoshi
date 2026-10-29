@@ -77,6 +77,21 @@
     <p id="noteGiftAuthor" class="note-gift__author"></p>
     <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
     <a id="noteGiftLogin" class="secondary-action note-gift__login" href="/stickyNotes.html?login=1" hidden><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in to Nostr</span></a>
+    <!-- A note that carries a calendar event or a poll answers on its signature here as it does on the 2D board: the
+         blocks are the same ones, hidden until a reference resolves to one of them. -->
+    <div id="noteEventRsvp" class="note-gift__rsvp" hidden>
+      <p id="noteEventRsvpTitle" class="note-gift__rsvp-title"></p>
+      <p id="noteEventRsvpWhen" class="note-gift__hint"></p>
+      <div id="noteEventRsvpButtons" class="note-gift__rsvp-buttons" role="group" aria-label="Answer this event"></div>
+      <p id="noteEventRsvpCounts" class="note-gift__hint"></p>
+      <p id="noteEventRsvpHint" class="note-gift__hint" role="status"></p>
+    </div>
+    <div id="notePollVote" class="note-gift__rsvp" hidden>
+      <p id="notePollVoteQuestion" class="note-gift__rsvp-title"></p>
+      <div id="notePollVoteButtons" class="note-gift__rsvp-buttons" role="group" aria-label="Vote on this poll"></div>
+      <p id="notePollVoteCounts" class="note-gift__hint"></p>
+      <p id="notePollVoteHint" class="note-gift__hint" role="status"></p>
+    </div>
     <div class="note-gift__block"><h3>React</h3><div id="noteGiftReactions" class="note-gift__reactions" role="group" aria-label="Pick a reaction"></div></div>
     <div class="note-gift__block">
       <h3>Zap</h3><p id="noteGiftZapTarget" class="note-gift__hint"></p>

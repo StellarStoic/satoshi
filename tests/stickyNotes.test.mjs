@@ -5097,3 +5097,44 @@ test('the four kinds are two by two on a phone, so nothing is pushed off the dia
   // The wide layout stays a single row: this is a phone rule, not a redesign of the composer.
   assert.match(css, /\.note-kind \{ display: flex; gap: 4px;/, 'the default is still one row');
 });
+
+test('the 3D world prints a reference as the card word, and answers on its signature', async () => {
+  // D: "3d should show the pool or events as we show on 2d. Not as long string. And when tapping the signature we don't
+  // have the response control to an events" — the world drew the raw bech32 and its dialog only knew reactions and zaps.
+  const [world, gifts, markup] = await Promise.all([
+    readFile(new URL('../pinstrWorld.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../pinstrWorldGifts.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../pinstrWorld.html', import.meta.url), 'utf8'),
+  ]);
+
+  // The paper: the address becomes the word the 2D paper prints, and the event settles which word when the prefix cannot.
+  assert.match(world, /function referenceWord\(note\)/);
+  assert.match(world, /return reference\.startsWith\('nevent'\) \? POLL_LABEL : EVENT_LABEL;/);
+  assert.match(world, /function contentForPaper\(note\)/);
+  assert.match(world, /const content = contentForPaper\(note\);/, 'the fitted text is measured on what is drawn');
+  assert.match(world, /const kind = Number\(event\.kind\) === POLL_KIND \? 'poll' : 'calendar';/,
+    'the relay settles what the prefix guessed');
+  assert.match(world, /renderNoteSurface\(record\);/, 'and the paper is redrawn with the right word');
+
+  // The dialog: both blocks exist in the world page, hidden, and the module paints them.
+  for (const id of ['noteEventRsvp', 'noteEventRsvpButtons', 'notePollVote', 'notePollVoteButtons']) {
+    assert.match(markup, new RegExp(`id="${id}"`), `${id} is in the world dialog`);
+  }
+  assert.match(markup, /<div id="noteEventRsvp" class="note-gift__rsvp" hidden>/);
+  assert.match(markup, /<div id="notePollVote" class="note-gift__rsvp" hidden>/);
+  assert.match(gifts, /function paintReference\(\)/);
+  assert.match(gifts, /async function loadReference\(note\)/);
+  assert.match(gifts, /paintReference\(\);\s*\n\s*loadReference\(current\)\.catch/, 'the dialog reads the reference when it opens');
+  // Signed out, the buttons are there and disabled with the sentence, exactly as on the board.
+  assert.match(gifts, /button\.disabled = !session;/);
+  assert.match(gifts, /'Log in to respond to this event'/);
+  assert.match(gifts, /button\.disabled = !session \|\| poll\.closed;/);
+  assert.match(gifts, /'Log in to vote on this poll'/);
+  // And both are written with the shared shapes, to the relays this reader has.
+  assert.match(gifts, /rsvpTemplate\(\{coordinate:card\.coordinate, status, eventId:card\.id, authorPubkey:card\.pubkey,/);
+  assert.match(gifts, /pollResponseTemplate\(\{pollId:poll\.id, optionIds, pollPubkey:poll\.pubkey,/);
+  assert.match(gifts, /const took = await publish\(signed, relays\(\)\);/);
+  // A world reader has no clipboard hand-over, so a signature that did not come back says what to do.
+  assert.match(gifts, /Approve the answer in your signer, then come back to this page\./);
+  assert.match(gifts, /Approve the vote in your signer, then come back to this page\./);
+});
