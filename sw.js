@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v545';   // v545: the fourth kind — notes, pictures, calendars and polls
+const CACHE = 'satoshi-static-v546';   // v546: a poll's reference is drawn as a poll on the composer's paper
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',

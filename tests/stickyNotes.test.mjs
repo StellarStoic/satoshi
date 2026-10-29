@@ -5073,3 +5073,13 @@ test('the poll is published before the note that names it, and a vote has a rout
   assert.match(page, /\? 'Log in to vote on this poll'/);
   assert.match(page, /elements\.notePollVoteHint\.textContent = !session\s*\n?\s*\? 'Log in to vote on this poll'/);
 });
+
+test('the composer draws a poll reference as a poll, not as a calendar event', async () => {
+  // Caught on the live board: the reference was written correctly, and the chip on the paper still said "calendar event",
+  // because the drawer had one label for every reference. The composer knows which kind it is writing.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const drawer = page.slice(page.indexOf('function drawEventChipsInEditor'), page.indexOf('function drawLinkChipsInEditor'));
+  assert.match(drawer, /const pollChip = noteKind === 'poll';/);
+  assert.match(drawer, /chip\.textContent = pollChip \? `\\u\{1F4CA\} \$\{POLL_LABEL\}` : `\\u\{1F4C5\} \$\{EVENT_LABEL\}`;/);
+  assert.match(drawer, /chip\.dataset\.referenceKind = pollChip \? 'poll' : 'calendar';/);
+});

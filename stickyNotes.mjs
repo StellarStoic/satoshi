@@ -7114,7 +7114,11 @@ function drawEventChipsInEditor({force = false} = {}) {
       // The address as the reader wrote it travels back out: a bare `naddr1…` stays bare, `nostr:naddr1…` keeps its
       // prefix, so nothing in the note changes behind their back.
       chip.dataset.href = match.token;
-      chip.textContent = `\u{1F4C5} ${EVENT_LABEL}`;
+      // The chip says what the pinned card will say, and the composer knows which kind it is writing: a poll's
+      // reference is not a calendar event, and a reader who just asked a question should not be told otherwise.
+      const pollChip = noteKind === 'poll';
+      chip.dataset.referenceKind = pollChip ? 'poll' : 'calendar';
+      chip.textContent = pollChip ? `\u{1F4CA} ${POLL_LABEL}` : `\u{1F4C5} ${EVENT_LABEL}`;
       chip.title = match.token;
       const before = text.slice(0, at);
       const after = text.slice(end);
