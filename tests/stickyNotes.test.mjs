@@ -4933,3 +4933,22 @@ test('a relay that refuses the socket cannot stop the dialog from opening', asyn
   assert.match(resolver, /return null;\s*\} finally \{\s*calendarPending\.delete\(bech32\);/,
     'a miss is a null answer, and the pending marker is still cleared');
 });
+
+test('calendar events and answers go to the public relays as well, because our own relay cannot admit them', async () => {
+  // Measured on the relay's own gate, not assumed: `000000005e9dda…` is on the admit whitelist and is permitted every
+  // kind, but a key that is not on that list is refused for all of them — and a payment grant may only authorize a
+  // kind-1 note. So the event behind a paid reader's calendar note, and every answer pressed on it, would be refused
+  // there. D chose the public relays: the board already reads profiles from ditto and damus.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  assert.match(page, /const CALENDAR_PUBLIC_RELAYS = \['wss:\/\/relay\.ditto\.pub', 'wss:\/\/relay\.damus\.io', 'wss:\/\/relay\.primal\.net'\];/);
+  assert.match(page, /function calendarWriteRelays\(\) \{\s*return \[\.\.\.new Set\(\[\.\.\.giftRelays\(\), \.\.\.CALENDAR_PUBLIC_RELAYS\]\)\];/);
+  assert.match(page, /function calendarReadRelays\(\) \{\s*return \[\.\.\.new Set\(\[RELAY, \.\.\.CALENDAR_PUBLIC_RELAYS, \.\.\.userRelays\]\)\];/);
+
+  // Both writers use it, and neither is left on the default (our relay alone).
+  assert.match(page, /const took = await publishToRelays\(event, calendarWriteRelays\(\)\);/);
+  assert.match(page, /const took = await publishToRelays\(signed, calendarWriteRelays\(\)\);\s*if \(!took\) \{\s*elements\.noteEventRsvpHint/);
+
+  // And both readers, or an answer written to a public relay would never be counted.
+  assert.match(page, /for \(const relay of calendarReadRelays\(\)\) \{/);
+  assert.match(page, /Promise\.all\(calendarReadRelays\(\)\.map\(async relay => \{[\s\S]{0,280}kinds: \[RSVP_KIND\]/);
+});

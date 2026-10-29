@@ -4460,7 +4460,7 @@ let calendarEventPublished = '';
 
 async function publishSignedCalendarEvent(event) {
   if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid calendar event, so the note was not pinned.');
-  const took = await publishToRelays(event);
+  const took = await publishToRelays(event, calendarWriteRelays());
   if (!took) throw new Error('No relay took the calendar event, so the note was not pinned. Press Pin to try again.');
   calendarEventPublished = eventCoordinate(event.kind, event.pubkey, event.tags.find(tag => tag[0] === 'd')?.[1]);
   return true;
@@ -5402,6 +5402,29 @@ function giftRelays() {
 }
 
 /**
+ * The public relays a calendar event and its answers also go to.
+ *
+ * Ours admits a kind-1 note through a payment grant and nothing else, so a key that is not on the admit gate's whitelist
+ * cannot write a 31922, a 31923 or a 31925 there — the event behind a paid reader's calendar note, and every answer they
+ * press, would be refused. Measured with a stranger key: ditto and damus both answered OK, and our own relay answered
+ * "blocked: pubkey is not allowed to publish to this relay" for both events. D chose this route: they go to the public
+ * relays the board already reads for author profiles as well as to ours, so the feature works for anyone, and the data is
+ * public either way. Our own relay keeps them too when the author is on its whitelist. Three public relays, because one
+ * of them being quiet must not take the answers with it.
+ */
+const CALENDAR_PUBLIC_RELAYS = ['wss://relay.ditto.pub', 'wss://relay.damus.io', 'wss://relay.primal.net'];
+
+/** Where a calendar event or an answer is written. */
+function calendarWriteRelays() {
+  return [...new Set([...giftRelays(), ...CALENDAR_PUBLIC_RELAYS])];
+}
+
+/** Where one is looked for: our relay first, then the public ones, then whatever the reader added. */
+function calendarReadRelays() {
+  return [...new Set([RELAY, ...CALENDAR_PUBLIC_RELAYS, ...userRelays])];
+}
+
+/**
  * Where a zap waits between being signed and becoming an invoice.
  *
  * A zap request has to be signed before the recipient's server will take it, and on a phone the
@@ -6301,7 +6324,7 @@ async function resolveCalendarEvent(bech32) {
   if (!reference) { calendarEvents.set(bech32, null); return null; }
   calendarPending.add(bech32);
   try {
-    for (const relay of [RELAY, 'wss://relay.damus.io']) {
+    for (const relay of calendarReadRelays()) {
       // A relay that refuses the socket rejects the read, and a rejection here used to travel all the way up and stop
       // the dialog from opening at all — the reader tapped the signature and nothing happened. A lookup that fails is
       // a miss, not an exception: the card simply has nothing to show yet.
@@ -6352,7 +6375,16 @@ function calendarCardFor(bech32, noteId) {
 /** Who answered a coordinate, newest per pubkey: one person holds one answer. */
 async function loadRsvpAnswers(coordinate) {
   if (!coordinate) return new Map();
-  const events = await readCalendarEvents(RELAY, {kinds: [RSVP_KIND], '#a': [coordinate], limit: 500});
+  // Every relay an answer may be on, in parallel: ours admits only whitelisted keys, so a reader's answer is on a public
+  // relay and reading only ours would show nobody's answers but a whitelisted author's.
+  const batches = await Promise.all(calendarReadRelays().map(async relay => {
+    try {
+      return await readCalendarEvents(relay, {kinds: [RSVP_KIND], '#a': [coordinate], limit: 500});
+    } catch {
+      return [];
+    }
+  }));
+  const events = batches.flat();
   const fromRelay = new Map();
   for (const event of events) {
     const status = (event.tags || []).find(tag => tag?.[0] === 'status')?.[1];
@@ -6425,7 +6457,9 @@ async function sendRsvp(card, status) {
       elements.noteEventRsvpHint.textContent = 'Approve the answer in your signer, then come back to this page.';
       return;
     }
-    const took = await publishToRelays(signed);
+    // The answer goes where the event went: ours refuses the kind from anyone the admit gate does not know, and an
+    // answer is written by whoever came, not by the whitelist.
+    const took = await publishToRelays(signed, calendarWriteRelays());
     if (!took) {
       elements.noteEventRsvpHint.textContent = 'No relay took the answer. Try again in a moment.';
       return;
