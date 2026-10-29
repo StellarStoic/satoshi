@@ -4817,3 +4817,20 @@ test('an answer the relay has not indexed yet is not taken off the screen', asyn
   assert.deepEqual(mergeRsvpAnswers(new Map([['aaaa', mine]]), new Map([['aaaa', newer]])).get('aaaa'), newer);
   assert.deepEqual(mergeRsvpAnswers(new Map([['aaaa', newer]]), new Map([['aaaa', mine]])).get('aaaa'), newer);
 });
+
+test('a block hidden by its attribute is really gone, not merely marked hidden', async () => {
+  // A class rule that sets a display wins over the user agent's `[hidden] { display: none }`, so every element this
+  // sheet gives a display to needs its own [hidden] rule — the file's oldest convention, and the reason the calendar
+  // form was showing for a written note and a picture, and an empty answer row was in every note's dialog.
+  const [css, html] = await Promise.all([
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
+  ]);
+  for (const [selector, id] of [['.note-event', 'noteEvent'], ['.note-gift__rsvp', 'noteEventRsvp']]) {
+    assert.match(css, new RegExp(`${selector.replace('.', '\\.')} \\{[^}]*display:`),
+      `${selector} declares a display of its own`);
+    assert.match(css, new RegExp(`${selector.replace('.', '\\.')}\\[hidden\\] \\{ display: none; \\}`),
+      `${selector} must therefore carry its own [hidden] rule`);
+    assert.match(html, new RegExp(`id="${id}"[^>]*hidden`), `and the markup starts it hidden`);
+  }
+});

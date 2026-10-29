@@ -35,6 +35,10 @@
 .amber-paste__input:focus-visible { outline: 1px solid var(--accent, #f2a900); outline-offset: 1px; }
 .amber-paste__use { margin-top: 8px; }
 .note-event { display: grid; gap: 10px; margin: 0 0 14px; }
+/* The file's own convention, and the reason it exists: a class rule that sets a display beats the user agent's
+   [hidden] rule, so an element hidden by the attribute stays on screen unless its own [hidden] rule says otherwise.
+   Without this the calendar form showed for a written note and a picture too. */
+.note-event[hidden] { display: none; }
 .note-event__lead { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--text-muted, #9aa0a6); }
 .note-event__field { display: grid; gap: 4px; font-size: .8rem; color: var(--text-muted, #9aa0a6); }
 .note-event__field input { min-height: 40px; padding: 8px 10px; font: inherit; font-size: .95rem;
@@ -50,6 +54,9 @@
 .note-event__check input { width: 18px; height: 18px; accent-color: var(--accent, #f2a900); }
 .note-event__status:empty { display: none; }
 .note-gift__rsvp { display: grid; gap: 8px; margin: 4px 0 10px; text-align: left; }
+/* Same rule for the answer row: a note with no calendar event sets hidden, and a display here would keep an empty
+   section with its margins in every dialog. */
+.note-gift__rsvp[hidden] { display: none; }
 .note-gift__rsvp-title { margin: 0; font-weight: 600; }
 .note-gift__rsvp-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .note-gift__rsvp-buttons button { min-height: 44px; padding: 0 14px; border: 1px solid rgba(255,255,255,.24);
