@@ -86,7 +86,7 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 // The badge a note's foot carries is drawn from the model's own vocabulary, so the words the
 // desk sells under live in one place rather than being spelled again in the page.
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
- isGiftAction, noteStackOrder, subscriptionFreeOffer,
+ isGiftAction, answersInsideDialog, noteStackOrder, subscriptionFreeOffer,
  // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
  EVENT_LABEL, calendarEventFromEvent, eventReferences, eventReferenceMatches, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
  // the composer's own calendar: the event it builds, the reference the note carries, and the coordinate both agree on
@@ -6399,12 +6399,16 @@ async function loadRsvpAnswers(coordinate) {
 }
 
 /** Paint the answers: three buttons, their counts, and the reader's own answer marked. */
+/** The card the answer block is currently drawn from, so a signature that comes back can find it again. */
+let paintedRsvpCard = null;
+
 function paintRsvpSection(card, {missing = false} = {}) {
   const box = elements.noteEventRsvp;
   if (!box) return;
-  if (!card && !missing) { box.hidden = true; return; }
+  if (!card && !missing) { paintedRsvpCard = null; box.hidden = true; return; }
   box.hidden = false;
   if (missing) {
+    paintedRsvpCard = null;
     elements.noteEventRsvpTitle.textContent = 'The event behind this note never reached a relay';
     elements.noteEventRsvpWhen.textContent = '';
     elements.noteEventRsvpButtons.replaceChildren();
@@ -6414,6 +6418,7 @@ function paintRsvpSection(card, {missing = false} = {}) {
     return;
   }
   const session = getNostrSession();
+  paintedRsvpCard = card;
   elements.noteEventRsvpTitle.textContent = card.title;
   elements.noteEventRsvpWhen.textContent = [card.when, card.location].filter(Boolean).join(' · ');
   const answers = rsvpAnswers.get(card.coordinate) || new Map();
@@ -6440,13 +6445,83 @@ function paintRsvpSection(card, {missing = false} = {}) {
 }
 
 /** Sign and publish an answer, then read the tallies back off the relay. */
+/**
+ * Say where an answer got to.
+ *
+ * In the answer block while it is on screen, and on the board otherwise: a reader whose phone reloaded the page on the
+ * way back from the signer is not looking at the event any more, and a line inside a dialog they cannot see says nothing.
+ */
+function sayRsvpOutcome(message, error = false) {
+  if (message && elements.noteEventRsvp && !elements.noteEventRsvp.hidden && paintedRsvpCard) {
+    elements.noteEventRsvpHint.textContent = message;
+    return;
+  }
+  if (!message || !elements.boardStatus) return;
+  status(elements.boardStatus, message, error);
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 6000);
+}
+
+/**
+ * Publish a signed answer, record it, and fold the relays' tally back in.
+ *
+ * Shared by the tap and by a signature that comes back later — from the clipboard poll, or from a page that reloaded on
+ * the way back from the signer — because both end in the same three steps.
+ */
+async function publishRsvpAnswer(signed, {coordinate, status: answerStatus, card = null}) {
+  // The answer goes where the event went: ours refuses the kind from anyone the admit gate does not know, and an answer
+  // is written by whoever came, not by the whitelist.
+  const took = await publishToRelays(signed, calendarWriteRelays());
+  if (!took) {
+    sayRsvpOutcome('No relay took the answer. Try again in a moment.', true);
+    return false;
+  }
+  const author = signed.pubkey || (getNostrSession() || {}).pubkey || '';
+  // The answer is ours and it is already signed, so it shows on the button now; the relay read then folds in everyone
+  // else's. Waiting for the relay to echo our own answer back would leave the press looking ignored.
+  const answers = rsvpAnswers.get(coordinate) || new Map();
+  answers.set(author, {status: answerStatus, at: signed.created_at || Math.floor(Date.now() / 1000)});
+  rsvpAnswers.set(coordinate, answers);
+  const target = card || (paintedRsvpCard?.coordinate === coordinate ? paintedRsvpCard : null);
+  if (target) paintRsvpSection(target);
+  sayRsvpOutcome(`Answer sent: ${RSVP_LABELS[answerStatus]}.`);
+  loadRsvpAnswers(coordinate).then(fresh => {
+    rsvpAnswers.set(coordinate, fresh);
+    if (target && elements.noteEventRsvp && !elements.noteEventRsvp.hidden) {
+      paintRsvpSection(target);
+      sayRsvpOutcome(`Answer sent: ${RSVP_LABELS[answerStatus]}.`);
+    }
+  }).catch(() => {});
+  return true;
+}
+
+/**
+ * An answer the reader signed in Amber: publish it, wherever its signature came back from.
+ *
+ * This arm did not exist, so a calendar answer fell into the note's own checks, which called it "a signature for a
+ * different note" and dropped it. D pressed Maybe, Amber copied the signature, and nothing was ever published.
+ */
+async function finishRsvpFromSigner(answer) {
+  const context = answer?.context || {};
+  const coordinate = String(context.coordinate || '');
+  const answerStatus = context.status;
+  if (!answer.event || !coordinate || !RSVP_STATUSES.includes(answerStatus)) {
+    throw new Error('That signature did not say which event, or which way, so no answer was sent.');
+  }
+  const session = getNostrSession();
+  if (answer.event.pubkey && session?.pubkey && answer.event.pubkey !== session.pubkey) {
+    throw new Error('That answer was signed on a different key, so nothing was sent.');
+  }
+  return publishRsvpAnswer(answer.event, {coordinate, status: answerStatus});
+}
+
 async function sendRsvp(card, status) {
   const session = getNostrSession();
   if (!session) {
     elements.noteEventRsvpHint.textContent = 'Log in to respond to this event';
     return;
   }
-  elements.noteEventRsvpHint.textContent = 'Sending your answer…';
+  elements.noteEventRsvpHint.textContent = 'Sending your answer\u2026';
   try {
     const template = rsvpTemplate({
       coordinate: card.coordinate, status, eventId: card.id,
@@ -6454,30 +6529,14 @@ async function sendRsvp(card, status) {
     });
     const signed = await signNostrEvent(template, {action: 'rsvp', coordinate: card.coordinate, status});
     if (!signed) {
-      elements.noteEventRsvpHint.textContent = 'Approve the answer in your signer, then come back to this page.';
+      // Amber answers by copying: the request is parked, this page is navigated away in the same tap, and the answer is
+      // on the clipboard when the reader comes back. Saying so is not enough — the clipboard has to be watched, or the
+      // reader returns to a page that has forgotten the question.
+      elements.noteEventRsvpHint.textContent = 'Approve the answer in Amber. This page reads it when you come back.';
+      if (amberSignaturePending()) startAmberClipboardPoll();
       return;
     }
-    // The answer goes where the event went: ours refuses the kind from anyone the admit gate does not know, and an
-    // answer is written by whoever came, not by the whitelist.
-    const took = await publishToRelays(signed, calendarWriteRelays());
-    if (!took) {
-      elements.noteEventRsvpHint.textContent = 'No relay took the answer. Try again in a moment.';
-      return;
-    }
-    // The answer is ours and it is already signed, so it shows on the button now; the relay read then folds in
-    // everyone else's. Waiting for the relay to echo our own answer back would leave the press looking ignored.
-    const answers = rsvpAnswers.get(card.coordinate) || new Map();
-    answers.set(session.pubkey, {status, at: signed.created_at || Math.floor(Date.now() / 1000)});
-    rsvpAnswers.set(card.coordinate, answers);
-    paintRsvpSection(card);
-    elements.noteEventRsvpHint.textContent = `Answer sent: ${RSVP_LABELS[status]}.`;
-    loadRsvpAnswers(card.coordinate).then(fresh => {
-      rsvpAnswers.set(card.coordinate, fresh);
-      if (elements.noteEventRsvp && !elements.noteEventRsvp.hidden) {
-        paintRsvpSection(card);
-        elements.noteEventRsvpHint.textContent = `Answer sent: ${RSVP_LABELS[status]}.`;
-      }
-    }).catch(() => {});
+    await publishRsvpAnswer(signed, {coordinate: card.coordinate, status, card});
   } catch (error) {
     elements.noteEventRsvpHint.textContent = error?.message || 'That answer could not be sent.';
   }
@@ -7899,6 +7958,8 @@ async function applySignerReturn() {
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
+    } else if (amber?.action === 'sign' && amber.context?.action === 'rsvp') {
+      applied = await finishRsvpFromSigner(amber);
     } else if (amber?.action === 'sign' && amber.context?.action === 'calendar') {
       applied = await finishCalendarFromSigner(amber);
     } else if (amber?.action === 'sign' && isGiftAction(amber.context?.action)) {
@@ -7953,6 +8014,12 @@ async function completeAmberSignature(answer) {
   // signature carries no order id, so those checks called it a signature for a different note and dropped it.
   if (answer.context?.action === 'calendar') {
     await finishCalendarFromSigner(answer);
+    return true;
+  }
+  // A calendar answer travels the same hand-over as a gift and carries no order, so it is claimed here too — the
+  // note's own checks below called it a signature for a different note and dropped it.
+  if (answer.context?.action === 'rsvp') {
+    await finishRsvpFromSigner(answer);
     return true;
   }
   if (isGiftAction(answer.context?.action)) {
@@ -8178,7 +8245,7 @@ function startAmberClipboardPoll() {
   // A gift is asked for from a dialog that is already open and already says what to do, so the
   // hand-over step is not put on top of it: two modals over one another is what makes a finished action
   // look like a stuck one. A note has no such dialog and gets the hand-over exactly as before.
-  if (!isGiftAction(pendingAmberRequest()?.context?.action) && !elements.amberDialog.open) {
+  if (!answersInsideDialog(pendingAmberRequest()?.context?.action) && !elements.amberDialog.open) {
     showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
   }
   amberClipboardDeadline = Date.now() + AMBER_CLIPBOARD_POLL_TIMEOUT_MS;

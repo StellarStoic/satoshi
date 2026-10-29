@@ -2107,6 +2107,17 @@ export function isGiftAction(action) {
 }
 
 /**
+ * Whether an act is asked for from a dialog that is already open and already says what to do.
+ *
+ * A reaction or a zap lives in the gift dialog, and a calendar answer lives in the same dialog's answer block. The
+ * hand-over is not raised over either — two modals on top of one another is what makes a finished action look like a
+ * stuck one — and the clipboard is read in the background instead.
+ */
+export function answersInsideDialog(action) {
+  return isGiftAction(action) || action === 'rsvp';
+}
+
+/**
  * What one reaction is worth, in sats, when a note's score is worked out.
  *
  * One sat counted as one reaction made money speak far too loudly: the smallest zap the board offers is

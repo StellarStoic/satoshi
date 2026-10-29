@@ -2856,8 +2856,8 @@ test('the hand-over control is in front of the reader the moment a copy request 
   // without waiting for an event this device never fires.
   const start = script.slice(script.indexOf('function startAmberClipboardPoll'),
     script.indexOf('const signerReturn = await applySignerReturn();'));
-  assert.match(start, /if \(!isGiftAction\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{\s+showAmberHandOver\(/,
-    'the poll puts the button in front of a reader who is not already looking at it - and never over a gift, whose own dialog already says what to do');
+  assert.match(start, /if \(!answersInsideDialog\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{\s+showAmberHandOver\(/,
+    'the poll puts the button in front of a reader who is not already looking at it — and never over a dialog that already says what to do, which is a gift\'s and a calendar answer\'s');
 
   // The button reads inside the reader's own tap, and a tap that did not finish leaves the wait
   // running rather than stopping the clock on a request that is still parked.
@@ -3784,7 +3784,7 @@ test('a gift is not handed a second dialog on top of the one it is signed from',
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // The gift dialog is already open and already says what to do, so the hand-over is not raised over
   // it: a modal on top of a modal is how a finished action looks like a stuck one.
-  assert.match(script, /if \(!isGiftAction\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{/);
+  assert.match(script, /if \(!answersInsideDialog\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{/);
   // A note still gets it, and the waiting sentence is unchanged for that case.
   assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 5,
     'the waiting-state call sites are all still there');
@@ -4946,9 +4946,38 @@ test('calendar events and answers go to the public relays as well, because our o
 
   // Both writers use it, and neither is left on the default (our relay alone).
   assert.match(page, /const took = await publishToRelays\(event, calendarWriteRelays\(\)\);/);
-  assert.match(page, /const took = await publishToRelays\(signed, calendarWriteRelays\(\)\);\s*if \(!took\) \{\s*elements\.noteEventRsvpHint/);
+  assert.match(page, /const took = await publishToRelays\(signed, calendarWriteRelays\(\)\);\s*if \(!took\) \{\s*sayRsvpOutcome/);
 
   // And both readers, or an answer written to a public relay would never be counted.
   assert.match(page, /for \(const relay of calendarReadRelays\(\)\) \{/);
   assert.match(page, /Promise\.all\(calendarReadRelays\(\)\.map\(async relay => \{[\s\S]{0,280}kinds: \[RSVP_KIND\]/);
+});
+
+test('an answer the reader signed in Amber is published, not called "a signature for a different note"', async () => {
+  // D: "RSVP. The responses are not recognised." Amber answers every signing request by *copying*, and the page puts its
+  // own `amber-waiting:<uuid>` marker on the clipboard first so it can tell "not answered yet" from "answered". Nothing
+  // on the answer path read the clipboard back, and no branch claimed an `rsvp` signature, so it fell through to the
+  // note's own checks, was reported as a signature for a different note, and was dropped.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const model = await readFile(new URL('../stickyNotesModel.mjs', import.meta.url), 'utf8');
+
+  // The hand-over is not raised over a dialog that already says what to do, and an answer counts as one of those.
+  assert.match(model, /export function answersInsideDialog\(action\) \{\s*return isGiftAction\(action\) \|\| action === 'rsvp';/);
+
+  // Both ways home claim it, above the note checks that used to swallow it.
+  const complete = page.slice(page.indexOf('async function completeAmberSignature'), page.indexOf('function retireAmberHandOver'));
+  assert.ok(complete.indexOf("answer.context?.action === 'rsvp'") > 0, 'the paste path claims an answer');
+  assert.ok(complete.indexOf("answer.context?.action === 'rsvp'") < complete.indexOf('if (!pending?.orderId)'),
+    'and claims it before the checks that assume a note');
+  assert.match(page, /else if \(amber\?\.action === 'sign' && amber\.context\?\.action === 'rsvp'\) \{\s*applied = await finishRsvpFromSigner\(amber\);/);
+
+  // The tap starts watching the clipboard, because the page is navigated away in the same gesture.
+  assert.match(page, /Approve the answer in Amber\. This page reads it when you come back\./);
+  assert.match(page, /if \(amberSignaturePending\(\)\) startAmberClipboardPoll\(\);/);
+
+  // And the answer's outcome is written where the reader can see it: in the block while it is open, on the board after
+  // a reload took the event off the screen.
+  assert.match(page, /function sayRsvpOutcome\(message, error = false\)/);
+  assert.match(page, /async function publishRsvpAnswer\(signed, \{coordinate, status: answerStatus, card = null\}\)/);
+  assert.match(page, /const took = await publishToRelays\(signed, calendarWriteRelays\(\)\);/);
 });
