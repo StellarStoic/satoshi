@@ -573,6 +573,12 @@
      screen, and the fitter takes it from there. */
   .sticky-note { width: 190px; padding: 18px 12px 15px; }
   .sticky-note--placing { width: 210px; }
+  /* Four kinds do not fit one row on a phone — Note, Picture, Calendar, Poll pushed the last one off the dialog and made
+     the whole page scroll sideways. Two and two, as D asked: Note | Picture on the first line, Calendar | Poll on the
+     next. `minmax(0, 1fr)` and `min-width: 0` because a grid item's automatic minimum is its content, which is exactly
+     what overflowed. */
+  .note-kind { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .note-kind__button { min-width: 0; justify-content: center; padding: 8px 10px; }
   .login-methods { grid-template-columns: 1fr; }.login-field { grid-template-columns: 1fr auto; }.login-field > span { grid-column: 1 / -1; }
   .dialog-inner { padding: 22px 18px; }
   .placement-controls > span { display:none; }.placement-controls { bottom: calc(48px + env(safe-area-inset-bottom)); }

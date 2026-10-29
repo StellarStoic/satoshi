@@ -5083,3 +5083,17 @@ test('the composer draws a poll reference as a poll, not as a calendar event', a
   assert.match(drawer, /chip\.textContent = pollChip \? `\\u\{1F4CA\} \$\{POLL_LABEL\}` : `\\u\{1F4C5\} \$\{EVENT_LABEL\}`;/);
   assert.match(drawer, /chip\.dataset\.referenceKind = pollChip \? 'poll' : 'calendar';/);
 });
+
+test('the four kinds are two by two on a phone, so nothing is pushed off the dialog', async () => {
+  // D: "the pools are on the right overflowing the screen size on mobile and makes site scroll left right. On mobile we
+  // could have 2 and in next line 2". Four buttons in one flex row are wider than a 390px dialog, and the overflow made
+  // the whole page pan sideways.
+  const css = await readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8');
+  const narrow = css.slice(css.indexOf('@media (max-width: 680px)'), css.indexOf('@media (max-width: 680px)') + 4000);
+  assert.match(narrow, /\.note-kind \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/,
+    'two columns inside the narrow-screen block');
+  assert.match(narrow, /\.note-kind__button \{ min-width: 0; justify-content: center; padding: 8px 10px; \}/,
+    'and each button may shrink, with its own label centred');
+  // The wide layout stays a single row: this is a phone rule, not a redesign of the composer.
+  assert.match(css, /\.note-kind \{ display: flex; gap: 4px;/, 'the default is still one row');
+});
