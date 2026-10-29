@@ -5138,3 +5138,21 @@ test('the 3D world prints a reference as the card word, and answers on its signa
   assert.match(gifts, /Approve the answer in your signer, then come back to this page\./);
   assert.match(gifts, /Approve the vote in your signer, then come back to this page\./);
 });
+
+test('every name the 3D dialog imports is really exported by the module it names', async () => {
+  // Caught on the wire, not by a test: `pollResponseTemplate` was imported from noteGifts.mjs, which does not export it —
+  // and a module that fails to import takes the whole dialog with it, reactions and zaps included. A source test cannot
+  // see that, so this one imports both modules and checks the names against what they actually export.
+  const gifts = await readFile(new URL('../pinstrWorldGifts.mjs', import.meta.url), 'utf8');
+  const block = gifts.slice(0, gifts.indexOf('const USER_RELAYS_KEY'));
+  const wanted = {};
+  for (const found of block.matchAll(/import\s*\{([^}]*)\}\s*from\s*'(\.\/[^']+)'/g)) {
+    wanted[found[2]] = found[1].split(',').map(name => name.trim()).filter(Boolean);
+  }
+  assert.ok(Object.keys(wanted).length >= 2, 'the dialog imports from its two sibling modules');
+  for (const [specifier, names] of Object.entries(wanted)) {
+    const module = await import(new URL(`..${specifier.slice(1)}`, import.meta.url));
+    const missing = names.filter(name => !(name in module));
+    assert.deepEqual(missing, [], `${specifier} must export every name the dialog asks of it`);
+  }
+});

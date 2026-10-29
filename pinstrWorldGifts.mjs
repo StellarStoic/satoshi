@@ -1,11 +1,11 @@
 import {
   REACTION_SET, ZAP_AMOUNTS, reactionTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
-  rsvpTemplate, pollResponseTemplate,
+  rsvpTemplate,
 } from './noteGifts.mjs';
 import {
   eventReferences, calendarEventFromEvent, pollFromEvent, tallyRsvps, mergeRsvpAnswers,
-  tallyPollVotes, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, POLL_RESPONSE_KIND,
+  tallyPollVotes, pollResponseTemplate, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, POLL_RESPONSE_KIND,
 } from './stickyNotesModel.mjs';
 import {getNostrSession, signNostrEvent} from './nostrSession.mjs';
 
