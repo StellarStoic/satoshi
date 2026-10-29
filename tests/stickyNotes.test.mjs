@@ -2687,7 +2687,9 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(script, /stopAmberClipboardPoll\(\);\s+status\(elements\.amberCopyStatus, ''\);/);
   // The completion the poll reaches is the shared one, so a note's order is checked there - after the
   // gift route above it, which is what lets a signed reaction or zap be finished at all.
-  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,900}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
+  // The bounds are room for the arms that route a signature to its own flow (a gift, and now the calendar event a note
+  // names) without letting the note checks drift somewhere else entirely.
+  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,1600}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
 
   // The manual step in front of the reader still exists, and it names where the signature goes.
   assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
@@ -2736,7 +2738,9 @@ test('the hand-over dialog is one line, one button, and a paste box, and every m
   // one of them used to carry a sentence of its own, which is how the wording the reader asked for
   // stopped reaching them.
   assert.equal(AMBER_HAND_OVER_WAITING_LINE, 'Amber has it on your clipboard. Tap the button to hand it over.');
-  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 4,
+  // Five: sign-in, the note itself, a resumed note, a second go at a copied signature, and the calendar event that is
+  // signed before the note which names it.
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 5,
     'every waiting-state call site writes the one waiting-state sentence');
 
   // The copy that was removed does not come back through the page: neither the steps, nor the
@@ -3626,7 +3630,7 @@ test('no signature is mistaken for a note\u2019s when it is a gift\u2019s', () =
 test('a gift signature is finished by its own flow on every path home, not just on a reload', async () => {
   const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // Every returning signature passes through completeAmberSignature, so the gift is routed there.
-  assert.match(page, /async function completeAmberSignature\(answer\) \{[\s\S]{0,900}if \(isGiftAction\(answer\.context\?\.action\)\)/);
+  assert.match(page, /async function completeAmberSignature\(answer\) \{[\s\S]{0,1600}if \(isGiftAction\(answer\.context\?\.action\)\)/);
   // And above the note guards, which is what used to swallow it. Compared inside the function: the
   // order check also appears elsewhere in the file, in the flow that publishes a note.
   const body = page.slice(page.indexOf('async function completeAmberSignature'),
@@ -3782,7 +3786,7 @@ test('a gift is not handed a second dialog on top of the one it is signed from',
   // it: a modal on top of a modal is how a finished action looks like a stuck one.
   assert.match(script, /if \(!isGiftAction\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{/);
   // A note still gets it, and the waiting sentence is unchanged for that case.
-  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 4,
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 5,
     'the waiting-state call sites are all still there');
 });
 
@@ -4883,4 +4887,37 @@ test('the type of a note only ever comes from the variable the fitter writes', a
   // The smaller phone type is real, it is just applied as a base the fitter then works from.
   assert.match(script, /function narrowScreen\(\)/);
   assert.match(script, /return narrowScreen\(\) \? Math\.round\(base \* 0\.84\) : base;/);
+});
+
+test('the calendar event is published before the note that points at it, and a failure stops the pin', async () => {
+  // D: "Where are buttons for callendar event going, maybe and not going when i tap the signature?" His note at u26 was
+  // pinned with a card, and the event behind it (31923:000000005e9dda…:pin-d94da822) answered on none of three relays:
+  // the event used to be published after the note, unawaited, and its failure only wrote a status line that the publish
+  // path then replaced and hid after three and a half seconds. A pinned note pointing at nothing has no answers to give.
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const body = page.slice(page.indexOf('async function publishPinnedNote'), page.indexOf('async function forgetPinnedPicture'));
+  const calendarAt = body.indexOf('await publishCalendarEvent(pending.calendar)');
+  const signAt = body.indexOf("signNostrEvent(template, {orderId: pending.orderId, action: 'pin'})");
+  assert.ok(calendarAt > 0, 'the pin publishes the event itself');
+  assert.ok(calendarAt < signAt, 'and asks for the note\'s signature only after the event is on the relays');
+  assert.doesNotMatch(body, /publishCalendarEvent\(pending\.calendar\);/,
+    'the old fire-and-forget call after the publish is gone');
+
+  // The event's own failure has to travel: a thrown error leaves the order unclaimed and the draft on the paper, while a
+  // returned false was the silent dead card.
+  // From the helper that publishes a signed event through the one that signs it: both halves refuse out loud.
+  const publisher = page.slice(page.indexOf('async function publishSignedCalendarEvent'), page.indexOf('async function finishCalendarFromSigner'));
+  for (const failure of [
+    /throw new Error\('The calendar event has to be signed on the same key/,
+    /Your signer did not answer for the calendar event, so the note was not pinned/,
+    /No relay took the calendar event, so the note was not pinned/,
+  ]) {
+    assert.match(publisher, failure);
+  }
+  assert.doesNotMatch(publisher, /status\(elements\.boardStatus/, 'nothing about this is only a status line');
+
+  // Amber needs two signatures — the event, then the note — and each answer has to route to its own flow.
+  assert.match(page, /answer\.context\?\.action === 'calendar'[\s\S]{0,200}finishCalendarFromSigner\(answer\)/);
+  assert.match(page, /async function finishCalendarFromSigner\(answer\)[\s\S]{0,900}await publishPinnedNote\(\)/,
+    'the event\'s signature publishes the event and then carries the pin on to the note');
 });

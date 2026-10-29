@@ -4434,32 +4434,67 @@ function attachCalendarReference(template) {
  * The note is already pinned by the time this runs, so a failure here is reported and not thrown: the reader has paid
  * once, and the card that will not resolve is worth saying out loud rather than taking their note away.
  */
+/**
+ * Put the event a note points at on the relays — **before** the note that points at it.
+ *
+ * This used to run after the note was pinned, and it did not throw: a failure was written into the board status, which
+ * the publish path then replaced with "Your note is pinned" and hid again after three and a half seconds. So a note
+ * could be pinned with a card that had nothing behind it — D's "the noEvent that doesn't exist" — and the reader who
+ * tapped the signature got no answer buttons and no explanation. Verified on his note: the reference was
+ * 31923:000000005e9dda…:pin-d94da822, and the private relay, relay.ditto.pub and relay.damus.io all had nothing.
+ *
+ * Now a failed event stops the pin instead: the note is never published, the order stays unclaimed and unpaid against,
+ * the draft stays in the composer and the reader is told which step failed and to press Pin again.
+ */
+/** The coordinate already published for this draft, so a second pass does not ask for a second signature. */
+let calendarEventPublished = '';
+
+async function publishSignedCalendarEvent(event) {
+  if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid calendar event, so the note was not pinned.');
+  const took = await publishToRelays(event);
+  if (!took) throw new Error('No relay took the calendar event, so the note was not pinned. Press Pin to try again.');
+  calendarEventPublished = eventCoordinate(event.kind, event.pubkey, event.tags.find(tag => tag[0] === 'd')?.[1]);
+  return true;
+}
+
 async function publishCalendarEvent(template) {
   const session = getNostrSession();
   if (!session || session.pubkey !== template.pubkey) {
-    status(elements.boardStatus, 'The note is pinned, but the calendar event was not published: the identity changed.');
-    elements.boardStatus.hidden = false;
-    return false;
+    throw new Error('The calendar event has to be signed on the same key as the note, and the signer changed. Nothing was pinned — sign in again and press Pin.');
   }
+  const coordinate = eventCoordinate(template.kind, template.pubkey, template.tags.find(tag => tag[0] === 'd')?.[1]);
+  if (calendarEventPublished === coordinate) return true;
+  let signed;
   try {
-    const signed = await signNostrEvent(template, {action: 'calendar', coordinate: eventCoordinate(template.kind, template.pubkey, template.tags.find(tag => tag[0] === 'd')?.[1])});
-    if (!signed) {
-      status(elements.boardStatus, 'The note is pinned. Your signer did not answer for the calendar event, so the card has nothing behind it yet — pin again to retry.');
-      elements.boardStatus.hidden = false;
-      return false;
-    }
-    const took = await publishToRelays(signed);
-    if (!took) {
-      status(elements.boardStatus, 'The note is pinned, but no relay took the calendar event. The card has nothing behind it yet.');
-      elements.boardStatus.hidden = false;
-      return false;
-    }
-    return true;
+    signed = await signNostrEvent(template, {action: 'calendar', coordinate});
   } catch (error) {
-    status(elements.boardStatus, `The note is pinned. The calendar event did not publish: ${error?.message || 'unknown reason'}.`);
-    elements.boardStatus.hidden = false;
-    return false;
+    throw new Error(`Your signer refused the calendar event, so the note was not pinned: ${error?.message || 'no reason given'}. Press Pin to try again.`);
   }
+  if (!signed) {
+    // Amber has taken the request and will copy the answer: the reader pastes it back, and that answer (not this call)
+    // publishes the event and carries on into the note. Two signatures are needed — one for the event, one for the note
+    // that names it — and this is the first of them.
+    if (amberSignaturePending()) {
+      showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
+      startAmberClipboardPoll();
+      return 'pending';
+    }
+    throw new Error('Your signer did not answer for the calendar event, so the note was not pinned. Press Pin to try again.');
+  }
+  await publishSignedCalendarEvent(signed);
+  return true;
+}
+
+/** A calendar signature the reader brought back from Amber: publish the event, then let the pin carry on to the note. */
+async function finishCalendarFromSigner(answer) {
+  if (!answer || answer.action !== 'sign' || answer.context?.action !== 'calendar' || !pending?.calendar) return false;
+  if (answer.event?.pubkey && pending.calendar.pubkey && answer.event.pubkey !== pending.calendar.pubkey) {
+    throw new Error('That signature is for a different key. Your note is still here — pin it again.');
+  }
+  await publishSignedCalendarEvent(answer.event);
+  sayAmberRoundTrip('Event is on the relays — now sign the note that names it');
+  await publishPinnedNote();
+  return true;
 }
 
 /**
@@ -4467,6 +4502,7 @@ async function publishCalendarEvent(template) {
  * file the reader chose once can ride along onto something else.
  */
 function forgetPinnedPicture() {
+  calendarEventPublished = '';
   selectNoteKind('text');
   chooseNoteImage(null);
   selectImageGrade(STICKY_IMAGE_DEFAULT_GRADE);
@@ -5204,6 +5240,16 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // was written — so this is the first id that means anything, and the last chance to mine
     // before the signature fixes it. A resumed signature (Amber handed it back) was already
     // mined before it left, so it is not mined again.
+    // The event goes up first, on the same key, and a failure here stops everything below it: no signature is asked
+    // for, nothing is published, and the order is left alone for the retry.
+    if (!resumedEvent && pending.calendar) {
+      // 'pending' means the event's signature is on its way back from Amber: nothing is pinned yet, and the answer
+      // picks the pin up where this left it. See finishCalendarFromSigner().
+      if (await publishCalendarEvent(pending.calendar) === 'pending') {
+        elements.pin.disabled = false;
+        return;
+      }
+    }
     if (!resumedEvent && pending.powBits) {
       const mined = await mineThisNote(template, pending.powBits);
       if (!mined) { elements.pin.disabled = false; return; }
@@ -5244,10 +5290,7 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // The pin is done on this page, so the hand-over that asked for the signature comes down with it. Nothing that can
     // wait for a network goes in front of this: the reader is waiting to be given their page back.
     retireAmberHandOver();
-    // The calendar event then goes up beside the note it is written on, on the same key, so the card in the note
-    // resolves to an event that is really there. The note is already pinned, so a failure here is told and not thrown.
     calendarSlug = '';
-    if (pending.calendar) publishCalendarEvent(pending.calendar);
     // The flow that launched this publish hears the outcome before anything else, so it can retire
     // its own wait even when this page's reader has already looked away.
     report?.(true, result.message || 'Your note is pinned.');
@@ -5607,7 +5650,11 @@ async function openNoteGiftDialog(eventId, opener = null) {
   // the three buttons and their counts come first. Everything below them is what this dialog already did.
   const reference = eventReferences(record.sticky?.content)[0] || '';
   const card = reference ? await resolveCalendarEvent(reference) : null;
-  if (elements.noteGiftTitle) elements.noteGiftTitle.textContent = card ? 'Respond to this event' : 'React or zap this note';
+  if (elements.noteGiftTitle) {
+    elements.noteGiftTitle.textContent = card
+      ? 'Respond to this event'
+      : reference ? 'This event is not on the relays' : 'React or zap this note';
+  }
   if (card) {
     rsvpAnswers.delete(card.coordinate);
     paintRsvpSection(card);
@@ -5616,7 +5663,9 @@ async function openNoteGiftDialog(eventId, opener = null) {
       if (elements.noteEventRsvp && !elements.noteEventRsvp.hidden) paintRsvpSection(card);
     }).catch(() => {});
   } else {
-    paintRsvpSection(null);
+    // A card with no event behind it used to open on "React or zap this note" and nothing else, which is what a note
+    // whose event never published looks like from the reader's side. Say what happened instead of offering silence.
+    paintRsvpSection(null, {missing: Boolean(reference)});
   }
 
   const session = getNostrSession();
@@ -6250,7 +6299,8 @@ async function resolveCalendarEvent(bech32) {
       const card = newest ? calendarEventFromEvent(newest) : null;
       if (card) { calendarEvents.set(bech32, card); return card; }
     }
-    calendarEvents.set(bech32, null);
+    // A miss is not remembered. It used to be, so a relay that was merely slow on the first render left the card dead
+    // for the life of the page even after the event arrived — and an event published a minute later never appeared.
     return null;
   } finally {
     calendarPending.delete(bech32);
@@ -6300,11 +6350,20 @@ async function loadRsvpAnswers(coordinate) {
 }
 
 /** Paint the answers: three buttons, their counts, and the reader's own answer marked. */
-function paintRsvpSection(card) {
+function paintRsvpSection(card, {missing = false} = {}) {
   const box = elements.noteEventRsvp;
   if (!box) return;
-  if (!card) { box.hidden = true; return; }
+  if (!card && !missing) { box.hidden = true; return; }
   box.hidden = false;
+  if (missing) {
+    elements.noteEventRsvpTitle.textContent = 'The event behind this note never reached a relay';
+    elements.noteEventRsvpWhen.textContent = '';
+    elements.noteEventRsvpButtons.replaceChildren();
+    elements.noteEventRsvpCounts.textContent = '';
+    elements.noteEventRsvpHint.textContent = 'There is nothing to answer here: the note is pinned, but the event it points at was never published. React or zap the note below.';
+    if (elements.noteGiftLogin) elements.noteGiftLogin.hidden = true;
+    return;
+  }
   const session = getNostrSession();
   elements.noteEventRsvpTitle.textContent = card.title;
   elements.noteEventRsvpWhen.textContent = [card.when, card.location].filter(Boolean).join(' · ');
@@ -7789,6 +7848,8 @@ async function applySignerReturn() {
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
+    } else if (amber?.action === 'sign' && amber.context?.action === 'calendar') {
+      applied = await finishCalendarFromSigner(amber);
     } else if (amber?.action === 'sign' && isGiftAction(amber.context?.action)) {
       // A reaction or a zap came back: it is not the note flow's, so it goes to its own handler
       // rather than falling through to the "that was for a different note" arm below.
@@ -7836,6 +7897,13 @@ async function completeAmberSignature(answer) {
   // to be routed above the note checks below. A gift signature carries no order, so those checks
   // reported it as a signature for a different note and dropped it: the reader signed a zap, Amber
   // closed, and the invoice never came because nothing ever asked for one.
+  // The event a calendar note names is signed before the note is, so its answer comes back first and has to be
+  // published before the note's own hand-over is asked for. This arm has to sit above the note checks: a calendar
+  // signature carries no order id, so those checks called it a signature for a different note and dropped it.
+  if (answer.context?.action === 'calendar') {
+    await finishCalendarFromSigner(answer);
+    return true;
+  }
   if (isGiftAction(answer.context?.action)) {
     // The hand-over has said everything it has to say, and the gift's own dialog is what the reader
     // needs to see next.
