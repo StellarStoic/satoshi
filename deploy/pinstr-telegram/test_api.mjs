@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createServer, readSession } from './api.mjs';
+import { createServer, readSession, canSignKind } from './api.mjs';
 
 const TOKEN = '123456:TEST-token-not-a-real-bot';
 const SECRET = 'test-session-secret-please-change';
@@ -97,4 +97,16 @@ test('options preflight answers 204', async () => {
     const r = await fetch(`${base}/tg/verify`, { method: 'OPTIONS', headers: { origin: 'https://pinstr.si' } });
     assert.equal(r.status, 204);
   });
+});
+
+test('the door signs a calendar event and never a private message', () => {
+  // The board offers a calendar note on the same composer as a text note, so a Telegram reader pressing "pin event"
+  // used to be refused by this list — a policy set that had not grown with the feature. The public calendar kinds are
+  // in; the private ones are deliberately still out, because a bearer token must not be able to write mail.
+  for (const kind of [31922, 31923, 31925]) {
+    assert.equal(canSignKind(kind), true, `kind ${kind} is part of a calendar note`);
+  }
+  for (const kind of [4, 1059, 13]) {
+    assert.equal(canSignKind(kind), false, `kind ${kind} is private or a seal and stays unsignable here`);
+  }
 });

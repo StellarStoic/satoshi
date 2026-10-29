@@ -124,6 +124,41 @@ function readTelegramSession() {
   }
 }
 
+function forgetTelegramSession() {
+  try {
+    localStorage.removeItem(TG_SESSION_KEY);
+  } catch { /* nothing stored, or storage blocked: nothing to forget */ }
+}
+
+/**
+ * Mint a fresh session from the Mini App's own launch data.
+ *
+ * A stored token lives seven days, and a server restarted with a new session secret invalidates every token at once.
+ * Either way this page can go on believing the reader is signed in while the server answers "no valid session", which
+ * the board showed as the whole error when a note was pinned — a dead end with no way forward. Inside Telegram the
+ * launch data is already here, so a new session costs one request and no prompt.
+ *
+ * One renewal at a time: a calendar note signs an event and a note together, and two parallel verifications would race
+ * to store two tokens for the same reader.
+ */
+let renewalInFlight = null;
+function renewTelegramSession() {
+  if (renewalInFlight) return renewalInFlight;
+  const initData = miniAppInitData();
+  if (!initData) return Promise.resolve(null);
+  renewalInFlight = (async () => {
+    try {
+      const verified = await post('/verify', { initData });
+      if (!verified.ok) return null;
+      rememberTelegramSession(verified.data);
+      return verified.data;
+    } catch {
+      return null;
+    }
+  })().finally(() => { renewalInFlight = null; });
+  return renewalInFlight;
+}
+
 /**
  * Is the board's current session one this module hosts?
  *
@@ -180,7 +215,22 @@ function installSessionSigner(detail, {fresh = false} = {}) {
         tags: (event && event.tags) || [],
         content: (event && event.content) || '',
       };
-      const res = await post('/sign', { event: draft }, detail.session);
+      const send = () => post('/sign', { event: draft }, detail.session);
+      let res = await send();
+      if (res.status === 401) {
+        // The token died while the page still said "signed in". Inside Telegram this costs one quiet request; outside
+        // it, the reader is told what to do rather than handed the server's own words. Either way the dead token is
+        // dropped, so the next attempt cannot be guaranteed to fail the same way.
+        const renewed = await renewTelegramSession();
+        if (!renewed) {
+          forgetTelegramSession();
+          throw new Error('Your Telegram session has ended. Log in with Telegram again, then pin this note.');
+        }
+        detail.session = renewed.session;
+        if (renewed.user) detail.user = renewed.user;
+        if (globalThis.PinstrTelegram) globalThis.PinstrTelegram.session = renewed.session;
+        res = await send();
+      }
       if (!res.ok) throw new Error((res.data && res.data.error) || `signing failed (${res.status})`);
       return res.data.event;
     },
@@ -470,9 +520,23 @@ function watchForLoginBlock() {
 // storage left the account dialog without its export and delete controls - it looked like a smaller,
 // poorer dialog than the one just after signing in. Re-mount from the stored session as well, both
 // once the DOM is there and every time the account dialog opens.
-function restoreTelegramSession() {
-  const stored = readTelegramSession();
-  if (!stored) return;
+function mountTelegramIdentity(boardSession, session, user) {
+  const detail = {
+    active: true,
+    signedIn: true,
+    pubkey: boardSession.pubkey,
+    session,
+    user: user || {},
+    npub: boardSession.npub || '',
+  };
+  try {
+    // A re-mount only: the session is already the reader's, and this must not write it again.
+    installSessionSigner(detail);
+  } catch { /* the board will say it needs a signer rather than pretending to have one */ }
+  mountKeyTools(detail);
+}
+
+async function restoreTelegramSession() {
   let boardSession;
   try {
     boardSession = JSON.parse(localStorage.getItem(BOARD_SESSION_KEY) || 'null');
@@ -483,13 +547,13 @@ function restoreTelegramSession() {
   // to an Amber, extension or pasted key since, and dressing that identity as this one is what made the account dialog
   // report the wrong signer.
   if (!hostedBoardSession(boardSession)) return;
-  const pubkey = boardSession.pubkey;
-  const detail = { active: true, signedIn: true, pubkey, session: stored.session, user: stored.user || {}, npub: boardSession.npub || '' };
-  try {
-    // A re-mount only: the session is already the reader's, and this must not write it again.
-    installSessionSigner(detail);
-  } catch { /* the board will say it needs a signer rather than pretending to have one */ }
-  mountKeyTools(detail);
+  const stored = readTelegramSession();
+  if (stored) return mountTelegramIdentity(boardSession, stored.session, stored.user);
+  // The board holds a Telegram identity and the token behind it is gone — past its seven days, or storage cleared. In
+  // the Mini App another can be minted from the launch data; without that the board asks for a signer, which is the
+  // honest answer.
+  const renewed = await renewTelegramSession();
+  if (renewed) mountTelegramIdentity(boardSession, renewed.session, renewed.user);
 }
 
 function remountKeyToolsFromSession() {
@@ -518,7 +582,7 @@ function remountKeyToolsFromSession() {
 
 function armKeyToolsFromStorage() {
   const run = () => {
-    restoreTelegramSession();
+    Promise.resolve(restoreTelegramSession()).catch(() => {});
     remountKeyToolsFromSession();
     const dialog = document.querySelector('#accountDialog');
     if (!dialog || dialog.dataset.pinstrKeyWatch === '1') return;

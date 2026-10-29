@@ -10,7 +10,15 @@ import { sealSecret, openSecret, checkKind0, publishToAll } from './profile.mjs'
 import { nsecToBytes, bytesToHex } from './bech32.mjs';
 import { schnorr } from './vendor/noble/secp256k1.js';
 
-const SIGNABLE_KINDS = new Set([0, 1, 7]);
+// A key sealed on this box signs only what the board offers, and never a private message: kind 4 and kind 1059 stay
+// out on purpose, because a stolen bearer token must not be able to read or send anyone's mail. The calendar kinds
+// (31922 whole days, 31923 timed) and the answer that goes with them (31925) are public events a reader composes on the
+// board exactly like a note — leaving them out made "pin this event" fail with "that event kind cannot be signed here"
+// for every Telegram reader, which reads as a broken door rather than a policy list.
+const SIGNABLE_KINDS = new Set([0, 1, 7, 31922, 31923, 31925]);
+export function canSignKind(kind) {
+  return SIGNABLE_KINDS.has(kind);
+}
 const MAX_CONTENT = 8192;
 
 function signEventFor(pubkey, priv, { kind, created_at, tags, content }) {
@@ -351,7 +359,7 @@ export function createServer(env = {}) {
         if (!record || !record.sealed) return send(res, 409, { error: 'no key to sign with' });
         const body = await readJson(req, 64 * 1024);
         const draft = body.event || {};
-        if (!SIGNABLE_KINDS.has(draft.kind)) return send(res, 400, { error: 'that event kind cannot be signed here' });
+        if (!canSignKind(draft.kind)) return send(res, 400, { error: 'that event kind cannot be signed here' });
         if (typeof draft.content !== 'string' || draft.content.length > MAX_CONTENT) return send(res, 400, { error: 'bad content' });
         if (!Array.isArray(draft.tags) || draft.tags.some((t) => !Array.isArray(t))) return send(res, 400, { error: 'bad tags' });
         let priv;

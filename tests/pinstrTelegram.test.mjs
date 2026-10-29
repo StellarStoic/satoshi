@@ -50,13 +50,16 @@ function fakeDom() {
   return {document, card, dialog};
 }
 
-async function load({boardSession, telegramSession}) {
+async function load({boardSession, telegramSession, initData = '', fetchImpl = null}) {
   const {document, card} = fakeDom();
   globalThis.document = document;
   globalThis.localStorage = memoryStorage({
     [BOARD_SESSION_KEY]: JSON.stringify(boardSession),
     ...(telegramSession ? {[TG_SESSION_KEY]: JSON.stringify(telegramSession)} : {}),
   });
+  globalThis.Telegram = initData ? {WebApp: {initData, ready() {}, expand() {}}} : undefined;
+  globalThis.location = {hash: '', search: ''};
+  if (fetchImpl) globalThis.fetch = fetchImpl;
   globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
   globalThis.MutationObserver = class { observe() {} };
   globalThis.dispatchEvent = () => {};
@@ -132,4 +135,70 @@ test('a Telegram session that already exists is left as one', async () => {
   });
   const stored = JSON.parse(globalThis.localStorage.getItem(BOARD_SESSION_KEY));
   assert.equal(stored.method, 'telegram', 'the session this module hosts keeps its own method');
+});
+
+test('a token the server has forgotten is renewed, and the note still gets signed', async () => {
+  // What D hit: the page said "signed in with Telegram" and pressing Pin returned the server's own words, "no valid
+  // session", because the stored token had died (seven days old, or minted before a session-secret change). Inside the
+  // Mini App the launch data can mint another, so the note is signed instead of the reader being stuck.
+  const calls = [];
+  const signer = () => globalThis.PinstrTelegramSigner;
+  const fetchImpl = async (url, init) => {
+    calls.push({path: url.replace(/^.*\/tg/, '/tg'), auth: init.headers.authorization || ''});
+    if (url.endsWith('/verify')) {
+      return {status: 200, ok: true, json: async () => ({session: 'renewed-token', user: {id: 12345}, expiresAt: '2999-01-01T00:00:00Z'})};
+    }
+    const auth = init.headers.authorization || '';
+    if (auth === 'Bearer dead-token') return {status: 401, ok: false, json: async () => ({error: 'no valid session'})};
+    return {status: 200, ok: true, json: async () => ({event: {id: 'signed-here', kind: 31923}})};
+  };
+  await load({
+    boardSession: {pubkey: 'd'.repeat(64), method: 'telegram'},
+    telegramSession: {session: 'dead-token', user: {id: 12345}, expiresAt: ''},
+    initData: 'auth_date=1&hash=deadbeef',
+    fetchImpl,
+  });
+  assert.ok(signer(), 'the module mounted its signer for the Telegram session');
+  const signed = await signer().signEvent({kind: 31923, created_at: 1, tags: [], content: ''});
+  assert.equal(signed.id, 'signed-here', 'the calendar event is signed after the quiet renewal');
+  assert.deepEqual(calls.map(call => call.path), ['/tg/sign', '/tg/verify', '/tg/sign'],
+    'one refused signature, one renewal, one signature that lands');
+  assert.equal(calls[2].auth, 'Bearer renewed-token', 'the retry carries the new token');
+  assert.equal(JSON.parse(globalThis.localStorage.getItem(TG_SESSION_KEY)).session, 'renewed-token',
+    'and the new token is kept, so the next note does not repeat the renewal');
+});
+
+test('outside Telegram a dead token says what to do, and is dropped', async () => {
+  const fetchImpl = async () => ({status: 401, ok: false, json: async () => ({error: 'no valid session'})});
+  await load({
+    boardSession: {pubkey: 'e'.repeat(64), method: 'telegram'},
+    telegramSession: {session: 'dead-token', user: {id: 12345}, expiresAt: ''},
+    initData: '',
+    fetchImpl,
+  });
+  assert.ok(globalThis.PinstrTelegramSigner, 'the stale session still mounts, so the board is not left signerless');
+  await assert.rejects(
+    () => globalThis.PinstrTelegramSigner.signEvent({kind: 1, created_at: 1, tags: [], content: 'hi'}),
+    /Your Telegram session has ended\. Log in with Telegram again, then pin this note\./,
+    'the reader is told what to do instead of being handed "no valid session"',
+  );
+  assert.equal(globalThis.localStorage.getItem(TG_SESSION_KEY), null,
+    'the dead token is dropped rather than retried forever');
+});
+
+test('a Telegram board session with no token mints one on load', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url.replace(/^.*\/tg/, '/tg'));
+    return {status: 200, ok: true, json: async () => ({session: 'fresh-token', user: {id: 999}, expiresAt: '2999-01-01T00:00:00Z'})};
+  };
+  await load({
+    boardSession: {pubkey: 'f'.repeat(64), method: 'telegram', npub: 'npub1ffff'},
+    initData: 'auth_date=2&hash=cafebabe',
+    fetchImpl,
+  });
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.deepEqual(calls, ['/tg/verify'], 'the launch data is exchanged for a session without asking the reader');
+  assert.ok(globalThis.PinstrTelegramSigner, 'so the board can sign again after a week away');
+  assert.equal(JSON.parse(globalThis.localStorage.getItem(TG_SESSION_KEY)).session, 'fresh-token');
 });
