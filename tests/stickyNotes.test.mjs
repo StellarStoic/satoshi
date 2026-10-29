@@ -4839,3 +4839,25 @@ test('a block hidden by its attribute is really gone, not merely marked hidden',
     assert.match(html, new RegExp(`id="${id}"[^>]*hidden`), `and the markup starts it hidden`);
   }
 });
+
+test('the paper shrinks its type before it refuses, and never eats what was typed', async () => {
+  const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  // One floor, shared by the composer's fit and the board's: a note that only fits the draft at 8px would be cut when
+  // it is pinned, so the two ranges have to be the same range.
+  assert.match(script, /const NOTE_MIN_FONT_PX = 9;/);
+  assert.equal((script.match(/while \(size > NOTE_MIN_FONT_PX/g) || []).length, 2,
+    'both the draft and the published note shrink down to that floor and no further');
+  assert.doesNotMatch(script, /while \(size > 10 /, 'the old bare floor is gone');
+
+  // When even the floor does not fit, the words stay and the counter tells the truth: it used to put the last valid
+  // text back, which is how a reader's long note looked like the page had swallowed it while the counter still
+  // promised characters that could not be placed.
+  const overflow = script.slice(script.indexOf('if (editorOverflows()) {'), script.indexOf('lastValidEditor = text;'));
+  assert.doesNotMatch(overflow, /elements\.editor\.textContent = lastValidEditor/,
+    'a note that cannot fit is left in the editor to be edited');
+  assert.match(overflow, /updateCapacity\(\{paperFull: true\}\)/,
+    'and the counter says the paper is full instead of counting room');
+  assert.match(script, /The paper is full — shorten the note or use a smaller font/);
+  // The refusal, when it comes, names the real limit rather than "too full".
+  assert.match(script, /does not fit the paper even at its smallest type/);
+});

@@ -3978,6 +3978,15 @@ function baseFontSize(font, draft = false) {
   return sizes[font] || sizes.typewriter;
 }
 
+/**
+ * The smallest type this paper ever uses.
+ *
+ * The composer shrinks a note to fit and the board shrinks a published note to fit, and they must agree on the floor:
+ * a note that only fits the draft at 8px would be cut on the board at 10. It is low enough that a long note keeps its
+ * words and high enough to still be read on a phone.
+ */
+const NOTE_MIN_FONT_PX = 9;
+
 function fitDraftTypography() {
   let size = baseFontSize(selectedFont, true);
   elements.draft.style.setProperty('--note-font-size', `${size}px`);
@@ -3986,7 +3995,7 @@ function fitDraftTypography() {
     const availableHeight = elements.draft.clientHeight - verticalInset;
     return elements.editor.scrollHeight <= availableHeight + 1 && elements.editor.scrollWidth <= elements.editor.clientWidth + 1;
   };
-  while (size > 10 && !fits()) {
+  while (size > NOTE_MIN_FONT_PX && !fits()) {
     size -= 1;
     elements.draft.style.setProperty('--note-font-size', `${size}px`);
   }
@@ -3996,7 +4005,7 @@ function fitDraftTypography() {
 function fitPublishedTypography(note, textBox, textContent, font) {
   let size = baseFontSize(font);
   note.style.setProperty('--note-font-size', `${size}px`);
-  while (size > 10 && (textContent.getBoundingClientRect().height > textBox.clientHeight + 1 || textContent.scrollWidth > textBox.clientWidth + 1)) {
+  while (size > NOTE_MIN_FONT_PX && (textContent.getBoundingClientRect().height > textBox.clientHeight + 1 || textContent.scrollWidth > textBox.clientWidth + 1)) {
     size -= 1;
     note.style.setProperty('--note-font-size', `${size}px`);
   }
@@ -4006,7 +4015,7 @@ function editorOverflows() {
   return !fitDraftTypography();
 }
 
-function updateCapacity() {
+function updateCapacity({paperFull = false} = {}) {
   // Counted in the text that will be published: a mention is drawn as a name in
   // the editor but travels as its whole npub, so what the counter shows is what
   // the relay will hold.
@@ -4016,7 +4025,12 @@ function updateCapacity() {
   elements.draft.classList.toggle('sticky-note--dense', length > 280);
   elements.capacity.classList.toggle('is-almost-full', almostFull);
   elements.capacity.classList.toggle('is-full', full);
-  if (!length) elements.capacity.textContent = 'The paper is empty';
+  if (paperFull) {
+    // The characters say there is room and the paper says otherwise: the paper wins, because that is what will be
+    // pinned. Saying "21 characters left" beside text that cannot be placed was a promise the board could not keep.
+    elements.capacity.textContent = 'The paper is full — shorten the note or use a smaller font';
+    elements.capacity.classList.add('is-full');
+  } else if (!length) elements.capacity.textContent = 'The paper is empty';
   else if (full) elements.capacity.textContent = 'The note is full';
   else elements.capacity.textContent = `${STICKY_MAX_CHARACTERS - length} characters left`;
 }
@@ -4044,12 +4058,10 @@ function handleEditorInput() {
     return;
   }
   if (editorOverflows()) {
-    elements.editor.textContent = lastValidEditor;
-    updateCapacity();
-    fitDraftTypography();
-    const selection = window.getSelection();
-    selection.selectAllChildren(elements.editor);
-    selection.collapseToEnd();
+    // The paper cannot hold this at its smallest type. The words stay where the reader can see and edit them — taking
+    // them away is how a long paste looked like the page had eaten it, and it left the counter saying there was room —
+    // and the counter says what the paper says. Pinning refuses, in words, before anything is ordered.
+    updateCapacity({paperFull: true});
     return;
   }
   lastValidEditor = text;
@@ -4597,7 +4609,9 @@ async function startPayment() {
     // anything is ordered, so an empty note cannot reach the desk without one.
     if (!content && !pictureComing) throw new Error('Write something on the note first.');
     if (pictureComing && !pickedImage && !pending?.image) throw new Error('Choose the picture first, then place it.');
-    if (!pictureComing && editorOverflows()) throw new Error('The note is too full.');
+    if (!pictureComing && editorOverflows()) {
+      throw new Error('This note does not fit the paper even at its smallest type. Take a few words out and pin it again.');
+    }
     elements.pay.disabled = true;
     status(elements.paymentStatus, quotedPrice === 0 ? 'Checking your subscription...' : 'Preparing invoice...');
     if (quotedPrice > 0) showPaymentPreparing(quotedPrice);
