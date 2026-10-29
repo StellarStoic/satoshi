@@ -2492,8 +2492,13 @@ test('an address in the composer counts as the word the paper prints', async () 
   assert.match(script, /else if \(node\.dataset\?\.href\) out \+= node\.dataset\.href;/,
     'a link chip stands for its address, never for the four characters it shows');
   assert.match(script, /chip\.className = 'sticky-editor__link'/);
-  assert.match(script, /drawLinkChipsInEditor\(\);\n  const text = elements\.editor\.textContent/,
-    'addresses are drawn before the note is measured');
+  assert.match(script, /drawLinkChipsInEditor\(\);\n  drawEventChipsInEditor\(\);\n  const text = elements\.editor\.textContent/,
+    'addresses and calendar references are both drawn before the note is measured');
+  // A calendar reference is the same bargain: the card's label is what the paper prints, and the address behind it is
+  // what travels. Without this a note that fits perfectly once pinned was refused as too full.
+  assert.match(script, /chip\.className = 'sticky-editor__event'/);
+  assert.match(script, /chip\.dataset\.href = match\.token;/, "the reader's own spelling of the address travels back out");
+  assert.match(script, /drawEventChipsInEditor\(\{force: true\}\)/, 'an appended reference is drawn at once');
   assert.match(script, /drawLinkChipsInEditor\(\{force: true\}\)/, 'a pasted address is converted whole');
   assert.match(script, /if \(editorPasting\)/, 'and the guards wait for that conversion instead of refusing it');
 });

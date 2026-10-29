@@ -622,6 +622,9 @@
 /* Mentions: the chip in the composer, the picker under the note, and the way a
    tagged person is drawn on a note. */
 .sticky-editor__link { padding: 0 .14em; border-radius: 3px; background: rgba(38,35,30,.1); text-decoration: underline; text-decoration-thickness: .08em; text-underline-offset: .14em; white-space: nowrap; }
+/* A calendar reference, drawn as the card's own label so the draft paper measures what the pinned one will show. The
+   address it stands for is on the element, and editorContent() puts it back. */
+.sticky-editor__event { padding: 0 .3em; border: 1px solid rgba(38,35,30,.28); border-radius: 4px; background: rgba(38,35,30,.1); white-space: nowrap; font-size: .92em; }
 .sticky-editor__mention { padding: 0 .18em; border-radius: 3px; background: rgba(38,35,30,.12); color: #1f4d2b; font-weight: 700; white-space: nowrap; }
 .sticky-note__mention { padding: 0 .16em; border-radius: 3px; background: rgba(38,35,30,.1); color: #1f4d2b; font-weight: 700; white-space: nowrap; }
 .mention-menu { margin: 6px 0 2px; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; background: rgba(18,19,19,.94); box-shadow: 0 10px 26px rgba(0,0,0,.32); }

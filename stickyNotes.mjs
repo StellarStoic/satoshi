@@ -88,7 +88,7 @@ import {mineNote, describeSeconds} from './powMining.mjs';
 import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, relayLampFor, relayHostLabel, addUserRelay, removeUserRelay, animatedPicture,
  isGiftAction, noteStackOrder, subscriptionFreeOffer,
  // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
- EVENT_LABEL, calendarEventFromEvent, eventReferences, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
+ EVENT_LABEL, calendarEventFromEvent, eventReferences, eventReferenceMatches, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
  // the composer's own calendar: the event it builds, the reference the note carries, and the coordinate both agree on
  buildCalendarEvent, appendCalendarReference, eventCoordinate,
  mergeRsvpAnswers,
@@ -4030,6 +4030,7 @@ function handleEditorInput() {
   // A finished address is drawn as the word the paper prints before anything is measured: five
   // thousand characters of query string drawn as `link` must not measure as five thousand.
   drawLinkChipsInEditor();
+  drawEventChipsInEditor();
   const text = elements.editor.textContent;
   const published = normaliseStickyText(editorContent());
   elements.draft.classList.toggle('sticky-note--dense', stickyNoteLength(published) > 280);
@@ -4398,6 +4399,9 @@ function attachCalendarReference(template) {
   }
   elements.editor.textContent = next;
   lastValidEditor = next;
+  // The appended address is drawn as the card's label straight away, so the paper measures what it will pin and the
+  // reader sees a card rather than a hundred and twenty characters of bech32.
+  drawEventChipsInEditor({force: true});
   updateCapacity();
   return {template, naddr};
 }
@@ -6521,6 +6525,53 @@ function caretAfterChip(chip) {
  * the chip. A pasted query string can run to thousands of characters: drawn as itself it fills the
  * note and is refused for not fitting, while the paper will only ever show four characters.
  */
+/**
+ * An event reference draws as the word the pinned note prints: `calendar event`.
+ *
+ * The card in a published note is a fourteen-character label, but the address behind it is a hundred and twenty
+ * characters with nowhere to break — so a note that is perfectly readable once pinned measured as overflow in the
+ * composer, and the reader was told the note was too full while the counter still offered four hundred characters.
+ * Drawing it as the label makes the draft paper measure what the pinned paper will be, and `editorContent()` already
+ * turns any chip with an `href` back into the address it stands for, so the published note and its hash are unchanged.
+ */
+function drawEventChipsInEditor({force = false} = {}) {
+  const editor = elements.editor;
+  const selection = window.getSelection();
+  const caretNode = selection && selection.rangeCount ? selection.getRangeAt(0).startContainer : null;
+  const caretOffset = selection && selection.rangeCount ? selection.getRangeAt(0).startOffset : null;
+  const nodes = [...editor.childNodes].filter(node => node.nodeType === 3);
+  for (const node of nodes) {
+    const text = node.textContent || '';
+    const matches = eventReferenceMatches(text);
+    for (let index = matches.length - 1; index >= 0; index -= 1) {
+      const match = matches[index];
+      const at = match.index ?? text.indexOf(match.token);
+      if (at < 0) continue;
+      const end = at + match.token.length;
+      // A reference being typed is left alone until it is finished — and so is the rest of the word it sits in
+      const finishing = caretNode === node && caretOffset !== null && caretOffset > at && caretOffset < end;
+      if (finishing && !force) continue;
+      const chip = document.createElement('span');
+      chip.className = 'sticky-editor__event';
+      chip.contentEditable = 'false';
+      // The address as the reader wrote it travels back out: a bare `naddr1…` stays bare, `nostr:naddr1…` keeps its
+      // prefix, so nothing in the note changes behind their back.
+      chip.dataset.href = match.token;
+      chip.textContent = `\u{1F4C5} ${EVENT_LABEL}`;
+      chip.title = match.token;
+      const before = text.slice(0, at);
+      const after = text.slice(end);
+      const parent = node.parentNode;
+      if (!parent) continue;
+      if (before) parent.insertBefore(document.createTextNode(before), node);
+      parent.insertBefore(chip, node);
+      if (after) parent.insertBefore(document.createTextNode(after), node);
+      node.remove();
+      break;   // this text node is spent; the next pass sees the new ones
+    }
+  }
+}
+
 function drawLinkChipsInEditor({force = false} = {}) {
   const editor = elements.editor;
   const selection = window.getSelection();
