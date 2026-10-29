@@ -362,6 +362,14 @@
       <h2 id="amberCopyTitle">Finish signing in with Amber</h2>
       <div id="amberCopyStatus" class="inline-status" role="status" aria-live="polite">Amber has it on your clipboard. Tap the button to hand it over.</div>
       <button type="button" id="amberPaste" class="primary-action amber-paste"><i class="lni lni-clipboard" aria-hidden="true"></i><span>Paste what Amber copied</span></button>
+      <!-- The clipboard read above needs a permission this browser grants per site, and on a site it has never
+           granted it the read is simply refused. This box is the way out: the reader pastes Amber's answer with
+           their own paste action, so the page never touches the clipboard at all. -->
+      <label class="amber-paste__field" for="amberPasteInput"><span>Or paste it here yourself</span>
+        <textarea id="amberPasteInput" class="amber-paste__input" rows="2" autocomplete="off" spellcheck="false"
+          placeholder="Paste what Amber copied"></textarea>
+      </label>
+      <button type="button" id="amberPasteUse" class="secondary-action amber-paste__use"><i class="lni lni-checkmark" aria-hidden="true"></i><span>Use what I pasted</span></button>
     </div>
   </dialog>
   <dialog id="nostrConnectDialog" class="sticky-dialog" aria-labelledby="nostrConnectTitle">

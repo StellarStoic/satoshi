@@ -2689,7 +2689,7 @@ test('the copied signature is polled for, because Android fires no return event'
   assert.match(script, /elements\.amberPaste\.addEventListener\('click'/);
 });
 
-test('the hand-over dialog is one line and one button, and every message rides that line', async () => {
+test('the hand-over dialog is one line, one button, and a paste box, and every message rides that line', async () => {
   const [markup, script, css] = await Promise.all([
     readFile(new URL('../stickyNotes.html', import.meta.url), 'utf8'),
     readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
@@ -2710,6 +2710,13 @@ test('the hand-over dialog is one line and one button, and every message rides t
   assert.equal(dialog.match(/id="amberCopyStatus"/g).length, 1, 'exactly one line element is in there');
   assert.doesNotMatch(dialog, /amber-steps|amberCopyNote|amber-note/, 'the step list and the paragraph are gone');
   assert.equal(dialog.match(/<(p|ol|li)\b/g), null, 'no prose is left in the dialog');
+  // And the way out of a read this browser refuses: a box the reader pastes into themselves. Chrome grants
+  // clipboard access per site, so on a site it has never granted it the button above can never work — which is
+  // what a reader on pinstr.si hit while satoshi.si worked.
+  assert.match(dialog, /<textarea id="amberPasteInput"/, 'the dialog carries a paste box');
+  assert.match(dialog, /<button type="button" id="amberPasteUse"/, 'and a control that uses what was pasted');
+  assert.match(script, /adoptAmberClipboard\(\{text: pasted\}\)/, 'a pasted key completes a sign-in');
+  assert.match(script, /adoptAmberSignature\(\{text: pasted\}\)/, 'and a pasted signature completes a signing hand-over');
 
   // Nothing styles what is no longer there, and nothing in the page reaches for the removed note:
   // the one line is the only surface the round trip speaks through inside the dialog.
@@ -2749,7 +2756,7 @@ test('the hand-over dialog is one line and one button, and every message rides t
   for (const message of [
     /sayAmberRoundTrip\('Amber has copied a signature - reading it'\)/,
     /sayAmberRoundTrip\('Signature verified - pinning your note'\)/,
-    /The browser would not let the page read the clipboard\./,
+    /The browser will not let this page read the clipboard\. Paste what Amber copied into the box below/,
     /That signature did not match your note\./,
     /The server refused the pin: \$\{outcome\.message\}/,
     /Amber never handed a signature back\. Ask for the \$\{amberActionWords\(\)\} again, or use the paste button\./,
@@ -2869,9 +2876,9 @@ test('the clipboard round trip says on the page where it got to', async () => {
   assert.match(say, /if \(elements\.amberCopyStatus\.textContent === message/);
 
   // Each failure point gets its own sentence, so a round trip that stops says where it stopped.
-  assert.match(script, /The browser would not let the page read the clipboard\. Tap the button below to read what Amber copied\./,
-    'a read the browser refused');
-  assert.match(script, /This page cannot read the clipboard while it is in the background\. Tap the button below to read what Amber copied\./,
+  assert.match(script, /The browser will not let this page read the clipboard\. Paste what Amber copied into the box below, or tap the button to try reading it again\./,
+    'a read the browser refused — and the box that needs no permission is named with it');
+  assert.match(script, /This page cannot read the clipboard while it is in the background\. Paste what Amber copied into the box below, or tap the button to try reading it again\./,
     'a read refused while the page does not claim focus');
   // A clipboard that is empty, or still holding what an earlier trip left there, is the middle of a
   // round trip rather than a step that failed: the signer's write lands after this page is told it is
@@ -3636,7 +3643,7 @@ test('a gift signature is finished by its own flow on every path home, not just 
 test('a round trip in flight is not a failure, and a tap brings the signature home', async () => {
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // A refusal is still said: only the reader can act on that one.
-  assert.match(script, /The browser would not let the page read the clipboard\. Tap the button below/);
+  assert.match(script, /The browser will not let this page read the clipboard\. Paste what Amber copied into the box below/);
   // The one moment the reader must act is the timeout, and it names what is being signed rather than
   // telling a reader who is reacting that Amber did not hand "the note" back.
   assert.match(script, /function amberActionWords\(\) \{/);

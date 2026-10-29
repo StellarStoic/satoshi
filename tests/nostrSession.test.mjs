@@ -1169,3 +1169,38 @@ test('a label survives a session that carries no npub', async () => {
   const long = 'npub1' + 'q'.repeat(58);
   assert.equal(shortNpub(long), `${long.slice(0, 9)}...${long.slice(-5)}`);
 });
+
+test('a browser that refuses the clipboard read is not the end of the hand-over', async () => {
+  // Chrome grants clipboard access per site. On a site it has never granted it, readText throws and there is
+  // nothing the page can do — which is exactly the wall a reader on pinstr.si hit while satoshi.si worked. The
+  // paste box exists for that case: the same value, pasted by hand, needs no permission at all.
+  const storage = memoryStorage();
+  globalThis.localStorage = storage;
+  globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+  globalThis.history = {replaceState() {}};
+  globalThis.location = {
+    origin: 'https://pinstr.si', pathname: '/', search: '', hash: '', assign() {},
+  };
+  globalThis.window = {dispatchEvent() {}, NostrTools: {nip19: {npubEncode: value => `npub1${value.slice(0, 58)}`}}};
+  let reads = 0;
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {userAgent: 'Android', clipboard: {readText: async () => { reads += 1; throw new Error('NotAllowedError'); }}},
+  });
+
+  const sessionModule = await import(`../nostrSession.mjs?amber-paste-box=${Date.now()}`);
+  sessionModule.beginAmberLogin({copy: true});
+  // The hand-off itself reads what is already there, inside the tap, to fingerprint it — so that a value the
+  // reader copied for something else can never be mistaken for the answer. That read is expected; what matters
+  // is that the *adopt* read is refused and the paste box needs none at all.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const afterHandOff = reads;
+  await assert.rejects(() => sessionModule.adoptAmberClipboard(), /Paste what Amber copied into the box/,
+    'a refused read tells the reader where to paste instead of only saying it was refused');
+  assert.equal(reads, afterHandOff + 1, 'the adopt read was attempted, and refused');
+
+  const answer = await sessionModule.adoptAmberClipboard({text: 'E'.repeat(64)});
+  assert.equal(answer.session.pubkey, 'e'.repeat(64), 'a key pasted by hand completes the sign-in');
+  assert.equal(reads, afterHandOff + 1, 'and the clipboard was not touched to do it');
+  assert.equal(sessionModule.getNostrSession().method, 'amber');
+});

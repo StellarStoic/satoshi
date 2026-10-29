@@ -26,6 +26,14 @@
    a 184px text box on a 140px note. Clamping the wrapper is what lets the label truncate instead. */
 .sticky-note .sticky-note__text > span { max-width: 100%; min-width: 0; }
 /* The calendar form, sized for a phone first: two dates side by side only when there is room for both. */
+/* The hand-over dialog's own paste box. A textarea rather than an input: a signature is a long line and the
+   reader must be able to see that all of it arrived. 16px text stops iOS zooming the page on focus. */
+.amber-paste__field { display: grid; gap: 6px; margin: 6px 0 0; font-size: .82rem; color: var(--text-muted, #9aa0a6); }
+.amber-paste__input { width: 100%; min-height: 58px; padding: 9px 10px; font: inherit; font-size: 16px;
+  color: inherit; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+  resize: vertical; overflow-wrap: anywhere; }
+.amber-paste__input:focus-visible { outline: 1px solid var(--accent, #f2a900); outline-offset: 1px; }
+.amber-paste__use { margin-top: 8px; }
 .note-event { display: grid; gap: 10px; margin: 0 0 14px; }
 .note-event__lead { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--text-muted, #9aa0a6); }
 .note-event__field { display: grid; gap: 4px; font-size: .8rem; color: var(--text-muted, #9aa0a6); }

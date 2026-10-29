@@ -351,7 +351,7 @@ export function noteAmberHandOverOutcome(message, error = false) {
  * Take the value Amber copied, for a request sent with no callback URL. The request that is still
  * parked decides what is being handed over, never what the clipboard happens to hold.
  */
-export async function adoptAmberClipboard({silent = false} = {}) {
+export async function adoptAmberClipboard({silent = false, text: text_ = null} = {}) {
   // A silent read is the page finishing a sign-in by itself; it never reports anything, and the
   // request stays parked when it cannot be used, so the button under the form still works.
   const stop = message => {
@@ -370,14 +370,21 @@ export async function adoptAmberClipboard({silent = false} = {}) {
   const waiting = parked[0];
   if (!waiting) return stop('Nothing is waiting for Amber. Start the sign-in again.');
   if (waiting.state.action !== 'login') return stop('That request is not a sign-in. Start the sign-in again.');
-  if (!navigator.clipboard?.readText) {
-    return stop('This browser will not let the page read the clipboard. Paste the key into the private key field instead.');
-  }
+  // A value the reader pasted in themselves needs no permission and no activation: the page never reads the
+  // clipboard, which is the only part that was ever refused. That is the way out on a site this browser has not
+  // granted clipboard access to, and the value is the same either way.
   let text = '';
-  try {
-    text = (await navigator.clipboard.readText()) || '';
-  } catch {
-    return stop('The browser refused to read the clipboard. Tap again and allow it.');
+  if (typeof text_ === 'string') {
+    text = text_;
+  } else {
+    if (!navigator.clipboard?.readText) {
+      return stop('This browser will not let the page read the clipboard. Paste what Amber copied into the box on this dialog.');
+    }
+    try {
+      text = (await navigator.clipboard.readText()) || '';
+    } catch {
+      return stop('The browser refused to read the clipboard. Paste what Amber copied into the box on this dialog and press Use it.');
+    }
   }
   const pubkey = text.trim().toLowerCase();
   if (!pubkey) return stop('The clipboard is empty. In Amber, copy the key it offered, then tap again.');
@@ -404,7 +411,7 @@ export async function adoptAmberClipboard({silent = false} = {}) {
  * what the clipboard happens to hold, and a silent read never swallows a value the reader copied
  * before asking.
  */
-export async function adoptAmberSignature({silent = false, onStatus = null} = {}) {
+export async function adoptAmberSignature({silent = false, onStatus = null, text: text_ = null} = {}) {
   // A silent read is the page finishing a signing round trip by itself; it never reports anything,
   // and the request stays parked when it cannot be used, so the button still works. `onStatus` is
   // how even a silent read says where it stopped: the board turns those codes into one line the
@@ -432,14 +439,19 @@ export async function adoptAmberSignature({silent = false, onStatus = null} = {}
   if (waiting.state.action !== 'sign' || !waiting.state.copy) {
     return stop('not-handoff', 'That request is not a signing hand-off. Start the signing again.');
   }
-  if (!navigator.clipboard?.readText) {
-    return stop('no-api', 'This browser will not let the page read the clipboard. Pin the note again to sign it.');
-  }
   let text = '';
-  try {
-    text = (await navigator.clipboard.readText()) || '';
-  } catch {
-    return stop('refused', 'The browser refused to read the clipboard. Tap again and allow it.');
+  if (typeof text_ === 'string') {
+    // Pasted by the reader: no read is made, so there is nothing to refuse.
+    text = text_;
+  } else {
+    if (!navigator.clipboard?.readText) {
+      return stop('no-api', 'This browser will not let the page read the clipboard. Paste the signature Amber copied into the box on this dialog.');
+    }
+    try {
+      text = (await navigator.clipboard.readText()) || '';
+    } catch {
+      return stop('refused', 'The browser refused to read the clipboard. Paste the signature Amber copied into the box on this dialog and press Use it.');
+    }
   }
   const signature = text.trim();
   if (!signature) {

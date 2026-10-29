@@ -271,6 +271,7 @@ const elements = {
   amberPaste: document.getElementById('amberPaste'),
   amberDialog: document.getElementById('amberCopyDialog'),
   amberCopyTitle: document.getElementById('amberCopyTitle'),
+  amberPasteInput: document.getElementById('amberPasteInput'), amberPasteUse: document.getElementById('amberPasteUse'),
   amberCopyStatus: document.getElementById('amberCopyStatus'),
   nostrConnect: document.getElementById('nostrConnectDialog'),
   nostrConnectQr: document.getElementById('nostrConnectQr'),
@@ -6873,6 +6874,47 @@ elements.amberPaste.addEventListener('click', async () => {
     if (amberSignaturePending()) startAmberClipboardPoll();
   }
 });
+/**
+ * The reader pasted Amber's answer in themselves.
+ *
+ * Same two round trips as the paste button, except that neither of them reads the clipboard: a browser grants
+ * clipboard access per site, and on a site it has never granted it, the read is refused with nothing the page can
+ * do about it. A value pasted by hand needs no permission, so this is the route that always works — including on
+ * an origin the reader has never signed in on before.
+ */
+elements.amberPasteUse?.addEventListener('click', async () => {
+  const pasted = String(elements.amberPasteInput?.value || '').trim();
+  if (!pasted) {
+    status(elements.amberCopyStatus, 'Paste what Amber copied into the box first.', true);
+    return;
+  }
+  try {
+    // A signature, when one is waiting: the same completion the poll uses, so a pasted signature and a read one
+    // cannot take different paths through the publish.
+    if (amberSignaturePending()) {
+      status(elements.amberCopyStatus, 'Reading what you pasted...');
+      const answer = await adoptAmberSignature({text: pasted});
+      if (answer?.action === 'sign') {
+        elements.amberPasteInput.value = '';
+        stopAmberClipboardPoll();
+        await completeAmberSignature(answer);
+        return;
+      }
+      // Refusals name themselves in the dialog's own line; nothing else is said over them.
+      return;
+    }
+    status(elements.amberCopyStatus, 'Reading what you pasted...');
+    const answer = await adoptAmberClipboard({text: pasted});
+    elements.amberPasteInput.value = '';
+    updateAccount();
+    status(elements.amberCopyStatus, '');
+    if (elements.amberDialog.open) elements.amberDialog.close();
+    if (elements.login.open) elements.login.close();
+    showLoginConfirmation(answer.session);
+  } catch (error) {
+    status(elements.amberCopyStatus, error.message, true);
+  }
+});
 elements.nostrConnectCopy.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(elements.nostrConnectUri.textContent);
@@ -7768,7 +7810,12 @@ async function completeAmberSignature(answer) {
  */
 function showAmberHandOver(message) {
   if (elements.login.open) elements.login.close();
-  if (!elements.amberDialog.open) elements.amberDialog.showModal();
+  if (!elements.amberDialog.open) {
+    elements.amberDialog.showModal();
+    // A box still holding the last answer would hand it over again on the next request, so it is emptied when the
+    // step opens — not when a poll restart re-shows it, which would wipe what the reader is typing.
+    if (elements.amberPasteInput) elements.amberPasteInput.value = '';
+  }
   // This step is a signature, and the front of the dialog has to say which one it is: a sign-in and a
   // signature are the same clipboard step. What is waiting and what to tap are named on the dialog's
   // one line, in the messages that pass through here.
@@ -7854,8 +7901,8 @@ function amberReadFailure(code, focused) {
     // says it is not is the ordinary "the signer is still in front" answer. The read is attempted
     // either way, which is the whole point of the change.
     return focused
-      ? 'The browser would not let the page read the clipboard. Tap the button below to read what Amber copied.'
-      : 'This page cannot read the clipboard while it is in the background. Tap the button below to read what Amber copied.';
+      ? 'The browser will not let this page read the clipboard. Paste what Amber copied into the box below, or tap the button to try reading it again.'
+      : 'This page cannot read the clipboard while it is in the background. Paste what Amber copied into the box below, or tap the button to try reading it again.';
   }
   if (code === 'empty' || code === 'invalid') {
     // Neither is a failure, so neither is said. The signer is another app: what it copies lands after
