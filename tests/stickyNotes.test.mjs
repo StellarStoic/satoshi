@@ -4861,3 +4861,26 @@ test('the paper shrinks its type before it refuses, and never eats what was type
   // The refusal, when it comes, names the real limit rather than "too full".
   assert.match(script, /does not fit the paper even at its smallest type/);
 });
+
+test('the type of a note only ever comes from the variable the fitter writes', async () => {
+  // The fault D hit on his phone: the narrow-screen media query set `font-size: 15px` on `.sticky-note` directly, which
+  // wins over `font-size: var(--note-font-size)`. Every shrink the composer and the board made was therefore discarded —
+  // a 120-character note measured as not fitting at any size and was refused, while a desktop window shrank it happily.
+  const [css, script] = await Promise.all([
+    readFile(new URL('../stickyNotes.css', import.meta.url), 'utf8'),
+    readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8'),
+  ]);
+  const narrow = css.slice(css.indexOf('@media (max-width: 680px)'), css.indexOf('@media (max-width: 680px)') + 4000);
+  for (const selector of ['.sticky-note {', '.sticky-note--placing {']) {
+    const at = narrow.indexOf(selector);
+    assert.ok(at > 0, `${selector} is in the narrow-screen block`);
+    const rule = narrow.slice(at, narrow.indexOf('}', at));
+    assert.doesNotMatch(rule, /font-size:/,
+      `${selector} must not pin a font-size: it would override the variable the fitter writes`);
+  }
+  assert.match(css, /\.sticky-note \{[^}]*font-size: var\(--note-font-size\)/,
+    'the only source of a note\'s type is the variable');
+  // The smaller phone type is real, it is just applied as a base the fitter then works from.
+  assert.match(script, /function narrowScreen\(\)/);
+  assert.match(script, /return narrowScreen\(\) \? Math\.round\(base \* 0\.84\) : base;/);
+});

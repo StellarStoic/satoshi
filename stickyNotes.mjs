@@ -3966,6 +3966,15 @@ function selectLiveliness(key) {
   if (elements.livelinessHint) elements.livelinessHint.textContent = livelinessHintText(rung);
 }
 
+/** A phone draws the paper smaller, so its base type is smaller too — but only the base, never a fixed size. */
+function narrowScreen() {
+  try {
+    return globalThis.matchMedia?.('(max-width: 680px)')?.matches === true;
+  } catch {
+    return false;
+  }
+}
+
 function baseFontSize(font, draft = false) {
   const sizes = {
     typewriter: draft ? 18 : 17,
@@ -3975,7 +3984,8 @@ function baseFontSize(font, draft = false) {
     kalam: draft ? 21 : 19,
     serif: draft ? 18 : 17,
   };
-  return sizes[font] || sizes.typewriter;
+  const base = sizes[font] || sizes.typewriter;
+  return narrowScreen() ? Math.round(base * 0.84) : base;
 }
 
 /**

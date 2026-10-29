@@ -563,8 +563,13 @@
 .sticky-note--doomed { opacity: .6; filter: grayscale(.4); outline: 2px solid #ff5c53; }
 @media (max-width: 680px) {
   .icon-text-button, .primary-action { min-height: 38px; padding: 7px 10px; font-size: .78rem; }
-  .sticky-note { width: 190px; font-size: 15px; padding: 18px 12px 15px; }
-  .sticky-note--placing { width: 210px; font-size: 16px; }
+  /* No `font-size` here, on purpose: the type of a note is `var(--note-font-size)`, which the fitting code writes as it
+     shrinks the text to fit. A hard font-size in this rule wins over that variable, so on a phone the fit loop ran
+     without effect and every note longer than a couple of lines was refused as too full (and published notes could not
+     shrink either). The smaller phone type is applied where it belongs: baseFontSize() scales the base for a narrow
+     screen, and the fitter takes it from there. */
+  .sticky-note { width: 190px; padding: 18px 12px 15px; }
+  .sticky-note--placing { width: 210px; }
   .login-methods { grid-template-columns: 1fr; }.login-field { grid-template-columns: 1fr auto; }.login-field > span { grid-column: 1 / -1; }
   .dialog-inner { padding: 22px 18px; }
   .placement-controls > span { display:none; }.placement-controls { bottom: calc(48px + env(safe-area-inset-bottom)); }
