@@ -148,6 +148,13 @@ export const PAGE_HELP = Object.freeze({
                     + ' offers three answers: Attending, Maybe or Declined, with how many people said each. Your answer is'
                     + ' signed by you and replaces your earlier one if you change your mind. Not signed in? The buttons are'
                     + ' there but disabled, and the dialog says so: log in to respond to this event.',
+                    'A note can carry a poll too. Choose Poll in the note maker, ask a question, and give two to six'
+                    + ' answers; let people pick more than one if the question allows it. The board writes the poll, writes'
+                    + ' its reference on the note, and publishes both together, so the note keeps its words and gains a'
+                    + ' card with the question. Press the card, or the signature, and the question opens with a button per'
+                    + ' answer and how many people chose each. One vote each: a newer vote replaces your earlier one, and'
+                    + ' a poll with a last day stops taking votes then. Not signed in? The buttons are there but disabled,'
+                    + ' and the dialog says so: log in to vote on this poll.',
                     'You do not have to decide about the pass before you start writing. Write the note, press the button,'
                     + ' pay for the pass, and the note you were already writing goes onto the board by itself. For the rest'
                     + ' of the pass the button simply says Place your note.',
@@ -183,6 +190,14 @@ export const PAGE_HELP = Object.freeze({
                     + ' a and d both the event coordinate — addressable, so answering again replaces the earlier answer —'
                     + ' and a status of accepted, tentative or declined; the tally takes one answer per pubkey, newest'
                     + ' first, and an answer needs a signed-in identity because it is signed by the reader.',
+                    'A poll note carries the question as a reference in its text — an nevent1… pointing at a NIP-88'
+                    + ' kind 1068 event whose content is the question, whose option tags are [option, id, label] pairs,'
+                    + ' and which names the relays it expects answers on and whether it is singlechoice or'
+                    + ' multiplechoice. A poll is a regular event, not an addressable one, so the note names it by id —'
+                    + ' and an id is the hash of the event without its signature, which is why the reference is on the'
+                    + ' paper before anything is signed. A vote is kind 1018 with the poll in an e tag and one response'
+                    + ' tag per chosen option; the tally keeps one vote per pubkey, newest first, and a singlechoice'
+                    + ' poll reads only the first response tag of an answer.',
                     'A note is one kind 1 Nostr event signed by your own signer: a browser extension, a bunker, or a key'
                     + ' pasted for a single visit. The text is the event content and everything else travels in tags:'
                     + ' ["t","pinstr"], up to three additional hashtag t tags, ["client","satoshi.si"], and one'

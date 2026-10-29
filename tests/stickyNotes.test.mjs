@@ -2689,7 +2689,7 @@ test('the copied signature is polled for, because Android fires no return event'
   // gift route above it, which is what lets a signed reaction or zap be finished at all.
   // The bounds are room for the arms that route a signature to its own flow (a gift, and now the calendar event a note
   // names) without letting the note checks drift somewhere else entirely.
-  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,1600}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
+  assert.match(script, /stopAmberClipboardPoll\(\);[\s\S]{0,3000}if \(!pending\?\.orderId\) \{[\s\S]{0,400}if \(pending\?\.orderId !== answer\.context\?\.orderId\)/);
 
   // The manual step in front of the reader still exists, and it names where the signature goes.
   assert.match(script, /elements\.amberCopyTitle\.textContent = 'Finish signing with Amber';/);
@@ -2740,7 +2740,9 @@ test('the hand-over dialog is one line, one button, and a paste box, and every m
   assert.equal(AMBER_HAND_OVER_WAITING_LINE, 'Amber has it on your clipboard. Tap the button to hand it over.');
   // Five: sign-in, the note itself, a resumed note, a second go at a copied signature, and the calendar event that is
   // signed before the note which names it.
-  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 5,
+  // Six: sign-in, the note, a resumed note, a second go at a copied signature, the calendar event and the poll — two
+  // of those are notes that carry a second event, and each event asks the signer for its own signature.
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 6,
     'every waiting-state call site writes the one waiting-state sentence');
 
   // The copy that was removed does not come back through the page: neither the steps, nor the
@@ -3230,8 +3232,9 @@ test('a paid picture note can still be placed, words or none', async () => {
   assert.match(script, /image: noteKind === 'image' \? String\(pending\?\.image \|\| ''\) : ''/);
 });
 
-test('the composer offers a note, a picture or an event, and asks only a note for words', async () => {
-  // The three kinds are named what they are, and the words field is offered to a written note and to a calendar note:
+test('the composer offers a note, a picture, a calendar event or a poll, and asks only a note for words', async () => {
+  // The four kinds are named what they are, and the words field is offered to a written note, a calendar note and
+  // a poll:
   // a picture has no words on it, so a text box (or a placeholder asking for them) is an invitation to type something
   // the print would never show anyone — while a calendar note keeps its paper, because the reference is written on it
   // and a line of words before the card is what a reader usually wants.
@@ -3239,7 +3242,9 @@ test('the composer offers a note, a picture or an event, and asks only a note fo
   assert.match(html, /data-note-kind="text"[^>]*><i[^>]*><\/i><span>Note<\/span>/);
   assert.match(html, /data-note-kind="image"[^>]*><i[^>]*><\/i><span>Picture<\/span>/);
   assert.match(html, /data-note-kind="event"[^>]*><i[^>]*><\/i><span>Calendar<\/span>/,
-    'the event kind sits beside the other two, as D asked');
+    'the event kind sits beside the others, as D asked');
+  assert.match(html, /data-note-kind="poll"[^>]*><i[^>]*><\/i><span>Poll<\/span>/,
+    'and the poll is the fourth kind D asked for: notes, pictures, calendars, polls');
   assert.doesNotMatch(html, /Written note|Pinned picture/, 'the kinds are called what they are');
   assert.doesNotMatch(html, /words are optional/, 'the picture is not told it may have words');
   assert.match(html, /<div class="composer-count" id="composerCount">/, 'the counter can hide with the paper it counts for');
@@ -3248,6 +3253,11 @@ test('the composer offers a note, a picture or an event, and asks only a note fo
     assert.match(html, new RegExp(`id="${id}"`), `${id} is in the composer`);
   }
   assert.match(html, /<div id="noteEvent" class="note-event" hidden>/, 'and it starts hidden');
+  // The poll form is NIP-88's own shape: a question, and answers to choose between.
+  for (const id of ['notePoll', 'notePollQuestion', 'notePollOption1', 'notePollOption2', 'notePollAddOption', 'notePollMultiple']) {
+    assert.match(html, new RegExp(`id="${id}"`), `${id} is in the composer`);
+  }
+  assert.match(html, /<div id="notePoll" class="note-event note-poll" hidden>/, 'and the poll form starts hidden too');
 
   const script = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   assert.match(script, /if \(elements\.draftNote\) elements\.draftNote\.hidden = noteKind === 'image'/);
@@ -3255,7 +3265,7 @@ test('the composer offers a note, a picture or an event, and asks only a note fo
   assert.match(script, /if \(elements\.noteEvent\) elements\.noteEvent\.hidden = noteKind !== 'event'/,
     'the event form shows for its own kind only');
   assert.doesNotMatch(script, /if you like/, 'and no placeholder asks for them either');
-  assert.match(script, /noteKind === 'image' \? 'Pin a picture'\s*\n?\s*: noteKind === 'event' \? 'Pin an event' : 'Pin a note'/,
+  assert.match(script, /noteKind === 'image' \? 'Pin a picture'\s*\n?\s*: noteKind === 'event' \? 'Pin an event'\s*\n?\s*: noteKind === 'poll' \? 'Pin a poll' : 'Pin a note'/,
     'the heading follows the kind');
   // Words left in the paper by a written draft are not part of a picture note, and its length
   // cannot make a picture note too full: the paper is not on screen for it at all.
@@ -3630,7 +3640,7 @@ test('no signature is mistaken for a note\u2019s when it is a gift\u2019s', () =
 test('a gift signature is finished by its own flow on every path home, not just on a reload', async () => {
   const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
   // Every returning signature passes through completeAmberSignature, so the gift is routed there.
-  assert.match(page, /async function completeAmberSignature\(answer\) \{[\s\S]{0,1600}if \(isGiftAction\(answer\.context\?\.action\)\)/);
+  assert.match(page, /async function completeAmberSignature\(answer\) \{[\s\S]{0,3000}if \(isGiftAction\(answer\.context\?\.action\)\)/);
   // And above the note guards, which is what used to swallow it. Compared inside the function: the
   // order check also appears elsewhere in the file, in the flow that publishes a note.
   const body = page.slice(page.indexOf('async function completeAmberSignature'),
@@ -3786,7 +3796,7 @@ test('a gift is not handed a second dialog on top of the one it is signed from',
   // it: a modal on top of a modal is how a finished action looks like a stuck one.
   assert.match(script, /if \(!answersInsideDialog\(pendingAmberRequest\(\)\?\.context\?\.action\) && !elements\.amberDialog\.open\) \{/);
   // A note still gets it, and the waiting sentence is unchanged for that case.
-  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 5,
+  assert.equal((script.match(/showAmberHandOver\(AMBER_HAND_OVER_WAITING_LINE\)/g) || []).length, 6,
     'the waiting-state call sites are all still there');
 });
 
@@ -4927,7 +4937,9 @@ test('a relay that refuses the socket cannot stop the dialog from opening', asyn
   // the dialog's own path, the read rejected, and the rejection travelled out of openNoteGiftDialog — so tapping the
   // signature did nothing at all instead of opening the note.
   const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
-  const resolver = page.slice(page.indexOf('async function resolveCalendarEvent'), page.indexOf('function calendarCardFor'));
+  // The guard lives in the resolver every reference goes through — one cache, both kinds — and not in the two thin
+  // wrappers that read a calendar event or a poll out of it.
+  const resolver = page.slice(page.indexOf('async function referenceEvent'), page.indexOf('function calendarCardFor'));
   assert.match(resolver, /try \{\s*events = await readCalendarEvents\(relay, reference\.filter\);\s*\} catch \{\s*continue;\s*\}/,
     'each relay read is guarded, and a dead one is skipped rather than thrown');
   assert.match(resolver, /return null;\s*\} finally \{\s*calendarPending\.delete\(bech32\);/,
@@ -4980,4 +4992,84 @@ test('an answer the reader signed in Amber is published, not called "a signature
   assert.match(page, /function sayRsvpOutcome\(message, error = false\)/);
   assert.match(page, /async function publishRsvpAnswer\(signed, \{coordinate, status: answerStatus, card = null\}\)/);
   assert.match(page, /const took = await publishToRelays\(signed, calendarWriteRelays\(\)\);/);
+});
+
+test('a poll is a note, a question event and a vote, and the note names the question before anything is signed', async () => {
+  // D: "Now lets include pools so we would have notes, images, calendars and pools." NIP-88 is the wire: kind 1068 for
+  // the question, kind 1018 for an answer. A poll is a *regular* event, so the note names it by id — and an event id is
+  // the hash of the event without its signature, which is what lets the note be hashed, priced and paid for with the
+  // reference already on its paper.
+  const model = await import('../stickyNotesModel.mjs');
+  const {neventEncode} = await import('../noteGifts.mjs');
+  const pubkey = 'a'.repeat(64);
+
+  const poll = model.pollTemplate({question: 'Pineapple on pizza?', options: ['Yay', 'Nay'], pubkey,
+    relays: ['wss://relay.ditto.pub'], type: 'singlechoice', createdAt: 1700000000});
+  assert.equal(poll.kind, 1068);
+  assert.deepEqual(poll.tags, [['option', '1', 'Yay'], ['option', '2', 'Nay'],
+    ['relay', 'wss://relay.ditto.pub'], ['polltype', 'singlechoice']]);
+  assert.equal(poll.content, 'Pineapple on pizza?');
+
+  // The form refuses what cannot be a poll, in words a reader can act on.
+  assert.throws(() => model.pollTemplate({question: '', options: ['a', 'b'], pubkey}), /needs a question/);
+  assert.throws(() => model.pollTemplate({question: 'q', options: ['only one'], pubkey}), /at least two options/);
+  assert.throws(() => model.pollTemplate({question: 'q', options: ['a', 'b'], pubkey, type: 'ranked'}), /singlechoice or multiplechoice/);
+
+  // Drawn: the event gives the question, the answers and the type back.
+  const drawn = model.pollFromEvent({...poll, id: 'b'.repeat(64)});
+  assert.equal(drawn.question, 'Pineapple on pizza?');
+  assert.deepEqual(drawn.options, [{id: '1', label: 'Yay'}, {id: '2', label: 'Nay'}]);
+  assert.equal(drawn.type, 'singlechoice');
+  assert.equal(drawn.closed, false);
+
+  // One vote per pubkey, newest wins — NIP-88's own counting rule.
+  const vote = (pubkeyOfVoter, ids, at) => model.pollResponseTemplate({pollId: 'b'.repeat(64), optionIds: ids, pubkey: pubkeyOfVoter, createdAt: at});
+  const voter = 'c'.repeat(64);
+  const older = {...model.pollResponseTemplate({pollId: 'b'.repeat(64), optionIds: ['1'], pubkey: voter}), created_at: 100};
+  const newer = {...model.pollResponseTemplate({pollId: 'b'.repeat(64), optionIds: ['2'], pubkey: voter}), created_at: 200};
+  const single = model.tallyPollVotes([older, newer], {type: 'singlechoice'});
+  assert.deepEqual([...single.counts], [['2', 1]], 'the newest answer is the one that counts');
+  assert.equal(single.total, 1, 'and one person is one vote');
+
+  // A multiple-choice answer keeps every option it names.
+  const multi = model.tallyPollVotes([{...newer, tags: [['e', 'b'.repeat(64)], ['response', '1'], ['response', '2']]}], {type: 'multiplechoice'});
+  assert.deepEqual([...multi.counts].sort(), [['1', 1], ['2', 1]]);
+
+  // The reference the note carries is an nevent of that poll's id.
+  const nevent = neventEncode({id: 'b'.repeat(64), pubkey, kind: model.POLL_KIND});
+  assert.match(nevent, /^nevent1/);
+  assert.deepEqual(model.eventReferences(`Have a look nostr:${nevent}`), [nevent],
+    'the existing reference plumbing already reads an nevent, so a poll needs no new syntax on the paper');
+});
+
+test('the poll is published before the note that names it, and a vote has a route home', async () => {
+  const page = await readFile(new URL('../stickyNotes.mjs', import.meta.url), 'utf8');
+  const body = page.slice(page.indexOf('async function publishPinnedNote'), page.indexOf('async function forgetPinnedPicture'));
+  const pollAt = body.indexOf('await publishPollEvent(pending.poll)');
+  const signAt = body.indexOf("signNostrEvent(template, {orderId: pending.orderId, action: 'pin'})");
+  assert.ok(pollAt > 0, 'the pin publishes the poll itself');
+  assert.ok(pollAt < signAt, 'and asks for the note\'s signature only after the poll is on the relays');
+
+  // The id the note names is the hash of the fields that are signed, and the board checks the signer gave them back.
+  assert.match(page, /const id = window\.NostrTools\.getEventHash\(hashable\);/);
+  assert.match(page, /if \(expectedId && event\.id !== expectedId\) \{/,
+    'a signer that changed the poll would leave the note pointing at nothing');
+
+  // A vote is claimed before the note checks, in both ways home — the same arm the calendar answer needed.
+  assert.match(page, /if \(answer\.context\?\.action === 'vote'\) \{\s*await finishPollVoteFromSigner\(answer\);/);
+  assert.match(page, /else if \(amber\?\.action === 'sign' && amber\.context\?\.action === 'vote'\) \{\s*applied = await finishPollVoteFromSigner\(amber\);/);
+  assert.match(page, /async function finishPollVoteFromSigner\(answer\)/);
+
+  // Votes are read from every relay an answer may be on, and merged rather than replaced.
+  assert.match(page, /async function loadPollVotes\(pollId\)/);
+  assert.match(page, /const filter = \{kinds: \[POLL_RESPONSE_KIND\], '#e': \[pollId\], limit: 500\};/);
+  assert.match(page, /Promise\.all\(calendarReadRelays\(\)\.map\(async relay => \{\s*try \{\s*return await readCalendarEvents\(relay, filter\);/,
+    'every relay in the read list is asked, in parallel');
+  assert.match(page, /const byId = new Map\(\(pollVotes\.get\(pollId\) \|\| \[\]\)\.map\(event => \[event\.id, event\]\)\);/,
+    'a relay that has not indexed the vote just cast must not take it off the screen');
+
+  // A reader with no identity is told why the buttons do nothing, exactly as on a calendar event.
+  assert.match(page, /button\.disabled = !session \|\| closed;/);
+  assert.match(page, /\? 'Log in to vote on this poll'/);
+  assert.match(page, /elements\.notePollVoteHint\.textContent = !session\s*\n?\s*\? 'Log in to vote on this poll'/);
 });

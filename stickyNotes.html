@@ -305,6 +305,14 @@
       <p id="noteEventRsvpCounts" class="note-gift__hint"></p>
       <p id="noteEventRsvpHint" class="note-gift__hint" role="status"></p>
     </div>
+    <!-- A note that carries a poll asks its question here, on the signature, the way a calendar note asks whether you
+         are coming. The buttons are built in JavaScript, because they carry the counts and the reader's own choice. -->
+    <div id="notePollVote" class="note-gift__rsvp" hidden>
+      <p id="notePollVoteQuestion" class="note-gift__rsvp-title"></p>
+      <div id="notePollVoteButtons" class="note-gift__rsvp-buttons" role="group" aria-label="Vote on this poll"></div>
+      <p id="notePollVoteCounts" class="note-gift__hint"></p>
+      <p id="notePollVoteHint" class="note-gift__hint" role="status"></p>
+    </div>
     <div id="noteGiftStatus" class="inline-status" role="status" aria-live="polite"></div>
     <button type="button" id="noteGiftLogin" class="secondary-action note-gift__login" hidden><i class="lni lni-user-4" aria-hidden="true"></i><span>Log in to Nostr</span></button>
     <div class="note-gift__block">
@@ -455,6 +463,7 @@
         <button type="button" class="note-kind__button is-selected" data-note-kind="text" aria-pressed="true"><i class="lni lni-text-format" aria-hidden="true"></i><span>Note</span></button>
         <button type="button" class="note-kind__button" data-note-kind="image" aria-pressed="false"><i class="lni lni-image-1" aria-hidden="true"></i><span>Picture</span></button>
         <button type="button" class="note-kind__button" data-note-kind="event" aria-pressed="false"><i class="lni lni-calendar-days" aria-hidden="true"></i><span>Calendar</span></button>
+        <button type="button" class="note-kind__button" data-note-kind="poll" aria-pressed="false"><i class="lni lni-stats-up" aria-hidden="true"></i><span>Poll</span></button>
       </div>
       <!-- A calendar note is a note whose text carries a NIP-52 event. The writer fills this in, the reference is
            appended to the paper so the note is hashed with it, and the event itself is published beside the note. -->
@@ -479,6 +488,34 @@
           <input id="noteEventLocation" type="text" maxlength="90" autocomplete="off" placeholder="somewhere">
         </label>
         <div id="noteEventStatus" class="inline-status note-event__status" role="status" aria-live="polite"></div>
+      </div>
+      <!-- A poll is a second event beside the note, the way a calendar event is: NIP-88's kind 1068, pointed at with an
+           `nevent` in the note's own words. The reader picks the answers here; the note carries the question. -->
+      <div id="notePoll" class="note-event note-poll" hidden>
+        <p class="note-event__lead">The note carries a real NIP-88 poll. The board draws a card with the question, and
+          anyone can vote — one vote per person, and a newer vote replaces the older one.</p>
+        <label class="note-event__field"><span>Ask</span>
+          <input id="notePollQuestion" type="text" maxlength="120" autocomplete="off" placeholder="Pineapple on pizza?">
+        </label>
+        <div id="notePollOptionList" class="note-poll__options">
+          <label class="note-event__field"><span>Answer 1</span>
+            <input id="notePollOption1" class="note-poll__option" type="text" maxlength="40" autocomplete="off" placeholder="Yay">
+          </label>
+          <label class="note-event__field"><span>Answer 2</span>
+            <input id="notePollOption2" class="note-poll__option" type="text" maxlength="40" autocomplete="off" placeholder="Nay">
+          </label>
+          <label class="note-event__field"><span>Answer 3 (optional)</span>
+            <input id="notePollOption3" class="note-poll__option" type="text" maxlength="40" autocomplete="off" placeholder="Only with hot honey">
+          </label>
+          <label class="note-event__field"><span>Answer 4 (optional)</span>
+            <input id="notePollOption4" class="note-poll__option" type="text" maxlength="40" autocomplete="off">
+          </label>
+        </div>
+        <button type="button" id="notePollAddOption" class="secondary-action note-poll__add"><i class="lni lni-plus" aria-hidden="true"></i><span>Add an answer</span></button>
+        <label class="note-event__check"><input id="notePollMultiple" type="checkbox">
+          <span>Let people pick more than one</span>
+        </label>
+        <div id="notePollStatus" class="inline-status note-event__status" role="status" aria-live="polite"></div>
       </div>
       <div id="draftNote" class="sticky-note sticky-note--yellow draft-note">
         <div id="stickyEditor" class="sticky-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Type here..." spellcheck="true"></div>

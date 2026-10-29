@@ -89,6 +89,9 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
  isGiftAction, answersInsideDialog, noteStackOrder, subscriptionFreeOffer,
  // the calendar note: what a reference looks like, what a card shows, and the answer's own shape
  EVENT_LABEL, calendarEventFromEvent, eventReferences, eventReferenceMatches, RSVP_KIND, RSVP_STATUSES, RSVP_LABELS, tallyRsvps,
+ // the poll note: NIP-88's question and its answers, in the model so both halves share one vocabulary
+ POLL_KIND, POLL_RESPONSE_KIND, POLL_LABEL, POLL_TYPES, POLL_QUESTION_MAX_CHARACTERS, POLL_OPTION_MAX_CHARACTERS,
+ POLL_MAX_OPTIONS, pollTemplate, pollFromEvent, pollResponseTemplate, tallyPollVotes,
  // the composer's own calendar: the event it builds, the reference the note carries, and the coordinate both agree on
  buildCalendarEvent, appendCalendarReference, eventCoordinate,
  mergeRsvpAnswers,
@@ -98,7 +101,7 @@ import {stickyPaymentBadge, coveredPinNotes, PIN_RAISE_MS, USER_RELAY_LIMIT, rel
 import {
   REACTION_SET, ZAP_AMOUNTS, reactionTemplate, rsvpTemplate, zapRequestTemplate, lud16ToLnurlpUrl,
   parseLnurlPay, clampZapAmount, zapCallbackUrl, parseInvoice, lnurlDecode, lnurlEncode,
-  giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice, naddrEncode,
+  giftTally, zapReceiptSats, isReactionForNote, isReceiptForNote, receiptMatchesInvoice, naddrEncode, neventEncode,
 } from './noteGifts.mjs';
 import {
   beginAmberLogin,
@@ -247,6 +250,17 @@ const elements = {
   noteEventEnd: document.getElementById('noteEventEnd'), noteEventLocation: document.getElementById('noteEventLocation'),
   noteEventStartLabel: document.getElementById('noteEventStartLabel'), noteEventEndLabel: document.getElementById('noteEventEndLabel'),
   noteEventStatus: document.getElementById('noteEventStatus'),
+  notePoll: document.getElementById('notePoll'),
+  notePollQuestion: document.getElementById('notePollQuestion'),
+  notePollOptionList: document.getElementById('notePollOptionList'),
+  notePollAddOption: document.getElementById('notePollAddOption'),
+  notePollMultiple: document.getElementById('notePollMultiple'),
+  notePollStatus: document.getElementById('notePollStatus'),
+  notePollVote: document.getElementById('notePollVote'),
+  notePollVoteQuestion: document.getElementById('notePollVoteQuestion'),
+  notePollVoteButtons: document.getElementById('notePollVoteButtons'),
+  notePollVoteCounts: document.getElementById('notePollVoteCounts'),
+  notePollVoteHint: document.getElementById('notePollVoteHint'),
   draftNote: document.getElementById('draftNote'), composerCount: document.getElementById('composerCount'),
   noteImageGradesHint: document.getElementById('noteImageGradesHint'),
   composerTitle: document.getElementById('composerTitle'),
@@ -4298,7 +4312,7 @@ function setImageStatus(message = '', error = false) {
  * it and the note points at it, so the note itself stays as small as a written one.
  */
 function selectNoteKind(kind) {
-  noteKind = ['image', 'event'].includes(kind) ? kind : 'text';
+  noteKind = ['image', 'event', 'poll'].includes(kind) ? kind : 'text';
   elements.noteKind?.querySelectorAll('[data-note-kind]').forEach(button => {
     const chosen = button.dataset.noteKind === noteKind;
     button.classList.toggle('is-selected', chosen);
@@ -4306,6 +4320,15 @@ function selectNoteKind(kind) {
   });
   if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
   if (elements.noteEvent) elements.noteEvent.hidden = noteKind !== 'event';
+  if (elements.notePoll) elements.notePoll.hidden = noteKind !== 'poll';
+  if (noteKind === 'poll' && elements.notePollStatus) {
+    // A poll is two signatures for the same reason a calendar note is: the question is one event, the note that names it
+    // is another. A signer that has to be handed each request by hand asks twice.
+    const amber = (getNostrSession() || {}).method === 'amber';
+    elements.notePollStatus.textContent = amber
+      ? 'Amber will ask twice: once to sign the poll, then once to sign the note that names it.'
+      : '';
+  }
   if (noteKind === 'event' && elements.noteEventStatus) {
     // Two signatures, because a calendar note is two events: the event, then the note that names it. A signer that has
     // to be handed a request by hand (Amber) therefore asks twice, and saying so before the first hand-over is the
@@ -4324,7 +4347,8 @@ function selectNoteKind(kind) {
   // The heading says what is being pinned, in the word this board uses everywhere else for it.
   if (elements.composerTitle) {
     elements.composerTitle.textContent = noteKind === 'image' ? 'Pin a picture'
-      : noteKind === 'event' ? 'Pin an event' : 'Pin a note';
+      : noteKind === 'event' ? 'Pin an event'
+      : noteKind === 'poll' ? 'Pin a poll' : 'Pin a note';
   }
   if (noteKind === 'event') prepareCalendarForm();
   elements.editor.setAttribute('data-placeholder', 'Type here...');
@@ -4420,21 +4444,74 @@ function calendarEventFromForm(pubkey) {
  * Refused when the note would no longer fit: the desk counts a reference as the card's label, not as seventy
  * characters, and a note refused after payment is not refunded.
  */
-function attachCalendarReference(template) {
-  const naddr = naddrEncode({identifier: template.tags.find(t => t[0] === 'd')?.[1],
-                             pubkey: template.pubkey, kind: template.kind});
-  const next = appendCalendarReference(editorContent(), naddr);
-  if (next === editorContent()) return {template, naddr};
-  if (stickyNoteLength(normaliseStickyText(next)) > STICKY_MAX_CHARACTERS) {
-    throw new Error('The event will not fit on this note. Take a few words out and pin it again.');
-  }
+/** Put a reference on the paper, once, refusing when the note would no longer fit. */
+function putReferenceOnPaper(bech32, tooLong) {
+  const next = appendCalendarReference(editorContent(), bech32);
+  if (next === editorContent()) return;
+  if (stickyNoteLength(normaliseStickyText(next)) > STICKY_MAX_CHARACTERS) throw new Error(tooLong);
   elements.editor.textContent = next;
   lastValidEditor = next;
   // The appended address is drawn as the card's label straight away, so the paper measures what it will pin and the
   // reader sees a card rather than a hundred and twenty characters of bech32.
   drawEventChipsInEditor({force: true});
   updateCapacity();
+}
+
+function attachCalendarReference(template) {
+  const naddr = naddrEncode({identifier: template.tags.find(t => t[0] === 'd')?.[1],
+                             pubkey: template.pubkey, kind: template.kind});
+  putReferenceOnPaper(naddr, 'The event will not fit on this note. Take a few words out and pin it again.');
   return {template, naddr};
+}
+
+/** The poll the form describes, or a thrown sentence when it does not describe one. */
+function pollTemplateFromForm(pubkey) {
+  const question = String(elements.notePollQuestion?.value || '').trim();
+  const options = [...(elements.notePollOptionList?.querySelectorAll('.note-poll__option') || [])]
+    .map(input => String(input.value || '').trim())
+    .filter(Boolean);
+  const type = elements.notePollMultiple?.checked ? 'multiplechoice' : 'singlechoice';
+  return pollTemplate({question, options, pubkey, relays: calendarWriteRelays(), type});
+}
+
+/**
+ * Append the poll's own address to the paper.
+ *
+ * A poll is a regular event, so the note names it by id — and a Nostr id is the hash of the event **without** its
+ * signature. That is what makes this possible at all: the reference is known before anything is signed, so the note can
+ * be hashed and paid for with the reference already on it, exactly as a calendar note is.
+ */
+function attachPollReference(template) {
+  const hashable = {kind: template.kind, created_at: template.created_at, tags: template.tags,
+                    content: template.content, pubkey: template.pubkey};
+  const id = window.NostrTools.getEventHash(hashable);
+  const nevent = neventEncode({id, pubkey: template.pubkey, kind: template.kind});
+  putReferenceOnPaper(nevent, 'The poll will not fit on this note. Take a few words out and pin it again.');
+  return {template: {...template, id}, id, nevent};
+}
+
+/** Grow the answer list by one, up to what a small paper can ask. */
+function addPollOption() {
+  const list = elements.notePollOptionList;
+  if (!list) return;
+  const existing = [...list.querySelectorAll('.note-poll__option')];
+  if (existing.length >= POLL_MAX_OPTIONS) {
+    status(elements.notePollStatus, `A poll on a note can ask up to ${POLL_MAX_OPTIONS} answers.`);
+    return;
+  }
+  const label = document.createElement('label');
+  label.className = 'note-event__field';
+  const caption = document.createElement('span');
+  caption.textContent = `Answer ${existing.length + 1} (optional)`;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'note-poll__option';
+  input.maxLength = POLL_OPTION_MAX_CHARACTERS;
+  input.autocomplete = 'off';
+  label.append(caption, input);
+  list.append(label);
+  input.focus();
+  status(elements.notePollStatus, '');
 }
 
 /**
@@ -4457,6 +4534,65 @@ function attachCalendarReference(template) {
  */
 /** The coordinate already published for this draft, so a second pass does not ask for a second signature. */
 let calendarEventPublished = '';
+
+/** The poll already on the relays for this draft, so the second pass does not ask for a third signature. */
+let pollPublished = '';
+
+async function publishSignedPoll(event, expectedId = '') {
+  if (!window.NostrTools.verifyEvent(event)) {
+    throw new Error('Your signer returned an invalid poll, so the note was not pinned.');
+  }
+  // The note names this event by id, and the id is the hash of the fields that were signed: a signer that changed them
+  // would leave the note pointing at something that does not exist, which is the dead card this board has paid for once.
+  if (expectedId && event.id !== expectedId) {
+    throw new Error('The signed poll does not match the one this note names, so the note was not pinned. Press Pin to try again.');
+  }
+  const took = await publishToRelays(event, calendarWriteRelays());
+  if (!took) throw new Error('No relay took the poll, so the note was not pinned. Press Pin to try again.');
+  pollPublished = event.id;
+  return true;
+}
+
+/**
+ * Sign and publish the poll, before the note that names it.
+ *
+ * Same rule as the calendar event, and for the same reason: a note pinned before its event is a card with nothing behind
+ * it. A failure here throws, so the order stays unclaimed and the draft stays on the paper.
+ */
+async function publishPollEvent(template) {
+  const session = getNostrSession();
+  if (!session || session.pubkey !== template.pubkey) {
+    throw new Error('The poll has to be signed on the same key as the note, and the signer changed. Nothing was pinned — sign in again and press Pin.');
+  }
+  if (pollPublished && pollPublished === template.id) return true;
+  const hashable = {kind: template.kind, created_at: template.created_at, tags: template.tags,
+                    content: template.content, pubkey: template.pubkey};
+  let signed;
+  try {
+    signed = await signNostrEvent(hashable, {action: 'poll', pollId: template.id});
+  } catch (error) {
+    throw new Error(`Your signer refused the poll, so the note was not pinned: ${error?.message || 'no reason given'}. Press Pin to try again.`);
+  }
+  if (!signed) {
+    if (amberSignaturePending()) {
+      showAmberHandOver(AMBER_HAND_OVER_WAITING_LINE);
+      startAmberClipboardPoll();
+      return 'pending';
+    }
+    throw new Error('Your signer did not answer for the poll, so the note was not pinned. Press Pin to try again.');
+  }
+  await publishSignedPoll(signed, template.id);
+  return true;
+}
+
+/** A poll's signature the reader brought back: publish it, then carry the pin on into the note. */
+async function finishPollFromSigner(answer) {
+  if (!answer || answer.action !== 'sign' || answer.context?.action !== 'poll' || !pending?.poll) return false;
+  await publishSignedPoll(answer.event, pending.poll.id);
+  sayAmberRoundTrip('The poll is on the relays — now sign the note that names it');
+  await publishPinnedNote();
+  return true;
+}
 
 async function publishSignedCalendarEvent(event) {
   if (!window.NostrTools.verifyEvent(event)) throw new Error('Your signer returned an invalid calendar event, so the note was not pinned.');
@@ -4512,6 +4648,7 @@ async function finishCalendarFromSigner(answer) {
  */
 function forgetPinnedPicture() {
   calendarEventPublished = '';
+  pollPublished = '';
   selectNoteKind('text');
   chooseNoteImage(null);
   selectImageGrade(STICKY_IMAGE_DEFAULT_GRADE);
@@ -4657,6 +4794,15 @@ async function startPayment() {
       calendarTemplate = attached.template;
       status(elements.noteEventStatus, `Card on the paper: ${written.tags.find(tag => tag[0] === 'title')?.[1] || 'event'}.`);
     }
+    // A poll note is hashed with the poll's address on the paper, for the same reason: the desk recomputes the hash.
+    const pollComing = noteKind === 'poll';
+    let pollWritten = null;
+    if (pollComing) {
+      const written = pollTemplateFromForm(session.pubkey);
+      const attached = attachPollReference(written);
+      pollWritten = attached.template;
+      status(elements.notePollStatus, `Card on the paper: ${written.content}.`);
+    }
     const mentions = pictureComing ? [] : editorMentions();
     const content = pictureComing ? '' : normaliseStickyText(editorContent());
     // A written note has to say something. A pinned picture is the note itself, so it may be
@@ -4690,7 +4836,10 @@ async function startPayment() {
       imageGrade: noteKind === 'image' ? selectedImageGrade : '',
       // The event the note's reference points at, kept with the draft so a reload between paying and pinning still
       // publishes it — the coordinate is fixed, so this is the same event either way.
-      calendar: calendarTemplate || undefined};
+      calendar: calendarTemplate || undefined,
+      // The poll the note's reference points at. Kept with the draft, because the id the reference names is fixed by
+      // this exact event and a reload between paying and pinning must publish that one.
+      poll: pollWritten || undefined};
     // Mining is the NIP-05 perk, so the name has to be in hand before the order is asked for.
     // session.profile is only filled when a profile happened to load, which is why a key that
     // does have a name could still be told it had none: the name is looked up on the relays
@@ -5249,6 +5398,14 @@ async function publishPinnedNote(resumedEvent = null, report = null) {
     // was written — so this is the first id that means anything, and the last chance to mine
     // before the signature fixes it. A resumed signature (Amber handed it back) was already
     // mined before it left, so it is not mined again.
+    // Both of a note's companions go up first, on the same key, and a failure in either stops everything below it: no
+    // note signature is asked for, nothing is published, and the order is left alone for the retry.
+    if (!resumedEvent && pending.poll) {
+      if (await publishPollEvent(pending.poll) === 'pending') {
+        elements.pin.disabled = false;
+        return;
+      }
+    }
     // The event goes up first, on the same key, and a failure here stops everything below it: no signature is asked
     // for, nothing is published, and the order is left alone for the retry.
     if (!resumedEvent && pending.calendar) {
@@ -5681,11 +5838,22 @@ async function openNoteGiftDialog(eventId, opener = null) {
   // A note that carries a calendar event opens on the answer, not on the reactions: the reader was asked to come, so
   // the three buttons and their counts come first. Everything below them is what this dialog already did.
   const reference = eventReferences(record.sticky?.content)[0] || '';
-  const card = reference ? await resolveCalendarEvent(reference) : null;
+  const poll = reference ? await resolvePollEvent(reference) : null;
+  const card = reference && !poll ? await resolveCalendarEvent(reference) : null;
   if (elements.noteGiftTitle) {
-    elements.noteGiftTitle.textContent = card
-      ? 'Respond to this event'
-      : reference ? 'This event is not on the relays' : 'React or zap this note';
+    elements.noteGiftTitle.textContent = poll
+      ? 'Vote on this poll'
+      : card ? 'Respond to this event'
+      : reference ? 'What this note points at is not on the relays'
+      : 'React or zap this note';
+  }
+  // One of the three answer blocks, never two: a note carries one reference, and only its own kind opens here.
+  paintPollVote(null);
+  if (poll) {
+    paintPollVote(poll);
+    loadPollVotes(poll.id).then(() => {
+      if (elements.notePollVote && !elements.notePollVote.hidden) paintPollVote(poll);
+    }).catch(() => {});
   }
   if (card) {
     rsvpAnswers.delete(card.coordinate);
@@ -5694,10 +5862,12 @@ async function openNoteGiftDialog(eventId, opener = null) {
       rsvpAnswers.set(card.coordinate, answers);
       if (elements.noteEventRsvp && !elements.noteEventRsvp.hidden) paintRsvpSection(card);
     }).catch(() => {});
-  } else {
+  } else if (!poll) {
     // A card with no event behind it used to open on "React or zap this note" and nothing else, which is what a note
     // whose event never published looks like from the reader's side. Say what happened instead of offering silence.
     paintRsvpSection(null, {missing: Boolean(reference)});
+  } else {
+    paintRsvpSection(null);
   }
 
   const session = getNostrSession();
@@ -6263,8 +6433,12 @@ function toggleLinkRest() {
  * Nothing is invented locally: the event is read from the relay, and an answer is signed by the reader's own key and
  * published there. A reader with no identity sees the buttons disabled and the sentence that says what is missing.
  */
-const calendarEvents = new Map();      // bech32 → parsed card data, or null when it does not resolve
+// bech32 → the event it names. One cache for both kinds of reference, because a note does not say which kind it carries:
+// a calendar event and a poll are reached the same way and told apart by the event's own kind.
+const calendarEvents = new Map();      // bech32 → the referenced event, or null when it does not resolve
 const calendarPending = new Set();
+/** The votes on screen, by poll id. */
+const pollVotes = new Map();
 const rsvpAnswers = new Map();         // coordinate → Map(pubkey → {status, at})
 const rsvpPainted = new Set();         // coordinates currently shown in the dialog
 
@@ -6317,7 +6491,14 @@ function readCalendarEvents(url, filter, {timeout = 4000} = {}) {
 }
 
 /** The card data for a reference, read once per reference and remembered for the visit. */
-async function resolveCalendarEvent(bech32) {
+/**
+ * The event a reference names, whatever kind it is.
+ *
+ * Read once and cached: a card is drawn on every render, and a note carrying a reference must not open a socket per
+ * paint. A miss is not cached — an event that arrives a minute later appears without a reload — and a relay that refuses
+ * the socket is a miss, not an exception: a rejection here used to travel out of the dialog's own path.
+ */
+async function referenceEvent(bech32) {
   if (calendarEvents.has(bech32)) return calendarEvents.get(bech32);
   if (calendarPending.has(bech32)) return null;
   const reference = readEventReference(bech32);
@@ -6336,8 +6517,7 @@ async function resolveCalendarEvent(bech32) {
       }
       // addressable events are replaceable: the newest wins, and an older copy must not shadow it
       const newest = events.sort((left, right) => right.created_at - left.created_at)[0];
-      const card = newest ? calendarEventFromEvent(newest) : null;
-      if (card) { calendarEvents.set(bech32, card); return card; }
+      if (newest) { calendarEvents.set(bech32, newest); return newest; }
     }
     // A miss is not remembered. It used to be, so a relay that was merely slow on the first render left the card dead
     // for the life of the page even after the event arrived — and an event published a minute later never appeared.
@@ -6345,6 +6525,19 @@ async function resolveCalendarEvent(bech32) {
   } finally {
     calendarPending.delete(bech32);
   }
+}
+
+/** The card a calendar reference draws, or null when the event behind it is missing or is not a calendar event. */
+async function resolveCalendarEvent(bech32) {
+  const event = await referenceEvent(bech32);
+  if (!event || Number(event.kind) === POLL_KIND) return null;
+  return calendarEventFromEvent(event);
+}
+
+/** The poll a reference names, or null. */
+async function resolvePollEvent(bech32) {
+  const event = await referenceEvent(bech32);
+  return event ? pollFromEvent(event) : null;
 }
 
 /** The chip a reference is drawn as, filled in when the event arrives. */
@@ -6364,8 +6557,21 @@ function calendarCardFor(bech32, noteId) {
     const target = noteId || '';
     if (target) openNoteGiftDialog(target, chip);
   });
-  resolveCalendarEvent(bech32).then(card => {
-    if (!card || !chip.isConnected) return;
+  referenceEvent(bech32).then(event => {
+    if (!event || !chip.isConnected) return;
+    const poll = pollFromEvent(event);
+    if (poll) {
+      // A poll is the same kind of reference worn differently: the note does not say which it carries, so the card
+      // becomes the question once the event arrives.
+      chip.dataset.referenceKind = 'poll';
+      chip.firstChild.textContent = '\u{1F4CA} ';
+      label.textContent = POLL_LABEL;
+      chip.title = poll.closed ? `${poll.question} · voting has closed` : `${poll.question} — tap the signature to vote`;
+      chip.setAttribute('aria-label', 'Poll in this note');
+      return;
+    }
+    const card = calendarEventFromEvent(event);
+    if (!card) return;
     label.textContent = card.when ? `${card.title} · ${card.when}` : card.title;
     chip.title = [card.title, card.when, card.location].filter(Boolean).join(' · ');
   });
@@ -6442,6 +6648,164 @@ function paintRsvpSection(card, {missing = false} = {}) {
   elements.noteEventRsvpHint.textContent = session ? '' : 'Log in to respond to this event';
   if (elements.noteGiftLogin) elements.noteGiftLogin.hidden = Boolean(session);
   rsvpPainted.add(card.coordinate);
+}
+
+/**
+ * Read the votes on a poll.
+ *
+ * NIP-88 says the answers are on the relays the poll itself lists, and the board adds its own read list: ours refuses
+ * the kind from anyone its admit gate does not know, so a reader's vote lives on a public relay. Merged, never
+ * replaced — a relay that has not indexed the vote just cast must not take it off the screen.
+ */
+async function loadPollVotes(pollId) {
+  if (!pollId) return [];
+  const filter = {kinds: [POLL_RESPONSE_KIND], '#e': [pollId], limit: 500};
+  const batches = await Promise.all(calendarReadRelays().map(async relay => {
+    try {
+      return await readCalendarEvents(relay, filter);
+    } catch {
+      return [];
+    }
+  }));
+  const byId = new Map((pollVotes.get(pollId) || []).map(event => [event.id, event]));
+  for (const event of batches.flat()) if (event?.id) byId.set(event.id, event);
+  const merged = [...byId.values()];
+  pollVotes.set(pollId, merged);
+  return merged;
+}
+
+/** The poll whose buttons are on screen, so a vote that comes back can find them. */
+let paintedPoll = null;
+
+/** Draw the question and one button per answer, with the counts and the reader's own choice. */
+function paintPollVote(poll) {
+  const box = elements.notePollVote;
+  if (!box) return;
+  if (!poll) { box.hidden = true; paintedPoll = null; return; }
+  box.hidden = false;
+  paintedPoll = poll;
+  elements.notePollVoteQuestion.textContent = poll.question;
+  const session = getNostrSession();
+  const {counts, voters, total} = tallyPollVotes(pollVotes.get(poll.id) || [], {type: poll.type});
+  const mine = session ? voters.get(session.pubkey) || [] : [];
+  const closed = Boolean(poll.closed);
+  elements.notePollVoteButtons.replaceChildren(...poll.options.map(option => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.pollOption = option.id;
+    const count = counts.get(option.id) || 0;
+    button.textContent = count ? `${option.label} · ${count}` : option.label;
+    button.setAttribute('aria-pressed', String(mine.includes(option.id)));
+    button.disabled = !session || closed;
+    button.title = closed ? 'Voting on this poll has closed'
+      : session ? `Vote for ${option.label}` : 'Log in to vote on this poll';
+    button.addEventListener('click', () => sendPollVote(poll, option.id));
+    return button;
+  }));
+  elements.notePollVoteCounts.textContent = closed
+    ? `${total} ${total === 1 ? 'person voted' : 'people voted'} · voting has closed`
+    : total ? `${total} ${total === 1 ? 'person has voted' : 'people have voted'}` : 'Nobody has voted yet';
+  elements.notePollVoteHint.textContent = !session
+    ? 'Log in to vote on this poll'
+    : poll.type === 'multiplechoice' ? 'Pick as many as you like; your newest vote is the one that counts.'
+      : '';
+  if (elements.noteGiftLogin) elements.noteGiftLogin.hidden = Boolean(session);
+}
+
+/** Say where a vote got to, in the block while it is on screen and on the board after a reload. */
+function sayPollOutcome(message, error = false) {
+  if (message && elements.notePollVote && !elements.notePollVote.hidden && paintedPoll) {
+    elements.notePollVoteHint.textContent = message;
+    return;
+  }
+  if (!message || !elements.boardStatus) return;
+  status(elements.boardStatus, message, error);
+  elements.boardStatus.hidden = false;
+  setTimeout(() => { elements.boardStatus.hidden = true; }, 6000);
+}
+
+/** Publish a signed vote, then fold the relays' tally back in. Shared by the tap and a returned signature. */
+async function publishPollVote(signed, {pollId, optionIds, poll = null}) {
+  const took = await publishToRelays(signed, calendarWriteRelays());
+  if (!took) {
+    sayPollOutcome('No relay took your vote. Try again in a moment.', true);
+    return false;
+  }
+  const known = new Map((pollVotes.get(pollId) || []).map(event => [event.id, event]));
+  known.set(signed.id, signed);
+  pollVotes.set(pollId, [...known.values()]);
+  const target = poll || (paintedPoll?.id === pollId ? paintedPoll : null);
+  if (target) paintPollVote(target);
+  const chosen = optionIds
+    .map(id => target?.options.find(option => option.id === id)?.label)
+    .filter(Boolean)
+    .join(', ');
+  sayPollOutcome(`Your vote: ${chosen || 'recorded'}.`);
+  loadPollVotes(pollId).then(() => {
+    if (target && elements.notePollVote && !elements.notePollVote.hidden) paintPollVote(target);
+  }).catch(() => {});
+  return true;
+}
+
+/**
+ * A vote the reader signed in Amber: publish it, wherever the signature came back from.
+ *
+ * The same arm the calendar answer needed and did not have: a vote carries no order id, so without this it is reported
+ * as a signature for a different note and dropped.
+ */
+async function finishPollVoteFromSigner(answer) {
+  const context = answer?.context || {};
+  const pollId = String(context.pollId || '');
+  const optionIds = (context.optionIds || []).map(String).filter(Boolean);
+  if (!answer.event || !pollId || !optionIds.length) {
+    throw new Error('That signature did not say which poll, or which answer, so no vote was sent.');
+  }
+  const session = getNostrSession();
+  if (answer.event.pubkey && session?.pubkey && answer.event.pubkey !== session.pubkey) {
+    throw new Error('That vote was signed on a different key, so nothing was sent.');
+  }
+  return publishPollVote(answer.event, {pollId, optionIds});
+}
+
+/** Cast a vote: one answer for a singlechoice poll, a set of them for a multiplechoice one. */
+async function sendPollVote(poll, optionId) {
+  const session = getNostrSession();
+  if (!session) {
+    elements.notePollVoteHint.textContent = 'Log in to vote on this poll';
+    return;
+  }
+  if (poll.closed) {
+    elements.notePollVoteHint.textContent = 'Voting on this poll has closed.';
+    return;
+  }
+  const {voters} = tallyPollVotes(pollVotes.get(poll.id) || [], {type: poll.type});
+  const current = new Set(voters.get(session.pubkey) || []);
+  let optionIds;
+  if (poll.type === 'multiplechoice') {
+    if (current.has(optionId)) current.delete(optionId); else current.add(optionId);
+    optionIds = [...current];
+    if (!optionIds.length) {
+      elements.notePollVoteHint.textContent = 'A vote needs at least one answer picked.';
+      return;
+    }
+  } else {
+    optionIds = [optionId];
+  }
+  elements.notePollVoteHint.textContent = 'Sending your vote\u2026';
+  try {
+    const template = pollResponseTemplate({
+      pollId: poll.id, optionIds, pollPubkey: poll.pubkey, relay: RELAY, pubkey: session.pubkey,
+    });
+    const signed = await signNostrEvent(template, {action: 'vote', pollId: poll.id, optionIds});
+    if (!signed) {
+      elements.notePollVoteHint.textContent = 'Approve the vote in Amber. This page reads it when you come back.';
+      if (amberSignaturePending()) startAmberClipboardPoll();
+      return;
+    }
+    await publishPollVote(signed, {pollId: poll.id, optionIds, poll});
+  } catch (error) {
+    elements.notePollVoteHint.textContent = error?.message || 'That vote could not be sent.';
+  }
 }
 
 /** Sign and publish an answer, then read the tallies back off the relay. */
@@ -7772,6 +8136,9 @@ elements.noteKind?.addEventListener('click', event => {
   const button = event.target.closest('[data-note-kind]');
   if (button) selectNoteKind(button.dataset.noteKind);
 });
+// One more answer per press, up to what a small paper can ask; the buttons for a poll's own votes are built where the
+// question is drawn, because they carry the counts.
+elements.notePollAddOption?.addEventListener('click', addPollOption);
 elements.noteImageFile?.addEventListener('change', () => chooseNoteImage(elements.noteImageFile.files?.[0] || null));
 // The size the reader is told they may send comes from the same constant the guard measures
 // against, so the promise and the refusal can never drift apart.
@@ -7958,6 +8325,10 @@ async function applySignerReturn() {
       if (elements.login.open) elements.login.close();
       // The reader's own note comes back with the identity that was pinning it.
       if (!syncPlacementWithSession()) showLoginConfirmation(amber.session);
+    } else if (amber?.action === 'sign' && amber.context?.action === 'poll') {
+      applied = await finishPollFromSigner(amber);
+    } else if (amber?.action === 'sign' && amber.context?.action === 'vote') {
+      applied = await finishPollVoteFromSigner(amber);
     } else if (amber?.action === 'sign' && amber.context?.action === 'rsvp') {
       applied = await finishRsvpFromSigner(amber);
     } else if (amber?.action === 'sign' && amber.context?.action === 'calendar') {
@@ -8014,6 +8385,16 @@ async function completeAmberSignature(answer) {
   // signature carries no order id, so those checks called it a signature for a different note and dropped it.
   if (answer.context?.action === 'calendar') {
     await finishCalendarFromSigner(answer);
+    return true;
+  }
+  // A poll the note names, and a vote on one, are claimed here for the same reason the calendar event is: they carry no
+  // order id, so the note's own checks would call them signatures for a different note.
+  if (answer.context?.action === 'poll') {
+    await finishPollFromSigner(answer);
+    return true;
+  }
+  if (answer.context?.action === 'vote') {
+    await finishPollVoteFromSigner(answer);
     return true;
   }
   // A calendar answer travels the same hand-over as a gift and carries no order, so it is claimed here too — the

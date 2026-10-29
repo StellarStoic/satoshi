@@ -39,6 +39,9 @@
    [hidden] rule, so an element hidden by the attribute stays on screen unless its own [hidden] rule says otherwise.
    Without this the calendar form showed for a written note and a picture too. */
 .note-event[hidden] { display: none; }
+/* A poll's answers are a list that grows, so they stack one per row inside the form rather than sharing it. */
+.note-poll__options { display: grid; gap: 10px; }
+.note-poll__add { justify-self: start; }
 .note-event__lead { margin: 0; font-size: .86rem; line-height: 1.5; color: var(--text-muted, #9aa0a6); }
 .note-event__field { display: grid; gap: 4px; font-size: .8rem; color: var(--text-muted, #9aa0a6); }
 .note-event__field input { min-height: 40px; padding: 8px 10px; font: inherit; font-size: .95rem;

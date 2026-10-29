@@ -341,6 +341,118 @@ export function stickyTextParts(content) {
   return parts;
 }
 
+// NIP-88's poll: the question is one kind-1068 event the note points at, and a vote is a kind-1018 event naming it.
+// A poll is a regular event, not an addressable one, so the note's reference is an `nevent` of the poll's own id —
+// and an event id is the hash of the event without its signature, so the reference is known before anything is signed.
+export const POLL_KIND = 1068;
+export const POLL_RESPONSE_KIND = 1018;
+export const POLL_TYPES = ['singlechoice', 'multiplechoice'];
+/** The word the paper prints where a poll's address was. */
+export const POLL_LABEL = 'poll';
+export const POLL_MIN_OPTIONS = 2;
+export const POLL_MAX_OPTIONS = 6;
+export const POLL_OPTION_MAX_CHARACTERS = 40;
+export const POLL_QUESTION_MAX_CHARACTERS = 120;
+
+const isHex64 = value => /^[0-9a-f]{64}$/i.test(String(value || ''));
+
+/**
+ * A poll, ready to be signed.
+ *
+ * Option ids are the option's place in the list, counting from one: NIP-88 only asks that they be alphanumeric and
+ * unique, and a stable id is what lets a vote written before a reload still mean the same option afterwards.
+ */
+export function pollTemplate({question, options = [], pubkey, relays = [], type = 'singlechoice', endsAt = 0, createdAt = 0}) {
+  const text = String(question || '').trim();
+  if (!text) throw new Error('A poll needs a question.');
+  if (text.length > POLL_QUESTION_MAX_CHARACTERS) {
+    throw new Error(`A poll question can be ${POLL_QUESTION_MAX_CHARACTERS} characters.`);
+  }
+  const labels = options.map(option => String(option || '').trim()).filter(Boolean);
+  if (labels.length < POLL_MIN_OPTIONS) throw new Error('A poll needs at least two options.');
+  if (labels.length > POLL_MAX_OPTIONS) throw new Error(`A poll can have at most ${POLL_MAX_OPTIONS} options.`);
+  if (labels.some(label => label.length > POLL_OPTION_MAX_CHARACTERS)) {
+    throw new Error(`An option can be ${POLL_OPTION_MAX_CHARACTERS} characters.`);
+  }
+  if (!isHex64(pubkey)) throw new Error('A poll needs an author.');
+  if (!POLL_TYPES.includes(type)) throw new Error('A poll is either singlechoice or multiplechoice.');
+  const tags = labels.map((label, index) => ['option', String(index + 1), label]);
+  for (const relay of relays) if (relay) tags.push(['relay', String(relay)]);
+  tags.push(['polltype', type]);
+  if (endsAt) tags.push(['endsAt', String(Math.floor(endsAt))]);
+  return {
+    kind: POLL_KIND,
+    created_at: Number(createdAt) || Math.floor(Date.now() / 1000),
+    tags,
+    content: text,
+    pubkey,
+  };
+}
+
+/** A poll as the board draws it, or null when the event is not one this board can show. */
+export function pollFromEvent(event) {
+  if (!event || Number(event.kind) !== POLL_KIND) return null;
+  const tags = event.tags || [];
+  const options = tags
+    .filter(tag => tag?.[0] === 'option' && tag[1] && tag[2])
+    .map(tag => ({id: String(tag[1]), label: String(tag[2])}));
+  if (options.length < POLL_MIN_OPTIONS) return null;
+  const question = String(event.content || '').trim();
+  if (!question) return null;
+  const type = String(tags.find(tag => tag?.[0] === 'polltype')?.[1] || '') === 'multiplechoice'
+    ? 'multiplechoice' : 'singlechoice';
+  const endsAt = Number(tags.find(tag => tag?.[0] === 'endsAt')?.[1] || 0) || 0;
+  return {
+    id: event.id,
+    pubkey: event.pubkey,
+    question,
+    options,
+    type,
+    endsAt,
+    closed: Boolean(endsAt && endsAt * 1000 <= Date.now()),
+    relays: tags.filter(tag => tag?.[0] === 'relay' && tag[1]).map(tag => String(tag[1])),
+    createdAt: event.created_at,
+  };
+}
+
+/** One answer: the poll's id in an `e` tag, then one `response` tag per chosen option. */
+export function pollResponseTemplate({pollId, optionIds = [], pollPubkey = '', relay = '', pubkey}) {
+  if (!isHex64(pollId)) throw new Error('An answer needs the poll it answers.');
+  const ids = [...new Set(optionIds.map(String).filter(Boolean))];
+  if (!ids.length) throw new Error('An answer needs at least one option.');
+  if (!isHex64(pubkey)) throw new Error('An answer needs an author.');
+  const tags = [['e', String(pollId), String(relay || ''), 'root']];
+  if (isHex64(pollPubkey)) tags.push(['p', String(pollPubkey), String(relay || '')]);
+  for (const id of ids) tags.push(['response', id]);
+  return {kind: POLL_RESPONSE_KIND, created_at: Math.floor(Date.now() / 1000), tags, content: '', pubkey};
+}
+
+/**
+ * Count the votes.
+ *
+ * NIP-88's own rule, which is the whole of the counting: one vote per pubkey, and the newest of a pubkey's answers
+ * wins. A single-choice poll keeps only the first `response` tag of an answer; a multiple-choice poll keeps them all.
+ */
+export function tallyPollVotes(events = [], {type = 'singlechoice'} = {}) {
+  const newest = new Map();
+  for (const event of events) {
+    if (!event || Number(event.kind) !== POLL_RESPONSE_KIND || !isHex64(event.pubkey)) continue;
+    const current = newest.get(event.pubkey);
+    if (!current || Number(event.created_at) > Number(current.created_at)) newest.set(event.pubkey, event);
+  }
+  const counts = new Map();
+  const voters = new Map();
+  for (const [pubkey, event] of newest) {
+    let ids = [...new Set((event.tags || []).filter(tag => tag?.[0] === 'response').map(tag => String(tag[1] || '')))];
+    ids = ids.filter(Boolean);
+    if (type === 'singlechoice') ids = ids.slice(0, 1);
+    if (!ids.length) continue;
+    voters.set(pubkey, ids);
+    for (const id of ids) counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return {counts, voters, total: voters.size};
+}
+
 // NIP-52's answer to a calendar event. Addressable, so answering again replaces the earlier answer instead of
 // piling up, and `d` is the coordinate itself for the same reason: one visitor holds one answer per event.
 export const RSVP_KIND = 31925;

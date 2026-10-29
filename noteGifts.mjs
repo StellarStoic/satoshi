@@ -174,6 +174,26 @@ export function naddrEncode({identifier, pubkey, kind}) {
   return bech32Encode('naddr', Uint8Array.from(bytes));
 }
 
+/**
+ * An `nevent` reference to one event: the id, then the author and kind as hints.
+ *
+ * A poll is a regular event rather than an addressable one, so the note points at it by id. TLV order is the same as
+ * naddr's — 0 the id, 2 the author, 3 the kind — which is what nostr-tools reads back.
+ */
+export function neventEncode({id, pubkey, kind}) {
+  const eventId = String(id || '');
+  if (!/^[0-9a-f]{64}$/i.test(eventId)) throw new Error('An event reference needs an event id.');
+  const chunk = (type, payload) => [type, payload.length, ...payload];
+  const toBytes = hex => [...Uint8Array.from(String(hex).match(/../g).map(pair => parseInt(pair, 16)))];
+  const bytes = [...chunk(0, toBytes(eventId))];
+  if (/^[0-9a-f]{64}$/i.test(String(pubkey || ''))) bytes.push(...chunk(2, toBytes(pubkey)));
+  const kindNumber = Number(kind);
+  if (Number.isInteger(kindNumber) && kindNumber >= 0) {
+    bytes.push(...chunk(3, [(kindNumber >>> 24) & 255, (kindNumber >>> 16) & 255, (kindNumber >>> 8) & 255, kindNumber & 255]));
+  }
+  return bech32Encode('nevent', Uint8Array.from(bytes));
+}
+
 export function bech32Encode(hrp, bytes) {
   const data = convertBits([...bytes], 8, 5, true);
   const checksum = bech32Polymod([...bech32HrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0]) ^ 1;
