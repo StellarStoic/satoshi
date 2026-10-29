@@ -75,9 +75,11 @@ function injectLoginStyles() {
   style.id = 'pinstr-tg-styles';
   style.textContent = `
     .pinstr-nostr { margin: 0 0 10px; }
-    .pinstr-nostr > summary { list-style: none; display: flex; align-items: center; gap: 10px; width: 100%; }
+    /* Centred like the buttons under it: the label sat against the left edge while every method beside it was
+       centred, and the chevron is taken out of the flow so centring the words does not drag it along. */
+    .pinstr-nostr > summary { list-style: none; display: flex; position: relative; align-items: center; justify-content: center; gap: 10px; width: 100%; }
     .pinstr-nostr > summary::-webkit-details-marker { display: none; }
-    .pinstr-nostr > summary::after { content: '\\25BE'; margin-left: auto; font-size: .9em; opacity: .7; }
+    .pinstr-nostr > summary::after { content: '\\25BE'; position: absolute; right: 0; font-size: .9em; opacity: .7; }
     .pinstr-nostr[open] > summary::after { transform: rotate(180deg); }
     .pinstr-nostr[open] > summary { margin-bottom: 10px; }
   `;

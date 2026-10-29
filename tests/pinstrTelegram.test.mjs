@@ -202,3 +202,19 @@ test('a Telegram board session with no token mints one on load', async () => {
   assert.ok(globalThis.PinstrTelegramSigner, 'so the board can sign again after a week away');
   assert.equal(JSON.parse(globalThis.localStorage.getItem(TG_SESSION_KEY)).session, 'fresh-token');
 });
+
+test('the Nostr summary is centred like the buttons it opens', async () => {
+  // D: "in the log in modal the sign in with nostr is text aligned left. Make it center." The summary is a flex row, so
+  // the label was centred only if the flex line was — it was not, while every button under it was. The chevron is taken
+  // out of the flow, because `margin-left: auto` would otherwise hold the words against the left edge again.
+  const {readFile} = await import('node:fs/promises');
+  const script = await readFile(new URL('../pinstr-telegram.mjs', import.meta.url), 'utf8');
+  const summary = script.slice(script.indexOf('.pinstr-nostr > summary {'), script.indexOf('.pinstr-nostr > summary::after'));
+  assert.match(summary, /justify-content: center/, 'the label sits in the middle of the dialog');
+  assert.match(summary, /position: relative/, 'and the chevron is positioned against it');
+  const chevron = script.slice(script.indexOf('.pinstr-nostr > summary::after'), script.indexOf('[open] > summary::after'));
+  assert.match(chevron, /position: absolute/);
+  assert.match(chevron, /right: 0/);
+  assert.doesNotMatch(chevron, /margin-left: auto/,
+    'the old auto margin is what kept the words on the left, so it must be gone');
+});
