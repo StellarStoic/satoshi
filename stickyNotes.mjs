@@ -4306,6 +4306,15 @@ function selectNoteKind(kind) {
   });
   if (elements.noteImage) elements.noteImage.hidden = noteKind !== 'image';
   if (elements.noteEvent) elements.noteEvent.hidden = noteKind !== 'event';
+  if (noteKind === 'event' && elements.noteEventStatus) {
+    // Two signatures, because a calendar note is two events: the event, then the note that names it. A signer that has
+    // to be handed a request by hand (Amber) therefore asks twice, and saying so before the first hand-over is the
+    // difference between that and an app that looks like it is asking the same thing over again.
+    const amber = (getNostrSession() || {}).method === 'amber';
+    elements.noteEventStatus.textContent = amber
+      ? 'Amber will ask twice: once to sign the event, then once to sign the note that names it.'
+      : '';
+  }
   // A picture note has no words on it, so the paper and the counter are offered to a written note
   // only: an empty text box, or a placeholder asking for words, invites typing that the print
   // would never show anyone. A calendar note keeps its paper — the reference is written on it, and a
