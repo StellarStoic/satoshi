@@ -55,6 +55,7 @@ SOURCES = (
     {"id": "stacker-nostr", "label": "Stacker News Nostr", "homepage": "https://stacker.news/~nostr", "url": "https://stacker.news/~nostr/rss", "kind": "nostr"},
     {"id": "european-bitcoiners", "label": "European Bitcoiners", "homepage": "https://europeanbitcoiners.com/", "url": "https://europeanbitcoiners.com/rss/", "kind": "news"},
     {"id": "nostr-uk", "label": "Nostr UK", "homepage": "https://nostr.co.uk/", "url": "https://nostr.co.uk/rss.xml", "kind": "nostr"},
+    {"id": "nostr-mag", "label": "Nostr Magazine", "homepage": "https://nostrmag.com/", "url": "https://nostrmag.com/rss", "kind": "nostr"},
     {"id": "hacker-news", "label": "Hacker News", "homepage": "https://news.ycombinator.com/", "url": "https://hn.algolia.com/api/v1/search_by_date?query=bitcoin&tags=story&hitsPerPage=35", "kind": "community", "format": "hackernews"},
     {"id": "reddit-bitcoin", "label": "Reddit r/Bitcoin", "homepage": "https://www.reddit.com/r/Bitcoin/", "url": "https://www.reddit.com/r/Bitcoin/hot.json?limit=40&raw_json=1", "kind": "community", "format": "reddit"},
     {"id": "reddit-nostr", "label": "Reddit r/nostr", "homepage": "https://www.reddit.com/r/nostr/", "url": "https://www.reddit.com/r/nostr/hot.json?limit=40&raw_json=1", "kind": "nostr", "format": "reddit"},
