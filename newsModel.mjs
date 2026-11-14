@@ -2,6 +2,21 @@ export function parseKeywords(value) {
   return [...new Set(String(value || '').split(',').map(word => word.trim().toLocaleLowerCase()).filter(Boolean))];
 }
 
+// A saved source selection predates any feed added after it was stored, so a new
+// publisher would appear in the list but stay switched off. Additions are registered
+// per catalog version and applied only to a selection older than that version: a
+// source the reader switched off is never resurrected by someone else's release.
+export function migrateEnabledSources(enabledSources, savedVersion, additions) {
+  if (!Array.isArray(enabledSources)) return null;
+  const version = Number(savedVersion || 0);
+  const migrated = [...enabledSources];
+  for (const [introduced, ids] of Object.entries(additions || {})) {
+    if (version >= Number(introduced)) continue;
+    for (const id of ids) if (!migrated.includes(id)) migrated.push(id);
+  }
+  return migrated;
+}
+
 export function filterNews(items, {enabledSources = null, blocked = [], required = [], query = ''} = {}) {
   const enabled = enabledSources === null ? null : new Set(enabledSources);
   const blockedWords = Array.isArray(blocked) ? blocked : parseKeywords(blocked);

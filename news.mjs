@@ -1,8 +1,8 @@
-import {deduplicateNews, filterNews, mediaUrlFromTags, parseKeywords, withMedia} from './newsModel.mjs';
+import {deduplicateNews, filterNews, mediaUrlFromTags, migrateEnabledSources, parseKeywords, withMedia} from './newsModel.mjs';
 
 const SETTINGS_KEY = 'bitcoinNewsSettings';
 const PAGE_SIZE = 24;
-const SOURCE_CATALOG_VERSION = 1;
+const SOURCE_CATALOG_VERSION = 2;
 const NOSTRRECAP_NPUB = 'npub1etjm06353tl0cnqs9wmmzfwyj283z3ee5facwlrte7l957fgqwzqsznr68';
 const KNOWN_NOSTR_NAMES = new Map([[NOSTRRECAP_NPUB, 'nostrrecap']]);
 const BUILTIN_NOSTR_SOURCES = [{
@@ -13,6 +13,9 @@ const BUILTIN_NOSTR_SOURCES = [{
   status: 'client',
   clientNostr: true,
 }];
+// ids introduced at each catalog version. Version 1 is derived from the builtin list so
+// the two cannot drift apart; later versions name the dataset feeds they add.
+const SOURCE_CATALOG_ADDITIONS = {1: BUILTIN_NOSTR_SOURCES.map(source => source.id), 2: ['nostr-mag']};
 const feed = document.getElementById('newsFeed');
 const status = document.getElementById('newsStatus');
 const updated = document.getElementById('newsUpdated');
@@ -35,11 +38,8 @@ function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     const enabledSources = Array.isArray(saved?.enabledSources) ? [...saved.enabledSources] : null;
-    if (enabledSources && Number(saved?.sourceCatalogVersion || 0) < SOURCE_CATALOG_VERSION) {
-      for (const source of BUILTIN_NOSTR_SOURCES) if (!enabledSources.includes(source.id)) enabledSources.push(source.id);
-    }
     return {
-      enabledSources,
+      enabledSources: migrateEnabledSources(enabledSources, saved?.sourceCatalogVersion, SOURCE_CATALOG_ADDITIONS),
       required: String(saved?.required || ''),
       blocked: String(saved?.blocked || ''),
       customSources: Array.isArray(saved?.customSources) ? saved.customSources.map(normalizeNostrSource) : [],

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deduplicateNews, filterNews, parseKeywords} from '../newsModel.mjs';
+import {deduplicateNews, filterNews, migrateEnabledSources, parseKeywords} from '../newsModel.mjs';
 
 const items = [
   {sourceId: 'optech', source: 'Optech', title: 'Lightning update', summary: 'Channel changes', url: 'https://a'},
@@ -84,4 +84,32 @@ test('older media tags still work, and a note without an image yields nothing', 
 test('an imeta text url is not mistaken for a picture', () => {
   const tags = [['imeta', 'url https://example.com/article', 'alt a link'], ['imeta', `url ${BLOSSOM}`]];
   assert.equal(mediaUrlFromTags(tags), BLOSSOM);
+});
+
+const CATALOG = {1: ['nostr-nostrrecap'], 2: ['nostr-mag']};
+
+test('no saved selection keeps every source enabled', () => {
+  assert.equal(migrateEnabledSources(null, 1, CATALOG), null);
+});
+
+test('a selection older than the catalog gains the feeds introduced since', () => {
+  const migrated = migrateEnabledSources(['optech'], 1, CATALOG);
+  assert.deepEqual(migrated, ['optech', 'nostr-mag']);
+});
+
+test('an unticked builtin source is not resurrected by a later release', () => {
+  const migrated = migrateEnabledSources(['optech'], 1, CATALOG);
+  assert.ok(!migrated.includes('nostr-nostrrecap'));
+});
+
+test('a first-visit selection gains every registered id', () => {
+  assert.deepEqual(migrateEnabledSources([], 0, CATALOG), ['nostr-nostrrecap', 'nostr-mag']);
+});
+
+test('a current selection is left exactly as the reader left it', () => {
+  assert.deepEqual(migrateEnabledSources(['optech'], 2, CATALOG), ['optech']);
+});
+
+test('migration never duplicates a source already selected', () => {
+  assert.deepEqual(migrateEnabledSources(['nostr-mag'], 0, CATALOG), ['nostr-mag', 'nostr-nostrrecap']);
 });
