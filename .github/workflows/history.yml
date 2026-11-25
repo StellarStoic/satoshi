@@ -107,6 +107,11 @@ jobs:
       - uses: actions/deploy-pages@v5
         id: deployment
         continue-on-error: true
+      # "at a later time" is the operative part: two attempts back to back fail together when the outage
+      # lasts minutes, which is what happened on 25 Nov at 22:42. Give the second attempt a gap.
+      - name: Wait before retrying the deployment
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 90
       - name: Retry Pages deployment once
         id: deployment_retry
         # Not failure(): after continue-on-error the job is not failed, and the retry would never run.
