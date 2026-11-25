@@ -61,6 +61,13 @@
       <h2>Method 1: keep a copy of your wallet's answer</h2>
       <p>This works on any host, including ones that only serve files and cannot run code. You take the JSON your wallet serves for its own address and place it under your domain, under the name you want to hand out.</p>
       <ol class="learn-steps">
+        <li>Give the domain something to answer with. If it already serves a site, skip this. If not, point it at the host that will hold the file — for GitHub Pages that is four A records on the apex, or a CNAME on a subdomain, plus the lowest TTL your DNS provider allows:
+          <pre><code>185.199.108.153
+185.199.109.153
+185.199.110.153
+185.199.111.153</code></pre>
+          Propagation can take minutes or hours, and nothing below works until it has. Enter the domain under the repository's <em>Settings → Pages</em>, and switch on <em>Enforce HTTPS</em> once the certificate is issued.
+        </li>
         <li>In a browser, open your wallet's own pay request. Replace <code>yourname</code> with your own name on that service:
           <pre><code>https://getalby.com/.well-known/lnurlp/yourname        # Alby
 https://walletofsatoshi.com/.well-known/lnurlp/yourname  # Wallet of Satoshi
@@ -81,21 +88,27 @@ https://minibits.cash/.well-known/lnurlp/yourname        # Minibits</code></pre>
       <h3>nginx</h3>
       <p>Add this inside the <code>server</code> block for the domain — for example in <code>/etc/nginx/sites-available/example.com</code>:</p>
       <pre><code>server {
-    location /.well-known/lnurlp/two {
+    location = /.well-known/lnurlp/two {
         return 302 https://getalby.com/.well-known/lnurlp/yourname;
+        add_header Access-Control-Allow-Origin "*";
     }
 }</code></pre>
       <p class="learn-caption">The target is whichever wallet you use; all three are listed further down. Then reload nginx:</p>
       <pre><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
       <h3>Apache</h3>
-      <pre><code>Redirect 302 /.well-known/lnurlp/two https://getalby.com/.well-known/lnurlp/yourname</code></pre>
-      <p class="learn-caption">In a virtual host file, or a <code>.htaccess</code> where overrides are allowed. Reload Apache after the change.</p>
+      <p>In a virtual host, or in the <code>.htaccess</code> in the domain's root where overrides are allowed:</p>
+      <pre><code>Redirect 302 /.well-known/lnurlp/two https://getalby.com/.well-known/lnurlp/yourname
+
+&lt;If "%{REQUEST_URI} =~ m#^/.well-known/lnurlp/#"&gt;
+    Header always set Access-Control-Allow-Origin "*"
+&lt;/If&gt;</code></pre>
+      <p class="learn-caption">The <code>&lt;If&gt;</code> block is the part worth keeping: it grants the cross-origin read only under <code>lnurlp</code>, so the rest of the site is not opened up to every origin that asks. Reload Apache after the change.</p>
       <p>Two details in that configuration are not decoration:</p>
       <ul>
         <li><strong>Temporary, not permanent.</strong> Use <code>302</code> (or <code>307</code>). A <code>301</code> invites clients and proxies to remember the target indefinitely, which is exactly what you do not want the day you change wallets.</li>
         <li><strong>Allow other origins.</strong> Wallets that run inside a web page read this URL from a browser, and a browser refuses a cross-origin read without the right header. If your client only ever runs as an app you will not notice; the first web client will.</li>
       </ul>
-      <pre><code>add_header Access-Control-Allow-Origin "*";</code></pre>
+      <p>On any other server the job is the same two things: one route that answers <code>/.well-known/lnurlp/two</code> with a redirect to the wallet's endpoint, and permission for another origin to read it. How each server spells that is in its own documentation.</p>
 
       <h2>Three wallets, one shape</h2>
       <p>The wallet only has to answer one URL. Alby, Wallet of Satoshi and Minibits all do, and the differences between them are small enough to list. Each of these was fetched and read while this page was written — the field names below are the ones you will see in your own file.</p>
@@ -168,7 +181,7 @@ location /.well-known/lnurlp/two { return 302 https://minibits.cash/.well-known/
         <li><strong>Lowercase.</strong> Addresses are matched as written. <code>Two@example.com</code> and <code>two@example.com</code> ask for two different files on a case-sensitive host.</li>
       </ul>
 
-      <p class="learn-sources">Where this comes from: the address-to-URL rule is <a href="https://github.com/lnurl/luds/blob/luds/16.md" target="_blank" rel="noopener noreferrer">LUD-16</a>, and the shape of a pay request is <a href="https://github.com/lnurl/luds/blob/luds/06.md" target="_blank" rel="noopener noreferrer">LUD-06</a>. Wallets mentioned: <a href="https://getalby.com/" target="_blank" rel="noopener noreferrer">Alby</a>, <a href="https://walletofsatoshi.com/" target="_blank" rel="noopener noreferrer">Wallet of Satoshi</a> and <a href="https://minibits.cash/" target="_blank" rel="noopener noreferrer">Minibits</a>. The field values on this page were fetched from a live endpoint while writing it; if a wallet changes its answer, the method still holds and the numbers may not.</p>
+      <p class="learn-sources">Where this comes from: the address-to-URL rule is <a href="https://github.com/lnurl/luds/blob/luds/16.md" target="_blank" rel="noopener noreferrer">LUD-16</a>, and the shape of a pay request is <a href="https://github.com/lnurl/luds/blob/luds/06.md" target="_blank" rel="noopener noreferrer">LUD-06</a>. The shape of this guide follows <a href="https://web.archive.org/web/20240424100645/https://orangepill.dev/bitcoin-guides/guide-to-create-lnaddress-redirection-on-your-domain/" target="_blank" rel="noopener noreferrer">a guide on orangepill.dev</a>, which is no longer served by its site and is readable only in the archive; the steps are rewritten here and the wallet details re-checked. Wallets mentioned: <a href="https://getalby.com/" target="_blank" rel="noopener noreferrer">Alby</a>, <a href="https://walletofsatoshi.com/" target="_blank" rel="noopener noreferrer">Wallet of Satoshi</a> and <a href="https://minibits.cash/" target="_blank" rel="noopener noreferrer">Minibits</a>. The field values on this page were fetched from a live endpoint while writing it; if a wallet changes its answer, the method still holds and the numbers may not.</p>
 
     </div>
   </main>
