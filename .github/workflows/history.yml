@@ -97,12 +97,18 @@ jobs:
           # Lightning address alias live. v5 stopped including hidden files by default, so without this
           # line a version bump would publish a site whose .well-known answers 404.
           include-hidden-files: true
+      # GitHub's own answer to "Fetching artifact metadata failed" is to re-run the deployment later.
+      # One retry inside the run turns that flake into a release instead of a site that silently stays on
+      # the previous build. The artifact is already in the run, so the second call costs a few seconds.
+      #
+      # continue-on-error is what keeps the recovered run green: without it the failed first attempt marks
+      # the job failed and the retry publishes the site anyway, so a successful release reads as a broken
+      # one — which is exactly how this went unnoticed for four days.
       - uses: actions/deploy-pages@v5
         id: deployment
-      # GitHub's own answer to "Fetching artifact metadata failed" is to re-run the deployment later.
-      # One retry inside the run turns that flake into a release instead of a site that silently stays
-      # on last week's build. The artifact is already in the run, so the second call costs a few seconds.
+        continue-on-error: true
       - name: Retry Pages deployment once
         id: deployment_retry
-        if: failure() && steps.deployment.outcome == 'failure'
+        # Not failure(): after continue-on-error the job is not failed, and the retry would never run.
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
