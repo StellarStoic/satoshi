@@ -32,14 +32,14 @@
     <div class="learn-body">
 
       <h2>What a Lightning address really is</h2>
-      <p>An address such as <code>one@minibits.cash</code> is not an inbox. It is a name that a wallet turns into a URL, fetches, and reads a small JSON document from. For an address <code>name@domain.tld</code> the URL is always the same shape:</p>
+      <p>An address such as <code>yourname@getalby.com</code> is not an inbox. It is a name that a wallet turns into a URL, fetches, and reads a small JSON document from. For an address <code>name@domain.tld</code> the URL is always the same shape:</p>
       <pre class="learn-json"><code>https://domain.tld/.well-known/lnurlp/name</code></pre>
-      <p>Ask for that URL and the wallet answers with a <em>pay request</em>: the smallest and largest amounts it will take, a line of text describing who is being paid, and a <code>callback</code> — the address a wallet calls, with an amount, to get an actual invoice. Here is a real answer from <code>one@minibits.cash</code>, abbreviated:</p>
+      <p>Ask for that URL and the wallet answers with a <em>pay request</em>: the smallest and largest amounts it will take, a line of text describing who is being paid, and a <code>callback</code> — the address a wallet calls, with an amount, to get an actual invoice. Here is a live answer from Minibits, abbreviated, with the handle replaced by <code>yourname</code>. Alby and Wallet of Satoshi answer in the same shape, with their own values listed further down:</p>
       <pre class="learn-json"><code>{
-  "callback": "https://minibits.cash/.well-known/lnurlp/one",
+  "callback": "https://minibits.cash/.well-known/lnurlp/yourname",
   "minSendable": 1000,
   "maxSendable": 1000000000,
-  "metadata": "[[\"text/plain\",\"Pay to one@minibits.cash with Lightning.\"],[\"text/identifier\",\"one@minibits.cash\"]]",
+  "metadata": "[[\"text/plain\",\"Pay to yourname@minibits.cash with Lightning.\"],[\"text/identifier\",\"yourname@minibits.cash\"]],"
   "commentAllowed": 100,
   "allowsNostr": true,
   "tag": "payRequest"
@@ -61,7 +61,11 @@
       <h2>Method 1: keep a copy of your wallet's answer</h2>
       <p>This works on any host, including ones that only serve files and cannot run code. You take the JSON your wallet serves for its own address and place it under your domain, under the name you want to hand out.</p>
       <ol class="learn-steps">
-        <li>In a browser, open your wallet's own pay request. If your address is <code>one@minibits.cash</code>, that is<br><code>https://minibits.cash/.well-known/lnurlp/one</code>.</li>
+        <li>In a browser, open your wallet's own pay request. Replace <code>yourname</code> with your own name on that service:
+          <pre><code>https://getalby.com/.well-known/lnurlp/yourname        # Alby
+https://walletofsatoshi.com/.well-known/lnurlp/yourname  # Wallet of Satoshi
+https://minibits.cash/.well-known/lnurlp/yourname        # Minibits</code></pre>
+        </li>
         <li>Save that JSON as a plain text file named after the address you want to give out, with no extension. Using <code>two@example.com</code> as the example, the file is named <code>two</code>.</li>
         <li>Put it at <code>.well-known/lnurlp/two</code> in the folder or repository your domain serves from, so the file is reachable at <code>https://example.com/.well-known/lnurlp/two</code>.</li>
         <li>If the host builds the site with a static generator, tell it to publish the folder — a top-level dot in <code>.well-known</code> means many generators skip it by default. For Jekyll, a <code>_config.yml</code> in the root with these two lines is enough:
@@ -78,13 +82,13 @@
       <p>Add this inside the <code>server</code> block for the domain — for example in <code>/etc/nginx/sites-available/example.com</code>:</p>
       <pre><code>server {
     location /.well-known/lnurlp/two {
-        return 302 https://minibits.cash/.well-known/lnurlp/one;
+        return 302 https://getalby.com/.well-known/lnurlp/yourname;
     }
 }</code></pre>
-      <p>Then reload nginx:</p>
+      <p class="learn-caption">The target is whichever wallet you use; all three are listed further down. Then reload nginx:</p>
       <pre><code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
       <h3>Apache</h3>
-      <pre><code>Redirect 302 /.well-known/lnurlp/two https://minibits.cash/.well-known/lnurlp/one</code></pre>
+      <pre><code>Redirect 302 /.well-known/lnurlp/two https://getalby.com/.well-known/lnurlp/yourname</code></pre>
       <p class="learn-caption">In a virtual host file, or a <code>.htaccess</code> where overrides are allowed. Reload Apache after the change.</p>
       <p>Two details in that configuration are not decoration:</p>
       <ul>
@@ -93,17 +97,53 @@
       </ul>
       <pre><code>add_header Access-Control-Allow-Origin "*";</code></pre>
 
-      <h2>Minibits as the wallet behind the address</h2>
-      <p>Minibits is an ecash wallet, and it hands out Lightning addresses of the form <code>name@minibits.cash</code>. Payments arrive over Lightning and land as ecash in the wallet, so the address is the front door rather than the wallet itself. What it serves for <code>one@minibits.cash</code>, fetched and read while writing this page:</p>
+      <h2>Three wallets, one shape</h2>
+      <p>The wallet only has to answer one URL. Alby, Wallet of Satoshi and Minibits all do, and the differences between them are small enough to list. Each of these was fetched and read while this page was written — the field names below are the ones you will see in your own file.</p>
+
+      <h3>Alby</h3>
+      <p>Addresses look like <code>name@getalby.com</code>, and the pay request sits at <code>https://getalby.com/.well-known/lnurlp/name</code>. The callback stays on the same domain, and the answer also carries <code>payerData</code> describing which sender details are welcome, so a client can ask for a name or an email before paying.</p>
       <dl class="learn-facts">
-        <div><dt>Endpoint</dt><dd><code>https://minibits.cash/.well-known/lnurlp/one</code></dd></div>
-        <div><dt>Range</dt><dd>1 sat to 1,000,000 sats per payment</dd></div>
-        <div><dt>Comments</dt><dd>Allowed up to 100 characters, so a sender can attach a note</dd></div>
-        <div><dt>Zaps</dt><dd><code>allowsNostr</code> is true and a <code>nostrPubkey</code> is published, so Nostr clients can pay it with a zap receipt</dd></div>
-        <div><dt>Callback</dt><dd>Absolute, on <code>minibits.cash</code> — which is why a saved copy of the JSON works</dd></div>
-        <div><dt>CORS</dt><dd><code>Access-Control-Allow-Origin: *</code> is sent, so browser clients can read it</dd></div>
+        <div><dt>Endpoint</dt><dd><code>https://getalby.com/.well-known/lnurlp/yourname</code></dd></div>
+        <div><dt>Range</dt><dd>1 sat to 10,000,000 sats, read from an account that accepts payments</dd></div>
+        <div><dt>Comments</dt><dd>Up to 255 characters</dd></div>
+        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
+        <div><dt>Callback</dt><dd><code>https://getalby.com/lnurlp/yourname/callback</code> — same domain, so a saved copy works</dd></div>
       </dl>
-      <p>So a complete setup on <code>example.com</code> is a single file at <code>.well-known/lnurlp/two</code> containing that JSON, or a single redirect line, and the address <code>two@example.com</code> pays into <code>one@minibits.cash</code>.</p>
+
+      <h3>Wallet of Satoshi</h3>
+      <p>Addresses look like <code>name@walletofsatoshi.com</code>, at <code>https://walletofsatoshi.com/.well-known/lnurlp/name</code>. There is one thing here worth understanding rather than copying blindly: the callback does not stay on <code>walletofsatoshi.com</code>. It points at <code>livingroomofsatoshi.com</code> with a long account identifier in the path — a different host, run by the same service.</p>
+      <p>That is legal and it works, and it is exactly why the copy method means <strong>copy the whole answer, never reconstruct it</strong>. Rebuild it from what you remember and you will write the wrong host, and the address will answer with a pay request that cannot produce an invoice.</p>
+      <dl class="learn-facts">
+        <div><dt>Endpoint</dt><dd><code>https://walletofsatoshi.com/.well-known/lnurlp/yourname</code></dd></div>
+        <div><dt>Range</dt><dd>1 sat to 100,000,000 sats per payment</dd></div>
+        <div><dt>Comments</dt><dd>Up to 255 characters</dd></div>
+        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
+        <div><dt>Callback</dt><dd>Absolute, on <code>livingroomofsatoshi.com</code> with a per-account id — copy it as it comes</dd></div>
+      </dl>
+
+      <h3>Minibits</h3>
+      <p>Addresses look like <code>name@minibits.cash</code>, at <code>https://minibits.cash/.well-known/lnurlp/name</code>. Minibits is an ecash wallet, so a payment arrives over Lightning and lands as ecash — the address is the front door, not the wallet. Its callback is the same path it was fetched from, which is the simplest case of the three.</p>
+      <dl class="learn-facts">
+        <div><dt>Endpoint</dt><dd><code>https://minibits.cash/.well-known/lnurlp/yourname</code></dd></div>
+        <div><dt>Range</dt><dd>1 sat to 1,000,000 sats per payment</dd></div>
+        <div><dt>Comments</dt><dd>Up to 100 characters</dd></div>
+        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
+        <div><dt>Callback</dt><dd>Same path on <code>minibits.cash</code>, so a saved copy works</dd></div>
+      </dl>
+
+      <p>Two cautions about those numbers. They belong to the account, not to the wallet: a different name on the same service can allow a different range, and an account that has not been set up to receive reports <code>maxSendable: 0</code>, which means nobody can pay it. Read the numbers from your own endpoint before quoting them to anyone. And all three answer with <code>Access-Control-Allow-Origin: *</code> when a browser asks, which is what lets a web client read them at all.</p>
+
+      <h3>The same redirect, once per wallet</h3>
+      <p>For Method 2, the only line that changes is the target. Use one of these; whichever wallet you pick, the address handed out stays <code>two@example.com</code>:</p>
+      <pre><code># Alby
+location /.well-known/lnurlp/two { return 302 https://getalby.com/.well-known/lnurlp/yourname; }
+
+# Wallet of Satoshi
+location /.well-known/lnurlp/two { return 302 https://walletofsatoshi.com/.well-known/lnurlp/yourname; }
+
+# Minibits
+location /.well-known/lnurlp/two { return 302 https://minibits.cash/.well-known/lnurlp/yourname; }</code></pre>
+      <p>With a file instead of a server, the same three sources are where you copy the JSON from — <code>https://getalby.com/.well-known/lnurlp/yourname</code>, <code>https://walletofsatoshi.com/.well-known/lnurlp/yourname</code>, or <code>https://minibits.cash/.well-known/lnurlp/yourname</code>. Save whichever your wallet served, whole and unedited, as <code>.well-known/lnurlp/two</code>.</p>
 
       <h2>Check it before you hand it out</h2>
       <ol class="learn-steps">
@@ -121,14 +161,14 @@
       <h2>What tends to break</h2>
       <ul>
         <li><strong>A saved copy is a snapshot.</strong> The file keeps whatever <code>callback</code> it had on the day you copied it. If the wallet reshapes its endpoint, the address stops asking for invoices and nobody can pay it. A redirect does not have this problem, and it is the reason Method 2 is the better default when you have a server.</li>
-        <li><strong>Not every provider's JSON can be copied.</strong> Copy the answer only if its <code>callback</code> is a full URL on the provider's own domain, as Minibits and Wallet of Satoshi do. Some providers generate the callback per request; then only a redirect works.</li>
+        <li><strong>Not every provider's JSON can be copied.</strong> Copy the answer only if its <code>callback</code> is a full URL, as all three wallets here serve. Watch for a callback that points at a per-request address, or one you cannot reach because the client would have to send something you do not have — then only a redirect works.</li>
         <li><strong>Plain HTTP does not count.</strong> Clients require HTTPS, so the certificate has to be right on the host answering <code>/.well-known/</code>, not just on the wallet's side.</li>
         <li><strong>Dot folders get dropped.</strong> Static generators and build steps that publish from a source folder routinely ignore <code>.well-known</code> unless told otherwise. Check the live URL, not the file in your editor.</li>
         <li><strong>The path must not be taken.</strong> <code>.well-known/lnurlp/two</code> is a path like any other; if your host answers it with a page instead of the file, wallets read HTML and fail.</li>
         <li><strong>Lowercase.</strong> Addresses are matched as written. <code>Two@example.com</code> and <code>two@example.com</code> ask for two different files on a case-sensitive host.</li>
       </ul>
 
-      <p class="learn-sources">Where this comes from: the address-to-URL rule is <a href="https://github.com/lnurl/luds/blob/luds/16.md" target="_blank" rel="noopener noreferrer">LUD-16</a>, and the shape of a pay request is <a href="https://github.com/lnurl/luds/blob/luds/06.md" target="_blank" rel="noopener noreferrer">LUD-06</a>. Wallets mentioned: <a href="https://minibits.cash/" target="_blank" rel="noopener noreferrer">Minibits</a>. The field values on this page were fetched from a live endpoint while writing it; if a wallet changes its answer, the method still holds and the numbers may not.</p>
+      <p class="learn-sources">Where this comes from: the address-to-URL rule is <a href="https://github.com/lnurl/luds/blob/luds/16.md" target="_blank" rel="noopener noreferrer">LUD-16</a>, and the shape of a pay request is <a href="https://github.com/lnurl/luds/blob/luds/06.md" target="_blank" rel="noopener noreferrer">LUD-06</a>. Wallets mentioned: <a href="https://getalby.com/" target="_blank" rel="noopener noreferrer">Alby</a>, <a href="https://walletofsatoshi.com/" target="_blank" rel="noopener noreferrer">Wallet of Satoshi</a> and <a href="https://minibits.cash/" target="_blank" rel="noopener noreferrer">Minibits</a>. The field values on this page were fetched from a live endpoint while writing it; if a wallet changes its answer, the method still holds and the numbers may not.</p>
 
     </div>
   </main>
