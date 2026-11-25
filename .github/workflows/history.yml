@@ -23,14 +23,14 @@ jobs:
     timeout-minutes: 45
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Release metadata needs the commit that last changed sw.js, which may be older
           # than the latest scheduled data refresh.
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - run: pip install -r tools/history/requirements.txt
@@ -79,7 +79,7 @@ jobs:
             git commit -m 'data: refresh site datasets'
             git push origin HEAD:${{ github.ref_name }}
           fi
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - name: Prepare static site
         run: |
           mkdir /tmp/satoshi-pages
@@ -90,8 +90,19 @@ jobs:
           test -n "$PWA_VERSION" && test -n "$PWA_COMMIT" && test -n "$PWA_UPDATED_AT"
           printf '{"version":"%s","commit":"%s","updatedAt":"%s"}\n' \
             "$PWA_VERSION" "$PWA_COMMIT" "$PWA_UPDATED_AT" > /tmp/satoshi-pages/pwa-release.json
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: /tmp/satoshi-pages
-      - uses: actions/deploy-pages@v4
+          # `.well-known/` is a dot directory, and it is where the site's NIP-05 document and every
+          # Lightning address alias live. v5 stopped including hidden files by default, so without this
+          # line a version bump would publish a site whose .well-known answers 404.
+          include-hidden-files: true
+      - uses: actions/deploy-pages@v5
         id: deployment
+      # GitHub's own answer to "Fetching artifact metadata failed" is to re-run the deployment later.
+      # One retry inside the run turns that flake into a release instead of a site that silently stays
+      # on last week's build. The artifact is already in the run, so the second call costs a few seconds.
+      - name: Retry Pages deployment once
+        id: deployment_retry
+        if: failure() && steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
