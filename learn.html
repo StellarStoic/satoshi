@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Short, practical guides to Bitcoin, Lightning and Nostr. Each one is a single page and ends with something you can check for yourself.">
+  <link rel="canonical" href="https://satoshi.si/learn.html">
+  <title>Learn: Bitcoin and Lightning guides | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/learn.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="learn-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main class="learn-main">
+    <header class="learn-heading">
+      <p>Knowledge</p>
+      <h1>Learn</h1>
+      <span>Guides that fit on one page. Each one explains a single thing, shows the commands, and ends with a check you can run yourself.</span>
+    </header>
+
+    <ul class="learn-topics">
+      <li class="learn-topic">
+        <a class="learn-topic-title" href="/learnLnaddress.html">Use your own domain for your Lightning address</a>
+        <p class="learn-topic-meta"><span class="learn-tag">Lightning</span> <span>Domain, wallet, no server required</span></p>
+        <p class="learn-topic-lede">A Lightning address looks like an email address, and it can sit on a domain you own while the money still arrives in whatever wallet you use. Two ways to build it: a file, or a redirect.</p>
+      </li>
+    </ul>
+
+    <p class="learn-note">New guides are added to this list as they are written. If one of them turns out to be wrong, or stops working because a wallet changed something, write to <a href="mailto:&#111;&#110;&#101;&#064;&#115;&#097;&#116;&#111;&#115;&#104;&#105;&#046;&#115;&#105;">one@satoshi.si</a> and it gets fixed.</p>
+  </main>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+    <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+</body>
+</html>

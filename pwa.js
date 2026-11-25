@@ -85,6 +85,7 @@ const MENU_ITEMS = [
     {label: 'Home', href: '/index.html'},
     {label: 'Wallet ₿', href: '/wallet.html'},
     {label: 'Knowledge', children: [
+        {label: 'Learn', href: '/learn.html'},
         {label: 'Bitcoin whitepaper', href: '/whitepaper.html'},
         {label: 'Self-custody', href: '/selfCustody.html'},
         {label: 'Words of Satoshi', href: '/quotes.html'},

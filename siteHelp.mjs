@@ -381,6 +381,14 @@ export const PAGE_HELP = Object.freeze({
         title: 'About Words of Satoshi',
         description: 'Read a rotating selection of Satoshi Nakamoto quotations. Select a quote to copy it, or use refresh to reveal another.'
     },
+    '/learn.html': {
+        title: 'About the guides',
+        description: 'Each guide covers one thing, shows the commands and the files involved, and ends with a check you can run. They assume a domain and a wallet, not a server.'
+    },
+    '/learnLnaddress.html': {
+        title: 'About this guide',
+        description: 'A Lightning address is a name that points at a pay request on your domain. Copy the wallet answer into a file, or redirect the path, then test it with curl and one small payment.'
+    },
     '/selfCustody.html': {
         title: 'About self-custody',
         description: 'Learn what Bitcoin self-custody really means and compare wallet, signing-device, backup, and node options for taking control of your keys.'

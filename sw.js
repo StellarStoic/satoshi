@@ -1,4 +1,4 @@
-const CACHE = 'satoshi-static-v551';   // v551: a new feed is switched on for existing readers
+const CACHE = 'satoshi-static-v552';   // v552: the Learn guides are added
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',
@@ -36,7 +36,8 @@ const CORE = [
     '/priceScanner.html', '/priceScanner.css', '/priceScanner.mjs',
     '/priceScannerOcr.mjs', '/priceScannerOcrWorker.mjs',
     '/priceScannerModel.mjs', '/priceScannerRates.mjs', '/priceScannerPhoto.mjs', '/priceScannerTracking.mjs', '/vendor/jsfeat/jsfeat-min.js', '/currencies.json',
-    '/vendor/lucide/lucide.min.js'
+    '/vendor/lucide/lucide.min.js',
+    '/learn.html', '/learn.css', '/learnLnaddress.html'
 ];
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
