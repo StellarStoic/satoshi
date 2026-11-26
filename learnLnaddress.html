@@ -75,14 +75,24 @@
 
       <h2 id="wallet-alby">Alby</h2>
       <p>Addresses look like <code>yourname@getalby.com</code>. The callback stays on the same domain as the address, which makes Alby the most straightforward of the four. Its answer also carries <code>payerData</code>, describing which sender details the account welcomes, so a client may ask for a name or an email before paying.</p>
-      <dl class="learn-facts">
-        <div><dt>Pay request</dt><dd><code>https://getalby.com/.well-known/lnurlp/yourname</code></dd></div>
-        <div><dt>Range</dt><dd>1 sat to 10,000,000 sats, read from an account that accepts payments</dd></div>
-        <div><dt>Comments</dt><dd>Up to 255 characters</dd></div>
-        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
-        <div><dt>Callback</dt><dd><code>https://getalby.com/lnurlp/yourname/callback</code> — same domain</dd></div>
-      </dl>
-      <p><strong>As a file.</strong> Open the pay request above in a browser, save the JSON as <code>two</code>, and place it as described in the common steps. Nothing needs editing: the callback inside already points at Alby.</p>
+      <pre class="learn-json"><code>{
+  "status": "OK",
+  "tag": "payRequest",
+  "commentAllowed": 255,
+  "callback": "https://getalby.com/lnurlp/yourname/callback",
+  "metadata": "[[\"text/identifier\",\"yourname@getalby.com\"],[\"text/plain\",\"Sats for yourname\"]]",
+  "minSendable": 1000,
+  "maxSendable": 10000000000,
+  "payerData": {
+    "name": { "mandatory": false },
+    "email": { "mandatory": false },
+    "pubkey": { "mandatory": false }
+  },
+  "nostrPubkey": "79f00d3f5a19ec806189fcab03c1be4ff81d18ee4f653c88fac41fe03570f432",
+  "allowsNostr": true
+}</code></pre>
+      <p class="learn-caption">Fetched from getalby.com while writing this, with the handle replaced by <code>yourname</code>. Amounts are millisatoshis: 1000 is 1 sat, 10000000000 is 10,000,000 sats. <code>payerData</code> is Alby asking which sender details are welcome before paying.</p>
+      <p><strong>As a file.</strong> Open <code>https://getalby.com/.well-known/lnurlp/yourname</code> in a browser, save the JSON as <code>two</code>, and place it as described in the common steps. Nothing needs editing: the callback inside already points at Alby.</p>
       <p><strong>As a redirect.</strong> Inside the <code>server</code> block for your domain:</p>
       <pre><code>location = /.well-known/lnurlp/two {
     return 302 https://getalby.com/.well-known/lnurlp/yourname;
@@ -94,14 +104,18 @@ sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 
       <h2 id="wallet-wos">Wallet of Satoshi</h2>
       <p>Addresses look like <code>yourname@walletofsatoshi.com</code>. One thing here is worth understanding rather than copying blindly: the callback does not stay on <code>walletofsatoshi.com</code>. It points at <code>livingroomofsatoshi.com</code> with a long account identifier in the path — a different host, run by the same service.</p>
-      <dl class="learn-facts">
-        <div><dt>Pay request</dt><dd><code>https://walletofsatoshi.com/.well-known/lnurlp/yourname</code></dd></div>
-        <div><dt>Range</dt><dd>1 sat to 100,000,000 sats per payment</dd></div>
-        <div><dt>Comments</dt><dd>Up to 255 characters</dd></div>
-        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
-        <div><dt>Callback</dt><dd><code>livingroomofsatoshi.com</code> with a per-account id</dd></div>
-      </dl>
-      <p><strong>As a file.</strong> Copy the answer whole. That is not politeness — rebuilding it from what you remember is how you write the wrong host, and an address whose callback points nowhere answers with a pay request that can never produce an invoice.</p>
+      <pre class="learn-json"><code>{
+  "callback": "https://livingroomofsatoshi.com/api/v1/lnurl/payreq/&lt;your-account-id&gt;",
+  "maxSendable": 100000000000,
+  "minSendable": 1000,
+  "metadata": "[[\"text/plain\",\"Wallet of Satoshi: yourname\"],[\"text/identifier\",\"yourname@walletofsatoshi.com\"]]",
+  "commentAllowed": 255,
+  "tag": "payRequest",
+  "allowsNostr": true,
+  "nostrPubkey": "be1d89794bf92de5dd64c1e60f6a2c70c140abac9932418fee30c5c637fe9479"
+}</code></pre>
+      <p class="learn-caption">Fetched from walletofsatoshi.com while writing this. Note the two hosts: the address is on <code>walletofsatoshi.com</code>, the callback is on <code>livingroomofsatoshi.com</code>, and the account id in it is one long value that you copy, never type. 100000000000 millisatoshis is 100,000,000 sats.</p>
+      <p><strong>As a file.</strong> Copy <code>https://walletofsatoshi.com/.well-known/lnurlp/yourname</code> whole. That is not politeness — rebuilding it from what you remember is how you write the wrong host, and an address whose callback points nowhere answers with a pay request that can never produce an invoice.</p>
       <p><strong>As a redirect.</strong> The same shape, a different target:</p>
       <pre><code>location = /.well-known/lnurlp/two {
     return 302 https://walletofsatoshi.com/.well-known/lnurlp/yourname;
@@ -112,14 +126,18 @@ sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 
       <h2 id="wallet-minibits">Minibits</h2>
       <p>Addresses look like <code>yourname@minibits.cash</code>. Minibits is an ecash wallet, so a payment arrives over Lightning and lands as ecash — the address is the front door, not the wallet. Its callback is the same path it was fetched from, the simplest case here.</p>
-      <dl class="learn-facts">
-        <div><dt>Pay request</dt><dd><code>https://minibits.cash/.well-known/lnurlp/yourname</code></dd></div>
-        <div><dt>Range</dt><dd>1 sat to 1,000,000 sats per payment</dd></div>
-        <div><dt>Comments</dt><dd>Up to 100 characters</dd></div>
-        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
-        <div><dt>Callback</dt><dd>The same path on <code>minibits.cash</code></dd></div>
-      </dl>
-      <p><strong>As a file.</strong> Save the JSON as <code>two</code>. The callback is on the same path, so a copy keeps working for as long as Minibits keeps its endpoint shape.</p>
+      <pre class="learn-json"><code>{
+  "callback": "https://minibits.cash/.well-known/lnurlp/yourname",
+  "minSendable": 1000,
+  "maxSendable": 1000000000,
+  "metadata": "[[\"text/plain\",\"Pay to yourname@minibits.cash with Lightning. Receiver will receive ecash into Minibits Wallet.\"],[\"text/identifier\",\"yourname@minibits.cash\"]]",
+  "commentAllowed": 100,
+  "allowsNostr": true,
+  "nostrPubkey": "beeb48407a6f087ea8f76dc384a5d88c67ced9bd9fb0cdba90930210df3d92e7",
+  "tag": "payRequest"
+}</code></pre>
+      <p class="learn-caption">Fetched from minibits.cash while writing this. The callback is the same path you fetched, and its own metadata says what the wallet is: the payment arrives as ecash.</p>
+      <p><strong>As a file.</strong> Save <code>https://minibits.cash/.well-known/lnurlp/yourname</code> as <code>two</code>. The callback is on the same path, so a copy keeps working for as long as Minibits keeps its endpoint shape.</p>
       <p><strong>As a redirect.</strong> The same shape again:</p>
       <pre><code>location = /.well-known/lnurlp/two {
     return 302 https://minibits.cash/.well-known/lnurlp/yourname;
@@ -130,17 +148,19 @@ sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code></pre>
 
       <h2 id="wallet-coinos">Coinos</h2>
       <p>Addresses look like <code>yourname@coinos.io</code>. Coinos is where the callback gets interesting: it moves to <strong>another host</strong> and it arrives <strong>with a query string already attached</strong>.</p>
-      <pre class="learn-json"><code>"callback": "https://names.coinos.io/lnurlp/yourname/cb?domain=coinos.io"</code></pre>
+      <pre class="learn-json"><code>{
+  "tag": "payRequest",
+  "callback": "https://names.coinos.io/lnurlp/yourname/cb?domain=coinos.io",
+  "minSendable": 1000,
+  "maxSendable": 500000000,
+  "metadata": "[[\"text/plain\",\"Paying yourname@coinos.io\"],[\"text/identifier\",\"yourname@coinos.io\"]]",
+  "commentAllowed": 200,
+  "allowsNostr": true,
+  "nostrPubkey": "e0c0ab7eb126bd4bd7168219c3dd195eb5ad92b7d7807ed2dda57f69c7c5d20d"
+}</code></pre>
+      <p class="learn-caption">Fetched from coinos.io while writing this. Two things to look at: the callback is on <code>names.coinos.io</code>, and it already carries <code>?domain=coinos.io</code>.</p>
       <p>That <code>?domain=</code> is the reason to read the callback instead of rebuilding it. A client that appends <code>?amount=…</code> to that address produces two question marks and a dead URL; the amount has to join with <code>&amp;amount=…</code>. Every wallet gets this right because it treats the callback as an address and adds a parameter; a person editing by hand does not.</p>
-      <dl class="learn-facts">
-        <div><dt>Pay request</dt><dd><code>https://coinos.io/.well-known/lnurlp/yourname</code></dd></div>
-        <div><dt>Range</dt><dd>1 sat to 500,000 sats per payment</dd></div>
-        <div><dt>Comments</dt><dd>Up to 200 characters</dd></div>
-        <div><dt>Zaps</dt><dd><code>allowsNostr</code> true with a <code>nostrPubkey</code></dd></div>
-        <div><dt>Callback</dt><dd><code>names.coinos.io</code>, carrying <code>?domain=coinos.io</code> already</dd></div>
-        <div><dt>Also on DNS</dt><dd>publishes a <code>_bitcoin-payment</code> record, so the DNS route below works for it</dd></div>
-      </dl>
-      <p><strong>As a file.</strong> Save the answer exactly as it comes. If you edit the callback to add an amount while copying, you have broken it.</p>
+      <p><strong>As a file.</strong> Save <code>https://coinos.io/.well-known/lnurlp/yourname</code> exactly as it comes. If you edit the callback to add an amount while copying, you have broken it.</p>
       <p><strong>As a redirect.</strong> The target is Coinos' own pay request, not the callback — the amount is added later, by the paying wallet:</p>
       <pre><code>location = /.well-known/lnurlp/two {
     return 302 https://coinos.io/.well-known/lnurlp/yourname;
@@ -170,7 +190,7 @@ dig +short TXT   two._bitcoin-payment.example.com</code></pre>
         <li><strong>A redirect</strong> cannot go stale, because every request asks the wallet itself. Prefer it whenever you have a server.</li>
         <li><strong>A DNS record</strong> needs no server and no file, but the fewest wallets read it, and it only exists where the wallet publishes such a record at all.</li>
       </ul>
-      <p>One caution about every number quoted above: it belongs to the <em>account</em>, not to the wallet. A different name on the same service can allow a different range, and an account that has not been set up to receive reports <code>maxSendable: 0</code>, which means nobody can pay it. Read the range from your own endpoint before quoting it to anyone.</p>
+      <p>One caution about every value in the JSON above: it belongs to the <em>account</em>, not to the wallet. A different name on the same service can allow a different range, and an account that has not been set up to receive reports <code>maxSendable: 0</code>, which means nobody can pay it. Read your own endpoint before quoting a number to anyone.</p>
 
       <h2>Before you hand the address out</h2>
       <ol class="learn-steps">
