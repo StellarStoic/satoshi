@@ -8,7 +8,7 @@ const pages = {
   '/opreturnBoard.html': ['OP_RETURN read: messages written into Bitcoin | Satoshi.si', 'A filtered stream of readable OP_RETURN messages found on the Bitcoin blockchain, newest first.'],
   '/whitepaper.html': ['Bitcoin Whitepaper Translations | Satoshi.si', 'Read the original Bitcoin whitepaper and browse translations of Satoshi Nakamoto\'s peer-to-peer electronic cash proposal.'],
   '/learn.html': ['Learn: Bitcoin and Lightning guides | Satoshi.si', 'Short practical guides to Bitcoin, Lightning and Nostr, each on one page and each ending with a check you can run yourself.'],
-  '/learnLnaddress.html': ['Your own domain for your Lightning address | Satoshi.si', 'Put a Lightning address on a domain you own with either a file on a static host or a redirect on your web server, while payments land in your wallet.'],
+  '/learnLnaddress.html': ['Your own domain for your Lightning address | Satoshi.si', 'Put a Lightning address on a domain you own with a file, a server redirect or a BIP 353 DNS record, while payments still land in the wallet you already use.'],
   '/selfCustody.html': ['Bitcoin Wallets and Self-Custody Guide | Satoshi.si', 'Compare Bitcoin wallets, signing devices and nodes while learning how self-custody protects your keys and bitcoin.'],
   '/wallet.html': ['Ark Bitcoin Wallet | Satoshi.si', 'An experimental self-custodial Bitcoin wallet using the Ark Layer 2 protocol, built with Second\'s Bark Web SDK for Signet and mainnet.'],
   '/bitcoinTxCost.html': ['Bitcoin and Ark Transaction Cost | Satoshi.si', 'Estimate transaction costs between Ark, Lightning, Legacy, nested SegWit, native SegWit, and Taproot using current fees and Second\'s pricing.'],
