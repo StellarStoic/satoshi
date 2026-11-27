@@ -129,6 +129,7 @@ const MENU_ITEMS = [
         {label: 'OP_RETURN write', href: '/opreturn.html'},
         {label: 'OP_RETURN read', href: '/opreturnBoard.html'},
         {label: 'GhostQR', href: '/ghostQR.html'},
+        {label: 'Check LN', href: '/checkLn.html'},
     ]},
     {label: 'News', href: '/news.html'},
     {label: 'Settings', href: '/settings.html'},

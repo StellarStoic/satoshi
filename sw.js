@@ -1,8 +1,9 @@
-const CACHE = 'satoshi-static-v556';   // v556: the guide shows each wallet's pay request as JSON
+const CACHE = 'satoshi-static-v557';   // v557: Check LN, one field for invoices, lnurls and addresses
 const CACHE_METADATA_URL = '/__satoshi_pwa_metadata__';
 const CORE = [
     '/', '/offline.html', '/styles.css', '/theme.css', '/themeBootstrap.js', '/pwa.js', '/paymentService.mjs', '/siteHelp.css', '/siteHelp.mjs', '/seo.mjs', '/siteFooter.mjs', '/analytics.css', '/analytics.mjs', '/satoshiChat.css', '/satoshiChat.mjs', '/satoshiContext.mjs', '/AI_CONTEXT.md', '/nip05store.html', '/nip05store.mjs', '/copyonclick.js', '/powMining.mjs', '/powWorker.mjs', '/img/btc-map-pin.png',
     '/pollinationsAuth.mjs', '/ai-callback.html', '/aiCallback.css', '/aiCallback.mjs',
+    '/checkLn.html', '/checkLn.css', '/checkLn.mjs', '/lightningCheckModel.mjs',
     '/settings.html', '/settings.css', '/settings.js', '/nostrKeys.html', '/nostrKeysGpu.mjs', '/vendor/nostr-key-miner/nostr_vanity.wgsl', '/vendor/nostr-key-miner/LICENSE',
     '/selfCustody.html', '/selfCustody.css', '/selfCustody.js',
     '/barkTxCost.html', '/barkTxCostModel.mjs', '/bark-pricing.json',

@@ -27,6 +27,7 @@ const pages = {
   '/btcMap.html': ['BTC Map: Find Places That Accept Bitcoin | Satoshi.si', 'Explore shops, cafes, services, communities, and upcoming events using public BTC Map data and an open-source map.'],
   '/21fm.html': ['21FM | Bitcoin Block Music Generator | Satoshi.si', 'Listen to 21FM: diverse generative music shaped by live Bitcoin blocks, fees, transactions, and mempool activity.'],
   '/stego.html': ['Steganography and Cipher Tools | Satoshi.si', 'Hide and recover encrypted messages in text or files, inspect Nostr events for concealed content, and explore reversible text ciphers entirely in your browser.'],
+  '/checkLn.html': ['Lightning invoice and LNURL check | Satoshi.si', 'Paste a Lightning invoice, an LNURL or a Lightning address and read what it actually says: amount, expiry, payment hash, pay request fields, and what is wrong with it.'],
   '/nip05.html': ['NIP-05 Nostr Identifier | Satoshi.si', 'Learn how NIP-05 gives a Nostr public key a human-readable identifier and explore names available on the satoshi.si domain.'],
   '/nip05store.html': ['NIP-05 Name Store | Satoshi.si', 'Claim a NIP-05 name like yourname@satoshi.si. Pay in sats over Lightning, on-chain or Ark, and use the same key to publish to the satoshi.si nostr relay.'],
   '/nostrKeys.html': ['Nostr Keys: Convert, Generate and Mine | Satoshi.si', 'Convert, generate and mine Nostr npub and nsec keys locally in your browser, with a downloadable offline HTML copy and configurable CPU mining.'],

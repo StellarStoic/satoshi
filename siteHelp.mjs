@@ -66,6 +66,10 @@ export const PAGE_HELP = Object.freeze({
         title: 'About Bitcoin and Nostr News',
         description: 'Browse Bitcoin and Nostr stories gathered from selected public feeds. Search the stream, filter sources and keywords, or add your own RSS and Nostr sources locally.'
     },
+    '/checkLn.html': {
+        title: 'About Check LN',
+        description: 'Paste an invoice, an LNURL or a Lightning address: an invoice is decoded in your browser down to its payment hash and expiry, and an address is read from its own endpoint with the answer shown as it arrives.'
+    },
     '/nip05.html': {
         title: 'About NIP-05',
         description: 'Learn about readable Nostr identifiers and the available satoshi.si NIP-05 names that can point to your Nostr public key.'

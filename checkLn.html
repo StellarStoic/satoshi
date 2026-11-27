@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101112">
+  <meta name="description" content="Paste a Lightning invoice, an LNURL or a Lightning address and read what it actually says: amount, expiry, payment hash, pay request fields, and what is wrong with it.">
+  <link rel="canonical" href="https://satoshi.si/checkLn.html">
+  <title>Lightning invoice and LNURL check | Satoshi.si</title>
+  <link rel="icon" href="/favicon-32x32.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link href="/vendor/lineicons/lineicons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/siteEffects.css">
+  <link rel="stylesheet" href="/checkLn.css">
+  <script src="/pwa.js" defer></script>
+  <script src="/siteEffects.js" defer></script>
+</head>
+<body class="check-ln-page">
+  <a href="#menu" id="toggle" aria-label="Navigation"><span></span></a>
+  <nav id="menu" aria-label="Main navigation"><ul></ul></nav>
+
+  <main class="ln-main">
+    <header class="ln-heading">
+      <p>Lightning checker</p>
+      <h1>Check LN</h1>
+      <span>One field takes a BOLT11 invoice, an lnurl, or a Lightning address. An invoice is decoded here
+        and never sent anywhere; an address or an lnurl is read from its own endpoint, and the answer is
+        shown exactly as it arrives.</span>
+    </header>
+
+    <section aria-label="Check a Lightning string">
+      <div class="ln-field">
+        <i class="lni lni-bolt-2 ln-field__bolt" aria-hidden="true"></i>
+        <label for="ln-input" class="sr-only">Lightning invoice, lnurl or Lightning address</label>
+        <input id="ln-input" type="text" spellcheck="false" autocomplete="off" autocapitalize="off"
+               placeholder="lnbc… / lnurl1… / name@domain" aria-describedby="ln-status">
+        <button id="ln-check" class="ln-button" type="button">Check</button>
+        <button id="ln-clear" class="ln-button ln-button--ghost" type="button">Clear</button>
+      </div>
+      <p id="ln-status" class="ln-status" role="status" aria-live="polite"></p>
+      <div id="ln-output"></div>
+    </section>
+  </main>
+
+  <footer class="footer" data-live-footer>
+    <a href="mailto:one@satoshi.si">one@satoshi.si</a>
+    <span id="block-height" role="button" tabindex="0" aria-label="Open recent Bitcoin block details"></span>
+    <span id="fee-rate" role="button" tabindex="0" aria-label="Open current Bitcoin fee estimates"></span>
+    <i class="lni lni-bolt-2" role="button" tabindex="0" aria-label="Support satoshi.si"></i>
+  </footer>
+
+  <script src="/burgerMenu.js"></script>
+  <script type="module" src="/checkLn.mjs"></script>
+</body>
+</html>
