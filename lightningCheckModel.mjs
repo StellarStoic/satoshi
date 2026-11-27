@@ -353,6 +353,33 @@ export function describeOtherLnurl(payload) {
     };
 }
 
+/**
+ * Everything on the screen, as one block of text.
+ *
+ * Debugging an address happens in a chat window: the reader needs the status, the errors and the endpoint's
+ * own answer pasted somewhere in one go. So this is built from what is rendered rather than from a
+ * remembered model — the text says what the screen says, including a failure that arrived after the first
+ * render (a callback that refused, an invoice that did not match).
+ */
+export function formatReport({input, status, when, url, blocks}) {
+    const lines = ['Check LN — satoshi.si/checkLn.html'];
+    if (when) lines.push(`When: ${when}`);
+    if (url) lines.push(`Page: ${url}`);
+    if (input) lines.push(`Input: ${input}`);
+    lines.push(`Status: ${status || '(nothing checked yet)'}`);
+    for (const block of blocks || []) {
+        const title = String(block.title || '').trim();
+        const rows = (block.lines || []).filter(line => String(line || '').trim());
+        const code = String(block.code || '').trim();
+        if (!title && !rows.length && !code) continue;
+        lines.push('');
+        if (title) lines.push(`## ${title}`);
+        lines.push(...rows);
+        if (code) lines.push('', code);
+    }
+    return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
+}
+
 /** Which reader a `tag` calls for. */
 export function describeLnurl(payload, url, now = Date.now()) {
     const tag = payload && payload.tag;

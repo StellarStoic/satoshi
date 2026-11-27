@@ -11,6 +11,7 @@ import {
     describeLnurl,
     detectKind,
     formatAmount,
+    formatReport,
     lnurlTarget,
 } from './lightningCheckModel.mjs';
 
@@ -192,8 +193,8 @@ async function showLnurl(target) {
         ['Source', target.source],
         ['Tag', payload.tag],
         ['Callback', described.callback],
-        ['Minimum', described.minSats === null ? '' : `${described.minSats} sats (${described.minSendable} msat)`],
-        ['Maximum', described.maxSats === null ? '' : `${described.maxSats} sats (${described.maxSendable} msat)`],
+        ['Minimum', described.minSats === null ? '' : `${formatAmount(described.minSendable)} (${described.minSendable} msat)`],
+        ['Maximum', described.maxSats === null ? '' : `${formatAmount(described.maxSendable)} (${described.maxSendable} msat)`],
         ['Comment allowed', described.commentAllowed ? `${described.commentAllowed} characters` : 'no'],
         ['Description', described.description],
         ['Image', described.hasImage ? 'present in metadata' : ''],
@@ -279,6 +280,102 @@ async function invoiceButton(payload) {
     return box;
 }
 
+/* ------------------------------------------------------------------ copying the screen ---------------- */
+
+/**
+ * Read the output area back into blocks.
+ *
+ * Deliberately from the DOM and not from `state`: a callback that refused after the first render, or an
+ * invoice that arrived later and did not match, is text on the screen, and the copy has to contain it.
+ */
+function readBlocks() {
+    const target = out();
+    if (!target) return [];
+    const blocks = [];
+    for (const node of target.children) {
+        if (!node.classList || !node.classList.contains('ln-block')) continue;
+        const lines = [];
+        const rows = node.querySelector('.ln-rows');
+        if (rows) {
+            const cells = [...rows.children];
+            for (let i = 0; i + 1 < cells.length; i += 2) {
+                lines.push(`${cells[i].textContent}: ${cells[i + 1].textContent}`);
+            }
+        }
+        for (const item of node.querySelectorAll('.ln-problems__item')) {
+            const level = item.querySelector('.ln-problems__level');
+            const text = item.querySelector('.ln-problems__text');
+            if (text) lines.push(`[${level ? level.textContent : 'note'}] ${text.textContent}`);
+        }
+        blocks.push({
+            title: node.querySelector('.ln-block__title')?.textContent || '',
+            lines,
+            code: node.querySelector('.ln-code')?.textContent || '',
+        });
+    }
+    return blocks;
+}
+
+function currentReport() {
+    const status = document.getElementById('ln-status');
+    return formatReport({
+        input: (input()?.value || '').trim(),
+        status: status ? status.textContent.trim() : '',
+        when: new Date().toISOString(),
+        url: location.href,
+        blocks: readBlocks(),
+    });
+}
+
+/** Clipboard first, and a visible box to copy from by hand when the browser refuses. */
+async function copyText(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch {
+        try {
+            const helper = el('textarea', 'ln-copy-helper');
+            helper.value = text;
+            helper.setAttribute('readonly', 'readonly');
+            document.body.appendChild(helper);
+            helper.select();
+            const ok = document.execCommand && document.execCommand('copy');
+            helper.remove();
+            return Boolean(ok);
+        } catch {
+            return false;
+        }
+    }
+}
+
+async function copyStatus() {
+    const button = document.getElementById('ln-copy');
+    const text = currentReport();
+    const ok = await copyText(text);
+    if (ok) {
+        if (button) {
+            const original = button.dataset.label || button.textContent;
+            button.dataset.label = original;
+            button.textContent = 'Copied';
+            clearTimeout(copyStatus.timer);
+            copyStatus.timer = setTimeout(() => {
+                button.textContent = button.dataset.label || 'Copy status';
+            }, 1600);
+        }
+        const note = document.getElementById('ln-copy-note');
+        if (note) note.remove();
+        return;
+    }
+    // never leave the reader with nothing: show the text so it can be selected
+    const box = section('Copy this by hand (the browser refused the clipboard)', 'ln-block--manual');
+    const pre = el('pre', 'ln-code');
+    pre.textContent = text;
+    box.appendChild(pre);
+    box.id = 'ln-copy-note';
+    box.scrollIntoView({block: 'nearest'});
+    out()?.appendChild(box);
+}
+
 /* ------------------------------------------------------------------ entry point ----------------------- */
 
 async function check() {
@@ -336,6 +433,7 @@ function wire() {
             check();
         }
     });
+    document.getElementById('ln-copy')?.addEventListener('click', copyStatus);
     document.getElementById('ln-clear')?.addEventListener('click', () => {
         field.value = '';
         clearOutput();

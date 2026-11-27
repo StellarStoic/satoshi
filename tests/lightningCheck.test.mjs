@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 import {
     bech32Decode,
+    formatReport,
     convertBits,
     decodeInvoice,
     describeLnurl,
@@ -153,6 +154,34 @@ test('amounts are printed the way a reader counts them', () => {
     assert.equal(formatAmount(1000), '1 sat');
     assert.equal(formatAmount(1500), '1500 msat (1.5 sats)');
     assert.equal(formatAmount(null), 'any amount');
+});
+
+test('the copy report carries the status, the errors and the raw answer', () => {
+    const report = formatReport({
+        input: 'one@example.com',
+        status: 'Could not read the endpoint: Failed to fetch',
+        when: '2026-11-26T20:00:00.000Z',
+        url: 'https://satoshi.si/checkLn.html',
+        blocks: [
+            {title: 'The request', lines: ['Asked for: https://example.com/.well-known/lnurlp/one', 'HTTP status: no answer']},
+            {title: 'What is wrong', lines: ['[error] this invoice has expired and cannot be paid']},
+            {title: 'The answer, exactly as it came', lines: [], code: '{"status":"ERROR","reason":"no"}'},
+            {title: '', lines: [], code: ''},
+        ],
+    });
+    assert.match(report, /^Check LN — satoshi\.si\/checkLn\.html/);
+    assert.match(report, /Input: one@example\.com/);
+    assert.match(report, /Status: Could not read the endpoint/);
+    assert.match(report, /## The request/);
+    assert.match(report, /\[error\] this invoice has expired/);
+    assert.match(report, /\{"status":"ERROR","reason":"no"\}/);
+    // an empty block leaves no heading behind, and the report ends with exactly one newline
+    assert.equal(report.includes('## \n'), false);
+    assert.equal(report.endsWith('\n'), true);
+    assert.equal(report.endsWith('\n\n'), false);
+    // nothing checked yet is still a copyable state
+    const empty = formatReport({});
+    assert.match(empty, /Status: \(nothing checked yet\)/);
 });
 
 test('bit conversion refuses an incomplete group instead of padding it', () => {
